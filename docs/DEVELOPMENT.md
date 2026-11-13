@@ -1,5 +1,17 @@
 # 개발 시작하기
 
+## 커밋 메시지
+
+커밋 제목과 본문은 영어로 작성합니다. 문서와 팀 대화는 기존처럼 한국어를 사용할 수 있습니다.
+변경한 내용과 목적을 짧고 구체적으로 적습니다.
+
+```text
+feat: add procurement order validation
+fix: preserve inventory when loading a game
+docs: clarify local development setup
+chore: configure the monorepo development environment
+```
+
 ## 준비
 
 - Node.js: `.nvmrc`에 적힌 버전. nvm 사용자는 `nvm install` 후 `nvm use`를 실행합니다.

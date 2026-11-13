@@ -1,5 +1,6 @@
 # DYNOSTY 개발 기준
 
+- 커밋 메시지의 제목과 본문은 영어로 작성한다. 코드·문서·대화의 언어는 이 규칙으로 바꾸지 않는다.
 - 런타임은 `.nvmrc`, 패키지 매니저는 `package.json`의 `packageManager`를 따른다.
 - `apps/web`은 화면·입력·Worker 연결, `apps/api`는 HTTP·DB 접근을 담당한다.
 - `packages/game-core`는 React·Babylon.js·DB·브라우저 전역 객체에 의존하지 않는 계산 코드다.
