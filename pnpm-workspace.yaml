@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+
+minimumReleaseAgeExclude:
+  - "@babylonjs/core@9.36.0"
+  - "@babylonjs/loaders@9.36.0"
+saveExact: true
+strictPeerDependencies: true
+engineStrict: true
+
+allowBuilds:
+  esbuild: true
+minimumReleaseAgeStrict: true

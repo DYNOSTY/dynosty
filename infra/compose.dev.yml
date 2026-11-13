@@ -1,0 +1,22 @@
+name: dynosty-dev
+
+services:
+  postgres:
+    image: postgres:18.7-alpine@sha256:75dcac3dfb1cd01ca3536910bbc84128759362f8b118bf8c55b38a94f68f3b73
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?pnpm setup을 먼저 실행하세요}
+      POSTGRES_DB: ${POSTGRES_DB:?pnpm setup을 먼저 실행하세요}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?pnpm setup을 먼저 실행하세요}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+
+volumes:
+  postgres-data:
