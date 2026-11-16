@@ -1,3 +1,4 @@
+import "@babylonjs/core/Culling/ray";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
@@ -8,13 +9,18 @@ import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import { Scene } from "@babylonjs/core/scene";
 import type { SceneSnapshot } from "@dynosty/game-core";
 import { createSceneEntities } from "./scene-entities.js";
+import { observeSceneClicks } from "./scene-input.js";
 
 export interface SceneController {
   update(snapshot: SceneSnapshot): void;
+  select(id: string | null): void;
   dispose(): void;
 }
 
-export function mountScene(canvas: HTMLCanvasElement): SceneController {
+export function mountScene(
+  canvas: HTMLCanvasElement,
+  onSelectionChange: (id: string | null) => void,
+): SceneController {
   const engine = new Engine(canvas, true);
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.08, 0.14, 0.12, 1);
@@ -34,14 +40,19 @@ export function mountScene(canvas: HTMLCanvasElement): SceneController {
   const groundMaterial = new StandardMaterial("ground-material", scene);
   groundMaterial.diffuseColor = new Color3(0.28, 0.43, 0.28);
   ground.material = groundMaterial;
-  const entities = createSceneEntities(scene);
+  const entities = createSceneEntities(scene, onSelectionChange);
+  const stopPicking = observeSceneClicks(canvas, (x, y) => {
+    entities.selectMesh(scene.pick(x, y)?.pickedMesh ?? null);
+  });
   const observer = new ResizeObserver(() => engine.resize());
   observer.observe(canvas);
   engine.runRenderLoop(() => scene.render());
   return {
     update: entities.update,
+    select: entities.select,
     dispose() {
       observer.disconnect();
+      stopPicking();
       entities.dispose();
       scene.dispose();
       engine.dispose();

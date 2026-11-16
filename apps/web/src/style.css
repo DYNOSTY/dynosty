@@ -306,3 +306,48 @@ h1 {
     padding: 0.8rem;
   }
 }
+
+.selection-actions {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0 1.25rem 1rem;
+}
+.selection-actions button {
+  padding: 0.5rem 0.8rem;
+  font-size: 0.8rem;
+}
+.selection-actions button[aria-pressed="true"] {
+  border-color: #4de6ff;
+  background: #214849;
+}
+.selection-info {
+  border-color: #4de6ff;
+}
+.selection-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.selection-badge {
+  margin-left: 0.5rem;
+  color: #83eaff;
+  font-size: 0.75rem;
+}
+.selection-facts {
+  margin: 0;
+}
+.selection-facts div {
+  padding: 0.85rem 0;
+  border-top: 1px solid #344b3f;
+}
+.selection-facts dt {
+  color: #bdd0bf;
+  font-size: 0.8rem;
+}
+.selection-facts dd {
+  margin: 0.4rem 0 0;
+  overflow-wrap: anywhere;
+}

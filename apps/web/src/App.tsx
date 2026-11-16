@@ -13,6 +13,7 @@ import {
 } from "./local-save.js";
 import { MediaPanel } from "./MediaPanel.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
+import { SelectionPanel } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import type { SceneController } from "./scene.js";
 import { VideoPanel } from "./VideoPanel.js";
@@ -20,6 +21,7 @@ import { WorkspacePanel } from "./WorkspacePanel.js";
 
 export function App() {
   const [saveOpen, setSaveOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const savePanelId = useId();
   const toolsPanelId = useId();
@@ -110,7 +112,7 @@ export function App() {
     void import("./scene.js")
       .then(({ mountScene }) => {
         if (cancelled) return;
-        sceneRef.current = mountScene(canvas);
+        sceneRef.current = mountScene(canvas, setSelectedId);
         setSceneStatus("준비 완료");
       })
       .catch(() => {
@@ -176,6 +178,17 @@ export function App() {
     (entity) => entity.kind === "resident",
   );
 
+  const selectedEntity =
+    appliedSnapshot?.entities.find(
+      (entity) => entity.id === selectedId && entity.visible,
+    ) ?? null;
+  const hasPanels = saveOpen || toolsOpen || selectedEntity !== null;
+
+  function clearSelection() {
+    sceneRef.current?.select(null);
+    canvasRef.current?.focus();
+  }
+
   return (
     <main className="play-shell">
       <header className="play-header">
@@ -217,9 +230,7 @@ export function App() {
         <span data-testid="play-scene-status">3D {sceneStatus}</span>
       </div>
       {workerError ? <p role="alert">{workerError}</p> : null}
-      <div
-        className={`play-workspace${saveOpen || toolsOpen ? " has-tools" : ""}`}
-      >
+      <div className={`play-workspace${hasPanels ? " has-tools" : ""}`}>
         <section aria-label="3D 개발 장면" className="play-scene">
           <div className="scene-heading">
             <h2>3D 장면</h2>
@@ -231,16 +242,34 @@ export function App() {
             tabIndex={0}
           />
           <div className="scene-footer">
-            <p>마우스로 회전 · 휠로 확대</p>
+            <p>클릭으로 선택 · 마우스로 회전 · 휠로 확대</p>
             <span>예제 장면</span>
           </div>
+          <fieldset className="selection-actions" aria-label="예제 대상 선택">
+            {appliedSnapshot?.entities
+              .filter((entity) => entity.visible)
+              .map((entity) => (
+                <button
+                  key={entity.id}
+                  type="button"
+                  className="quiet-button"
+                  aria-pressed={entity.id === selectedId}
+                  onClick={() => sceneRef.current?.select(entity.id)}
+                >
+                  {entity.kind === "building"
+                    ? "건물 예제 선택"
+                    : "주민 예제 선택"}
+                </button>
+              ))}
+          </fieldset>
         </section>
 
         <aside
           className="workspace-tools"
           aria-label="작업 메뉴"
-          hidden={!saveOpen && !toolsOpen}
+          hidden={!hasPanels}
         >
+          <SelectionPanel entity={selectedEntity} onClear={clearSelection} />
           <WorkspacePanel
             id={savePanelId}
             title="저장"
