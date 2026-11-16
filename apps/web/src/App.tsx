@@ -12,6 +12,7 @@ import {
   saveLocalExample,
 } from "./local-save.js";
 import { MediaPanel } from "./MediaPanel.js";
+import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import type { SceneController } from "./scene.js";
 import { VideoPanel } from "./VideoPanel.js";
@@ -248,6 +249,7 @@ export function App() {
         </p>
         {saveError ? <p role="alert">{saveError}</p> : null}
       </section>
+      <SaveFilePanel />
       <MediaPanel />
       <VideoPanel />
       <section aria-label="3D 개발 장면">
