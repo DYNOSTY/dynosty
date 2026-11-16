@@ -11,6 +11,7 @@ import {
   type SaveSlot,
   saveLocalExample,
 } from "./local-save.js";
+import { MediaPanel } from "./MediaPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import type { SceneController } from "./scene.js";
 
@@ -246,6 +247,7 @@ export function App() {
         </p>
         {saveError ? <p role="alert">{saveError}</p> : null}
       </section>
+      <MediaPanel />
       <section aria-label="3D 개발 장면">
         <canvas
           ref={canvasRef}

@@ -23,6 +23,8 @@ Web ── HTTP ──→ API ── SQL ──→ PostgreSQL
 
 음량과 음소거는 게임 저장과 분리된 Web 설정입니다. [설정 메뉴와 음량](SETTINGS.md)에 로컬 저장, 공용 오디오 출력과 검증 범위를 설명합니다.
 
+BGM·음성의 수동 재생은 같은 AudioProvider와 공용 출력을 사용합니다. 파일 수명과 채널별 정지·재생 경계는 [수동 BGM·음성 재생](MEDIA_AUDIO.md)에 정리합니다. Core와 API는 파일 선택이나 재생 조건에 관여하지 않습니다.
+
 Core의 패키지 이름은 `@dynosty/game-core`입니다. Web과 API는 워크스페이스 안에서 이 패키지를 사용합니다.
 
 3D 표시 정보도 Core에서 일반 값으로 정의합니다. Worker가 표시 목록을 보내면 Web이 Babylon 객체에 적용합니다. [3D 전달 규격과 예제](SCENE_PROTOCOL.md)에 좌표·식별값·표시 상태와 담당 경계를 설명합니다. 표시 예제는 게임 저장 상태와 별개이며 주민·경제 규칙을 포함하지 않습니다.
