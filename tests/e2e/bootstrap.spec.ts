@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openWorkspace } from "./workspace.js";
 
 test("웹 프록시를 통해 실제 PostgreSQL 연결을 확인한다", async ({
   request,
@@ -15,6 +16,7 @@ test("브라우저에서 API·Worker·3D 연결을 확인한다", async ({ page 
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await openWorkspace(page);
   await expect(page.getByRole("heading", { name: "DYNOSTY" })).toBeVisible();
   await expect(page.getByRole("status")).toHaveText("연결 완료");
   await expect(page.getByText("준비 완료", { exact: true })).toBeVisible();
@@ -33,6 +35,7 @@ test("Worker의 표시 정보가 3D 객체 갱신까지 전달된다", async ({ 
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await openWorkspace(page);
   const motion = page.getByTestId("scene-example-motion");
   await expect(motion).toHaveText("대기 표시");
   const canvas = page.locator("canvas");
@@ -47,6 +50,7 @@ test("Worker의 표시 정보가 3D 객체 갱신까지 전달된다", async ({ 
   await page.getByRole("button", { name: "3D 연결 예제 바꾸기" }).click();
   await expect(motion).toHaveText("대기 표시");
   await page.reload();
+  await openWorkspace(page);
   await expect(motion).toHaveText("대기 표시");
   expect(errors).toEqual([]);
 });

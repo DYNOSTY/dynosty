@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
+import { openWorkspace } from "./workspace.js";
 
 const key = "dynosty.example.saves";
 const fileValue = {
@@ -11,6 +12,7 @@ const fileValue = {
 
 async function seed(page: Page) {
   await page.goto("/");
+  await openWorkspace(page);
   await page.getByRole("button", { name: "하루 진행" }).click();
   await page.getByRole("button", { name: "3D 연결 예제 바꾸기" }).click();
   await page.getByRole("button", { name: "예제 저장", exact: true }).click();

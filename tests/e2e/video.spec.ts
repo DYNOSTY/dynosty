@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { openWorkspace } from "./workspace.js";
 
 const videoPath = fileURLToPath(
   new URL("./fixtures/test-video.webm", import.meta.url),
@@ -55,6 +56,7 @@ test("영상 수동 재생·정지·자연 종료에 저장된 음량·음소거
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await openWorkspace(page);
   await page.evaluate(() => {
     localStorage.setItem(
       "dynosty.settings",
@@ -63,6 +65,7 @@ test("영상 수동 재생·정지·자연 종료에 저장된 음량·음소거
     localStorage.setItem("dynosty.example.saves", "keep game save");
   });
   await page.reload();
+  await openWorkspace(page);
   await page.getByLabel("영상 파일", { exact: true }).setInputFiles(videoPath);
   expect(
     await page.evaluate(
@@ -123,6 +126,7 @@ test("영상 정지·파일 교체가 BGM을 멈추지 않고 이전 파일 참�
   page,
 }) => {
   await page.goto("/");
+  await openWorkspace(page);
   await page.getByLabel("BGM 파일", { exact: true }).setInputFiles(audioPath);
   await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
@@ -163,6 +167,7 @@ test("영상 정지·파일 교체가 BGM을 멈추지 않고 이전 파일 참�
     ),
   ).toBe(2);
   await page.reload();
+  await openWorkspace(page);
   await expect(
     page.getByRole("button", { name: "영상 재생", exact: true }),
   ).toBeDisabled();
@@ -178,6 +183,7 @@ test("잘못된 영상과 재생 거부를 안내하고 올바른 파일로 복�
   page,
 }) => {
   await page.goto("/");
+  await openWorkspace(page);
   const input = page.getByLabel("영상 파일", { exact: true });
   const play = page.getByRole("button", { name: "영상 재생", exact: true });
   await input.setInputFiles(videoPath);

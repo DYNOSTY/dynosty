@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
+import { openWorkspace } from "./workspace.js";
 
 const key = "dynosty.audio.catalog";
 const shortWave = readFileSync(
@@ -83,6 +84,7 @@ test("이름 변경은 재생을 유지하고 여러 음원의 연결을 전환�
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
+  await openWorkspace(page);
   await register(page, "BGM", "아침", "morning.wav");
   const morningId = await page.getByLabel("BGM 음원 목록").inputValue();
   await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
@@ -108,6 +110,7 @@ test("이름 변경은 재생을 유지하고 여러 음원의 연결을 전환�
   const before = await stored(page);
   expect(before).not.toContain("blob:");
   await page.reload();
+  await openWorkspace(page);
   expect(await stored(page)).toBe(before);
   await expect(page.getByLabel("BGM 음원 목록").locator("option")).toHaveText([
     "파일 직접 선택",
@@ -147,6 +150,7 @@ test("종류별 이름 검사와 제거를 처리하고 다른 채널·게임 �
   page,
 }) => {
   await page.goto("/");
+  await openWorkspace(page);
   await page.evaluate(() => {
     localStorage.setItem(
       "dynosty.settings",
@@ -155,6 +159,7 @@ test("종류별 이름 검사와 제거를 처리하고 다른 채널·게임 �
     localStorage.setItem("dynosty.example.saves", "keep game saves");
   });
   await page.reload();
+  await openWorkspace(page);
   await register(page, "BGM", "공통", "bgm.wav");
   await register(page, "음성", "공통", "voice.wav");
   for (const kind of ["BGM", "음성"])
@@ -201,6 +206,7 @@ test("목록 저장 실패 시 기존 목록·연결·재생을 보존하고 다
   page,
 }) => {
   await page.goto("/");
+  await openWorkspace(page);
   await register(page, "BGM", "아침", "old.wav");
   const id = await page.getByLabel("BGM 음원 목록").inputValue();
   await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
@@ -258,6 +264,7 @@ test("손상된 목록을 덮어쓰지 않고 직접 재생과 미연결 항목 
   page,
 }) => {
   await page.goto("/");
+  await openWorkspace(page);
   await page.getByLabel("음성 이름", { exact: true }).fill("추후 녹음");
   await page
     .getByRole("button", { name: "음성 목록 추가", exact: true })
@@ -268,6 +275,7 @@ test("손상된 목록을 덮어쓰지 않고 직접 재생과 미연결 항목 
   ).toBeNull();
   await page.evaluate((key) => localStorage.setItem(key, "{broken"), key);
   await page.reload();
+  await openWorkspace(page);
   await expect(page.getByRole("alert")).toContainText("읽지 못했습니다");
   await register(page, "BGM", "새 음원", "local.wav");
   await expect(page.getByRole("alert")).toContainText("덮어쓰지 않았습니다");

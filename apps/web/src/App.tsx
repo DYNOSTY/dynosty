@@ -4,7 +4,7 @@ import type {
   GameWorkerMessage,
   SceneSnapshot,
 } from "@dynosty/game-core";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   loadLocalExample,
   localSaveError,
@@ -16,8 +16,15 @@ import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import type { SceneController } from "./scene.js";
 import { VideoPanel } from "./VideoPanel.js";
+import { WorkspacePanel } from "./WorkspacePanel.js";
 
 export function App() {
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const savePanelId = useId();
+  const toolsPanelId = useId();
+  const saveMenuRef = useRef<HTMLButtonElement>(null);
+  const toolsMenuRef = useRef<HTMLButtonElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const sceneRef = useRef<SceneController | null>(null);
@@ -170,96 +177,163 @@ export function App() {
   );
 
   return (
-    <main>
-      <header>
-        <p className="eyebrow">3D 생존 · 도시 경영</p>
-        <h1>DYNOSTY</h1>
-        <p>게임 개발을 시작할 준비가 됐어요.</p>
-        <SettingsMenu />
-      </header>
-      <section aria-label="개발 환경 연결 상태" className="panel">
-        <p>
-          온라인 서버: <strong role="status">{apiStatus}</strong>
-        </p>
-        <p>
-          3D 화면: <strong>{sceneStatus}</strong>
-        </p>
-        <p aria-live="polite">
-          게임 시간:{" "}
+    <main className="play-shell">
+      <header className="play-header">
+        <div className="play-brand">
+          <p className="eyebrow">3D 생존 · 도시 경영</p>
+          <h1>DYNOSTY</h1>
+        </div>
+        <div className="play-time" aria-live="polite">
+          <span>게임 시간</span>
           <strong>{state ? `${state.day}일차` : "계산 준비 중"}</strong>
-        </p>
-        {workerError ? <p role="alert">{workerError}</p> : null}
-        <button
-          type="button"
-          onClick={advance}
-          disabled={!state || workerError !== null || saveBusy}
-        >
-          하루 진행
-        </button>
-        <button
-          type="button"
-          onClick={toggleSceneExample}
-          disabled={!appliedSnapshot || workerError !== null || saveBusy}
-        >
-          3D 연결 예제 바꾸기
-        </button>
-        <p aria-live="polite">
-          3D 예제 동작:{" "}
-          <strong data-testid="scene-example-motion">
-            {resident?.kind === "resident"
-              ? resident.motion === "walking"
-                ? "걷기 표시"
-                : "대기 표시"
-              : "준비 중"}
-          </strong>
-        </p>
-        <p className="hint">
-          연결 확인용 예제입니다. 자원·주민·미션 규칙은 앞으로 추가합니다.
-        </p>
-      </section>
-      <section aria-label="로컬 저장" className="panel">
-        <h2>예제 저장</h2>
+        </div>
+        <nav className="play-menu" aria-label="게임 메뉴">
+          <button
+            ref={saveMenuRef}
+            type="button"
+            aria-expanded={saveOpen}
+            aria-controls={savePanelId}
+            onClick={() => setSaveOpen(!saveOpen)}
+          >
+            저장
+          </button>
+          <SettingsMenu />
+          <button
+            ref={toolsMenuRef}
+            type="button"
+            className="quiet-button"
+            aria-expanded={toolsOpen}
+            aria-controls={toolsPanelId}
+            onClick={() => setToolsOpen(!toolsOpen)}
+          >
+            개발 도구
+          </button>
+        </nav>
+      </header>
+      <div className="play-status">
         <p>
-          이 브라우저에 저장됩니다. 최근 저장과 그 직전 저장을 불러올 수
-          있습니다.
+          플레이 화면 <span>· 화면 골격</span>
         </p>
-        <button
-          type="button"
-          onClick={() => accessSave("save")}
-          disabled={saveDisabled}
+        <span data-testid="play-scene-status">3D {sceneStatus}</span>
+      </div>
+      {workerError ? <p role="alert">{workerError}</p> : null}
+      <div
+        className={`play-workspace${saveOpen || toolsOpen ? " has-tools" : ""}`}
+      >
+        <section aria-label="3D 개발 장면" className="play-scene">
+          <div className="scene-heading">
+            <h2>3D 장면</h2>
+            <span className="prototype-label">개발 시제품</span>
+          </div>
+          <canvas
+            ref={canvasRef}
+            aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
+            tabIndex={0}
+          />
+          <div className="scene-footer">
+            <p>마우스로 회전 · 휠로 확대</p>
+            <span>예제 장면</span>
+          </div>
+        </section>
+
+        <aside
+          className="workspace-tools"
+          aria-label="작업 메뉴"
+          hidden={!saveOpen && !toolsOpen}
         >
-          예제 저장
-        </button>
-        <button
-          type="button"
-          onClick={() => accessSave("load")}
-          disabled={saveDisabled}
-        >
-          저장 불러오기
-        </button>
-        <button
-          type="button"
-          onClick={() => accessSave("load", "previous")}
-          disabled={saveDisabled}
-        >
-          이전 저장 불러오기
-        </button>
-        <p aria-live="polite" data-testid="local-save-status">
-          {saveBusy ? "처리 중입니다." : saveStatus}
-        </p>
-        {saveError ? <p role="alert">{saveError}</p> : null}
-      </section>
-      <SaveFilePanel />
-      <MediaPanel />
-      <VideoPanel />
-      <section aria-label="3D 개발 장면">
-        <canvas
-          ref={canvasRef}
-          aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
-          tabIndex={0}
-        />
-        <p className="hint">마우스로 회전 · 휠로 확대</p>
-      </section>
+          <WorkspacePanel
+            id={savePanelId}
+            title="저장"
+            open={saveOpen}
+            onClose={() => {
+              setSaveOpen(false);
+              saveMenuRef.current?.focus();
+            }}
+          >
+            <section aria-label="로컬 저장" className="panel">
+              <h2>예제 저장</h2>
+              <p>
+                이 브라우저에 저장됩니다. 최근 저장과 그 직전 저장을 불러올 수
+                있습니다.
+              </p>
+              <button
+                type="button"
+                onClick={() => accessSave("save")}
+                disabled={saveDisabled}
+              >
+                예제 저장
+              </button>
+              <button
+                type="button"
+                onClick={() => accessSave("load")}
+                disabled={saveDisabled}
+              >
+                저장 불러오기
+              </button>
+              <button
+                type="button"
+                onClick={() => accessSave("load", "previous")}
+                disabled={saveDisabled}
+              >
+                이전 저장 불러오기
+              </button>
+              <p aria-live="polite" data-testid="local-save-status">
+                {saveBusy ? "처리 중입니다." : saveStatus}
+              </p>
+              {saveError ? <p role="alert">{saveError}</p> : null}
+            </section>
+            <SaveFilePanel />
+          </WorkspacePanel>
+          <WorkspacePanel
+            id={toolsPanelId}
+            title="개발 도구"
+            open={toolsOpen}
+            onClose={() => {
+              setToolsOpen(false);
+              toolsMenuRef.current?.focus();
+            }}
+          >
+            <section aria-label="개발 환경 연결 상태" className="panel">
+              <p>
+                온라인 서버: <strong role="status">{apiStatus}</strong>
+              </p>
+              <p>
+                3D 화면: <strong>{sceneStatus}</strong>
+              </p>
+              <button
+                type="button"
+                onClick={advance}
+                disabled={!state || workerError !== null || saveBusy}
+              >
+                하루 진행
+              </button>
+              <button
+                type="button"
+                onClick={toggleSceneExample}
+                disabled={!appliedSnapshot || workerError !== null || saveBusy}
+              >
+                3D 연결 예제 바꾸기
+              </button>
+              <p aria-live="polite">
+                3D 예제 동작:{" "}
+                <strong data-testid="scene-example-motion">
+                  {resident?.kind === "resident"
+                    ? resident.motion === "walking"
+                      ? "걷기 표시"
+                      : "대기 표시"
+                    : "준비 중"}
+                </strong>
+              </p>
+              <p className="hint">
+                연결 확인용 예제입니다. 자원·주민·미션 규칙은 앞으로 추가합니다.
+              </p>
+            </section>
+
+            <MediaPanel />
+            <VideoPanel />
+          </WorkspacePanel>
+        </aside>
+      </div>
     </main>
   );
 }

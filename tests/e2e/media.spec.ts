@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openWorkspace } from "./workspace.js";
 
 // 테스트용 PCM WAV. 실제 BGM·대사 파일이나 네트워크 음원을 사용하지 않는다.
 function wave(seconds = 1) {
@@ -72,6 +73,7 @@ test("BGM·음성을 함께 재생하고 복원된 음량·음소거와 정지�
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await openWorkspace(page);
   await page.evaluate(() => {
     localStorage.setItem(
       "dynosty.settings",
@@ -80,6 +82,7 @@ test("BGM·음성을 함께 재생하고 복원된 음량·음소거와 정지�
     localStorage.setItem("dynosty.example.saves", "keep game save");
   });
   await page.reload();
+  await openWorkspace(page);
   await page.getByLabel("BGM 파일", { exact: true }).setInputFiles({
     name: "bgm.wav",
     mimeType: "audio/wav",
@@ -151,6 +154,7 @@ test("음성 자연 종료와 BGM 파일 교체·참조 해제를 처리한다",
   page,
 }) => {
   await page.goto("/");
+  await openWorkspace(page);
   const bgmFile = page.getByLabel("BGM 파일", { exact: true });
   await bgmFile.setInputFiles({
     name: "first.wav",
@@ -197,6 +201,7 @@ test("음성 자연 종료와 BGM 파일 교체·참조 해제를 처리한다",
   await expect(page.getByRole("alert")).toContainText("음원 파일");
   await expect(page.getByText("short.wav", { exact: true })).toBeVisible();
   await page.reload();
+  await openWorkspace(page);
   await expect(
     page.getByRole("button", { name: "BGM 재생", exact: true }),
   ).toBeDisabled();
@@ -212,6 +217,7 @@ test("손상된 음원과 재생 거부를 안내하고 새 파일로 다시 재
   page,
 }) => {
   await page.goto("/");
+  await openWorkspace(page);
   const voice = page.getByLabel("음성 파일", { exact: true });
   const play = page.getByRole("button", { name: "음성 재생", exact: true });
   await voice.setInputFiles({

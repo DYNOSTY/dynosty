@@ -1,9 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
+import { openWorkspace } from "./workspace.js";
 
 const saveKey = "dynosty.example.saves";
 
 async function ready(page: Page) {
   await page.goto("/");
+  await openWorkspace(page);
   await expect(page.getByTestId("scene-example-motion")).toHaveText(
     "대기 표시",
   );
@@ -55,6 +57,7 @@ test("날짜·3D 상태와 직전 저장을 복원하고 새로고침해도 저�
     "대기 표시",
   );
   await page.reload();
+  await openWorkspace(page);
   await expect(page.getByText("1일차", { exact: true })).toBeVisible();
   expect(await page.evaluate((key) => localStorage.getItem(key), saveKey)).toBe(
     before,
