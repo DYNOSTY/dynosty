@@ -2,6 +2,8 @@ import type {
   GameCommand,
   GameState,
   GameWorkerMessage,
+  PlayCommand,
+  PlayState,
   SceneSnapshot,
 } from "@dynosty/game-core";
 import { useEffect, useId, useRef, useState } from "react";
@@ -12,6 +14,9 @@ import {
   saveLocalExample,
 } from "./local-save.js";
 import { MediaPanel } from "./MediaPanel.js";
+import { PlayPanel } from "./PlayPanel.js";
+import { PlaySavePanel } from "./PlaySavePanel.js";
+import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SelectionPanel } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
@@ -21,6 +26,13 @@ import { WorkspacePanel } from "./WorkspacePanel.js";
 
 export function App() {
   const [saveOpen, setSaveOpen] = useState(false);
+  const [playState, setPlayState] = useState<PlayState | null>(null);
+  const [playError, setPlayError] = useState<string | null>(null);
+  const [exampleClock, setExampleClock] = useState(false);
+  const [playSaveBusy, setPlaySaveBusy] = useState(false);
+  const [playSaveStatus, setPlaySaveStatus] = useState("");
+  const [playSaveFailure, setPlaySaveFailure] = useState<string | null>(null);
+  const pendingPlaySaveRef = useRef<number | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const savePanelId = useId();
@@ -42,6 +54,12 @@ export function App() {
   );
   const [apiStatus, setApiStatus] = useState("연결 중");
   const [sceneStatus, setSceneStatus] = useState("불러오는 중");
+  const [cameraInfo, setCameraInfo] = useState<{
+    distance: number;
+    angle: number;
+    height: number;
+  } | null>(null);
+  const [assetWarning, setAssetWarning] = useState<string | null>(null);
   const [workerError, setWorkerError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,7 +68,32 @@ export function App() {
     });
     workerRef.current = worker;
     worker.onmessage = (event: MessageEvent<GameWorkerMessage>) => {
-      if (event.data.type === "state") setState(event.data.state);
+      if (event.data.type === "play-state") {
+        setPlayState(event.data.state);
+        setPlayError(null);
+      } else if (event.data.type === "play-error")
+        setPlayError(event.data.message);
+      else if (
+        event.data.type === "play-save-ready" ||
+        event.data.type === "play-loaded" ||
+        event.data.type === "play-save-error"
+      ) {
+        const message = event.data;
+        if (pendingPlaySaveRef.current !== message.requestId) return;
+        try {
+          if (message.type === "play-save-ready") {
+            savePlay(window.localStorage, message.save);
+            setPlaySaveStatus("게임을 저장했습니다.");
+          } else if (message.type === "play-loaded")
+            setPlaySaveStatus("게임을 불러왔습니다. 일시정지 상태입니다.");
+          else setPlaySaveFailure(message.message);
+        } catch (error) {
+          setPlaySaveFailure(playSaveError(error));
+        } finally {
+          pendingPlaySaveRef.current = null;
+          setPlaySaveBusy(false);
+        }
+      } else if (event.data.type === "state") setState(event.data.state);
       else if (event.data.type === "scene") setSnapshot(event.data.snapshot);
       else if (event.data.type === "error") setWorkerError(event.data.message);
       else {
@@ -76,6 +119,11 @@ export function App() {
       }
     };
     worker.onerror = () => {
+      pendingPlaySaveRef.current = null;
+      setPlaySaveBusy(false);
+      setPlayError(
+        "게임 기준이나 계산 모듈을 확인하지 못해 새 게임을 시작할 수 없습니다.",
+      );
       pendingSaveRef.current = null;
       setSaveBusy(false);
       setSaveStatus("");
@@ -85,6 +133,7 @@ export function App() {
       worker.terminate();
       workerRef.current = null;
       pendingSaveRef.current = null;
+      pendingPlaySaveRef.current = null;
     };
   }, []);
 
@@ -110,9 +159,16 @@ export function App() {
     if (!canvas) return;
     let cancelled = false;
     void import("./scene.js")
-      .then(({ mountScene }) => {
+      .then(async ({ mountScene }) => {
         if (cancelled) return;
-        sceneRef.current = mountScene(canvas, setSelectedId);
+        sceneRef.current = mountScene(
+          canvas,
+          setSelectedId,
+          setAssetWarning,
+          setCameraInfo,
+        );
+        await sceneRef.current.ready;
+        if (cancelled) return;
         setSceneStatus("준비 완료");
       })
       .catch(() => {
@@ -137,6 +193,7 @@ export function App() {
   }, [snapshot, sceneStatus]);
 
   function advance() {
+    setExampleClock(true);
     if (pendingSaveRef.current !== null) return;
     const command: GameCommand = { type: "advance-day" };
     workerRef.current?.postMessage(command);
@@ -149,6 +206,7 @@ export function App() {
   }
 
   function accessSave(operation: "save" | "load", slot: SaveSlot = "current") {
+    if (operation === "load") setExampleClock(true);
     if (!workerRef.current || pendingSaveRef.current !== null) return;
     setSaveError(null);
     setSaveStatus("");
@@ -172,6 +230,52 @@ export function App() {
     }
   }
 
+  useEffect(() => {
+    const pause = () => {
+      if (document.hidden)
+        workerRef.current?.postMessage({
+          type: "play-command",
+          command: { type: "pause", paused: true },
+        } satisfies GameCommand);
+    };
+    document.addEventListener("visibilitychange", pause);
+    return () => document.removeEventListener("visibilitychange", pause);
+  }, []);
+  function commandPlay(command: PlayCommand) {
+    if (playSaveBusy) return;
+    setExampleClock(false);
+    setPlayError(null);
+    workerRef.current?.postMessage({
+      type: "play-command",
+      command,
+    } satisfies GameCommand);
+  }
+  function accessPlaySave(operation: "save" | "load", previous = false) {
+    if (!workerRef.current || pendingPlaySaveRef.current !== null) return;
+    setPlaySaveFailure(null);
+    setPlaySaveStatus("");
+    try {
+      const requestId = ++nextRequestRef.current;
+      const command: GameCommand =
+        operation === "save"
+          ? { type: "request-play-save", requestId }
+          : {
+              type: "load-play",
+              requestId,
+              data: loadPlay(
+                window.localStorage,
+                previous ? "previous" : "current",
+              ),
+            };
+      pendingPlaySaveRef.current = requestId;
+      setPlaySaveBusy(true);
+      if (operation === "load") setExampleClock(false);
+      workerRef.current.postMessage(command);
+    } catch (error) {
+      setPlaySaveFailure(playSaveError(error));
+    }
+  }
+  const shownDay = exampleClock ? state?.day : (playState?.day ?? state?.day);
   const saveDisabled = !state || !snapshot || workerError !== null || saveBusy;
 
   const resident = appliedSnapshot?.entities.find(
@@ -197,8 +301,8 @@ export function App() {
           <h1>DYNOSTY</h1>
         </div>
         <div className="play-time" aria-live="polite">
-          <span>게임 시간</span>
-          <strong>{state ? `${state.day}일차` : "계산 준비 중"}</strong>
+          <span>{exampleClock ? "연결 예제 시간" : "게임 시간"}</span>
+          <strong>{shownDay ? `${shownDay}일차` : "계산 준비 중"}</strong>
         </div>
         <nav className="play-menu" aria-label="게임 메뉴">
           <button
@@ -230,12 +334,23 @@ export function App() {
         <span data-testid="play-scene-status">3D {sceneStatus}</span>
       </div>
       {workerError ? <p role="alert">{workerError}</p> : null}
+      <PlayPanel
+        state={playState}
+        error={playError}
+        busy={playSaveBusy}
+        onCommand={commandPlay}
+      />
       <div className={`play-workspace${hasPanels ? " has-tools" : ""}`}>
         <section aria-label="3D 개발 장면" className="play-scene">
           <div className="scene-heading">
             <h2>3D 장면</h2>
-            <span className="prototype-label">개발 시제품</span>
+            <span className="prototype-label">복홀 · 개발 모델</span>
           </div>
+          {assetWarning ? (
+            <p role="alert" className="hint model-warning">
+              {assetWarning}
+            </p>
+          ) : null}
           <canvas
             ref={canvasRef}
             aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
@@ -243,9 +358,16 @@ export function App() {
           />
           <div className="scene-footer">
             <p>클릭으로 선택 · 마우스로 회전 · 휠로 확대</p>
-            <span>예제 장면</span>
+            <span>대표 주민 1종 · 온돌 둥지</span>
           </div>
           <fieldset className="selection-actions" aria-label="예제 대상 선택">
+            <button
+              type="button"
+              className="quiet-button"
+              onClick={() => sceneRef.current?.resetCamera()}
+            >
+              기본 시점
+            </button>
             {appliedSnapshot?.entities
               .filter((entity) => entity.visible)
               .map((entity) => (
@@ -279,8 +401,16 @@ export function App() {
               saveMenuRef.current?.focus();
             }}
           >
+            <PlaySavePanel
+              busy={playSaveBusy}
+              ready={playState !== null}
+              status={playSaveStatus}
+              error={playSaveFailure}
+              onSave={() => accessPlaySave("save")}
+              onLoad={(previous) => accessPlaySave("load", previous)}
+            />
             <section aria-label="로컬 저장" className="panel">
-              <h2>예제 저장</h2>
+              <h2>연결 확인용 예제 저장</h2>
               <p>
                 이 브라우저에 저장됩니다. 최근 저장과 그 직전 저장을 불러올 수
                 있습니다.
@@ -323,6 +453,37 @@ export function App() {
             }}
           >
             <section aria-label="개발 환경 연결 상태" className="panel">
+              <div className="media-actions">
+                <button
+                  type="button"
+                  onClick={() => commandPlay({ type: "test-food", days: 0 })}
+                >
+                  식량 고갈 검사
+                </button>
+                <button
+                  type="button"
+                  onClick={() => commandPlay({ type: "test-food", days: 1 })}
+                >
+                  1일분 식량 복구
+                </button>
+              </div>
+              <p className="hint">
+                식량 검사 버튼은 개발용 재고 변경이며 생산·교역 규칙이 아닙니다.
+              </p>
+              <p>
+                카메라 거리(m):{" "}
+                <span data-testid="camera-distance">
+                  {cameraInfo?.distance.toFixed(2) ?? "준비 중"}
+                </span>{" "}
+                · 각도(도):{" "}
+                <span data-testid="camera-angle">
+                  {cameraInfo?.angle.toFixed(2) ?? "준비 중"}
+                </span>{" "}
+                · 높이(m):{" "}
+                <span data-testid="camera-height">
+                  {cameraInfo?.height.toFixed(2) ?? "준비 중"}
+                </span>
+              </p>
               <p>
                 온라인 서버: <strong role="status">{apiStatus}</strong>
               </p>

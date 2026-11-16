@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { clickExample, clickFloor, examplePoint } from "./scene-picking.js";
+import {
+  clickExample,
+  clickFloor,
+  examplePoint,
+  outlinePixels,
+} from "./scene-picking.js";
 
 async function ready(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -24,7 +29,7 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   // 패널 전환에 따른 장면 폭 변경 없이 실제 테두리 픽셀의 변화를 비교한다.
   await page.getByRole("button", { name: "저장", exact: true }).click();
   const canvas = page.locator("canvas");
-  const before = await canvas.screenshot();
+  expect(outlinePixels(await canvas.screenshot())).toBe(0);
   await clickExample(page, "building");
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
   await expect(info.getByText("건물 예제", { exact: false })).toBeVisible();
@@ -33,8 +38,8 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
     page.getByRole("button", { name: "건물 예제 선택", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect
-    .poll(async () => (await canvas.screenshot()).equals(before))
-    .toBe(false);
+    .poll(async () => outlinePixels(await canvas.screenshot()))
+    .toBeGreaterThan(20);
   await clickExample(page, "resident");
   await expect(info.getByText("주민 예제", { exact: false })).toBeVisible();
   await expect(info.getByText("대기 표시", { exact: true })).toBeVisible();
@@ -44,8 +49,8 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   await clickFloor(page);
   await expect(info).toBeHidden();
   await expect
-    .poll(async () => (await canvas.screenshot()).equals(before))
-    .toBe(true);
+    .poll(async () => outlinePixels(await canvas.screenshot()))
+    .toBe(0);
   await expect(page.getByText("1일차", { exact: true })).toBeVisible();
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.example.saves")),

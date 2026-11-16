@@ -4,19 +4,27 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Node } from "@babylonjs/core/node";
 import type { Scene } from "@babylonjs/core/scene";
 import {
   type SceneEntity,
   type SceneSnapshot,
   validateSceneSnapshot,
 } from "@dynosty/game-core";
+import {
+  buildModel,
+  type ModelAssets,
+  type ModelVisual,
+} from "./model-assets.js";
 
 // 박찬님의 실제 모델을 연결할 경계. 현재는 종류별 상자로 표시한다.
 export function createSceneEntities(
   scene: Scene,
   onSelectionChange: (id: string | null) => void = () => {},
+  onModelError: () => void = () => {},
 ) {
   let selectedId: string | null = null;
+  let models: ModelAssets = {};
   const objects = new Map<
     string,
     {
@@ -24,6 +32,8 @@ export function createSceneEntities(
       mesh: Mesh;
       material: StandardMaterial;
       entity: SceneEntity;
+      visual: ModelVisual | null;
+      modelAttempted: boolean;
     }
   >();
 
@@ -33,10 +43,16 @@ export function createSceneEntities(
     if (next === selectedId) return;
     if (selectedId !== null) {
       const previous = objects.get(selectedId);
-      if (previous) previous.mesh.renderOutline = false;
+      if (previous) {
+        previous.mesh.renderOutline = false;
+        previous.visual?.setOutline(false);
+      }
     }
     selectedId = next;
-    if (next !== null && object) object.mesh.renderOutline = true;
+    if (next !== null && object) {
+      object.mesh.renderOutline = true;
+      object.visual?.setOutline(true);
+    }
     onSelectionChange(next);
   }
 
@@ -44,6 +60,7 @@ export function createSceneEntities(
     const object = objects.get(id);
     if (!object) return;
     if (id === selectedId) select(null);
+    object.visual?.dispose();
     object.mesh.dispose();
     object.material.dispose();
     objects.delete(id);
@@ -52,8 +69,29 @@ export function createSceneEntities(
   return {
     select,
     selectMesh(mesh: AbstractMesh | null) {
-      const object = mesh ? objects.get(mesh.id) : undefined;
-      select(object?.mesh === mesh ? (mesh?.id ?? null) : null);
+      let current: Node | null = mesh;
+      while (current) {
+        const object = objects.get(current.id);
+        if (object?.mesh === current) {
+          select(current.id);
+          return;
+        }
+        current = current.parent;
+      }
+      select(null);
+    },
+    setModels(value: ModelAssets) {
+      models = value;
+      for (const object of objects.values()) {
+        object.visual?.dispose();
+        object.visual = null;
+        object.modelAttempted = false;
+        object.mesh.isVisible = true;
+      }
+    },
+    animate(delta: number) {
+      for (const object of objects.values())
+        if (object.mesh.isEnabled()) object.visual?.animate(delta);
     },
     update(snapshot: SceneSnapshot) {
       // 부적합한 입력이 기존 장면을 일부만 바꾸지 않게 먼저 검사한다.
@@ -74,10 +112,36 @@ export function createSceneEntities(
           mesh.renderOutline = false;
           mesh.outlineColor = new Color3(0.3, 0.9, 1);
           mesh.outlineWidth = 0.06;
-          object = { kind: entity.kind, mesh, material, entity };
+          object = {
+            kind: entity.kind,
+            mesh,
+            material,
+            entity,
+            visual: null,
+            modelAttempted: false,
+          };
           objects.set(entity.id, object);
         }
         object.entity = entity;
+        const asset = models[entity.kind];
+        if (asset && !object.modelAttempted) {
+          object.modelAttempted = true;
+          try {
+            object.visual = buildModel(
+              scene,
+              object.mesh,
+              object.material,
+              asset,
+            );
+            object.mesh.isVisible = false;
+            object.visual.setOutline(selectedId === entity.id);
+          } catch {
+            onModelError();
+          }
+        }
+        object.visual?.setMotion(
+          entity.kind === "resident" ? entity.motion : "idle",
+        );
         object.mesh.position.set(
           entity.position.x,
           entity.position.y + size / 2,

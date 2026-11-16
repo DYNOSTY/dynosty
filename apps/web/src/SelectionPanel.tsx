@@ -4,7 +4,10 @@ type Props = { entity: SceneEntity | null; onClear: () => void };
 
 export function SelectionPanel({ entity, onClear }: Props) {
   if (!entity) return null;
-  const name = entity.kind === "building" ? "건물 예제" : "주민 예제";
+  const name =
+    entity.kind === "building"
+      ? "건물 예제 · 온돌 둥지"
+      : "주민 예제 · 트리케라톱스";
   return (
     <section className="workspace-panel selection-info" aria-label="선택 정보">
       <div className="workspace-panel-heading">
@@ -43,8 +46,8 @@ export function SelectionPanel({ entity, onClear }: Props) {
         </dl>
       </div>
       <p className="hint">
-        기존 예제의 표시 정보입니다. 선택은 날짜나 게임 저장 내용을 바꾸지
-        않습니다.
+        자체 제작한 개발 모델의 표시 정보입니다. 선택은 날짜나 게임 저장 내용을
+        바꾸지 않습니다.
       </p>
       <p className="hint">빈 바닥을 클릭해도 선택을 해제할 수 있습니다.</p>
     </section>

@@ -1,0 +1,174 @@
+{
+  "rulesVersion": 1,
+  "approval": {
+    "date": "2026-11-17",
+    "basis": "사용자: 기존 추천 조합 적용 및 나머지 구현 선택 위임",
+    "status": "user-approved-development-baseline"
+  },
+  "resources": {
+    "RES_PLANT": {
+      "name": "풀",
+      "unit": "재고 단위",
+      "initial": 120,
+      "purpose": "초식 주민 식량",
+      "acquisition": "온상 재배소·채집막"
+    },
+    "RES_MEAT": {
+      "name": "고기",
+      "unit": "재고 단위",
+      "initial": 120,
+      "purpose": "육식 주민 식량",
+      "acquisition": "사냥·훈연장"
+    },
+    "RES_FISH": {
+      "name": "어류",
+      "unit": "재고 단위",
+      "initial": 120,
+      "purpose": "어식 주민 식량",
+      "acquisition": "양식장·어획 구역"
+    },
+    "RES_WOOD": {
+      "name": "목재",
+      "unit": "재고 단위",
+      "initial": 120,
+      "purpose": "건설·연구·비상 연료",
+      "acquisition": "벌목장·정찰 회수"
+    },
+    "RES_METAL": {
+      "name": "철재",
+      "unit": "재고 단위",
+      "initial": 40,
+      "purpose": "시설 개량·메카 연구",
+      "acquisition": "철광 작업장·제련소"
+    },
+    "RES_WATER": {
+      "name": "물",
+      "unit": "재고 단위",
+      "initial": 180,
+      "purpose": "음용·농업·온돌",
+      "acquisition": "취수 수문·정수 물레"
+    },
+    "RES_COAL": {
+      "name": "석탄",
+      "unit": "재고 단위",
+      "initial": 60,
+      "purpose": "온돌·식당 연료",
+      "acquisition": "발주·운송(승인 개발 기준)"
+    }
+  },
+  "population": [
+    {
+      "species": "R02",
+      "name": "트리케라톱스",
+      "diet": "RES_PLANT",
+      "count": 20,
+      "age": "adult"
+    },
+    {
+      "species": "R03",
+      "name": "벨로키랍토르",
+      "diet": "RES_MEAT",
+      "count": 20,
+      "age": "adult"
+    },
+    {
+      "species": "SPINO",
+      "name": "스피노사우루스",
+      "diet": "RES_FISH",
+      "count": 20,
+      "age": "adult"
+    }
+  ],
+  "initial": {
+    "day": 1,
+    "minute": 0,
+    "optimism": 50,
+    "pessimism": 0,
+    "weather": "보통",
+    "representativeResidentId": "example-resident-1",
+    "residentPosition": {
+      "x": -2,
+      "y": 0,
+      "z": 1
+    },
+    "buildings": [
+      {
+        "id": "example-building-1",
+        "type": "ondol-nest",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": -1
+        },
+        "headingRadians": 3.141592653589793
+      }
+    ],
+    "residentHeadingRadians": 3.141592653589793
+  },
+  "time": {
+    "minutesPerRealSecond": 10,
+    "minutesPerDay": 1440,
+    "tickMs": 1000,
+    "maxCatchUpMs": 1000,
+    "initialPaused": true,
+    "loadPaused": true,
+    "background": "pause-manual-resume"
+  },
+  "food": {
+    "precision": 10000,
+    "unitsPerResidentPerDay": 1,
+    "warningDays": 1,
+    "distribution": "proportional-by-diet",
+    "settlement": "minute-fixed-point"
+  },
+  "campaign": {
+    "stage3": "arrival-event",
+    "stage4PreparationDays": 15,
+    "stage4ColdDays": 15,
+    "stage5MinimumDays": 10,
+    "clues": ["C01", "C02", "C03", "C04"],
+    "researchOrder": ["R17", "R18"],
+    "r19": "after-yangnyeong-route",
+    "c04": "early-stage4",
+    "yangnyeong": "stage5"
+  },
+  "endings": {
+    "warningPessimism": 90,
+    "evictionPessimism": 100,
+    "evictionOptimism": 0,
+    "evictionMinutes": 1440,
+    "deathFraction": 0.8,
+    "failureFirst": true,
+    "endingAPessimism": 30,
+    "endingAHoldDays": 10
+  },
+  "fuel": {
+    "coalToWood": 3,
+    "heatingCoalPerDay": 7.9375,
+    "kitchenCoalPerDay": 1,
+    "noCoalWoodPerDay": 26.8125,
+    "heatingFirst": true,
+    "protectReservedWood": true
+  },
+  "developmentChoices": [
+    "시작 주민 60명은 세 식성별 성체 20명, 각 1 식량단위/일로 균등 배분한다. 원문 미지정 값에 대한 사용자 위임 개발 기준이다.",
+    "시작 재고는 식량 종류별 120, 목재120, 철재40, 물180, 석탄60 단위다. 원문 확정 수치로 인용하지 않는다.",
+    "첫 시작·불러오기·탭 비활성 후는 일시정지하며 오프라인 정산하지 않는다. 현실 1초=게임10분.",
+    "식성별 비례 소비, 부족 경고는 1일분 미만·0이면 긴급, 1일분 이상이면 해제. 기아 피해·사망 수치는 아직 이번 구현 범위가 아니다.",
+    "3D는 자체 제작한 개발용 트리케라톱스·온돌 둥지와 20×20m 지형, 1 표시 단위=1m를 사용하며 최종 외부 에셋과 구분한다."
+  ],
+  "sources": [
+    {
+      "id": "H",
+      "url": "https://docs.google.com/document/d/1-_ufAr0QC8HeiTBkFeG-I1CcP1vXL6sDWtUiyTvvIQs/edit",
+      "version": "v1.0",
+      "sections": ["4.1", "5.1", "5.2"]
+    },
+    {
+      "id": "S",
+      "url": "https://docs.google.com/document/d/1e1zLcBuRccjJq2JbfNQa-8BYFSmoQlxq0vW0Qz6GLQU/edit",
+      "version": "v1.0",
+      "sections": ["3.2", "4.2"]
+    }
+  ]
+}
