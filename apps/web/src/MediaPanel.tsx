@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
 import type { MediaChannel } from "./audio.js";
 
+type AudioChannel = Exclude<MediaChannel, "video">;
+
 const channels = ["bgm", "voice"] as const;
 const labels = { bgm: "BGM", voice: "음성" };
 type Selection = { url: string; name: string };
@@ -20,7 +22,7 @@ const initialView = (): TrackView => ({
 
 export function MediaPanel() {
   const { audioRef } = useAudio();
-  const selections = useRef<Record<MediaChannel, Selection | null>>({
+  const selections = useRef<Record<AudioChannel, Selection | null>>({
     bgm: null,
     voice: null,
   });
@@ -30,7 +32,7 @@ export function MediaPanel() {
     voice: initialView(),
   });
 
-  function update(channel: MediaChannel, patch: Partial<TrackView>) {
+  function update(channel: AudioChannel, patch: Partial<TrackView>) {
     setTracks((current) => ({
       ...current,
       [channel]: { ...current[channel], ...patch },
@@ -49,7 +51,7 @@ export function MediaPanel() {
     [audioRef],
   );
 
-  function select(channel: MediaChannel, file: File | undefined) {
+  function select(channel: AudioChannel, file: File | undefined) {
     if (!file) return;
     if (
       !file.type.startsWith("audio/") &&
@@ -78,13 +80,13 @@ export function MediaPanel() {
     });
   }
 
-  function stop(channel: MediaChannel) {
+  function stop(channel: AudioChannel) {
     requests.current[channel] += 1;
     audioRef.current?.stopMedia(channel);
     update(channel, { phase: "정지", error: null });
   }
 
-  async function play(channel: MediaChannel) {
+  async function play(channel: AudioChannel) {
     const selection = selections.current[channel];
     const audio = audioRef.current;
     if (!selection || !audio) return;

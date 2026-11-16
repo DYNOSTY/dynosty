@@ -5,9 +5,9 @@ import {
   parseAudioSettings,
 } from "./settings.js";
 
-export type MediaChannel = "bgm" | "voice";
+export type MediaChannel = "bgm" | "voice" | "video";
 
-// 확인음·BGM·음성을 같은 출력 음량으로 제어한다.
+// 확인음·BGM·음성·영상을 같은 출력 음량으로 제어한다.
 export function createAudioController(
   makeContext = () => new AudioContext(),
   makeMedia = () => new Audio(),
@@ -20,9 +20,9 @@ export function createAudioController(
   const voices = new Map<OscillatorNode, GainNode>();
   const tracks = new Map<
     MediaChannel,
-    { element: HTMLAudioElement; source: MediaElementAudioSourceNode }
+    { element: HTMLMediaElement; source: MediaElementAudioSourceNode }
   >();
-  const generations = { bgm: 0, voice: 0 };
+  const generations = { bgm: 0, voice: 0, video: 0 };
 
   function ensureContext() {
     if (!context) {
@@ -94,14 +94,20 @@ export function createAudioController(
       url: string,
       onEnded: () => void,
       onError: () => void,
+      suppliedElement?: HTMLMediaElement,
     ): Promise<boolean> {
       if (disposed) return false;
       stopMedia(channel);
       const generation = generations[channel];
       const active = ensureContext();
       let track = tracks.get(channel);
+      if (track && suppliedElement && track.element !== suppliedElement) {
+        track.source.disconnect();
+        tracks.delete(channel);
+        track = undefined;
+      }
       if (!track) {
-        const element = makeMedia();
+        const element = suppliedElement ?? makeMedia();
         const source = active.createMediaElementSource(element);
         if (!master) throw new Error("오디오 출력을 준비하지 못했습니다.");
         source.connect(master);
@@ -141,7 +147,8 @@ export function createAudioController(
       if (disposed) return;
       disposed = true;
       stopPreview();
-      for (const channel of ["bgm", "voice"] as const) stopMedia(channel);
+      for (const channel of ["bgm", "voice", "video"] as const)
+        stopMedia(channel);
       for (const track of tracks.values()) track.source.disconnect();
       tracks.clear();
       master?.disconnect();

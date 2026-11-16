@@ -55,6 +55,26 @@ function environment() {
 }
 
 describe("BGM·음성 공용 출력", () => {
+  it("외부 영상 요소를 재사용하고 요소 교체·정지·종료 시 연결을 정리한다", async () => {
+    const e = environment();
+    const first = e.makeMedia();
+    await e.audio.playMedia("video", "blob:video1", vi.fn(), vi.fn(), first);
+    expect(first.loop).toBe(false);
+    e.audio.stopMedia("video");
+    await e.audio.playMedia("video", "blob:video1", vi.fn(), vi.fn(), first);
+    expect(e.context.createMediaElementSource).toHaveBeenCalledTimes(1);
+    const second = e.makeMedia();
+    await e.audio.playMedia("video", "blob:video2", vi.fn(), vi.fn(), second);
+    expect(e.sources[0]?.disconnect).toHaveBeenCalledTimes(1);
+    expect(e.sources[1]?.connect).toHaveBeenCalledWith(e.master);
+    await e.audio.playMedia("bgm", "blob:bgm", vi.fn(), vi.fn());
+    e.audio.stopMedia("video");
+    expect(second.src).toBe("");
+    expect(e.elements[2]?.pause).not.toHaveBeenCalled();
+    e.audio.dispose();
+    expect(e.sources[1]?.disconnect).toHaveBeenCalledTimes(1);
+  });
+
   it("두 채널을 함께 재생하고 같은 음량·음소거를 적용하며 따로 정지한다", async () => {
     const e = environment();
     e.audio.applySettings({ ...defaultAudioSettings(), masterVolume: 35 });
