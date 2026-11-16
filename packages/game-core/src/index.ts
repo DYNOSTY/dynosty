@@ -6,7 +6,16 @@ export {
   validateSceneSnapshot,
 } from "./scene.js";
 
+import type { ExampleSave } from "./save.js";
 import type { SceneSnapshot } from "./scene.js";
+
+export {
+  createExampleSave,
+  type ExampleSave,
+  isRecord,
+  parseExampleSave,
+  SaveDataError,
+} from "./save.js";
 
 // 연결 확인용 최소 상태. 실제 자원·주민 규칙은 게임 설계에 맞춰 추가한다.
 export interface GameState {
@@ -16,10 +25,27 @@ export interface GameState {
 
 export type GameCommand =
   | { readonly type: "advance-day" }
-  | { readonly type: "toggle-scene-example" };
+  | { readonly type: "toggle-scene-example" }
+  | { readonly type: "request-save"; readonly requestId: number }
+  | {
+      readonly type: "load-example";
+      readonly requestId: number;
+      readonly data: unknown;
+    };
 export type GameWorkerMessage =
   | { readonly type: "state"; readonly state: GameState }
   | { readonly type: "scene"; readonly snapshot: SceneSnapshot }
+  | {
+      readonly type: "save-ready";
+      readonly requestId: number;
+      readonly save: ExampleSave;
+    }
+  | { readonly type: "load-complete"; readonly requestId: number }
+  | {
+      readonly type: "save-error";
+      readonly requestId: number;
+      readonly message: string;
+    }
   | { readonly type: "error"; readonly message: string };
 
 export function createInitialState(): GameState {

@@ -5,12 +5,23 @@ import type {
   SceneSnapshot,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
+import {
+  loadLocalExample,
+  localSaveError,
+  type SaveSlot,
+  saveLocalExample,
+} from "./local-save.js";
 import type { SceneController } from "./scene.js";
 
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const sceneRef = useRef<SceneController | null>(null);
+  const pendingSaveRef = useRef<number | null>(null);
+  const nextRequestRef = useRef(0);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [state, setState] = useState<GameState | null>(null);
   const [snapshot, setSnapshot] = useState<SceneSnapshot | null>(null);
   const [appliedSnapshot, setAppliedSnapshot] = useState<SceneSnapshot | null>(
@@ -28,12 +39,39 @@ export function App() {
     worker.onmessage = (event: MessageEvent<GameWorkerMessage>) => {
       if (event.data.type === "state") setState(event.data.state);
       else if (event.data.type === "scene") setSnapshot(event.data.snapshot);
-      else setWorkerError(event.data.message);
+      else if (event.data.type === "error") setWorkerError(event.data.message);
+      else {
+        const message = event.data;
+        if (pendingSaveRef.current !== message.requestId) return;
+        try {
+          if (message.type === "save-ready") {
+            saveLocalExample(window.localStorage, message.save);
+            setSaveStatus("예제를 저장했습니다.");
+          } else if (message.type === "load-complete") {
+            setSaveStatus("예제를 불러왔습니다.");
+          } else {
+            setSaveError(message.message);
+            setSaveStatus("");
+          }
+        } catch (error) {
+          setSaveError(localSaveError(error));
+          setSaveStatus("");
+        } finally {
+          pendingSaveRef.current = null;
+          setSaveBusy(false);
+        }
+      }
     };
-    worker.onerror = () => setWorkerError("게임 계산 연결을 확인해 주세요.");
+    worker.onerror = () => {
+      pendingSaveRef.current = null;
+      setSaveBusy(false);
+      setSaveStatus("");
+      setWorkerError("게임 계산 연결을 확인해 주세요.");
+    };
     return () => {
       worker.terminate();
       workerRef.current = null;
+      pendingSaveRef.current = null;
     };
   }, []);
 
@@ -86,14 +124,42 @@ export function App() {
   }, [snapshot, sceneStatus]);
 
   function advance() {
+    if (pendingSaveRef.current !== null) return;
     const command: GameCommand = { type: "advance-day" };
     workerRef.current?.postMessage(command);
   }
 
   function toggleSceneExample() {
+    if (pendingSaveRef.current !== null) return;
     const command: GameCommand = { type: "toggle-scene-example" };
     workerRef.current?.postMessage(command);
   }
+
+  function accessSave(operation: "save" | "load", slot: SaveSlot = "current") {
+    if (!workerRef.current || pendingSaveRef.current !== null) return;
+    setSaveError(null);
+    setSaveStatus("");
+    try {
+      const requestId = ++nextRequestRef.current;
+      const command: GameCommand =
+        operation === "save"
+          ? { type: "request-save", requestId }
+          : {
+              type: "load-example",
+              requestId,
+              data: loadLocalExample(window.localStorage, slot),
+            };
+      pendingSaveRef.current = requestId;
+      setSaveBusy(true);
+      workerRef.current.postMessage(command);
+    } catch (error) {
+      pendingSaveRef.current = null;
+      setSaveBusy(false);
+      setSaveError(localSaveError(error));
+    }
+  }
+
+  const saveDisabled = !state || !snapshot || workerError !== null || saveBusy;
 
   const resident = appliedSnapshot?.entities.find(
     (entity) => entity.kind === "resident",
@@ -121,14 +187,14 @@ export function App() {
         <button
           type="button"
           onClick={advance}
-          disabled={!state || workerError !== null}
+          disabled={!state || workerError !== null || saveBusy}
         >
           하루 진행
         </button>
         <button
           type="button"
           onClick={toggleSceneExample}
-          disabled={!appliedSnapshot || workerError !== null}
+          disabled={!appliedSnapshot || workerError !== null || saveBusy}
         >
           3D 연결 예제 바꾸기
         </button>
@@ -145,6 +211,38 @@ export function App() {
         <p className="hint">
           연결 확인용 예제입니다. 자원·주민·미션 규칙은 앞으로 추가합니다.
         </p>
+      </section>
+      <section aria-label="로컬 저장" className="panel">
+        <h2>예제 저장</h2>
+        <p>
+          이 브라우저에 저장됩니다. 최근 저장과 그 직전 저장을 불러올 수
+          있습니다.
+        </p>
+        <button
+          type="button"
+          onClick={() => accessSave("save")}
+          disabled={saveDisabled}
+        >
+          예제 저장
+        </button>
+        <button
+          type="button"
+          onClick={() => accessSave("load")}
+          disabled={saveDisabled}
+        >
+          저장 불러오기
+        </button>
+        <button
+          type="button"
+          onClick={() => accessSave("load", "previous")}
+          disabled={saveDisabled}
+        >
+          이전 저장 불러오기
+        </button>
+        <p aria-live="polite" data-testid="local-save-status">
+          {saveBusy ? "처리 중입니다." : saveStatus}
+        </p>
+        {saveError ? <p role="alert">{saveError}</p> : null}
       </section>
       <section aria-label="3D 개발 장면">
         <canvas
