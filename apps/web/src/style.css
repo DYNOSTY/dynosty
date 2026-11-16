@@ -104,7 +104,8 @@ canvas {
   border-radius: 0.5rem;
   overflow-wrap: anywhere;
 }
-.media-track input {
+.media-track input,
+.media-track select {
   display: block;
   max-width: 100%;
   margin-top: 0.5rem;
