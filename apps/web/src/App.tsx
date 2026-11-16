@@ -2,13 +2,20 @@ import type {
   GameCommand,
   GameState,
   GameWorkerMessage,
+  SceneSnapshot,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
+import type { SceneController } from "./scene.js";
 
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
+  const sceneRef = useRef<SceneController | null>(null);
   const [state, setState] = useState<GameState | null>(null);
+  const [snapshot, setSnapshot] = useState<SceneSnapshot | null>(null);
+  const [appliedSnapshot, setAppliedSnapshot] = useState<SceneSnapshot | null>(
+    null,
+  );
   const [apiStatus, setApiStatus] = useState("연결 중");
   const [sceneStatus, setSceneStatus] = useState("불러오는 중");
   const [workerError, setWorkerError] = useState<string | null>(null);
@@ -20,6 +27,7 @@ export function App() {
     workerRef.current = worker;
     worker.onmessage = (event: MessageEvent<GameWorkerMessage>) => {
       if (event.data.type === "state") setState(event.data.state);
+      else if (event.data.type === "scene") setSnapshot(event.data.snapshot);
       else setWorkerError(event.data.message);
     };
     worker.onerror = () => setWorkerError("게임 계산 연결을 확인해 주세요.");
@@ -50,11 +58,10 @@ export function App() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let cancelled = false;
-    let dispose: (() => void) | undefined;
     void import("./scene.js")
       .then(({ mountScene }) => {
         if (cancelled) return;
-        dispose = mountScene(canvas);
+        sceneRef.current = mountScene(canvas);
         setSceneStatus("준비 완료");
       })
       .catch(() => {
@@ -63,14 +70,34 @@ export function App() {
       });
     return () => {
       cancelled = true;
-      dispose?.();
+      sceneRef.current?.dispose();
+      sceneRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!snapshot || sceneStatus !== "준비 완료" || !sceneRef.current) return;
+    try {
+      sceneRef.current.update(snapshot);
+      setAppliedSnapshot(snapshot);
+    } catch {
+      setSceneStatus("3D 표시 정보 오류 — 전달 형식을 확인해 주세요");
+    }
+  }, [snapshot, sceneStatus]);
 
   function advance() {
     const command: GameCommand = { type: "advance-day" };
     workerRef.current?.postMessage(command);
   }
+
+  function toggleSceneExample() {
+    const command: GameCommand = { type: "toggle-scene-example" };
+    workerRef.current?.postMessage(command);
+  }
+
+  const resident = appliedSnapshot?.entities.find(
+    (entity) => entity.kind === "resident",
+  );
 
   return (
     <main>
@@ -98,6 +125,23 @@ export function App() {
         >
           하루 진행
         </button>
+        <button
+          type="button"
+          onClick={toggleSceneExample}
+          disabled={!appliedSnapshot || workerError !== null}
+        >
+          3D 연결 예제 바꾸기
+        </button>
+        <p aria-live="polite">
+          3D 예제 동작:{" "}
+          <strong data-testid="scene-example-motion">
+            {resident?.kind === "resident"
+              ? resident.motion === "walking"
+                ? "걷기 표시"
+                : "대기 표시"
+              : "준비 중"}
+          </strong>
+        </p>
         <p className="hint">
           연결 확인용 예제입니다. 자원·주민·미션 규칙은 앞으로 추가합니다.
         </p>

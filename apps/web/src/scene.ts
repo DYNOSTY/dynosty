@@ -4,11 +4,17 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import { Scene } from "@babylonjs/core/scene";
+import type { SceneSnapshot } from "@dynosty/game-core";
+import { createSceneEntities } from "./scene-entities.js";
 
-export function mountScene(canvas: HTMLCanvasElement): () => void {
+export interface SceneController {
+  update(snapshot: SceneSnapshot): void;
+  dispose(): void;
+}
+
+export function mountScene(canvas: HTMLCanvasElement): SceneController {
   const engine = new Engine(canvas, true);
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.08, 0.14, 0.12, 1);
@@ -28,17 +34,17 @@ export function mountScene(canvas: HTMLCanvasElement): () => void {
   const groundMaterial = new StandardMaterial("ground-material", scene);
   groundMaterial.diffuseColor = new Color3(0.28, 0.43, 0.28);
   ground.material = groundMaterial;
-  const building = CreateBox("sample-building", { size: 1.5 }, scene);
-  building.position.y = 0.75;
-  const buildingMaterial = new StandardMaterial("building-material", scene);
-  buildingMaterial.diffuseColor = new Color3(0.84, 0.66, 0.38);
-  building.material = buildingMaterial;
+  const entities = createSceneEntities(scene);
   const observer = new ResizeObserver(() => engine.resize());
   observer.observe(canvas);
   engine.runRenderLoop(() => scene.render());
-  return () => {
-    observer.disconnect();
-    scene.dispose();
-    engine.dispose();
+  return {
+    update: entities.update,
+    dispose() {
+      observer.disconnect();
+      entities.dispose();
+      scene.dispose();
+      engine.dispose();
+    },
   };
 }
