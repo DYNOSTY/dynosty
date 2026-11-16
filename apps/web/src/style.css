@@ -43,6 +43,7 @@ button:disabled {
   cursor: default;
 }
 button:focus-visible,
+input:focus-visible,
 canvas:focus-visible {
   outline: 3px solid #f0c879;
   outline-offset: 4px;
@@ -58,4 +59,41 @@ canvas {
   color: #bdd0bf;
   font-size: 0.9rem;
   line-height: 1.6;
+}
+.settings-dialog {
+  width: min(100% - 2rem, 480px);
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  padding: 1.5rem;
+  border: 1px solid #64856a;
+  border-radius: 1rem;
+  color: inherit;
+  background: #1e3529;
+}
+.settings-dialog::backdrop {
+  background: rgb(0 0 0 / 65%);
+}
+.settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.volume-label {
+  display: block;
+  margin: 1rem 0;
+}
+.volume-label output {
+  float: right;
+}
+.volume-label input {
+  display: block;
+  width: 100%;
+  margin: 1rem 0;
+  accent-color: #d6e8a8;
+}
+.mute-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }

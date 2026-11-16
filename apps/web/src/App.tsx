@@ -11,6 +11,7 @@ import {
   type SaveSlot,
   saveLocalExample,
 } from "./local-save.js";
+import { SettingsMenu } from "./SettingsMenu.js";
 import type { SceneController } from "./scene.js";
 
 export function App() {
@@ -171,6 +172,7 @@ export function App() {
         <p className="eyebrow">3D 생존 · 도시 경영</p>
         <h1>DYNOSTY</h1>
         <p>게임 개발을 시작할 준비가 됐어요.</p>
+        <SettingsMenu />
       </header>
       <section aria-label="개발 환경 연결 상태" className="panel">
         <p>
