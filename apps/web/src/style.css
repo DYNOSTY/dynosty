@@ -444,3 +444,151 @@ h1 {
     height: clamp(240px, 40dvh, 360px);
   }
 }
+
+.timber-controls,
+.timber-heading,
+.timber-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+.timber-demo {
+  padding: 1.1rem;
+  margin-bottom: 1rem;
+  border: 1px solid #687f59;
+  border-radius: 16px;
+  background: #192f24;
+}
+.timber-demo[hidden] {
+  display: none;
+}
+.timber-heading {
+  justify-content: space-between;
+}
+.timber-title {
+  margin: 0.3rem 0;
+}
+.timber-status {
+  padding: 0.7rem 0;
+  border-block: 1px solid #3c5748;
+  margin: 0.7rem 0;
+  justify-content: space-between;
+}
+.timber-controls {
+  margin: 0.7rem 0;
+}
+.timber-controls select {
+  padding: 0.45rem;
+  background: #254332;
+  color: inherit;
+  border: 1px solid #8ca47e;
+  border-radius: 6px;
+}
+.timber-stock {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.timber-stock div {
+  padding: 0.5rem;
+  border-left: 2px solid #9cac73;
+}
+.timber-stock-label,
+.timber-stock-value {
+  display: block;
+}
+.timber-stock-label {
+  font-size: 0.8rem;
+  color: #b7c6b0;
+}
+.timber-stock-value {
+  font-size: 1.3rem;
+}
+.timber-offers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.7rem 0;
+}
+.timber-offer {
+  padding: 0.9rem;
+  background: #12251c;
+  border: 1px solid #47634c;
+  border-radius: 10px;
+}
+.timber-offer.selected {
+  border: 2px solid #d1e8a0;
+}
+.timber-offer h3 {
+  margin: 0 0 0.5rem;
+}
+.timber-offer p {
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+}
+.timber-actions button {
+  margin: 0.3rem 0.5rem 0.3rem 0;
+}
+.timber-result {
+  padding: 1rem;
+  background: #28462d;
+  border-radius: 10px;
+}
+.timber-delay {
+  padding: 0.6rem;
+  background: #604227;
+  border-radius: 8px;
+}
+.timber-demo details {
+  margin: 0.7rem 0;
+  font-size: 0.9rem;
+}
+.timber-demo summary {
+  cursor: pointer;
+  color: #d1e8a0;
+}
+@media (max-width: 600px) {
+  .timber-offers {
+    grid-template-columns: 1fr;
+  }
+  .timber-stock {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .timber-title {
+    font-size: 1.15rem;
+  }
+  .timber-demo {
+    padding: 0.8rem;
+  }
+}
+.timber-tools .timber-stock {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.timber-tools .timber-offers {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.timber-tools .timber-heading {
+  display: block;
+}
+.timber-tools .timber-title {
+  margin-bottom: 0.7rem;
+}
+
+@media (max-width: 600px) {
+  .timber-tools .timber-offers {
+    grid-template-columns: 1fr;
+  }
+}
+
+.timber-entry-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #d6e8a8;
+  font: inherit;
+  line-height: inherit;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}

@@ -10,10 +10,11 @@ import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder"
 import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { Scene } from "@babylonjs/core/scene";
-import type { SceneSnapshot } from "@dynosty/game-core";
+import type { SceneSnapshot, TimberState } from "@dynosty/game-core";
 import { loadModelAssets } from "./model-assets.js";
 import { createSceneEntities } from "./scene-entities.js";
 import { observeSceneClicks } from "./scene-input.js";
+import { createTimberVisual } from "./timber-scene.js";
 
 export interface SceneController {
   update(snapshot: SceneSnapshot): void;
@@ -21,6 +22,7 @@ export interface SceneController {
   dispose(): void;
   readonly ready: Promise<void>;
   resetCamera(): void;
+  updateTimber(state: TimberState | null): void;
 }
 
 export function mountScene(
@@ -107,6 +109,7 @@ export function mountScene(
   const entities = createSceneEntities(scene, onSelectionChange, () =>
     onAssetWarning("모델을 만들지 못해 연결 예제로 표시합니다."),
   );
+  const timberVisual = createTimberVisual(scene);
   const abort = new AbortController();
   let disposed = false;
   const ready = loadModelAssets(abort.signal)
@@ -140,10 +143,12 @@ export function mountScene(
       });
     }
     entities.animate(engine.getDeltaTime() / 1000);
+    timberVisual.animate(engine.getDeltaTime() / 1000);
     scene.render();
   });
   return {
     ready,
+    updateTimber: timberVisual.update,
     resetCamera() {
       camera.alpha = -Math.PI / 2;
       camera.beta = Math.PI / 3;
@@ -160,6 +165,7 @@ export function mountScene(
       abort.abort();
       observer.disconnect();
       stopPicking();
+      timberVisual.dispose();
       entities.dispose();
       scene.dispose();
       engine.dispose();

@@ -116,3 +116,5 @@ export {
   supplyFood,
   tickPlay,
 } from "./play.js";
+
+export * from "./timber.js";

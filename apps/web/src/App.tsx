@@ -6,6 +6,7 @@ import type {
   PlayState,
   SceneSnapshot,
 } from "@dynosty/game-core";
+import { type TimberState, timberScene } from "@dynosty/game-core";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   loadLocalExample,
@@ -21,10 +22,13 @@ import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SelectionPanel } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import type { SceneController } from "./scene.js";
+import { TimberDemo } from "./TimberDemo.js";
 import { VideoPanel } from "./VideoPanel.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
 
 export function App() {
+  const [timberOpen, setTimberOpen] = useState(false);
+  const [timberState, setTimberState] = useState<TimberState | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
   const [playState, setPlayState] = useState<PlayState | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
@@ -183,6 +187,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (timberOpen) return;
+    sceneRef.current?.updateTimber(null);
     if (!snapshot || sceneStatus !== "준비 완료" || !sceneRef.current) return;
     try {
       sceneRef.current.update(snapshot);
@@ -190,7 +196,20 @@ export function App() {
     } catch {
       setSceneStatus("3D 표시 정보 오류 — 전달 형식을 확인해 주세요");
     }
-  }, [snapshot, sceneStatus]);
+  }, [snapshot, sceneStatus, timberOpen]);
+  useEffect(() => {
+    if (
+      !timberOpen ||
+      !timberState ||
+      sceneStatus !== "준비 완료" ||
+      !sceneRef.current
+    )
+      return;
+    const display = timberScene(timberState);
+    sceneRef.current.update(display);
+    sceneRef.current.updateTimber(timberState);
+    setAppliedSnapshot(display);
+  }, [timberOpen, timberState, sceneStatus]);
 
   function advance() {
     setExampleClock(true);
@@ -275,7 +294,11 @@ export function App() {
       setPlaySaveFailure(playSaveError(error));
     }
   }
-  const shownDay = exampleClock ? state?.day : (playState?.day ?? state?.day);
+  const shownDay = timberOpen
+    ? Math.floor((timberState?.elapsed ?? 0) / 1440) + 1
+    : exampleClock
+      ? state?.day
+      : (playState?.day ?? state?.day);
   const saveDisabled = !state || !snapshot || workerError !== null || saveBusy;
 
   const resident = appliedSnapshot?.entities.find(
@@ -301,7 +324,13 @@ export function App() {
           <h1>DYNOSTY</h1>
         </div>
         <div className="play-time" aria-live="polite">
-          <span>{exampleClock ? "연결 예제 시간" : "게임 시간"}</span>
+          <span>
+            {timberOpen
+              ? "조달 체험 시간"
+              : exampleClock
+                ? "연결 예제 시간"
+                : "게임 시간"}
+          </span>
           <strong>{shownDay ? `${shownDay}일차` : "계산 준비 중"}</strong>
         </div>
         <nav className="play-menu" aria-label="게임 메뉴">
@@ -328,22 +357,39 @@ export function App() {
         </nav>
       </header>
       <div className="play-status">
-        <p>
-          플레이 화면 <span>· 화면 골격</span>
-        </p>
+        {!timberOpen ? (
+          <button
+            type="button"
+            className="timber-entry-link"
+            disabled={sceneStatus !== "준비 완료"}
+            onClick={() => {
+              if (!playState?.paused)
+                commandPlay({ type: "pause", paused: true });
+              setTimberOpen(true);
+            }}
+          >
+            마른 목재20 조달 체험하기
+          </button>
+        ) : (
+          <p>마른 목재20 · 조달 체험판</p>
+        )}
         <span data-testid="play-scene-status">3D {sceneStatus}</span>
       </div>
       {workerError ? <p role="alert">{workerError}</p> : null}
-      <PlayPanel
-        state={playState}
-        error={playError}
-        busy={playSaveBusy}
-        onCommand={commandPlay}
-      />
-      <div className={`play-workspace${hasPanels ? " has-tools" : ""}`}>
+      <div hidden={timberOpen}>
+        <PlayPanel
+          state={playState}
+          error={playError}
+          busy={playSaveBusy}
+          onCommand={commandPlay}
+        />
+      </div>
+      <div
+        className={`play-workspace${hasPanels || timberOpen ? " has-tools" : ""}`}
+      >
         <section aria-label="3D 개발 장면" className="play-scene">
           <div className="scene-heading">
-            <h2>3D 장면</h2>
+            <h2>{timberOpen ? "조달 현장" : "3D 장면"}</h2>
             <span className="prototype-label">복홀 · 개발 모델</span>
           </div>
           {assetWarning ? (
@@ -387,10 +433,15 @@ export function App() {
         </section>
 
         <aside
-          className="workspace-tools"
+          className={`workspace-tools${timberOpen ? " timber-tools" : ""}`}
           aria-label="작업 메뉴"
-          hidden={!hasPanels}
+          hidden={!hasPanels && !timberOpen}
         >
+          <TimberDemo
+            active={timberOpen}
+            onState={setTimberState}
+            onExit={() => setTimberOpen(false)}
+          />
           <SelectionPanel entity={selectedEntity} onClear={clearSelection} />
           <WorkspacePanel
             id={savePanelId}
