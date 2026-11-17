@@ -46,7 +46,6 @@ test("선택하지 않은 세 장소의 상태와 현장 번호를 표시하며 
 test("재배치의 부족 이유·진행량을 복원하고 실패 불러오기는 알림·현재 상태·원문을 보존한다", async ({
   page: p,
 }) => {
-  test.setTimeout(60000);
   await receiveProgress(p);
   await expect(p.getByTestId("site-notices")).toContainText("전량 검사 완료");
   await siteAction(p, "격리품", "현장 보완 인원 배정");
@@ -103,7 +102,6 @@ test("재배치의 부족 이유·진행량을 복원하고 실패 불러오기�
 test("교환의 대기·예약 인원·재검수·수령 완료를 보여주고 완료 저장을 읽어도 알리지 않는다", async ({
   page: p,
 }) => {
-  test.setTimeout(60000);
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(e.message));
   await receiveProgress(p);

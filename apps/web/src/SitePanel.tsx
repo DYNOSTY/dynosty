@@ -4,7 +4,7 @@ import {
   laborFinished,
   laborNextAt,
 } from "@dynosty/game-core";
-import { useEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import {
   type SiteAction,
   type SiteId,
@@ -27,10 +27,17 @@ export function SitePanel({
   onCommand: (c: LaborCommand) => void;
   onClear: () => void;
 }) {
-  const ref = useRef<HTMLElement>(null),
+  const ref = useRef<HTMLHeadingElement>(null),
     view = useMemo(() => siteView(state, selected), [state, selected]);
-  useEffect(() => {
-    ref.current?.scrollIntoView({ block: "nearest" });
+  useLayoutEffect(() => {
+    const heading = ref.current,
+      aside = heading?.closest("aside");
+    // 전체 페이지를 이동시키지 않고 데스크톱의 내부 스크롤만 정리한다.
+    if (heading && aside && aside.scrollHeight > aside.clientHeight)
+      aside.scrollTop +=
+        heading.getBoundingClientRect().top -
+        aside.getBoundingClientRect().top -
+        12;
   }, []);
   if (!siteAvailable(state, selected)) return null;
   const action = (a: SiteAction, showReason = true) => (
@@ -47,13 +54,11 @@ export function SitePanel({
     </div>
   );
   return (
-    <section
-      ref={ref}
-      className="site-panel"
-      aria-label={`${view.name} 현장 정보`}
-    >
+    <section className="site-panel" aria-label={`${view.name} 현장 정보`}>
       <div className="site-heading">
-        <h3 data-testid="site-name">{view.name}</h3>
+        <h3 ref={ref} data-testid="site-name">
+          {view.name}
+        </h3>
         <button type="button" className="quiet-button" onClick={onClear}>
           현장 선택 해제
         </button>

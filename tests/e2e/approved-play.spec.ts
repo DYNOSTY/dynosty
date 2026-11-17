@@ -40,8 +40,10 @@ test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저�
   await expect(page.getByTestId("play-save-status")).toHaveText(
     "게임을 저장했습니다.",
   );
+  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   await page.getByRole("button", { name: "1일 진행", exact: true }).click();
   await expect(stock(page)).toHaveText("80");
+  await saveMenu(page);
   await page.getByRole("button", { name: "게임 저장", exact: true }).click();
   await expect(page.getByTestId("play-save-status")).toHaveText(
     "게임을 저장했습니다.",
@@ -139,7 +141,9 @@ test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존�
   const before = await page.evaluate(() =>
     localStorage.getItem("dynosty.play.saves"),
   );
+  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   await page.getByRole("button", { name: "1일 진행", exact: true }).click();
+  await saveMenu(page);
   await expect(stock(page)).toHaveText("100");
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
@@ -183,6 +187,8 @@ test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존�
 test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시점을 실제 장면에서 확인한다", async ({
   page,
 }) => {
+  // GLB 로딩·실제 렌더 캡처·반복 휠 조작을 소프트웨어 렌더러에서도 끝까지 확인한다.
+  test.setTimeout(480_000);
   const loaded: string[] = [];
   const errors: string[] = [];
   page.on("response", (r) => {
@@ -193,6 +199,8 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   await ready(page);
   expect(loaded.some((x) => x.endsWith("triceratops.json"))).toBe(true);
   expect(loaded.some((x) => x.endsWith("ondol-nest.json"))).toBe(true);
+  expect(loaded.some((x) => x.endsWith("BLD_NEST.glb"))).toBe(true);
+  expect(loaded.some((x) => x.endsWith("R02_Triceratops.glb"))).toBe(true);
   const canvas = page.locator("canvas");
   const idle = await canvas.screenshot();
   await expect
@@ -209,6 +217,9 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   await expect
     .poll(async () => (await canvas.screenshot()).equals(walk))
     .toBe(false);
+  await page
+    .getByRole("button", { name: "개발 도구 닫기", exact: true })
+    .click();
   const box = await canvas.boundingBox();
   if (!box) throw new Error("캔버스 없음");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -223,26 +234,31 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
     )
     .toBeLessThanOrEqual(77.36);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.wheel(0, -10000);
-  await expect
-    .poll(async () =>
-      Number(await page.getByTestId("camera-distance").textContent()),
-    )
-    .toBe(4);
-  await page.mouse.wheel(0, 100000);
-  await expect
-    .poll(async () =>
-      Number(await page.getByTestId("camera-distance").textContent()),
-    )
-    .toBe(48);
+  for (const [delta, limit] of [
+    [-10000, 4],
+    [100000, 140],
+  ] as const) {
+    // 새 카메라는 휠 한 번의 변화를 제한한다. 실제 입력을 반복해 한계를 확인한다.
+    await expect
+      .poll(
+        async () => {
+          await page.mouse.wheel(0, delta);
+          return Number(
+            await page.getByTestId("camera-distance").textContent(),
+          );
+        },
+        { timeout: 150_000, intervals: [100, 100, 200] },
+      )
+      .toBe(limit);
+  }
   await expect
     .poll(async () =>
       Number(await page.getByTestId("camera-height").textContent()),
     )
     .toBeGreaterThan(0.8);
   await page.getByRole("button", { name: "기본 시점", exact: true }).click();
-  await expect(page.getByTestId("camera-distance")).toHaveText("12.00");
-  await expect(page.getByTestId("camera-angle")).toHaveText("60.00");
+  await expect(page.getByTestId("camera-distance")).toHaveText("56.00");
+  await expect(page.getByTestId("camera-angle")).toHaveText("54.00");
   await clickExample(page, "building");
   await expect(
     page.getByRole("region", { name: "선택 정보", exact: true }),

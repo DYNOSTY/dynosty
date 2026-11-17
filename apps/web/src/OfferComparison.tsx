@@ -16,7 +16,12 @@ export function OfferComparison({
 }) {
   const v = qualityView(state);
   return (
-    <section className="quality-offers" aria-label="공급 제안 비교">
+    <section
+      id="labor-offer-actions"
+      tabIndex={-1}
+      className="quality-offers"
+      aria-label="공급 제안 비교"
+    >
       <h4>공급 제안 비교</h4>
       <section className="quality-table-scroll" aria-label="공급 조건 비교표">
         <table>

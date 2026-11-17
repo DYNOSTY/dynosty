@@ -55,12 +55,11 @@ test("메뉴를 여닫아도 장면·날짜를 유지하고 저장 메뉴에서 
     page.getByRole("button", { name: "개발 도구", exact: true }),
   ).toBeFocused();
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page.getByRole("button", { name: "개발 도구", exact: true }).click();
   await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
   );
-  await page.getByRole("button", { name: "개발 도구", exact: true }).click();
   await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await expect(page.getByText("3일차", { exact: true })).toBeVisible();
   await page
@@ -70,9 +69,11 @@ test("메뉴를 여닫아도 장면·날짜를 유지하고 저장 메뉴에서 
   expect(
     await canvas?.evaluate((e) => e === document.querySelector("canvas")),
   ).toBe(true);
-  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
+  await page
+    .getByRole("button", { name: "개발 도구 닫기", exact: true })
+    .click();
   await expect(
-    page.getByRole("button", { name: "저장", exact: true }),
+    page.getByRole("button", { name: "개발 도구", exact: true }),
   ).toBeFocused();
   expect(errors).toEqual([]);
 });

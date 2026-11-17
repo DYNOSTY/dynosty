@@ -30,7 +30,7 @@ export function createSiteSelection(
       id,
       targets[id].flatMap((n) => {
         const m = scene.getMeshByName(n);
-        return m ? [m] : [];
+        return m ? [m, ...m.getChildMeshes(false)] : [];
       }),
     );
   function outline(id: SiteId, enabled: boolean) {

@@ -3,7 +3,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { Scene } from "@babylonjs/core/scene";
 import { createSceneExample } from "@dynosty/game-core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createSceneEntities } from "./scene-entities.js";
 
 describe("표시 정보에서 Babylon 객체로 변환", () => {
@@ -159,6 +159,72 @@ describe("예제 대상 선택", () => {
       expect(w.selected).toEqual([mesh.id]);
     } finally {
       w.dispose();
+    }
+  });
+});
+
+describe("늦게 도착하는 GLB와 최신 게임 표시", () => {
+  it("setGlb 도중 갱신이 와도 중복 요청하지 않고 최신 동작·선택을 적용한다", async () => {
+    const engine = new NullEngine(),
+      scene = new Scene(engine);
+    const entities = createSceneEntities(scene);
+    const pending = new Map<
+      string,
+      (value: import("./village.js").GlbVisual) => void
+    >();
+    const factory = vi.fn(
+      (kind: string) =>
+        new Promise<import("./village.js").GlbVisual>((resolve) =>
+          pending.set(kind, resolve),
+        ),
+    );
+    const visual = () => ({
+      setOutline: vi.fn(),
+      setMotion: vi.fn(),
+      animate: vi.fn(),
+      dispose: vi.fn(),
+    });
+    try {
+      entities.update(createSceneExample());
+      entities.setGlb(factory);
+      entities.update(createSceneExample(true));
+      entities.select("example-resident-1");
+      expect(factory).toHaveBeenCalledTimes(2);
+      const resident = visual();
+      pending.get("resident")?.(resident);
+      await Promise.resolve();
+      expect(resident.setMotion).toHaveBeenCalledWith("walking");
+      expect(resident.setOutline).toHaveBeenCalledWith(true);
+      entities.dispose();
+      const building = visual();
+      pending.get("building")?.(building);
+      await Promise.resolve();
+      expect(building.dispose).toHaveBeenCalledOnce();
+    } finally {
+      entities.dispose();
+      scene.dispose();
+      engine.dispose();
+    }
+  });
+  it("새 엔티티의 GLB가 완성될 때 대기 중 전달된 걷기 상태를 반영한다", async () => {
+    const engine = new NullEngine(),
+      scene = new Scene(engine);
+    const entities = createSceneEntities(scene);
+    const visual = {
+      setOutline: vi.fn(),
+      setMotion: vi.fn(),
+      animate: vi.fn(),
+      dispose: vi.fn(),
+    };
+    try {
+      entities.setGlb(async () => visual);
+      entities.update(createSceneExample(true));
+      await Promise.resolve();
+      expect(visual.setMotion).toHaveBeenCalledWith("walking");
+    } finally {
+      entities.dispose();
+      scene.dispose();
+      engine.dispose();
     }
   });
 });

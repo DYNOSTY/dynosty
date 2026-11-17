@@ -10,12 +10,15 @@ import {
 } from "@dynosty/game-core";
 import { createExchangeVisual, exchangeCartX } from "./exchange-scene.js";
 import { createSceneEntities } from "./scene-entities.js";
+import { crewActivity } from "./site-life.js";
 import { SITE_POINTS } from "./site-targets.js";
+import { createTransportDecor } from "./transport-scene.js";
 
 /** 일손 이동은 시각 보간이며 게임의 작업 시간이나 배치를 변경하지 않는다. */
 export function createLaborVisual(scene: Scene) {
   const workers = createSceneEntities(scene);
   const exchangeVisual = createExchangeVisual(scene);
+  const transportDecor = createTransportDecor(scene);
   const material = new StandardMaterial("labor-station-material", scene);
   material.diffuseColor = new Color3(0.36, 0.62, 0.64);
   const waiting = new StandardMaterial("labor-queue-material", scene);
@@ -56,14 +59,17 @@ export function createLaborVisual(scene: Scene) {
       const slot = s.crew
         .filter((c) => c.job === "repair")
         .findIndex((c) => c.id === s.crew[i]?.id);
-      return { x: slot === 0 ? -1.9 : 1.4, z: -2.5 };
+      return {
+        x: 4.2 + (slot % 2) * 1.3,
+        z: -2.6 + Math.floor(slot / 2) * 1.1,
+      };
     }
     if (job === "prep")
-      return { x: 3.0 + (i % 2) * 2.2, z: -1.8 + Math.floor(i / 2) * 2.8 };
+      return { x: 2.8 + (i % 2) * 2, z: -0.8 + Math.floor(i / 2) * 2 };
     if (job === "exchange") {
       if (["reserved", "returning", "delivering"].includes(s.exchange.phase))
         return { x: exchangeCartX(s) + 0.9, z: 3.2 };
-      return { x: 2.1, z: -3.7 };
+      return { x: 3.3, z: -2.7 };
     }
     if (job === "carrier") {
       const t = s.timber;
@@ -73,15 +79,36 @@ export function createLaborVisual(scene: Scene) {
           : t.phase === "contracted"
             ? 0
             : 1;
-      return { x: -6 + progress * 8, z: 2.3 };
+      return s.timber.phase === "transport" || s.timber.phase === "contracted"
+        ? { x: -6 + progress * 8, z: 2.3 }
+        : { x: 3.3, z: -2.7 };
     }
     return { x: -4.5 + (i % 2) * 2.0, z: -2.0 + Math.floor(i / 2) * 2.8 };
+  }
+  let visualTime = 0;
+  function pose(seconds: number) {
+    if (!state) return;
+    if (!state.paused) visualTime += Math.max(0, Math.min(seconds, 0.1));
+    for (const [i, c] of state.crew.entries()) {
+      const mesh = scene.getMeshById(c.id),
+        goal = target(state, i),
+        p = positions.get(c.id);
+      if (!mesh) continue;
+      const working =
+        p &&
+        Math.hypot(p.x - goal.x, p.z - goal.z) < 0.03 &&
+        crewActivity(state, i).endsWith("중") &&
+        !crewActivity(state, i).includes("운송") &&
+        !state.paused;
+      mesh.rotation.z = working ? Math.sin(visualTime * 5 + i) * 0.12 : 0;
+    }
   }
   function animate(seconds: number) {
     exchangeVisual.animate(seconds);
     if (!state) return;
     if (settled) {
       workers.animate(seconds);
+      pose(seconds);
       return;
     }
     settled = true;
@@ -122,6 +149,7 @@ export function createLaborVisual(scene: Scene) {
     };
     workers.update(snapshot);
     workers.animate(seconds);
+    pose(seconds);
   }
   return {
     setModels(assets: Parameters<typeof workers.setModels>[0]) {
@@ -137,6 +165,7 @@ export function createLaborVisual(scene: Scene) {
         shown = next !== null;
       }
       exchangeVisual.update(next);
+      transportDecor.update(next);
       settled = false;
       bench.setEnabled(next !== null);
       for (const [i, p] of queue.entries())
@@ -151,6 +180,7 @@ export function createLaborVisual(scene: Scene) {
     animate,
     dispose() {
       workers.dispose();
+      transportDecor.dispose();
       exchangeVisual.dispose();
       for (const p of props) p.dispose();
       material.dispose();
