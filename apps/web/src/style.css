@@ -445,7 +445,7 @@ h1 {
 
 @media (max-width: 540px) {
   canvas {
-    height: clamp(240px, 40dvh, 360px);
+    height: clamp(200px, 30dvh, 300px);
   }
 }
 

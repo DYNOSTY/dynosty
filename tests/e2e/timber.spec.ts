@@ -327,6 +327,8 @@ test("식성별 주민 구성과 수레 내려놓기·이탈 단계를 표시한
 test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각자 이용한다", async ({
   page,
 }) => {
+  // 건설·직원 이동·식사를 실제 시간으로 기다리는 연속 시나리오다.
+  test.setTimeout(90_000);
   await enter(page);
   await loadFixture(
     page,
