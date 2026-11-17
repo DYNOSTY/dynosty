@@ -1,0 +1,14 @@
+import type {
+  TimberCommand,
+  TimberSave,
+  TimberState,
+} from "@dynosty/game-core";
+export type TimberRequest =
+  | { type: "command"; id: string; command: TimberCommand }
+  | { type: "save"; requestId: number }
+  | { type: "load"; requestId: number; data: unknown };
+export type TimberResponse =
+  | { type: "state"; state: TimberState }
+  | { type: "saved"; requestId: number; save: TimberSave }
+  | { type: "loaded"; requestId: number }
+  | { type: "error"; message: string; requestId: number | null };
