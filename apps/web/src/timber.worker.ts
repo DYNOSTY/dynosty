@@ -10,13 +10,24 @@ import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 
 let state = createTimberState(),
   last = performance.now();
+let initialized = false;
 const send = (m: TimberResponse) => self.postMessage(m);
 const publish = () => send({ type: "state", state });
 publish();
 self.onmessage = (event: MessageEvent<TimberRequest>) => {
   const m = event.data;
   try {
-    if (m.type === "command") state = commandTimber(state, m.command, m.id);
+    if (m.type === "init") {
+      if (!initialized)
+        state = { ...createTimberState(m.world), paused: false };
+      initialized = true;
+    } else if (m.type === "exit") {
+      state = { ...state, paused: true, remainder: 0 };
+      send({ type: "exited", world: state.world });
+      publish();
+      return;
+    } else if (m.type === "command")
+      state = commandTimber(state, m.command, m.id);
     else if (m.type === "save") {
       send({
         type: "saved",
@@ -27,6 +38,7 @@ self.onmessage = (event: MessageEvent<TimberRequest>) => {
     } else {
       const loaded = parseTimberSave(m.data);
       state = { ...loaded.state, paused: true, remainder: 0 };
+      initialized = true;
       send({ type: "loaded", requestId: m.requestId });
     }
     last = performance.now();
@@ -34,7 +46,7 @@ self.onmessage = (event: MessageEvent<TimberRequest>) => {
   } catch (e) {
     send({
       type: "error",
-      requestId: m.type === "command" ? null : m.requestId,
+      requestId: m.type === "save" || m.type === "load" ? m.requestId : null,
       message:
         e instanceof Error ? e.message : "체험판 명령을 처리하지 못했습니다.",
     });

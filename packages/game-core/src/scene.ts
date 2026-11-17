@@ -16,10 +16,13 @@ export type SceneEntity =
   | (SceneEntityBase & {
       readonly kind: "resident";
       readonly motion: "idle" | "walking";
+      readonly needsHelp?: boolean;
+      readonly indoors?: boolean;
     })
   | (SceneEntityBase & {
       readonly kind: "building";
       readonly highlighted: boolean;
+      readonly lit?: boolean;
     });
 
 export interface SceneSnapshot {

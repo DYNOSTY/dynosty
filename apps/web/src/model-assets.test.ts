@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Scene } from "@babylonjs/core/scene";
 import { createSceneExample } from "@dynosty/game-core";
 import { describe, expect, it } from "vitest";
@@ -100,4 +101,32 @@ describe("자체 제작 대표 모델", () => {
       engine.dispose();
     }
   });
+});
+
+it("둥지 창호는 입주한 밤에 빛나고 아침에는 발광을 끈다", () => {
+  const engine = new NullEngine(),
+    scene = new Scene(engine),
+    entities = createSceneEntities(scene);
+  try {
+    entities.setModels({ building: parseModel(building, "building") });
+    const base = createSceneExample();
+    const update = (lit: boolean) =>
+      entities.update({
+        ...base,
+        entities: base.entities.map((e) =>
+          e.kind === "building" ? { ...e, lit } : e,
+        ),
+      });
+    update(true);
+    const paper = scene.getMeshById("example-building-1:paper--0.6");
+    expect(paper?.material).toBeInstanceOf(StandardMaterial);
+    const material = paper?.material as StandardMaterial;
+    expect(material.emissiveColor.r).toBe(1);
+    update(false);
+    expect(material.emissiveColor.r).toBe(0);
+  } finally {
+    entities.dispose();
+    scene.dispose();
+    engine.dispose();
+  }
 });

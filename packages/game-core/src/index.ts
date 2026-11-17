@@ -89,10 +89,19 @@ export function advanceDay(state: GameState): GameState {
   return { ...state, day: state.day + 1 };
 }
 
+export * from "./bokhol.js";
+export * from "./development.js";
+export * from "./home-construction.js";
+export * from "./home-placement.js";
+export * from "./hospital.js";
+export * from "./logging.js";
 export {
   AMOUNT_SCALE,
+  advancePlayClock,
   advancePlayMinutes,
+  applyCitizenEvent,
   type Citizen,
+  type CitizenEvent,
   createPlaySave,
   createPlayScene,
   createPlayState,
@@ -116,5 +125,14 @@ export {
   supplyFood,
   tickPlay,
 } from "./play.js";
-
+export {
+  type GroundObstacle,
+  type GroundPoint,
+  residentPath,
+} from "./resident-path.js";
+export * from "./resident-routine.js";
+export * from "./storage.js";
+export * from "./story-research.js";
 export * from "./timber.js";
+export * from "./town.js";
+export * from "./village-services.js";

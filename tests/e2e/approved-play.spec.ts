@@ -234,7 +234,7 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
     .poll(async () =>
       Number(await page.getByTestId("camera-distance").textContent()),
     )
-    .toBe(48);
+    .toBe(720);
   await expect
     .poll(async () =>
       Number(await page.getByTestId("camera-height").textContent()),

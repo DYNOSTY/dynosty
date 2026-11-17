@@ -6,8 +6,15 @@ import type {
   PlayState,
   SceneSnapshot,
 } from "@dynosty/game-core";
-import { type TimberState, timberScene } from "@dynosty/game-core";
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  AMOUNT_SCALE,
+  type BuildingKind,
+  createPlaySave,
+  type HomePlacement,
+  type TimberState,
+  timberScene,
+} from "@dynosty/game-core";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   loadLocalExample,
   localSaveError,
@@ -21,12 +28,16 @@ import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SelectionPanel } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
-import type { SceneController } from "./scene.js";
+import type { BuildingHover, SceneController } from "./scene.js";
 import { TimberDemo } from "./TimberDemo.js";
 import { VideoPanel } from "./VideoPanel.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
 
 export function App() {
+  const [buildingHover, setBuildingHover] = useState<BuildingHover | null>(
+    null,
+  );
+  const [selectedHospital, setSelectedHospital] = useState<string | null>(null);
   const [timberOpen, setTimberOpen] = useState(false);
   const [timberState, setTimberState] = useState<TimberState | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -58,6 +69,10 @@ export function App() {
   );
   const [apiStatus, setApiStatus] = useState("연결 중");
   const [sceneStatus, setSceneStatus] = useState("불러오는 중");
+  useEffect(() => {
+    if (sceneStatus === "준비 완료")
+      sceneRef.current?.setSelectionEnabled(!timberOpen || toolsOpen);
+  }, [timberOpen, toolsOpen, sceneStatus]);
   const [cameraInfo, setCameraInfo] = useState<{
     distance: number;
     angle: number;
@@ -170,6 +185,8 @@ export function App() {
           setSelectedId,
           setAssetWarning,
           setCameraInfo,
+          setBuildingHover,
+          setSelectedHospital,
         );
         await sceneRef.current.ready;
         if (cancelled) return;
@@ -211,6 +228,21 @@ export function App() {
     setAppliedSnapshot(display);
   }, [timberOpen, timberState, sceneStatus]);
 
+  const beginHomePlacement = useCallback(
+    (
+      confirm: (pose: HomePlacement) => void,
+      feedback: (message: string, active: boolean) => void,
+      kind?: BuildingKind,
+    ) =>
+      sceneRef.current
+        ? sceneRef.current.beginHomePlacement(confirm, feedback, kind)
+        : feedback("3D 장면을 준비하고 있습니다.", false),
+    [],
+  );
+  const cancelHomePlacement = useCallback(
+    () => sceneRef.current?.cancelHomePlacement(),
+    [],
+  );
   function advance() {
     setExampleClock(true);
     if (pendingSaveRef.current !== null) return;
@@ -295,7 +327,7 @@ export function App() {
     }
   }
   const shownDay = timberOpen
-    ? Math.floor((timberState?.elapsed ?? 0) / 1440) + 1
+    ? (timberState?.world.day ?? 1)
     : exampleClock
       ? state?.day
       : (playState?.day ?? state?.day);
@@ -376,20 +408,39 @@ export function App() {
         <span data-testid="play-scene-status">3D {sceneStatus}</span>
       </div>
       {workerError ? <p role="alert">{workerError}</p> : null}
-      <div hidden={timberOpen}>
+      <div>
         <PlayPanel
-          state={playState}
+          compact={timberOpen}
+          state={
+            timberOpen && timberState
+              ? {
+                  ...timberState.world,
+                  resources: {
+                    ...timberState.world.resources,
+                    RES_WOOD:
+                      timberState.world.resources.RES_WOOD -
+                      timberState.reservedWood * AMOUNT_SCALE,
+                  },
+                }
+              : playState
+          }
           error={playError}
           busy={playSaveBusy}
           onCommand={commandPlay}
         />
+        {timberOpen ? (
+          <p className="hint">
+            공동 재고 · 운송 중·검사 대기·격리 물량은 사용 가능 재고에서
+            제외합니다.
+          </p>
+        ) : null}
       </div>
       <div
         className={`play-workspace${hasPanels || timberOpen ? " has-tools" : ""}`}
       >
         <section aria-label="3D 개발 장면" className="play-scene">
           <div className="scene-heading">
-            <h2>{timberOpen ? "조달 현장" : "3D 장면"}</h2>
+            <h2>{timberOpen ? "복홀 구릉지" : "3D 장면"}</h2>
             <span className="prototype-label">복홀 · 개발 모델</span>
           </div>
           {assetWarning ? (
@@ -402,9 +453,47 @@ export function App() {
             aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
             tabIndex={0}
           />
+          {buildingHover ? (
+            <div
+              role="tooltip"
+              className="building-health-tooltip"
+              style={{
+                position: "fixed",
+                left: buildingHover.x,
+                top: buildingHover.y,
+                pointerEvents: "none",
+                zIndex: 50,
+              }}
+            >
+              <span>
+                {buildingHover.name}
+                {buildingHover.health !== undefined
+                  ? ` · ${buildingHover.health}/100`
+                  : ""}
+              </span>
+              {buildingHover.health !== undefined ? (
+                <progress
+                  max={100}
+                  value={buildingHover.health}
+                  aria-label={`${buildingHover.name} 체력`}
+                />
+              ) : null}
+              {buildingHover.details ? (
+                <span>{buildingHover.details}</span>
+              ) : null}
+            </div>
+          ) : null}
           <div className="scene-footer">
-            <p>클릭으로 선택 · 마우스로 회전 · 휠로 확대</p>
-            <span>대표 주민 1종 · 온돌 둥지</span>
+            <p>
+              {timberOpen && !toolsOpen
+                ? "업무는 자동 배정 · 왼쪽 드래그 회전 · 오른쪽 드래그 이동 · 휠 확대"
+                : "클릭으로 선택 · 마우스로 회전 · 휠로 확대"}
+            </p>
+            <span>
+              {timberOpen
+                ? "주민은 자동 생활 · 건물에 마우스를 올리면 체력 표시"
+                : "주민 외형은 트리케라톱스 임시 모델"}
+            </span>
           </div>
           <fieldset className="selection-actions" aria-label="예제 대상 선택">
             <button
@@ -415,7 +504,7 @@ export function App() {
               기본 시점
             </button>
             {appliedSnapshot?.entities
-              .filter((entity) => entity.visible)
+              .filter((entity) => entity.visible && (!timberOpen || toolsOpen))
               .map((entity) => (
                 <button
                   key={entity.id}
@@ -426,7 +515,9 @@ export function App() {
                 >
                   {entity.kind === "building"
                     ? "건물 예제 선택"
-                    : "주민 예제 선택"}
+                    : timberOpen
+                      ? `${(timberState?.residents.findIndex((r) => r.id === entity.id) ?? -1) + 1}번 주민 선택`
+                      : "주민 예제 선택"}
                 </button>
               ))}
           </fieldset>
@@ -439,14 +530,37 @@ export function App() {
         >
           <TimberDemo
             active={timberOpen}
+            selectedHospital={selectedHospital}
+            world={playState}
+            showDevTools={toolsOpen}
+            saveOpen={saveOpen}
             onState={setTimberState}
-            onExit={() => setTimberOpen(false)}
+            onHomePlacement={beginHomePlacement}
+            onCancelHomePlacement={cancelHomePlacement}
+            onOverview={() => sceneRef.current?.overview()}
+            onView={(point, distance) =>
+              sceneRef.current?.focus(point, distance)
+            }
+            onExit={(world) => {
+              const requestId = ++nextRequestRef.current;
+              pendingPlaySaveRef.current = requestId;
+              setPlaySaveBusy(true);
+              workerRef.current?.postMessage({
+                type: "load-play",
+                requestId,
+                data: createPlaySave(world),
+              } satisfies GameCommand);
+              setTimberOpen(false);
+            }}
           />
-          <SelectionPanel entity={selectedEntity} onClear={clearSelection} />
+          <SelectionPanel
+            entity={timberOpen && !toolsOpen ? null : selectedEntity}
+            onClear={clearSelection}
+          />
           <WorkspacePanel
             id={savePanelId}
             title="저장"
-            open={saveOpen}
+            open={saveOpen && !timberOpen}
             onClose={() => {
               setSaveOpen(false);
               saveMenuRef.current?.focus();

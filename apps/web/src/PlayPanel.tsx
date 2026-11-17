@@ -13,8 +13,15 @@ type Props = {
   error: string | null;
   busy: boolean;
   onCommand: (command: PlayCommand) => void;
+  compact?: boolean;
 };
-export function PlayPanel({ state, error, busy, onCommand }: Props) {
+export function PlayPanel({
+  state,
+  error,
+  busy,
+  onCommand,
+  compact = false,
+}: Props) {
   const [confirm, setConfirm] = useState(false);
   if (!state)
     return (
@@ -24,11 +31,11 @@ export function PlayPanel({ state, error, busy, onCommand }: Props) {
         </p>
       </section>
     );
-  const warnings = foodWarnings(state);
+  const warnings = compact ? [] : foodWarnings(state);
   const clock = `${state.day}일 · ${String(Math.floor(state.minute / 60)).padStart(2, "0")}:${String(state.minute % 60).padStart(2, "0")}`;
   return (
     <section className="settlement-dashboard" aria-label="복홀 현황">
-      <div className="settlement-heading">
+      <div className="settlement-heading" hidden={compact}>
         <div>
           <h2 className="settlement-title">복홀 현황</h2>
           <p>
@@ -100,9 +107,17 @@ export function PlayPanel({ state, error, busy, onCommand }: Props) {
           </div>
         ))}
       </section>
-      <p className="play-baseline-note">
+      <p className="hint" data-testid="population-diets">
+        {GAME_RULES.population
+          .map(
+            (p) =>
+              `${p.name} ${state.citizens.filter((c) => c.alive && c.species === p.species).length}명(${GAME_RULES.resources[p.diet as keyof typeof GAME_RULES.resources].name})`,
+          )
+          .join(" · ")}
+      </p>
+      <p className="play-baseline-note" hidden={compact}>
         승인 개발 기준 v1 · {state.paused ? "일시정지" : "시간 진행 중"} · 1초 =
-        게임 10분 · 탭을 벗어나면 일시정지
+        게임 1분 · 탭을 벗어나면 일시정지
       </p>
       {warnings.length ? (
         <div className="food-warnings" role="alert" data-testid="food-warnings">
