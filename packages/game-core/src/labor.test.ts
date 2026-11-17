@@ -239,7 +239,7 @@ describe("개인별 공유 일손과 동시 작업", () => {
     if (key === "future") v.history[0].minute = 1000;
     if (key === "deadline") v.timber.due = 481;
     if (key === "progress") v.repairProgress = 20;
-    if (key === "version") v.version = 2;
+    if (key === "version") v.version = 99;
     expect(() => parseLaborState(v)).toThrow();
   });
 });

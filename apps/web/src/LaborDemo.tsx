@@ -6,12 +6,16 @@ import {
   type LaborCommand,
   type LaborState,
   laborFinished,
+  laborIron,
   laborNextAt,
+  laborReservedIron,
+  laborStock,
   queueRemaining,
   TIMBER_RULES,
   type TimberCommand,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
+import { ExchangePanel } from "./ExchangePanel.js";
 import type { LaborRequest, LaborResponse } from "./labor-protocol.js";
 import { laborSaveError, loadLabor, saveLabor } from "./labor-save.js";
 
@@ -44,7 +48,7 @@ function CrewRow({
         <select
           aria-label={`${label} 배치`}
           value={to}
-          disabled={disabled || job === "carrier"}
+          disabled={disabled || job === "carrier" || job === "exchange"}
           onChange={(e) => setTo(e.target.value as typeof to)}
         >
           <option value="idle">대기</option>
@@ -54,7 +58,9 @@ function CrewRow({
       </label>
       <button
         type="button"
-        disabled={disabled || job === "carrier" || job === to}
+        disabled={
+          disabled || job === "carrier" || job === "exchange" || job === to
+        }
         onClick={() => onMove(to)}
       >
         {label} {job === "idle" ? "배정" : "재배치"}
@@ -166,21 +172,28 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
         {error ? <p role="alert">{error}</p> : null}
       </section>
     );
+  const stock = laborStock(state),
+    iron = laborIron(state),
+    reservedIron = laborReservedIron(state);
   const t = state.timber,
     done = laborFinished(state),
     prep = countCrew(state, "prep"),
     repair = countCrew(state, "repair"),
     waiting = queueRemaining(state);
   const repairStatus =
-    state.repairProgress === 240
-      ? "완료"
-      : t.stock.quarantine === 0
-        ? "검사·수령 후 배치"
-        : repair === 2
-          ? "진행 중"
-          : repair === 1
-            ? "동료1명 필요 · 진행 보존"
-            : "배정 대기 · 진행 보존";
+    state.exchange.phase !== "none"
+      ? state.exchange.phase === "completed"
+        ? "교환으로 해소"
+        : "공급처 교환 선택"
+      : state.repairProgress === 240
+        ? "완료"
+        : t.stock.quarantine === 0
+          ? "검사·수령 후 배치"
+          : repair === 2
+            ? "진행 중"
+            : repair === 1
+              ? "동료1명 필요 · 진행 보존"
+              : "배정 대기 · 진행 보존";
   const prepStatus =
     state.elapsed < 480
       ? "8시간째 요청 열림"
@@ -226,7 +239,7 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
           공유 시간 {time(state.elapsed)}
         </strong>
         <span data-testid="labor-iron">
-          철재 {t.iron} · 예약 {t.reservedIron} · 가용 {t.iron - t.reservedIron}
+          철재 {iron} · 예약 {reservedIron} · 가용 {iron - reservedIron}
         </span>
         <span data-testid="labor-free">
           대기 일손 {countCrew(state, "idle")}/4
@@ -325,6 +338,7 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
           />
         ))}
       </fieldset>
+      <ExchangePanel state={state} busy={busy} onCommand={command} />
       <section aria-label="확장 체험 목재 요청">
         <h3>목재20 · 기한12시간</h3>
         <div className="labor-stock">
@@ -336,18 +350,28 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
               "available",
               "allocated",
               "used",
+              "transit",
             ] as const
           ).map((k, i) => (
             <span key={k}>
               {
-                ["검사대기", "수령전", "격리", "사용가능", "배분", "사용확인"][
-                  i
-                ]
+                [
+                  "검사대기",
+                  "수령전",
+                  "격리",
+                  "사용가능",
+                  "배분",
+                  "사용확인",
+                  "교환운송",
+                ][i]
               }{" "}
-              <strong data-testid={`labor-${k}`}>{t.stock[k]}</strong>
+              <strong data-testid={`labor-${k}`}>{stock[k]}</strong>
             </span>
           ))}
         </div>
+        <p data-testid="labor-total">
+          물량 합계 {Object.values(stock).reduce((a, b) => a + b, 0)}/20
+        </p>
         {t.phase === "select" ? (
           <>
             <div className="timber-offers">
@@ -434,15 +458,6 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
             확장 정상분 {t.stock.checked} 받기
           </button>
         ) : null}
-        {t.phase === "received" ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => wood({ type: "repair" })}
-          >
-            빈 일손2명 목재 보완 배정
-          </button>
-        ) : null}
         {["received", "repairing", "ready"].includes(t.phase) ? (
           <button
             type="button"
@@ -472,7 +487,15 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
         <div className="timber-result" data-testid="labor-result">
           <h3>두 생활 요청을 마쳤습니다</h3>
           <p>
-            공급{t.offer} · 철재{t.iron} 남음
+            공급{t.offer} · 철재{iron} 남음
+          </p>
+          <p>
+            불량 처리:{" "}
+            {state.exchange.phase === "completed"
+              ? "공급처 교환·재검수 (추가 철재1)"
+              : t.offer === "A"
+                ? "현장 보완"
+                : "불량 없음"}
           </p>
           <p>
             목재: {time(t.completedAt ?? 0)} ·{" "}
@@ -545,9 +568,11 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
           시 진행을 보존합니다.
         </p>
         <p>
-          배치 전환은 게임 시간0분, 화면 이동은 표시용입니다. 대기무리는 혼잡
-          표시이며 실제 먹이 소비·영양·기아를 계산하지 않습니다. 본편의
-          영양량·시간 배율·배급 간격·사망 수치는 미정입니다.
+          교환은 추가 철재1·담당1명, 회수90분+재납품90분+재검수120분입니다.
+          교환품4는 정상 고정이며 반품 책임·위약금·공급처 신뢰도·무작위 불량률은
+          본편 미정입니다. 배치 전환은 게임 시간0분, 화면 이동은 표시용입니다.
+          대기무리는 혼잡 표시이며 실제 먹이 소비·영양·기아를 계산하지 않습니다.
+          본편의 영양량·시간 배율·배급 간격·사망 수치는 미정입니다.
         </p>
         <p>
           확장 체험 저장은 기존 목재·생존 저장과 별도이며, 기존 기록을 임의로

@@ -8,11 +8,13 @@ import {
   queueRemaining,
   type SceneSnapshot,
 } from "@dynosty/game-core";
+import { createExchangeVisual, exchangeCartX } from "./exchange-scene.js";
 import { createSceneEntities } from "./scene-entities.js";
 
 /** 일손 이동은 시각 보간이며 게임의 작업 시간이나 배치를 변경하지 않는다. */
 export function createLaborVisual(scene: Scene) {
   const workers = createSceneEntities(scene);
+  const exchangeVisual = createExchangeVisual(scene);
   const material = new StandardMaterial("labor-station-material", scene);
   material.diffuseColor = new Color3(0.36, 0.62, 0.64);
   const waiting = new StandardMaterial("labor-queue-material", scene);
@@ -55,6 +57,11 @@ export function createLaborVisual(scene: Scene) {
     }
     if (job === "prep")
       return { x: 3.0 + (i % 2) * 2.2, z: -1.8 + Math.floor(i / 2) * 2.8 };
+    if (job === "exchange") {
+      if (["reserved", "returning", "delivering"].includes(s.exchange.phase))
+        return { x: exchangeCartX(s) + 0.9, z: 3.2 };
+      return { x: 2.1, z: -3.7 };
+    }
     if (job === "carrier") {
       const t = s.timber;
       const progress =
@@ -68,6 +75,7 @@ export function createLaborVisual(scene: Scene) {
     return { x: -4.5 + (i % 2) * 2.0, z: -2.0 + Math.floor(i / 2) * 2.8 };
   }
   function animate(seconds: number) {
+    exchangeVisual.animate(seconds);
     if (!state) return;
     if (settled) {
       workers.animate(seconds);
@@ -120,6 +128,7 @@ export function createLaborVisual(scene: Scene) {
     },
     update(next: LaborState | null) {
       state = next;
+      exchangeVisual.update(next);
       settled = false;
       bench.setEnabled(next !== null);
       for (const [i, p] of queue.entries())
@@ -134,6 +143,7 @@ export function createLaborVisual(scene: Scene) {
     animate,
     dispose() {
       workers.dispose();
+      exchangeVisual.dispose();
       for (const p of props) p.dispose();
       material.dispose();
       waiting.dispose();

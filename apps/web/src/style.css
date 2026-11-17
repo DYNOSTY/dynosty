@@ -679,3 +679,26 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+.exchange-panel {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid #a5b678;
+  border-radius: 10px;
+  background: #203a2a;
+}
+.exchange-options {
+  display: grid;
+  gap: 0.6rem;
+}
+.exchange-options article {
+  padding: 0.6rem;
+  border: 1px solid #687f59;
+  border-radius: 8px;
+}
+.exchange-options h4 {
+  margin: 0 0 0.5rem;
+}
+.exchange-panel button {
+  margin: 0.25rem 0.25rem 0.25rem 0;
+}

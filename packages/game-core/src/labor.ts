@@ -1,3 +1,13 @@
+import {
+  advanceExchange,
+  commandExchange,
+  type ExchangeCommand,
+  type ExchangeState,
+  emptyExchange,
+  exchangeDue,
+  parseExchange,
+  validateExchange,
+} from "./exchange.js";
 import { isRecord } from "./save.js";
 import type { SceneSnapshot } from "./scene.js";
 import {
@@ -24,15 +34,17 @@ export const LABOR_RULES = {
 } as const;
 export const CREW_IDS = ["crew-1", "crew-2", "crew-3", "crew-4"] as const;
 export type CrewId = (typeof CREW_IDS)[number];
-export type CrewJob = "idle" | "carrier" | "repair" | "prep";
+export type CrewJob = "idle" | "carrier" | "repair" | "prep" | "exchange";
 export const CREW_JOB_NAMES = {
   idle: "대기",
   carrier: "운송·검사",
+  exchange: "교환·재검수",
   repair: "목재 보완",
   prep: "배급 준비",
 } as const;
 export interface LaborState {
-  readonly version: 1;
+  readonly version: 2;
+  readonly exchange: ExchangeState;
   readonly elapsed: number;
   readonly paused: boolean;
   readonly speed: 1 | 3;
@@ -50,6 +62,7 @@ export interface LaborState {
   }[];
 }
 export type LaborCommand =
+  | ExchangeCommand
   | { type: "timber"; command: TimberCommand }
   | { type: "assign"; worker: CrewId; job: "repair" | "prep" }
   | {
@@ -83,7 +96,8 @@ export function queueRemaining(s: LaborState) {
 }
 export function createLaborState(): LaborState {
   return {
-    version: 1,
+    version: 2,
+    exchange: emptyExchange(),
     elapsed: 0,
     paused: true,
     speed: 1,
@@ -104,9 +118,16 @@ export function createLaborState(): LaborState {
   };
 }
 export function parseLaborState(v: unknown): LaborState {
+  if (isRecord(v) && v.version === 1) {
+    if ("exchange" in v)
+      fail(
+        "이전 형식에 지원하지 않는 교환 정보가 있습니다. 원본을 유지합니다.",
+      );
+    return parseLaborState({ ...v, version: 2, exchange: emptyExchange() });
+  }
   if (
     !isRecord(v) ||
-    v.version !== 1 ||
+    v.version !== 2 ||
     typeof v.paused !== "boolean" ||
     (v.speed !== 1 && v.speed !== 3) ||
     !Array.isArray(v.crew) ||
@@ -135,7 +156,9 @@ export function parseLaborState(v: unknown): LaborState {
       !isRecord(c) ||
       !CREW_IDS.includes(c.id as CrewId) ||
       ids.has(c.id as string) ||
-      !["idle", "carrier", "repair", "prep"].includes(c.job as string)
+      !["idle", "carrier", "repair", "prep", "exchange"].includes(
+        c.job as string,
+      )
     )
       fail("일손 식별값·중복 배정이 올바르지 않습니다.");
     ids.add(c.id as string);
@@ -161,7 +184,12 @@ export function parseLaborState(v: unknown): LaborState {
     if (h.minute < previous || h.minute > v.elapsed) fail();
     previous = h.minute;
   }
-  const s = { ...JSON.parse(JSON.stringify(v)), timber } as LaborState;
+  const s = {
+    ...JSON.parse(JSON.stringify(v)),
+    timber,
+    exchange: parseExchange(v.exchange),
+  } as LaborState;
+  validateExchange(s);
   // 현재 인원 배치와 무관한 물리적 상한. 중단/재배치 이력을 보존해도 이를 넘을 수 없다.
   const prepCapacity =
     Math.max(0, s.elapsed - LABOR_RULES.prepOpensAt) * LABOR_RULES.workers;
@@ -204,7 +232,9 @@ export function parseLaborState(v: unknown): LaborState {
   } else {
     if (repair !== 0) fail("지금은 목재 보완에 배정할 수 없습니다.");
     const expected =
-      timber.offer === "A" && ["ready", "completed"].includes(timber.phase)
+      timber.offer === "A" &&
+      s.exchange.phase !== "completed" &&
+      ["ready", "completed"].includes(timber.phase)
         ? 240
         : 0;
     if (s.repairProgress !== expected)
@@ -236,6 +266,8 @@ export function laborNextAt(s: LaborState): number | null {
   const times: number[] = [];
   if (s.elapsed < 480) times.push(480);
   if (s.timber.due !== null) times.push(s.timber.due);
+  const exchange = exchangeDue(s.exchange);
+  if (exchange !== null) times.push(exchange);
   const prep = countCrew(s, "prep");
   if (prep > 0 && s.prepProgress < 360)
     times.push(s.elapsed + Math.ceil((360 - s.prepProgress) / prep));
@@ -279,6 +311,8 @@ export function advanceLabor(input: LaborState, minutes: number): LaborState {
     prepProgress,
     prepCompletedAt: prepDone ? target : s.prepCompletedAt,
   };
+  const exchangeEvent = advanceExchange(n);
+  if (exchangeEvent) n = note(exchangeEvent.state, exchangeEvent.text);
   if (s.elapsed < 480 && target === 480)
     n = note(
       n,
@@ -311,12 +345,17 @@ function assign(
   const worker = s.crew.find((c) => c.id === id);
   if (!worker || worker.job !== from)
     fail("배정 상태가 바뀌었습니다. 최신 일손 현황을 확인하세요.");
+  if (from === "exchange")
+    fail(
+      "교환·재검수 담당은 작업 완료 또는 출발 전 취소까지 재배치할 수 없습니다.",
+    );
   if (from === "carrier")
     fail("운송·검사 예약자는 작업이 끝날 때까지 재배치할 수 없습니다.");
   if (to === from) fail("이미 같은 작업에 배정돼 있습니다.");
   if (
     to === "repair" &&
-    (!["received", "repairing"].includes(s.timber.phase) ||
+    (s.exchange.phase !== "none" ||
+      !["received", "repairing"].includes(s.timber.phase) ||
       s.timber.stock.quarantine !== 4 ||
       countCrew(s, "repair") >= 2)
   )
@@ -345,6 +384,15 @@ export function commandLabor(
     fail("처리 이력이 가득 찼습니다. 저장 후 새 체험을 시작하세요.");
   let n = s;
   switch (command.type) {
+    case "exchange-request":
+    case "exchange-cancel":
+    case "exchange-depart":
+    case "exchange-inspect":
+    case "exchange-receive": {
+      const result = commandExchange(s, command);
+      n = note(result.state, result.text);
+      break;
+    }
     case "assign": {
       const worker = s.crew.find((c) => c.id === command.worker);
       if (worker?.job !== "idle")
@@ -360,6 +408,8 @@ export function commandLabor(
       if (["advance", "next", "pause", "speed", "restart"].includes(c.type))
         fail("공용 시간 조작을 사용하세요.");
       if (c.type === "repair") {
+        if (s.exchange.phase !== "none")
+          fail("교환 진행 중에는 현장 보완을 중복할 수 없습니다.");
         if (s.timber.phase !== "received")
           fail("목재를 수령한 뒤 보완할 수 있습니다.");
         const needed = 2 - countCrew(s, "repair"),
@@ -437,20 +487,28 @@ export function tickLabor(input: LaborState, elapsedMs: number): LaborState {
 }
 export interface LaborSave {
   readonly format: "dynosty-labor";
-  readonly saveVersion: 1;
+  readonly saveVersion: 2;
   readonly state: LaborState;
 }
 export function parseLaborSave(v: unknown): LaborSave {
-  if (!isRecord(v) || v.format !== "dynosty-labor" || v.saveVersion !== 1)
+  if (
+    !isRecord(v) ||
+    v.format !== "dynosty-labor" ||
+    !isRecord(v.state) ||
+    !(
+      (v.saveVersion === 1 && v.state.version === 1) ||
+      (v.saveVersion === 2 && v.state.version === 2)
+    )
+  )
     fail("지원하지 않는 일손 체험 저장입니다. 원본을 유지합니다.");
   return {
     format: "dynosty-labor",
-    saveVersion: 1,
+    saveVersion: 2,
     state: parseLaborState(v.state),
   };
 }
 export function createLaborSave(state: LaborState): LaborSave {
-  return parseLaborSave({ format: "dynosty-labor", saveVersion: 1, state });
+  return parseLaborSave({ format: "dynosty-labor", saveVersion: 2, state });
 }
 export function laborScene(): SceneSnapshot {
   return {

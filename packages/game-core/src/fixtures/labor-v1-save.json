@@ -1,0 +1,174 @@
+{
+  "format": "dynosty-labor",
+  "saveVersion": 1,
+  "state": {
+    "version": 1,
+    "elapsed": 540,
+    "paused": true,
+    "speed": 1,
+    "remainder": 0,
+    "timber": {
+      "version": 1,
+      "elapsed": 540,
+      "paused": true,
+      "speed": 1,
+      "remainder": 0,
+      "offer": "A",
+      "phase": "received",
+      "iron": 4,
+      "reservedIron": 0,
+      "workers": 0,
+      "departure": 0,
+      "due": null,
+      "completedAt": null,
+      "stock": {
+        "waiting": 0,
+        "checked": 0,
+        "quarantine": 4,
+        "available": 16,
+        "allocated": 0,
+        "used": 0
+      },
+      "processed": ["v1-1", "v1-2", "v1-3", "v1-5", "v1-7"],
+      "history": [
+        {
+          "minute": 0,
+          "id": 0,
+          "text": "비가 새는 둥지: 마른 목재20을 12시간 안에 사용 준비하세요."
+        },
+        {
+          "id": 1,
+          "minute": 0,
+          "text": "제안A 약정: 철재4와 운송·검사 일손1 예약."
+        },
+        {
+          "id": 2,
+          "minute": 0,
+          "text": "철재 지불·수레 출발. 운송 중 물량은 사용 재고가 아닙니다."
+        },
+        {
+          "id": 3,
+          "minute": 360,
+          "text": "수레 도착. 검사 전에는 사용할 수 없습니다."
+        },
+        {
+          "id": 4,
+          "minute": 360,
+          "text": "전량 품질 검사와 수량·수령 확인 시작: 2시간."
+        },
+        {
+          "id": 5,
+          "minute": 480,
+          "text": "전량 검사·수량 확인 완료. 합격분을 수령하세요."
+        },
+        {
+          "id": 6,
+          "minute": 480,
+          "text": "정상분16 수령. 불량분은 격리합니다."
+        }
+      ]
+    },
+    "crew": [
+      {
+        "id": "crew-1",
+        "job": "repair"
+      },
+      {
+        "id": "crew-2",
+        "job": "prep"
+      },
+      {
+        "id": "crew-3",
+        "job": "prep"
+      },
+      {
+        "id": "crew-4",
+        "job": "prep"
+      }
+    ],
+    "repairProgress": 60,
+    "prepProgress": 120,
+    "prepCompletedAt": null,
+    "processed": [
+      "v1-1",
+      "v1-2",
+      "v1-3",
+      "v1-4",
+      "v1-5",
+      "v1-6",
+      "v1-7",
+      "v1-8",
+      "v1-9",
+      "v1-10",
+      "v1-11",
+      "v1-12"
+    ],
+    "history": [
+      {
+        "id": 0,
+        "minute": 0,
+        "text": "목재20과 배급 준비를 같은 일손4명으로 처리합니다. 배급 요청은8시간째 열립니다."
+      },
+      {
+        "id": 1,
+        "minute": 0,
+        "text": "제안A 약정: 철재4와 운송·검사 일손1 예약."
+      },
+      {
+        "id": 2,
+        "minute": 0,
+        "text": "철재 지불·수레 출발. 운송 중 물량은 사용 재고가 아닙니다."
+      },
+      {
+        "id": 3,
+        "minute": 360,
+        "text": "수레 도착. 검사 전에는 사용할 수 없습니다."
+      },
+      {
+        "id": 4,
+        "minute": 360,
+        "text": "전량 품질 검사와 수량·수령 확인 시작: 2시간."
+      },
+      {
+        "id": 5,
+        "minute": 480,
+        "text": "배급소에 대기3무리가 생겼습니다.10시간까지 정리를 준비하세요."
+      },
+      {
+        "id": 6,
+        "minute": 480,
+        "text": "전량 검사·수량 확인 완료. 합격분을 수령하세요."
+      },
+      {
+        "id": 7,
+        "minute": 480,
+        "text": "정상분16 수령. 불량분은 격리합니다."
+      },
+      {
+        "id": 8,
+        "minute": 480,
+        "text": "일손 1 배치: 대기 → 목재 보완. 기존 진행은 유지됩니다."
+      },
+      {
+        "id": 9,
+        "minute": 480,
+        "text": "일손 2 배치: 대기 → 목재 보완. 기존 진행은 유지됩니다."
+      },
+      {
+        "id": 10,
+        "minute": 480,
+        "text": "일손 3 배치: 대기 → 배급 준비. 기존 진행은 유지됩니다."
+      },
+      {
+        "id": 11,
+        "minute": 480,
+        "text": "일손 4 배치: 대기 → 배급 준비. 기존 진행은 유지됩니다."
+      },
+      {
+        "id": 12,
+        "minute": 540,
+        "text": "일손 2 배치: 목재 보완 → 배급 준비. 기존 진행은 유지됩니다."
+      }
+    ]
+  }
+}
