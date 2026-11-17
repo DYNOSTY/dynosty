@@ -702,3 +702,57 @@ h1 {
 .exchange-panel button {
   margin: 0.25rem 0.25rem 0.25rem 0;
 }
+
+.site-panel {
+  padding: 0.85rem;
+  margin: 0.9rem 0;
+  border: 2px solid #4de5ff;
+  border-radius: 12px;
+  background: #142e28;
+}
+.site-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.site-heading h3 {
+  margin: 0;
+}
+.site-panel dl {
+  margin: 0.7rem 0;
+}
+.site-panel dl > div {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #375a4c;
+}
+.site-panel dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.site-actions,
+.site-crew,
+.site-controls {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.7rem 0;
+}
+.site-crew {
+  min-width: 0;
+  padding: 0.6rem;
+  border: 1px solid #6b957f;
+  border-radius: 8px;
+}
+.site-panel .site-crew > div {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #375a4c;
+}
+.site-action {
+  margin-top: 0.4rem;
+}
+.site-action .hint {
+  margin: 0.3rem 0;
+}

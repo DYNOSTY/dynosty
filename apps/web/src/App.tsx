@@ -13,7 +13,7 @@ import {
   type TimberState,
   timberScene,
 } from "@dynosty/game-core";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   loadLocalExample,
   localSaveError,
@@ -28,6 +28,12 @@ import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SelectionPanel } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import type { SceneController } from "./scene.js";
+import {
+  isSiteId,
+  SITE_IDS,
+  SITE_NAMES,
+  siteAvailable,
+} from "./site-targets.js";
 import { TimberDemo } from "./TimberDemo.js";
 import { VideoPanel } from "./VideoPanel.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
@@ -342,10 +348,12 @@ export function App() {
     ) ?? null;
   const hasPanels = saveOpen || toolsOpen || selectedEntity !== null;
 
-  function clearSelection() {
+  const clearSelection = useCallback(() => {
     sceneRef.current?.select(null);
     canvasRef.current?.focus();
-  }
+  }, []);
+  const selectedSite =
+    timberOpen && laborOpen && isSiteId(selectedId) ? selectedId : null;
 
   return (
     <main className="play-shell">
@@ -435,7 +443,11 @@ export function App() {
           />
           <div className="scene-footer">
             <p>클릭으로 선택 · 마우스로 회전 · 휠로 확대</p>
-            <span>대표 주민 1종 · 온돌 둥지</span>
+            <span>
+              {timberOpen && laborOpen
+                ? "검수대 · 격리품 · 배급소"
+                : "대표 주민 1종 · 온돌 둥지"}
+            </span>
           </div>
           <fieldset className="selection-actions" aria-label="예제 대상 선택">
             <button
@@ -461,6 +473,22 @@ export function App() {
                 </button>
               ))}
           </fieldset>
+          {timberOpen && laborOpen ? (
+            <fieldset className="selection-actions" aria-label="현장 대상 선택">
+              {SITE_IDS.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="quiet-button"
+                  aria-pressed={selectedSite === id}
+                  disabled={!siteAvailable(laborState, id)}
+                  onClick={() => sceneRef.current?.select(id)}
+                >
+                  {SITE_NAMES[id]} 선택
+                </button>
+              ))}
+            </fieldset>
+          ) : null}
         </section>
 
         <aside
@@ -473,6 +501,8 @@ export function App() {
             onState={setTimberState}
             onLaborState={setLaborState}
             onLaborModeChange={setLaborOpen}
+            selectedSite={selectedSite}
+            onClearSelection={clearSelection}
             onExit={() => setTimberOpen(false)}
           />
           <SelectionPanel entity={selectedEntity} onClear={clearSelection} />

@@ -7,6 +7,7 @@ import {
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
 import { LaborDemo } from "./LaborDemo.js";
+import type { SiteId } from "./site-targets.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
 
@@ -29,6 +30,8 @@ type Props = {
   onExit: () => void;
   onLaborState: (state: LaborState) => void;
   onLaborModeChange: (mode: boolean) => void;
+  selectedSite: SiteId | null;
+  onClearSelection: () => void;
 };
 export function TimberDemo({
   active,
@@ -36,6 +39,8 @@ export function TimberDemo({
   onExit,
   onLaborState,
   onLaborModeChange,
+  selectedSite,
+  onClearSelection,
 }: Props) {
   const [laborMode, setLaborMode] = useState(false);
   useEffect(() => {
@@ -539,6 +544,8 @@ export function TimberDemo({
       <LaborDemo
         active={active && laborMode}
         onState={onLaborState}
+        selectedSite={selectedSite}
+        onClearSelection={onClearSelection}
         onExit={onExit}
         onClassic={() => setLaborMode(false)}
       />

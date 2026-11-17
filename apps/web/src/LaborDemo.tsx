@@ -18,6 +18,8 @@ import { useEffect, useRef, useState } from "react";
 import { ExchangePanel } from "./ExchangePanel.js";
 import type { LaborRequest, LaborResponse } from "./labor-protocol.js";
 import { laborSaveError, loadLabor, saveLabor } from "./labor-save.js";
+import { SitePanel } from "./SitePanel.js";
+import type { SiteId } from "./site-targets.js";
 
 const time = (m: number) => `${Math.floor(m / 60)}시간 ${m % 60}분`;
 type Props = {
@@ -25,6 +27,8 @@ type Props = {
   onState: (s: LaborState) => void;
   onExit: () => void;
   onClassic: () => void;
+  selectedSite: SiteId | null;
+  onClearSelection: () => void;
 };
 function CrewRow({
   id,
@@ -68,7 +72,14 @@ function CrewRow({
     </div>
   );
 }
-export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
+export function LaborDemo({
+  active,
+  onState,
+  onExit,
+  onClassic,
+  selectedSite,
+  onClearSelection,
+}: Props) {
   const [state, setState] = useState<LaborState | null>(null),
     [error, setError] = useState<string | null>(null),
     [status, setStatus] = useState(""),
@@ -100,7 +111,10 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
           if (m.type === "saved") {
             saveLabor(localStorage, m.save);
             setStatus("일손 체험을 저장했습니다.");
-          } else setStatus("일손 체험을 불러왔습니다. 일시정지 상태입니다.");
+          } else {
+            setStatus("일손 체험을 불러왔습니다. 일시정지 상태입니다.");
+            onClearSelection();
+          }
         } catch (err) {
           setError(laborSaveError(err));
         } finally {
@@ -119,7 +133,7 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
       worker.current = null;
       pending.current = null;
     };
-  }, [onState]);
+  }, [onState, onClearSelection]);
   useEffect(() => {
     const pause = () => {
       if (!active || document.hidden)
@@ -135,6 +149,7 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
   }, [active]);
   function command(c: LaborCommand) {
     if (busy || !worker.current) return;
+    if (c.type === "restart") onClearSelection();
     setError(null);
     worker.current.postMessage({
       type: "command",
@@ -169,7 +184,7 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
         aria-label="일손 배치·배급 체험판"
       >
         <p>공유 일손을 준비하고 있습니다.</p>
-        {error ? <p role="alert">{error}</p> : null}
+        {error && !selectedSite ? <p role="alert">{error}</p> : null}
       </section>
     );
   const stock = laborStock(state),
@@ -234,6 +249,17 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
           기존 목재 체험 보기
         </button>
       </div>
+      {selectedSite ? (
+        <SitePanel
+          key={selectedSite}
+          state={state}
+          selected={selectedSite}
+          busy={busy}
+          error={error}
+          onCommand={command}
+          onClear={onClearSelection}
+        />
+      ) : null}
       <div className="timber-status">
         <strong data-testid="labor-clock">
           공유 시간 {time(state.elapsed)}
@@ -559,7 +585,7 @@ export function LaborDemo({ active, onState, onExit, onClassic }: Props) {
       <p aria-live="polite" data-testid="labor-save-status">
         {busy ? "일손 저장 처리 중" : status}
       </p>
-      {error ? <p role="alert">{error}</p> : null}
+      {error && !selectedSite ? <p role="alert">{error}</p> : null}
       <details>
         <summary>체험 전용 수치·본편 미정 구분</summary>
         <p>

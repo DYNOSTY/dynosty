@@ -2,7 +2,11 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import type { Scene } from "@babylonjs/core/scene";
-import { EXCHANGE_RULES, type LaborState } from "@dynosty/game-core";
+import {
+  EXCHANGE_RULES,
+  type LaborState,
+  laborStock,
+} from "@dynosty/game-core";
 export function exchangeCartX(s: LaborState) {
   const e = s.exchange;
   if (e.phase === "returning")
@@ -91,6 +95,16 @@ export function createExchangeVisual(scene: Scene) {
       if (next && !active) cart.position.x = target;
       active = next;
       for (const p of parts) p.setEnabled(active);
+      // 일손 모드에서는 원납품과 교환품이 같은 검수대를 사용한다.
+      if (s) {
+        const stock = laborStock(s);
+        table.setEnabled(true);
+        parcel.setEnabled(stock.waiting + stock.checked > 0);
+        parcel.material = stock.checked > 0 ? dry : wet;
+        scene
+          .getMeshByName("timber-cargo")
+          ?.setEnabled(s.timber.phase === "transport");
+      }
       if (!active || !s) return;
       scene.getMeshByName("timber-cart")?.setEnabled(false);
       cart.setEnabled(s.timber.phase !== "completed");
@@ -99,7 +113,7 @@ export function createExchangeVisual(scene: Scene) {
       const atInspection = ["arrived", "inspecting", "checked"].includes(
         s.exchange.phase,
       );
-      table.setEnabled(atInspection);
+      table.setEnabled(true);
       parcel.setEnabled(atInspection);
       parcel.material = s.exchange.phase === "checked" ? dry : wet;
     },

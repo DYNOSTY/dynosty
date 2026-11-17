@@ -10,6 +10,7 @@ import {
 } from "@dynosty/game-core";
 import { createExchangeVisual, exchangeCartX } from "./exchange-scene.js";
 import { createSceneEntities } from "./scene-entities.js";
+import { SITE_POINTS } from "./site-targets.js";
 
 /** 일손 이동은 시각 보간이며 게임의 작업 시간이나 배치를 변경하지 않는다. */
 export function createLaborVisual(scene: Scene) {
@@ -41,6 +42,8 @@ export function createLaborVisual(scene: Scene) {
     p.setEnabled(false);
     p.isPickable = false;
   }
+  const quarantine = scene.getMeshByName("timber-quarantine");
+  let shown = false;
   let state: LaborState | null = null;
   let settled = false;
   const positions = new Map<
@@ -128,6 +131,11 @@ export function createLaborVisual(scene: Scene) {
     },
     update(next: LaborState | null) {
       state = next;
+      if (shown !== (next !== null)) {
+        if (next) quarantine?.position.set(...SITE_POINTS["site-quarantine"]);
+        else quarantine?.position.set(2.7, 0.175, 0.5);
+        shown = next !== null;
+      }
       exchangeVisual.update(next);
       settled = false;
       bench.setEnabled(next !== null);

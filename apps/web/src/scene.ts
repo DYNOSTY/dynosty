@@ -19,6 +19,8 @@ import { createLaborVisual } from "./labor-scene.js";
 import { loadModelAssets } from "./model-assets.js";
 import { createSceneEntities } from "./scene-entities.js";
 import { observeSceneClicks } from "./scene-input.js";
+import { createSiteSelection } from "./site-selection.js";
+import { isSiteId } from "./site-targets.js";
 import { createTimberVisual } from "./timber-scene.js";
 
 export interface SceneController {
@@ -112,11 +114,38 @@ export function mountScene(
   const groundMaterial = new StandardMaterial("ground-material", scene);
   groundMaterial.diffuseColor = new Color3(0.28, 0.43, 0.28);
   ground.material = groundMaterial;
-  const entities = createSceneEntities(scene, onSelectionChange, () =>
-    onAssetWarning("모델을 만들지 못해 연결 예제로 표시합니다."),
+  let selected: string | null = null;
+  const publishSelection = (id: string | null) => {
+    if (id !== selected) {
+      selected = id;
+      onSelectionChange(id);
+    }
+  };
+  const entities = createSceneEntities(
+    scene,
+    (id) => {
+      if (id === null && isSiteId(selected)) return;
+      if (id !== null) sites.select(null);
+      publishSelection(id);
+    },
+    () => onAssetWarning("모델을 만들지 못해 연결 예제로 표시합니다."),
   );
   const timberVisual = createTimberVisual(scene);
   const laborVisual = createLaborVisual(scene);
+  const sites = createSiteSelection(scene, (id) => {
+    if (id === null && !isSiteId(selected)) return;
+    if (id !== null) entities.select(null);
+    publishSelection(id);
+  });
+  const select = (id: string | null) => {
+    if (isSiteId(id)) {
+      entities.select(null);
+      sites.select(id);
+    } else {
+      sites.select(null);
+      entities.select(id);
+    }
+  };
   const abort = new AbortController();
   let disposed = false;
   const ready = loadModelAssets(abort.signal)
@@ -135,7 +164,13 @@ export function mountScene(
         onAssetWarning("대표 모델을 불러오지 못해 연결 예제로 표시합니다.");
     });
   const stopPicking = observeSceneClicks(canvas, (x, y) => {
-    entities.selectMesh(scene.pick(x, y)?.pickedMesh ?? null);
+    const mesh = scene.pick(x, y)?.pickedMesh ?? null,
+      site = sites.idForMesh(mesh);
+    if (site) select(site);
+    else {
+      sites.select(null);
+      entities.selectMesh(mesh);
+    }
   });
   const observer = new ResizeObserver(() => engine.resize());
   observer.observe(canvas);
@@ -158,7 +193,10 @@ export function mountScene(
   return {
     ready,
     updateTimber: timberVisual.update,
-    updateLabor: laborVisual.update,
+    updateLabor(state) {
+      laborVisual.update(state);
+      sites.update(state);
+    },
     resetCamera() {
       camera.alpha = -Math.PI / 2;
       camera.beta = Math.PI / 3;
@@ -169,13 +207,14 @@ export function mountScene(
       camera.inertialRadiusOffset = 0;
     },
     update: entities.update,
-    select: entities.select,
+    select,
     dispose() {
       disposed = true;
       abort.abort();
       observer.disconnect();
       stopPicking();
       timberVisual.dispose();
+      sites.dispose();
       laborVisual.dispose();
       entities.dispose();
       scene.dispose();
