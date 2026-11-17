@@ -11,8 +11,8 @@ import type { LaborRequest, LaborResponse } from "./labor-protocol.js";
 let state = createLaborState(),
   last = performance.now();
 const send = (m: LaborResponse) => self.postMessage(m);
-const publish = () => send({ type: "state", state });
-publish();
+const publish = (reset = false) => send({ type: "state", state, reset });
+publish(true);
 self.onmessage = (event: MessageEvent<LaborRequest>) => {
   const m = event.data;
   try {
@@ -26,13 +26,13 @@ self.onmessage = (event: MessageEvent<LaborRequest>) => {
       return;
     } else {
       state = { ...parseLaborSave(m.data).state, paused: true, remainder: 0 };
-      publish();
+      publish(true);
       send({ type: "loaded", requestId: m.requestId });
       last = performance.now();
       return;
     }
     last = performance.now();
-    publish();
+    publish(m.type === "command" && m.command.type === "restart");
   } catch (e) {
     send({
       type: "error",

@@ -756,3 +756,81 @@ h1 {
 .site-action .hint {
   margin: 0.3rem 0;
 }
+
+.scene-viewport {
+  position: relative;
+}
+.site-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.site-markers .site-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: 1.5rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid #8af3ff;
+  border-radius: 0.4rem;
+  background: #092e2b;
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+}
+.site-progress {
+  padding: 1rem;
+  border-top: 1px solid #456650;
+}
+.site-progress-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.site-progress-heading h3 {
+  margin: 0 0 0.5rem;
+}
+.site-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.site-progress-grid article {
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid #486e5a;
+  border-radius: 0.6rem;
+  background: #112e27;
+  overflow-wrap: anywhere;
+}
+.site-progress-grid h4 {
+  margin: 0 0 0.5rem;
+  color: #8af3ff;
+}
+.site-progress-grid p {
+  margin: 0.5rem 0;
+}
+.site-progress-grid progress {
+  display: block;
+  width: 100%;
+  accent-color: #8af3ff;
+  margin-top: 0.5rem;
+}
+.progress-reason {
+  color: #f2daa0;
+  font-size: 0.9rem;
+}
+.site-progress [role="status"]:not(:empty) {
+  margin: 0.8rem 0;
+  padding: 0.7rem;
+  border-left: 3px solid #d9edb1;
+  background: #24462d;
+}
+@media (max-width: 700px) {
+  .site-progress-grid {
+    grid-template-columns: 1fr;
+  }
+}
