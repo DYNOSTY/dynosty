@@ -1,7 +1,8 @@
-import { useId, useRef, useState } from "react";
+import { type ReactNode, useId, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
 
-export function SettingsMenu() {
+// 게임 콘솔에서는 명령 칸 모양(children)으로 그린다. 접근 이름은 '설정' 그대로
+export function SettingsMenu({ className, children }: { className?: string; children?: ReactNode } = {}) {
   const { settings, warning, saveStatus, audioRef, updateSettings } =
     useAudio();
   const [previewStatus, setPreviewStatus] = useState("");
@@ -28,15 +29,22 @@ export function SettingsMenu() {
     <>
       <button
         type="button"
+        className={className}
         aria-haspopup="dialog"
         onClick={() => dialogRef.current?.showModal()}
       >
-        설정
+        {children ?? "설정"}
       </button>
       <dialog
         ref={dialogRef}
         aria-labelledby={titleId}
         className="settings-dialog"
+        // 창 밖(어두운 곳)을 누르면 닫힘
+        onClick={(event) => {
+          const r = event.currentTarget.getBoundingClientRect();
+          const out = event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom;
+          if (event.target === event.currentTarget && out) dialogRef.current?.close();
+        }}
         onClose={() => {
           audioRef.current?.stopPreview();
           setPreviewStatus("");
@@ -44,9 +52,13 @@ export function SettingsMenu() {
       >
         <div className="settings-heading">
           <h2 id={titleId}>설정</h2>
-          <button type="button" onClick={() => dialogRef.current?.close()}>
-            설정 닫기
-          </button>
+          <button
+            type="button"
+            className="g-knob g-knob--close"
+            aria-label="설정 닫기"
+            title="닫기 (Esc)"
+            onClick={() => dialogRef.current?.close()}
+          />
         </div>
         <label className="volume-label">
           전체 음량 <output>{settings.masterVolume}%</output>

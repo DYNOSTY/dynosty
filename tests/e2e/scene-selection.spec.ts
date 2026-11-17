@@ -91,7 +91,6 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
     .click();
   await expect(info).toContainText("걷기 표시");
   await expect(info).toContainText("2, 0, 1");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
   await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
@@ -107,7 +106,6 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
   await page
     .getByRole("button", { name: "개발 도구 닫기", exact: true })
     .click();
-  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   await expect(info).toBeVisible();
   await page.reload();
   await expect(info).toBeHidden();

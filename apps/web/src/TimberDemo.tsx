@@ -6,6 +6,7 @@ import {
   type TimberState,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
+import { Res } from "./GameHud.js";
 import { LaborDemo } from "./LaborDemo.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
@@ -149,14 +150,14 @@ export function TimberDemo({
         </div>
         <button
           type="button"
-          className="quiet-button"
+          className="g-knob g-knob--close"
+          aria-label="생존 예제로 돌아가기"
+          title="닫기 (Esc)"
           onClick={() => {
             command({ type: "pause", paused: true });
             onExit();
           }}
-        >
-          생존 예제로 돌아가기
-        </button>
+        />
       </div>
       <button type="button" disabled={busy} onClick={() => setLaborMode(true)}>
         일손 배치·배급 체험하기
@@ -192,7 +193,7 @@ export function TimberDemo({
                   command({ type: "pause", paused: !state.paused })
                 }
               >
-                {state.paused ? "체험 시간 시작" : "체험 일시정지"}
+                <span className="toggle-label">{state.paused ? "체험 시간 시작" : "체험 일시정지"}</span>
               </button>
               <button
                 type="button"
@@ -283,20 +284,24 @@ export function TimberDemo({
                         제안 {id} ·{" "}
                         {id === "A" ? "저렴한 자재" : "규격 적합 자재"}
                       </h3>
-                      <p>
-                        철재{o.cost} ↔ 목재20 · {o.travel / 60}시간 후 도착
+                      {/* 거래: 내는 것 ⇄ 받는 것 · 도착까지 */}
+                      <p className="offer-trade">
+                        <Res id="RES_METAL" n={o.cost} label={`철재 ${o.cost}`} />
+                        <span aria-hidden="true">⇄</span>
+                        <Res id="RES_WOOD" n={20} label="목재 20" />
+                        <span className="offer-time">{o.travel / 60}시간</span>
                       </p>
-                      <p>
-                        {id === "A"
-                          ? "포장 훼손 경고 · 젖은4 보완 필요"
-                          : "규격 적합 제안 · 도착 뒤 전량 검사 필요"}
+                      <p className={`offer-tag${id === "A" ? " is-warn" : " is-ok"}`}>
+                        {id === "A" ? "포장 훼손 · 젖은 목재 4" : "규격 적합"}
                       </p>
-                      <p>
-                        검사2시간
-                        {id === "A" ? " + 인원2명 건조·재검사4시간" : ""} · 전량
-                        준비 예상 {time(state.elapsed + 720)}
-                      </p>
-                      <p>계약 뒤 남는 철재{8 - o.cost}</p>
+                      <dl className="offer-facts">
+                        <dt>검사</dt>
+                        <dd>{id === "A" ? "2시간 + 재검사 4시간 (2명)" : "2시간"}</dd>
+                        <dt>남는 철</dt>
+                        <dd>
+                          <Res id="RES_METAL" n={8 - o.cost} label={`철재 ${8 - o.cost}`} />
+                        </dd>
+                      </dl>
                       <button
                         type="button"
                         aria-pressed={state.offer === id}

@@ -14,8 +14,14 @@ import {
 import {
   buildModel,
   type ModelAssets,
-  type ModelVisual,
 } from "./model-assets.js";
+import type { GlbVisual } from "./village.js";
+
+type GlbFactory = (
+  kind: SceneEntity["kind"],
+  parent: Mesh,
+  offsetY: number,
+) => Promise<GlbVisual>;
 
 // 박찬님의 실제 모델을 연결할 경계. 현재는 종류별 상자로 표시한다.
 export function createSceneEntities(
@@ -25,6 +31,7 @@ export function createSceneEntities(
 ) {
   let selectedId: string | null = null;
   let models: ModelAssets = {};
+  let glb: GlbFactory | null = null;
   const objects = new Map<
     string,
     {
@@ -32,7 +39,7 @@ export function createSceneEntities(
       mesh: Mesh;
       material: StandardMaterial;
       entity: SceneEntity;
-      visual: ModelVisual | null;
+      visual: GlbVisual | null;
       modelAttempted: boolean;
     }
   >();
@@ -80,6 +87,25 @@ export function createSceneEntities(
       }
       select(null);
     },
+    // 건물 도감·주민 v04 GLB가 준비되면 JSON 개발 모델 대신 씀
+    setGlb(factory: GlbFactory) {
+      glb = factory;
+      for (const [id, object] of objects) {
+        const { kind } = object;
+        const size = kind === "resident" ? 1 : 1.5;
+        factory(kind, object.mesh, -size / 2)
+          .then((visual) => {
+            if (objects.get(id) !== object) return visual.dispose();
+            object.visual?.dispose();
+            object.visual = visual;
+            object.modelAttempted = true;
+            object.mesh.isVisible = false;
+            visual.setOutline(selectedId === id);
+            visual.setMotion(object.entity.kind === "resident" ? object.entity.motion : "idle");
+          })
+          .catch(onModelError);
+      }
+    },
     setModels(value: ModelAssets) {
       models = value;
       for (const object of objects.values()) {
@@ -124,7 +150,18 @@ export function createSceneEntities(
         }
         object.entity = entity;
         const asset = models[entity.kind];
-        if (asset && !object.modelAttempted) {
+        if (glb && !object.modelAttempted) {
+          object.modelAttempted = true;
+          const target = object, id = entity.id, size0 = size;
+          glb(entity.kind, object.mesh, -size0 / 2)
+            .then((visual) => {
+              if (objects.get(id) !== target) return visual.dispose();
+              target.visual = visual;
+              target.mesh.isVisible = false;
+              visual.setOutline(selectedId === id);
+            })
+            .catch(onModelError);
+        } else if (asset && !object.modelAttempted) {
           object.modelAttempted = true;
           try {
             object.visual = buildModel(
@@ -139,7 +176,7 @@ export function createSceneEntities(
             onModelError();
           }
         }
-        object.visual?.setMotion(
+        object.visual?.setMotion?.(
           entity.kind === "resident" ? entity.motion : "idle",
         );
         object.mesh.position.set(
