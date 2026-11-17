@@ -89,6 +89,7 @@ export function advanceDay(state: GameState): GameState {
   return { ...state, day: state.day + 1 };
 }
 
+export * from "./exchange.js";
 export * from "./labor.js";
 export {
   AMOUNT_SCALE,

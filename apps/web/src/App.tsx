@@ -9,6 +9,7 @@ import type {
 import {
   type LaborState,
   laborScene,
+  laborStock,
   type TimberState,
   timberScene,
 } from "@dynosty/game-core";
@@ -231,7 +232,10 @@ export function App() {
       return;
     const display = laborScene();
     sceneRef.current.update(display);
-    sceneRef.current.updateTimber(laborState.timber);
+    sceneRef.current.updateTimber({
+      ...laborState.timber,
+      stock: laborStock(laborState),
+    });
     sceneRef.current.updateLabor(laborState);
     setAppliedSnapshot(display);
   }, [timberOpen, laborOpen, laborState, sceneStatus]);
