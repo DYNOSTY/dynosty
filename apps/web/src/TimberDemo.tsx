@@ -28,7 +28,7 @@ type Props = {
   active: boolean;
   onState: (state: TimberState) => void;
   onExit: () => void;
-  onLaborState: (state: LaborState) => void;
+  onLaborState: (state: LaborState, reset?: boolean) => void;
   onLaborModeChange: (mode: boolean) => void;
   selectedSite: SiteId | null;
   onClearSelection: () => void;

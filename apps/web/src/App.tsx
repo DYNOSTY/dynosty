@@ -27,7 +27,9 @@ import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SelectionPanel } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
+import { SiteProgress } from "./SiteProgress.js";
 import type { SceneController } from "./scene.js";
+import { type SiteNotice, siteCompletions } from "./site-progress.js";
 import {
   isSiteId,
   SITE_IDS,
@@ -41,6 +43,17 @@ import { WorkspacePanel } from "./WorkspacePanel.js";
 export function App() {
   const [laborOpen, setLaborOpen] = useState(false);
   const [laborState, setLaborState] = useState<LaborState | null>(null);
+  const [siteNotices, setSiteNotices] = useState<SiteNotice[]>([]);
+  const priorLabor = useRef<LaborState | null>(null);
+  const markersRef = useRef<HTMLDivElement>(null);
+  const receiveLabor = useCallback((next: LaborState, reset = false) => {
+    const added = siteCompletions(priorLabor.current, next, reset);
+    priorLabor.current = next;
+    setLaborState(next);
+    if (reset) setSiteNotices([]);
+    else if (added.length)
+      setSiteNotices((old) => [...old, ...added].slice(-4));
+  }, []);
   const [timberOpen, setTimberOpen] = useState(false);
   const [timberState, setTimberState] = useState<TimberState | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -246,6 +259,15 @@ export function App() {
     setAppliedSnapshot(display);
   }, [timberOpen, laborOpen, laborState, sceneStatus]);
 
+  useEffect(() => {
+    sceneRef.current?.setSiteMarkers(
+      timberOpen && laborOpen && sceneStatus === "준비 완료"
+        ? markersRef.current
+        : null,
+    );
+    return () => sceneRef.current?.setSiteMarkers(null);
+  }, [timberOpen, laborOpen, sceneStatus]);
+
   function advance() {
     setExampleClock(true);
     if (pendingSaveRef.current !== null) return;
@@ -436,11 +458,27 @@ export function App() {
               {assetWarning}
             </p>
           ) : null}
-          <canvas
-            ref={canvasRef}
-            aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
-            tabIndex={0}
-          />
+          <div className="scene-viewport">
+            <canvas
+              ref={canvasRef}
+              aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
+              tabIndex={0}
+            />
+            {timberOpen && laborOpen ? (
+              <div className="site-markers" ref={markersRef} aria-hidden="true">
+                {SITE_IDS.map((id, i) => (
+                  <span
+                    key={id}
+                    className="site-marker"
+                    data-site-marker={id}
+                    hidden
+                  >
+                    {i + 1}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <div className="scene-footer">
             <p>클릭으로 선택 · 마우스로 회전 · 휠로 확대</p>
             <span>
@@ -449,6 +487,14 @@ export function App() {
                 : "대표 주민 1종 · 온돌 둥지"}
             </span>
           </div>
+          {timberOpen && laborOpen && laborState ? (
+            <SiteProgress
+              state={laborState}
+              notices={siteNotices}
+              onDismiss={() => setSiteNotices([])}
+              onSelect={(id) => sceneRef.current?.select(id)}
+            />
+          ) : null}
           <fieldset className="selection-actions" aria-label="예제 대상 선택">
             <button
               type="button"
@@ -499,7 +545,7 @@ export function App() {
           <TimberDemo
             active={timberOpen}
             onState={setTimberState}
-            onLaborState={setLaborState}
+            onLaborState={receiveLabor}
             onLaborModeChange={setLaborOpen}
             selectedSite={selectedSite}
             onClearSelection={clearSelection}

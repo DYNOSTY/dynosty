@@ -5,7 +5,7 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
 import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
@@ -20,7 +20,13 @@ import { loadModelAssets } from "./model-assets.js";
 import { createSceneEntities } from "./scene-entities.js";
 import { observeSceneClicks } from "./scene-input.js";
 import { createSiteSelection } from "./site-selection.js";
-import { isSiteId } from "./site-targets.js";
+import {
+  isSiteId,
+  SITE_IDS,
+  SITE_POINTS,
+  type SiteId,
+  siteAvailable,
+} from "./site-targets.js";
 import { createTimberVisual } from "./timber-scene.js";
 
 export interface SceneController {
@@ -30,6 +36,7 @@ export interface SceneController {
   readonly ready: Promise<void>;
   resetCamera(): void;
   updateLabor(state: LaborState | null): void;
+  setSiteMarkers(layer: HTMLDivElement | null): void;
   updateTimber(state: TimberState | null): void;
 }
 
@@ -174,6 +181,10 @@ export function mountScene(
   });
   const observer = new ResizeObserver(() => engine.resize());
   observer.observe(canvas);
+  let markerLayer: HTMLDivElement | null = null;
+  let markerState: LaborState | null = null;
+  let markerNodes: { id: SiteId; node: HTMLElement; point: Vector3 }[] = [];
+  const markerIdentity = Matrix.Identity();
   let cameraKey = "";
   engine.runRenderLoop(() => {
     const key = `${camera.radius.toFixed(2)}:${camera.beta.toFixed(3)}:${camera.alpha.toFixed(3)}`;
@@ -189,11 +200,54 @@ export function mountScene(
     timberVisual.animate(engine.getDeltaTime() / 1000);
     laborVisual.animate(engine.getDeltaTime() / 1000);
     scene.render();
+    if (markerLayer) {
+      const width = canvas.clientWidth,
+        height = canvas.clientHeight;
+      const viewport = camera.viewport.toGlobal(width, height);
+      for (const { id, node, point } of markerNodes) {
+        const p = Vector3.Project(
+          point,
+          markerIdentity,
+          scene.getTransformMatrix(),
+          viewport,
+        );
+        const visible =
+          markerState &&
+          siteAvailable(markerState, id) &&
+          p.z >= 0 &&
+          p.z <= 1 &&
+          p.x >= 0 &&
+          p.x <= width &&
+          p.y >= 0 &&
+          p.y <= height;
+        if (node.hidden === Boolean(visible)) node.hidden = !visible;
+        if (visible) {
+          const transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -100%)`;
+          if (node.style.transform !== transform)
+            node.style.transform = transform;
+        }
+      }
+    }
   });
   return {
     ready,
+    setSiteMarkers(layer) {
+      markerLayer = layer;
+      markerNodes = layer
+        ? SITE_IDS.flatMap((id) => {
+            const node = layer.querySelector<HTMLElement>(
+              `[data-site-marker="${id}"]`,
+            );
+            const [x, y, z] = SITE_POINTS[id];
+            return node
+              ? [{ id, node, point: new Vector3(x, y + 0.8, z) }]
+              : [];
+          })
+        : [];
+    },
     updateTimber: timberVisual.update,
     updateLabor(state) {
+      markerState = state;
       laborVisual.update(state);
       sites.update(state);
     },
@@ -210,6 +264,8 @@ export function mountScene(
     select,
     dispose() {
       disposed = true;
+      markerLayer = null;
+      markerNodes = [];
       abort.abort();
       observer.disconnect();
       stopPicking();

@@ -24,7 +24,7 @@ import type { SiteId } from "./site-targets.js";
 const time = (m: number) => `${Math.floor(m / 60)}시간 ${m % 60}분`;
 type Props = {
   active: boolean;
-  onState: (s: LaborState) => void;
+  onState: (s: LaborState, reset?: boolean) => void;
   onExit: () => void;
   onClassic: () => void;
   selectedSite: SiteId | null;
@@ -99,7 +99,7 @@ export function LaborDemo({
       const m = e.data;
       if (m.type === "state") {
         setState(m.state);
-        onState(m.state);
+        onState(m.state, m.reset);
       } else if (m.type === "error") {
         setError(m.message);
         if (m.requestId === pending.current) {
