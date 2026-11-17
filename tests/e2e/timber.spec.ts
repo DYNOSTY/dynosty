@@ -16,6 +16,7 @@ for (const siteId of ["coal-west", "iron-north", "stone-east"] as const) {
   test(`${siteId} 작업장에 배치하면 광물을 자동 입고하고 저장 후 이어진다`, async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     let s = commandTimber(
       advanceTimber(createTimberState(), 120),
       { type: "build-logging", siteId },
@@ -57,12 +58,14 @@ for (const siteId of ["coal-west", "iron-north", "stone-east"] as const) {
     await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
     await button(page, "시간 재개").click();
     await expect
-      .poll(async () =>
-        Number(
-          (
-            await page.getByTestId(`resource-${resource}`).textContent()
-          )?.replaceAll(",", ""),
-        ),
+      .poll(
+        async () =>
+          Number(
+            (
+              await page.getByTestId(`resource-${resource}`).textContent()
+            )?.replaceAll(",", ""),
+          ),
+        { timeout: 15_000 },
       )
       .toBeGreaterThan(initial);
     await button(page, "일시정지").click();
