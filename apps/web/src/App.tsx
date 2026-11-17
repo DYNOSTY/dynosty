@@ -6,7 +6,12 @@ import type {
   PlayState,
   SceneSnapshot,
 } from "@dynosty/game-core";
-import { type TimberState, timberScene } from "@dynosty/game-core";
+import {
+  type LaborState,
+  laborScene,
+  type TimberState,
+  timberScene,
+} from "@dynosty/game-core";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   loadLocalExample,
@@ -27,6 +32,8 @@ import { VideoPanel } from "./VideoPanel.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
 
 export function App() {
+  const [laborOpen, setLaborOpen] = useState(false);
+  const [laborState, setLaborState] = useState<LaborState | null>(null);
   const [timberOpen, setTimberOpen] = useState(false);
   const [timberState, setTimberState] = useState<TimberState | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -189,6 +196,7 @@ export function App() {
   useEffect(() => {
     if (timberOpen) return;
     sceneRef.current?.updateTimber(null);
+    sceneRef.current?.updateLabor(null);
     if (!snapshot || sceneStatus !== "준비 완료" || !sceneRef.current) return;
     try {
       sceneRef.current.update(snapshot);
@@ -200,16 +208,33 @@ export function App() {
   useEffect(() => {
     if (
       !timberOpen ||
+      laborOpen ||
       !timberState ||
       sceneStatus !== "준비 완료" ||
       !sceneRef.current
     )
       return;
+    sceneRef.current.updateLabor(null);
     const display = timberScene(timberState);
     sceneRef.current.update(display);
     sceneRef.current.updateTimber(timberState);
     setAppliedSnapshot(display);
-  }, [timberOpen, timberState, sceneStatus]);
+  }, [timberOpen, timberState, sceneStatus, laborOpen]);
+  useEffect(() => {
+    if (
+      !timberOpen ||
+      !laborOpen ||
+      !laborState ||
+      sceneStatus !== "준비 완료" ||
+      !sceneRef.current
+    )
+      return;
+    const display = laborScene();
+    sceneRef.current.update(display);
+    sceneRef.current.updateTimber(laborState.timber);
+    sceneRef.current.updateLabor(laborState);
+    setAppliedSnapshot(display);
+  }, [timberOpen, laborOpen, laborState, sceneStatus]);
 
   function advance() {
     setExampleClock(true);
@@ -295,7 +320,9 @@ export function App() {
     }
   }
   const shownDay = timberOpen
-    ? Math.floor((timberState?.elapsed ?? 0) / 1440) + 1
+    ? Math.floor(
+        ((laborOpen ? laborState?.elapsed : timberState?.elapsed) ?? 0) / 1440,
+      ) + 1
     : exampleClock
       ? state?.day
       : (playState?.day ?? state?.day);
@@ -440,6 +467,8 @@ export function App() {
           <TimberDemo
             active={timberOpen}
             onState={setTimberState}
+            onLaborState={setLaborState}
+            onLaborModeChange={setLaborOpen}
             onExit={() => setTimberOpen(false)}
           />
           <SelectionPanel entity={selectedEntity} onClear={clearSelection} />

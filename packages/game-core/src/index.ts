@@ -89,6 +89,7 @@ export function advanceDay(state: GameState): GameState {
   return { ...state, day: state.day + 1 };
 }
 
+export * from "./labor.js";
 export {
   AMOUNT_SCALE,
   advancePlayMinutes,
@@ -116,5 +117,4 @@ export {
   supplyFood,
   tickPlay,
 } from "./play.js";
-
 export * from "./timber.js";

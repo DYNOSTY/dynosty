@@ -1,10 +1,12 @@
 import {
+  type LaborState,
   TIMBER_RULES,
   type TimberCommand,
   type TimberOffer,
   type TimberState,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
+import { LaborDemo } from "./LaborDemo.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
 
@@ -25,8 +27,20 @@ type Props = {
   active: boolean;
   onState: (state: TimberState) => void;
   onExit: () => void;
+  onLaborState: (state: LaborState) => void;
+  onLaborModeChange: (mode: boolean) => void;
 };
-export function TimberDemo({ active, onState, onExit }: Props) {
+export function TimberDemo({
+  active,
+  onState,
+  onExit,
+  onLaborState,
+  onLaborModeChange,
+}: Props) {
+  const [laborMode, setLaborMode] = useState(false);
+  useEffect(() => {
+    onLaborModeChange(laborMode);
+  }, [laborMode, onLaborModeChange]);
   const [state, setState] = useState<TimberState | null>(null),
     [error, setError] = useState<string | null>(null),
     [saveStatus, setSaveStatus] = useState(""),
@@ -91,7 +105,7 @@ export function TimberDemo({ active, onState, onExit }: Props) {
   }
   useEffect(() => {
     const pause = () => {
-      if (document.hidden || !active)
+      if (document.hidden || !active || laborMode)
         worker.current?.postMessage({
           type: "command",
           id: `${session.current}-${++counter.current}`,
@@ -101,7 +115,7 @@ export function TimberDemo({ active, onState, onExit }: Props) {
     pause();
     document.addEventListener("visibilitychange", pause);
     return () => document.removeEventListener("visibilitychange", pause);
-  }, [active]);
+  }, [active, laborMode]);
   function access(load: boolean, previous = false) {
     if (busy || !worker.current) return;
     setError(null);
@@ -122,9 +136,9 @@ export function TimberDemo({ active, onState, onExit }: Props) {
   }
   const stock = state?.stock,
     selected = state?.offer ? TIMBER_RULES.offers[state.offer] : null;
-  return (
+  const classic = (
     <section
-      hidden={!active}
+      hidden={!active || laborMode}
       className="timber-demo"
       aria-label="마른 목재20 체험판"
     >
@@ -144,6 +158,9 @@ export function TimberDemo({ active, onState, onExit }: Props) {
           생존 예제로 돌아가기
         </button>
       </div>
+      <button type="button" disabled={busy} onClick={() => setLaborMode(true)}>
+        일손 배치·배급 체험하기
+      </button>
       <p className="hint">
         비가 새는 둥지에 마른 목재20이 필요합니다. 사용 준비 기한은12시간입니다.
       </p>
@@ -516,5 +533,16 @@ export function TimberDemo({ active, onState, onExit }: Props) {
       )}
       {error ? <p role="alert">{error}</p> : null}
     </section>
+  );
+  return (
+    <>
+      <LaborDemo
+        active={active && laborMode}
+        onState={onLaborState}
+        onExit={onExit}
+        onClassic={() => setLaborMode(false)}
+      />
+      {classic}
+    </>
   );
 }

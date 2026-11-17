@@ -10,7 +10,12 @@ import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder"
 import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { Scene } from "@babylonjs/core/scene";
-import type { SceneSnapshot, TimberState } from "@dynosty/game-core";
+import type {
+  LaborState,
+  SceneSnapshot,
+  TimberState,
+} from "@dynosty/game-core";
+import { createLaborVisual } from "./labor-scene.js";
 import { loadModelAssets } from "./model-assets.js";
 import { createSceneEntities } from "./scene-entities.js";
 import { observeSceneClicks } from "./scene-input.js";
@@ -22,6 +27,7 @@ export interface SceneController {
   dispose(): void;
   readonly ready: Promise<void>;
   resetCamera(): void;
+  updateLabor(state: LaborState | null): void;
   updateTimber(state: TimberState | null): void;
 }
 
@@ -110,12 +116,14 @@ export function mountScene(
     onAssetWarning("모델을 만들지 못해 연결 예제로 표시합니다."),
   );
   const timberVisual = createTimberVisual(scene);
+  const laborVisual = createLaborVisual(scene);
   const abort = new AbortController();
   let disposed = false;
   const ready = loadModelAssets(abort.signal)
     .then(({ assets, failed }) => {
       if (disposed) return;
       entities.setModels(assets);
+      laborVisual.setModels(assets);
       onAssetWarning(
         failed.length
           ? "대표 모델을 불러오지 못해 해당 대상을 연결 예제로 표시합니다."
@@ -144,11 +152,13 @@ export function mountScene(
     }
     entities.animate(engine.getDeltaTime() / 1000);
     timberVisual.animate(engine.getDeltaTime() / 1000);
+    laborVisual.animate(engine.getDeltaTime() / 1000);
     scene.render();
   });
   return {
     ready,
     updateTimber: timberVisual.update,
+    updateLabor: laborVisual.update,
     resetCamera() {
       camera.alpha = -Math.PI / 2;
       camera.beta = Math.PI / 3;
@@ -166,6 +176,7 @@ export function mountScene(
       observer.disconnect();
       stopPicking();
       timberVisual.dispose();
+      laborVisual.dispose();
       entities.dispose();
       scene.dispose();
       engine.dispose();
