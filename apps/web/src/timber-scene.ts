@@ -100,8 +100,12 @@ export function createTimberVisual(scene: Scene) {
       shelter.setEnabled(s.elapsed > 720 && s.phase !== "completed");
     },
     animate(delta: number) {
+      const oldX = base.position.x;
       if (active)
         base.position.x += (target - base.position.x) * Math.min(1, delta * 4);
+      for (const wheel of parts)
+        if (wheel.name.includes("wheel"))
+          wheel.rotation.z -= (base.position.x - oldX) / 0.13;
     },
     dispose() {
       for (const m of parts) m.dispose();

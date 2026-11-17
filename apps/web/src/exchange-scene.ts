@@ -118,9 +118,13 @@ export function createExchangeVisual(scene: Scene) {
       parcel.material = s.exchange.phase === "checked" ? dry : wet;
     },
     animate(seconds: number) {
+      const oldX = cart.position.x;
       if (active)
         cart.position.x +=
           (target - cart.position.x) * Math.min(1, Math.max(0, seconds) * 4);
+      for (const wheel of parts)
+        if (wheel.name.includes("wheel"))
+          wheel.rotation.z -= (cart.position.x - oldX) / 0.13;
     },
     dispose() {
       for (const p of parts) p.dispose();

@@ -28,6 +28,7 @@ import { QualityFlow } from "./QualityFlow.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SelectionPanel } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
+import { SiteGuide } from "./SiteGuide.js";
 import { SiteProgress } from "./SiteProgress.js";
 import type { SceneController } from "./scene.js";
 import { type SiteNotice, siteCompletions } from "./site-progress.js";
@@ -37,8 +38,10 @@ import {
   SITE_NAMES,
   siteAvailable,
 } from "./site-targets.js";
+import { SCENE_SIGNS } from "./site-zones.js";
 import { TimberDemo } from "./TimberDemo.js";
 import { VideoPanel } from "./VideoPanel.js";
+import { CREW_BADGES, cartBadge } from "./visual-badges.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
 
 export function App() {
@@ -72,6 +75,7 @@ export function App() {
   const saveMenuRef = useRef<HTMLButtonElement>(null);
   const toolsMenuRef = useRef<HTMLButtonElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const asideRef = useRef<HTMLElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const sceneRef = useRef<SceneController | null>(null);
   const pendingSaveRef = useRef<number | null>(null);
@@ -375,6 +379,12 @@ export function App() {
     sceneRef.current?.select(null);
     canvasRef.current?.focus();
   }, []);
+  const showSite = useCallback((id: import("./site-targets.js").SiteId) => {
+    if (!sceneRef.current?.focusSite(id)) return;
+    asideRef.current?.scrollTo({ top: 0, behavior: "instant" });
+    canvasRef.current?.scrollIntoView({ block: "center", behavior: "instant" });
+    canvasRef.current?.focus({ preventScroll: true });
+  }, []);
   const selectedSite =
     timberOpen && laborOpen && isSiteId(selectedId) ? selectedId : null;
 
@@ -467,16 +477,33 @@ export function App() {
             />
             {timberOpen && laborOpen ? (
               <div className="site-markers" ref={markersRef} aria-hidden="true">
-                {SITE_IDS.map((id, i) => (
+                {SCENE_SIGNS.map(({ id, label }) => (
                   <span
                     key={id}
                     className="site-marker"
                     data-site-marker={id}
                     hidden
                   >
-                    {i + 1}
+                    {label}
                   </span>
                 ))}
+                {["crew-1", "crew-2", "crew-3", "crew-4"].map((id, i) => {
+                  const job = laborState?.crew[i]?.job ?? "idle";
+                  return (
+                    <span
+                      key={id}
+                      className="crew-marker"
+                      data-crew-marker={id}
+                      data-job={job}
+                      hidden
+                    >
+                      {i + 1} {CREW_BADGES[job]}
+                    </span>
+                  );
+                })}
+                <span className="transport-marker" data-transport-marker hidden>
+                  {laborState ? cartBadge(laborState) : null}
+                </span>
               </div>
             ) : null}
           </div>
@@ -490,12 +517,13 @@ export function App() {
           </div>
           {timberOpen && laborOpen && laborState ? (
             <>
+              <SiteGuide state={laborState} onSelect={showSite} />
               <QualityFlow state={laborState} />{" "}
               <SiteProgress
                 state={laborState}
                 notices={siteNotices}
                 onDismiss={() => setSiteNotices([])}
-                onSelect={(id) => sceneRef.current?.select(id)}
+                onSelect={showSite}
               />
             </>
           ) : null}
@@ -542,6 +570,7 @@ export function App() {
         </section>
 
         <aside
+          ref={asideRef}
           className={`workspace-tools${timberOpen ? " timber-tools" : ""}`}
           aria-label="작업 메뉴"
           hidden={!hasPanels && !timberOpen}

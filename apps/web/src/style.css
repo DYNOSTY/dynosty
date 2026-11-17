@@ -770,14 +770,16 @@ h1 {
   position: absolute;
   left: 0;
   top: 0;
-  min-width: 1.5rem;
-  padding: 0.15rem 0.35rem;
+  min-width: 0;
+  padding: 0.15rem 0.25rem;
   border: 1px solid #8af3ff;
   border-radius: 0.4rem;
   background: #092e2b;
   color: #fff;
   font-weight: 700;
   text-align: center;
+  font-size: 0.7rem;
+  white-space: nowrap;
 }
 .site-progress {
   padding: 1rem;
@@ -910,4 +912,115 @@ h1 {
 .quality-report dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.zone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  padding: 0;
+  margin: 0.5rem 0 0.75rem;
+  list-style: none;
+  font-size: 0.8rem;
+}
+.zone-legend li {
+  border: 1px solid #718777;
+  border-radius: 0.3rem;
+  padding: 0.25rem 0.4rem;
+}
+
+.site-guide {
+  padding: 1rem;
+  border-top: 1px solid #517363;
+  background: #1c3529;
+}
+.site-guide progress {
+  width: 100%;
+}
+.site-guide-tasks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 0.75rem;
+}
+.site-guide-tasks article {
+  border: 1px solid #63826c;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+.crew-activity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0;
+  list-style: none;
+}
+.crew-activity li {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+  border-left: 3px solid #d8e5a6;
+}
+
+.guide-action {
+  display: inline-block;
+  padding: 0.5rem 0.7rem;
+  margin-top: 0.4rem;
+  border: 1px solid #d8e5a6;
+  border-radius: 0.4rem;
+  color: #eff7cf;
+}
+.crew-marker,
+.transport-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0.12rem 0.25rem;
+  border: 1px solid #e0e8d3;
+  border-radius: 0.3rem;
+  background: #142820;
+  color: #fff;
+  font-size: 0.6rem;
+  white-space: nowrap;
+}
+.transport-marker {
+  border-style: dashed;
+  background: #322515;
+  font-size: 0.65rem;
+}
+.crew-badge {
+  border-bottom: 3px solid #9ca6a0;
+}
+[data-job="carrier"] {
+  border-color: #89d8ff;
+}
+[data-job="exchange"] {
+  border-color: #d3b1ff;
+}
+[data-job="repair"] {
+  border-color: #ffc881;
+}
+[data-job="prep"] {
+  border-color: #a9e47f;
+}
+.guide-action:focus-visible {
+  outline: 3px solid #8af3ff;
+  outline-offset: 3px;
+}
+
+.site-marker::after,
+.crew-marker::after,
+.transport-marker::after {
+  content: "";
+  position: absolute;
+  left: var(--marker-line-x, 50%);
+  width: 0;
+  height: var(--marker-line, 0px);
+  border-left: 1px solid currentColor;
+  opacity: 0.7;
+}
+.site-markers [data-anchor-side="below"]::after {
+  bottom: calc(-1 * var(--marker-line, 0px));
+}
+.site-markers [data-anchor-side="above"]::after {
+  top: calc(-1 * var(--marker-line, 0px));
 }

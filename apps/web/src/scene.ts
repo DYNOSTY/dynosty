@@ -16,23 +16,22 @@ import type {
   TimberState,
 } from "@dynosty/game-core";
 import { createLaborVisual } from "./labor-scene.js";
+import { type MarkerRect, placeMarker } from "./marker-layout.js";
 import { loadModelAssets } from "./model-assets.js";
 import { createQualityVisual } from "./quality-scene.js";
 import { createSceneEntities } from "./scene-entities.js";
 import { observeSceneClicks } from "./scene-input.js";
+import { focusSiteCamera, resetSceneCamera } from "./site-camera.js";
 import { createSiteSelection } from "./site-selection.js";
-import {
-  isSiteId,
-  SITE_IDS,
-  SITE_POINTS,
-  type SiteId,
-  siteAvailable,
-} from "./site-targets.js";
+import { isSiteId, type SiteId } from "./site-targets.js";
+import { SCENE_SIGNS } from "./site-zones.js";
 import { createTimberVisual } from "./timber-scene.js";
+import { createZoneVisual } from "./zone-scene.js";
 
 export interface SceneController {
   update(snapshot: SceneSnapshot): void;
   select(id: string | null): void;
+  focusSite(id: SiteId): boolean;
   dispose(): void;
   readonly ready: Promise<void>;
   resetCamera(): void;
@@ -141,6 +140,7 @@ export function mountScene(
   const timberVisual = createTimberVisual(scene);
   const laborVisual = createLaborVisual(scene);
   const qualityVisual = createQualityVisual(scene);
+  const zoneVisual = createZoneVisual(scene);
   const sites = createSiteSelection(scene, (id) => {
     if (id === null && !isSiteId(selected)) return;
     if (id !== null) entities.select(null);
@@ -185,7 +185,14 @@ export function mountScene(
   observer.observe(canvas);
   let markerLayer: HTMLDivElement | null = null;
   let markerState: LaborState | null = null;
-  let markerNodes: { id: SiteId; node: HTMLElement; point: Vector3 }[] = [];
+  let markerNodes: {
+    id: string;
+    node: HTMLElement;
+    point: Vector3;
+    track?: string;
+    height?: number;
+    measured?: { key: string; width: number; height: number };
+  }[] = [];
   const markerIdentity = Matrix.Identity();
   let cameraKey = "";
   engine.runRenderLoop(() => {
@@ -206,7 +213,22 @@ export function mountScene(
       const width = canvas.clientWidth,
         height = canvas.clientHeight;
       const viewport = camera.viewport.toGlobal(width, height);
-      for (const { id, node, point } of markerNodes) {
+      const occupied: MarkerRect[] = [];
+      for (const marker of markerNodes) {
+        const { node, point, track, height: offset } = marker;
+        const tracked = track ? scene.getMeshById(track) : null;
+        if (tracked) {
+          point.copyFrom(tracked.position);
+          point.y += offset ?? 0;
+        }
+        if (
+          (track && !tracked?.isEnabled()) ||
+          (node.hasAttribute("data-transport-marker") &&
+            !node.textContent?.trim())
+        ) {
+          node.hidden = true;
+          continue;
+        }
         const p = Vector3.Project(
           point,
           markerIdentity,
@@ -215,7 +237,6 @@ export function mountScene(
         );
         const visible =
           markerState &&
-          siteAvailable(markerState, id) &&
           p.z >= 0 &&
           p.z <= 1 &&
           p.x >= 0 &&
@@ -224,9 +245,39 @@ export function mountScene(
           p.y <= height;
         if (node.hidden === Boolean(visible)) node.hidden = !visible;
         if (visible) {
-          const transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -100%)`;
+          const key = `${width}:${node.textContent}`;
+          if (marker.measured?.key !== key)
+            marker.measured = {
+              key,
+              width: node.offsetWidth,
+              height: node.offsetHeight,
+            };
+          const rect = placeMarker(
+            p.x,
+            p.y,
+            marker.measured.width,
+            marker.measured.height,
+            width,
+            height,
+            occupied,
+          );
+          if (!rect) {
+            node.hidden = true;
+            continue;
+          }
+          occupied.push(rect);
+          const transform = `translate(${rect.left}px, ${rect.top}px)`;
           if (node.style.transform !== transform)
             node.style.transform = transform;
+          const below = rect.top + rect.height <= p.y;
+          const line = `${Math.max(0, below ? p.y - rect.top - rect.height : rect.top - p.y)}px`;
+          const lineX = `${Math.max(0, Math.min(rect.width, p.x - rect.left))}px`;
+          if (node.style.getPropertyValue("--marker-line") !== line)
+            node.style.setProperty("--marker-line", line);
+          if (node.style.getPropertyValue("--marker-line-x") !== lineX)
+            node.style.setProperty("--marker-line-x", lineX);
+          const side = below ? "below" : "above";
+          if (node.dataset.anchorSide !== side) node.dataset.anchorSide = side;
         }
       }
     }
@@ -236,32 +287,65 @@ export function mountScene(
     setSiteMarkers(layer) {
       markerLayer = layer;
       markerNodes = layer
-        ? SITE_IDS.flatMap((id) => {
+        ? SCENE_SIGNS.flatMap(({ id, point }) => {
             const node = layer.querySelector<HTMLElement>(
               `[data-site-marker="${id}"]`,
             );
-            const [x, y, z] = SITE_POINTS[id];
-            return node
-              ? [{ id, node, point: new Vector3(x, y + 0.8, z) }]
-              : [];
+            const [x, y, z] = point;
+            return node ? [{ id, node, point: new Vector3(x, y, z) }] : [];
           })
         : [];
+      if (layer) {
+        for (const id of ["crew-1", "crew-2", "crew-3", "crew-4"]) {
+          const node = layer.querySelector<HTMLElement>(
+            `[data-crew-marker="${id}"]`,
+          );
+          if (node)
+            markerNodes.push({
+              id,
+              node,
+              point: Vector3.Zero(),
+              track: id,
+              height: 1.15,
+            });
+        }
+        const node = layer.querySelector<HTMLElement>(
+          "[data-transport-marker]",
+        );
+        if (node)
+          markerNodes.push({
+            id: "cart",
+            node,
+            point: Vector3.Zero(),
+            track:
+              markerState && markerState.exchange.phase !== "none"
+                ? "exchange-cart"
+                : "timber-cart",
+            height: 1,
+          });
+      }
     },
     updateTimber: timberVisual.update,
     updateLabor(state) {
+      if (!state && markerState) resetSceneCamera(camera);
       markerState = state;
+      const cartMarker = markerNodes.find((m) => m.id === "cart");
+      if (cartMarker)
+        cartMarker.track =
+          state?.exchange.phase !== "none" ? "exchange-cart" : "timber-cart";
       laborVisual.update(state);
       qualityVisual.update(state);
+      zoneVisual.update(state);
       sites.update(state);
     },
+    focusSite(id) {
+      select(id);
+      if (selected !== id) return false;
+      focusSiteCamera(camera, id);
+      return true;
+    },
     resetCamera() {
-      camera.alpha = -Math.PI / 2;
-      camera.beta = Math.PI / 3;
-      camera.radius = 12;
-      camera.setTarget(Vector3.Zero());
-      camera.inertialAlphaOffset = 0;
-      camera.inertialBetaOffset = 0;
-      camera.inertialRadiusOffset = 0;
+      resetSceneCamera(camera);
     },
     update: entities.update,
     select,
@@ -272,9 +356,10 @@ export function mountScene(
       abort.abort();
       observer.disconnect();
       stopPicking();
+      sites.dispose();
+      zoneVisual.dispose();
       qualityVisual.dispose();
       timberVisual.dispose();
-      sites.dispose();
       laborVisual.dispose();
       entities.dispose();
       scene.dispose();

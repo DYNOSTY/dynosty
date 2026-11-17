@@ -407,6 +407,7 @@ export function LaborDemo({
         {t.phase === "select" ? (
           <button
             type="button"
+            id="labor-contract-action"
             disabled={busy || !t.offer}
             onClick={() => wood({ type: "contract" })}
           >
@@ -419,6 +420,7 @@ export function LaborDemo({
             <button
               type="button"
               disabled={busy}
+              id="labor-depart-action"
               onClick={() => wood({ type: "depart" })}
             >
               확장 수레 출발
@@ -463,6 +465,7 @@ export function LaborDemo({
           <button
             type="button"
             disabled={busy || t.stock.available === 0}
+            id="labor-allocate-action"
             onClick={() => wood({ type: "allocate" })}
           >
             확장 정상 목재 {t.stock.available} 배분
@@ -472,6 +475,7 @@ export function LaborDemo({
           <button
             type="button"
             disabled={busy || t.stock.allocated !== 20}
+            id="labor-use-action"
             onClick={() => wood({ type: "use" })}
           >
             확장 목재 사용 확인
