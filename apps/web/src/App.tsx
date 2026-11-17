@@ -24,6 +24,7 @@ import { MediaPanel } from "./MediaPanel.js";
 import { PlayPanel } from "./PlayPanel.js";
 import { PlaySavePanel } from "./PlaySavePanel.js";
 import { loadPlay, playSaveError, savePlay } from "./play-save.js";
+import { QualityFlow } from "./QualityFlow.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SelectionPanel } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
@@ -488,12 +489,15 @@ export function App() {
             </span>
           </div>
           {timberOpen && laborOpen && laborState ? (
-            <SiteProgress
-              state={laborState}
-              notices={siteNotices}
-              onDismiss={() => setSiteNotices([])}
-              onSelect={(id) => sceneRef.current?.select(id)}
-            />
+            <>
+              <QualityFlow state={laborState} />{" "}
+              <SiteProgress
+                state={laborState}
+                notices={siteNotices}
+                onDismiss={() => setSiteNotices([])}
+                onSelect={(id) => sceneRef.current?.select(id)}
+              />
+            </>
           ) : null}
           <fieldset className="selection-actions" aria-label="예제 대상 선택">
             <button
