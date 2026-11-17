@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { openWorkspace } from "./workspace.js";
 
 const settingsKey = "dynosty.settings";
 const gameKey = "dynosty.example.saves";
@@ -8,7 +7,6 @@ test("설정 메뉴에서 키보드로 바꾼 음량·음소거를 새로고침 
   page,
 }) => {
   await page.goto("/");
-  await openWorkspace(page);
   await page.evaluate(
     (key) => localStorage.setItem(key, "keep game save"),
     gameKey,
@@ -27,7 +25,6 @@ test("설정 메뉴에서 키보드로 바꾼 음량·음소거를 새로고침 
   await expect(dialog).not.toBeVisible();
   await expect(opener).toBeFocused();
   await page.reload();
-  await openWorkspace(page);
   await opener.click();
   await expect(volume).toHaveValue("100");
   await expect(
@@ -74,7 +71,6 @@ test("저장된 음량이 실제 오디오 출력에 적용되고 자동 재생�
     Object.assign(window, { settingsAudioProbe: probe });
   }, settingsKey);
   await page.goto("/");
-  await openWorkspace(page);
   await page.getByRole("button", { name: "설정", exact: true }).click();
   const dialog = page.getByRole("dialog");
   const volume = dialog.getByRole("slider", { name: "전체 음량" });
@@ -132,13 +128,11 @@ for (const raw of [
     page,
   }) => {
     await page.goto("/");
-    await openWorkspace(page);
     await page.evaluate(({ key, value }) => localStorage.setItem(key, value), {
       key: settingsKey,
       value: raw,
     });
     await page.reload();
-    await openWorkspace(page);
     await page.getByRole("button", { name: "설정", exact: true }).click();
     const dialog = page.getByRole("dialog");
     const volume = dialog.getByRole("slider", { name: "전체 음량" });
@@ -159,7 +153,6 @@ test("설정 쓰기 실패는 이번 실행에만 적용하고 이전 설정·�
   page,
 }) => {
   await page.goto("/");
-  await openWorkspace(page);
   await page.getByRole("button", { name: "설정", exact: true }).click();
   const dialog = page.getByRole("dialog");
   const volume = dialog.getByRole("slider", { name: "전체 음량" });
@@ -193,7 +186,6 @@ test("설정 쓰기 실패는 이번 실행에만 적용하고 이전 설정·�
     "keep game save",
   );
   await page.reload();
-  await openWorkspace(page);
   await page.getByRole("button", { name: "설정", exact: true }).click();
   await expect(volume).toHaveValue("100");
 });
@@ -211,7 +203,6 @@ test("오디오를 사용할 수 없어도 안전한 안내 후 설정을 변경
     });
   });
   await page.goto("/");
-  await openWorkspace(page);
   await page.getByRole("button", { name: "설정", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "확인음 듣기" }).click();

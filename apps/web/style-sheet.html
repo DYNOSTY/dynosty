@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DYNOSTY 기준 시트 M1</title>
+<link rel="stylesheet" href="/src/theme.css" />
+<link rel="stylesheet" href="/src/kit.css" />
+<style>
+  body { margin: 0; background: var(--hanji-deep); color: var(--meok); font: var(--fs-body)/1.55 var(--font-body); word-break: keep-all; }
+  .sheet { max-width: 1360px; margin: 0 auto; padding: 48px 24px 96px; }
+  .sheet > h1 { font: 700 var(--fs-display)/1.2 var(--font-title); margin: 0 0 8px; }
+  .sheet > p { color: var(--meok-sub); margin: 0 0 40px; }
+  section.block { margin: 0 0 56px; }
+  section.block > h2 { font: 700 var(--fs-title)/1.3 var(--font-title); margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--hanji-line); }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+  .swatch { width: 150px; }
+  .swatch i { display: block; height: 72px; border-radius: 6px; border: 1px solid rgb(0 0 0 / 12%); }
+  .swatch b { display: block; margin-top: 8px; font-size: var(--fs-sub); }
+  .swatch span { display: block; color: var(--meok-sub); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .type-row { display: grid; grid-template-columns: 160px 1fr; gap: 16px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--hanji-line); }
+  .type-row small { color: var(--meok-sub); font-size: var(--fs-sub); }
+  .label { color: var(--meok-sub); font-size: var(--fs-sub); margin: 0 0 8px; }
+  .variant-title { font: 700 var(--fs-title)/1.3 var(--font-title); margin: 32px 0 8px; }
+  .variant-note { color: var(--meok-sub); margin: 0 0 12px; }
+  .stage-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; }
+  .stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; background: url(/ui/kit/bg_village.jpg) center / cover; }
+  .stage-caption { color: var(--meok-sub); font-size: 14px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main class="sheet">
+  <h1>DYNOSTY 기준 시트 · M1</h1>
+  <p>재질은 한지 · 옻칠 나무 · 쪽빛 천 · 먹 · 낙관입니다. 유물 화면, 시나리오 삽화, 건물 도감에서 뽑았습니다.</p>
+
+  <section class="block">
+    <h2>색</h2>
+    <div class="row">
+      <div class="swatch"><i style="background:var(--hanji)"></i><b>한지</b><span>#EFE6D2 · 창 바탕</span></div>
+      <div class="swatch"><i style="background:var(--hanji-deep)"></i><b>한지 짙음</b><span>#E2D5BC · 칸 구분</span></div>
+      <div class="swatch"><i style="background:var(--meok)"></i><b>먹</b><span>#2B2620 · 글자</span></div>
+      <div class="swatch"><i style="background:var(--ottchil)"></i><b>옻칠</b><span>#3A2A22 · 콘솔 틀</span></div>
+      <div class="swatch"><i style="background:var(--jjok)"></i><b>쪽빛</b><span>#34436A · 주요 버튼</span></div>
+      <div class="swatch"><i style="background:var(--nakgwan)"></i><b>낙관</b><span>#A8322D · 경고</span></div>
+      <div class="swatch"><i style="background:var(--cheongja)"></i><b>청자</b><span>#7F9E8E · 정상·희망</span></div>
+      <div class="swatch"><i style="background:var(--hanbok)"></i><b>한복 보라</b><span>#7B6A9B · 인물·선택</span></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>글자 (1920×1080 기준)</h2>
+    <div class="type-row"><small>창 제목 36</small><span style="font:700 36px/1.2 var(--font-title)">아버지의 장부</span></div>
+    <div class="type-row"><small>칸 제목 24</small><span style="font:700 24px/1.3 var(--font-title)">필요한 물자</span></div>
+    <div class="type-row"><small>본문 18</small><span>비가 새는 둥지에 마른 목재 20이 필요합니다. 사용 준비 기한은 12시간입니다.</span></div>
+    <div class="type-row"><small>숫자 18</small><span style="font-variant-numeric:tabular-nums;font-weight:600">120 · 40 · 8.9375 석탄/일</span></div>
+    <div class="type-row"><small>보조 16</small><span style="font-size:16px;color:var(--meok-sub)">예약 0 · 가용 8 · 하루 수요 8.94</span></div>
+  </section>
+
+  <section class="block">
+    <h2>버튼 (눌러도 크기가 바뀌지 않음)</h2>
+    <div class="row">
+      <div><p class="label">기본</p><button type="button" class="k-btn">발주하기</button></div>
+      <div><p class="label">마우스 올림</p><button type="button" class="k-btn is-hover">발주하기</button></div>
+      <div><p class="label">누름</p><button type="button" class="k-btn is-active">발주하기</button></div>
+      <div><p class="label">못 누름</p><button type="button" class="k-btn" disabled>발주하기</button></div>
+      <div><p class="label">보조</p><button type="button" class="k-btn k-btn--quiet">나중에</button></div>
+      <div><p class="label">위험</p><button type="button" class="k-btn k-btn--danger">징발 명령</button></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>자원 아이콘과 상세</h2>
+    <div class="row" id="icon-row"></div>
+    <div class="row" style="margin-top:24px">
+      <div class="k-tip">
+        <div class="k-tip__head"><img src="/ui/resources-3d/RES_WOOD.png" alt="" width="32" height="32" /> 나무</div>
+        <dl class="k-tip__grid">
+          <dt>실재고</dt><dd>120</dd>
+          <dt>예약</dt><dd>20</dd>
+          <dt>가용</dt><dd>100</dd>
+          <dt>하루 수요</dt><dd>0</dd>
+          <dt>남을 비축</dt><dd>100</dd>
+        </dl>
+        <p class="k-tip__note">공사·연구 예약분은 땔감으로 태우지 않습니다.</p>
+      </div>
+      <div class="mood-compare">
+        <div><p class="label">가. 등롱 · 먹 항아리 — 몸통 구멍에 양이 차오름</p><div class="mood-box" data-mood-a data-h="52" data-d="28"></div><div class="mood-box" data-mood-a data-h="18" data-d="83"></div></div>
+        <div><p class="label">나. 저울 — 무거운 쪽으로 기울고 양쪽에 숫자</p><div class="mood-box" data-mood-b data-h="52" data-d="28"></div><div class="mood-box" data-mood-b data-h="18" data-d="83"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>창 (조달 의뢰 예시 · A 구조)</h2>
+    <div class="k-window" style="width:520px">
+      <div class="k-window__band"><h3>마른 목재 20, 필요한 곳까지</h3></div>
+      <div class="k-window__body">
+        <p class="k-window__lead">비가 새는 둥지에 마른 목재 20이 필요합니다.</p>
+        <h4>필요한 물자</h4>
+        <div class="k-need"><img src="/ui/resources-3d/RES_WOOD.png" alt="" width="40" height="40" /><span>마른 목재</span><b>20</b></div>
+        <h4>납기와 검수</h4>
+        <p>기한 12시간 · 검수 2시간 · 일손 가용 4/4</p>
+        <h4>대가</h4>
+        <div class="k-need"><img src="/ui/resources-3d/RES_METAL.png" alt="" width="40" height="40" /><span>철재</span><b>4</b></div>
+        <div class="k-window__actions"><button type="button" class="k-btn">제안 비교하기</button><button type="button" class="k-btn k-btn--quiet">닫기</button></div>
+      </div>
+      <img class="k-seal" src="/ui/kit/seal.png" alt="" />
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>화면 틀 후보 · 1920×1080</h2>
+    <p class="stage-caption">배경은 시나리오 삽화이며 실제 게임 화면이 아닙니다. 틀의 느낌만 비교합니다.</p>
+
+    <p class="variant-title">가. 스타식 하단 콘솔</p>
+    <p class="variant-note">아래 전체를 옻칠 나무 콘솔이 받칩니다. 왼쪽 지도 · 가운데 선택 정보 · 오른쪽 명령 3×3.</p>
+    <div class="stage-wrap"><div class="stage" id="stage-a">
+      <div class="h-top">
+        <div class="h-top__title"><b>복홀</b><span>1단계 · 남겨진 터전</span></div>
+        <div class="h-res" data-res></div>
+        <div class="h-top__time"><b>1일 09:00</b><span class="h-speed"><i>Ⅱ</i><i class="on">1×</i><i>2×</i><i>4×</i></span></div>
+      </div>
+      <div class="k-panel h-goal"><h4>목표</h4><p>농장 1곳을 건설하세요</p><small>거처 부족 40 / 60</small></div>
+      <div class="k-panel h-weather"><h4>날씨와 온돌</h4><p>맑을 듯합니다</p><small>석탄 8.94/일 · 남은 4.5일</small></div>
+      <div class="k-bubble h-advisor-a"><b>나르미</b><p>목재와 돌을 먼저 확인해.</p></div>
+      <div class="c-console">
+        <div class="c-console__frame" aria-hidden="true"><img src="/ui/kit/console_0.png" alt=""><img class="grow" src="/ui/kit/console_1.png" alt=""><img src="/ui/kit/console_2.png" alt=""><img class="grow" src="/ui/kit/console_3.png" alt=""><img src="/ui/kit/console_4.png" alt=""></div>
+        <div class="c-console__map"><div class="c-map"></div></div>
+        <div class="c-console__info">
+          <div class="c-portrait"><img src="/ui/kit/bld_nest.png" alt="" /></div>
+          <div class="c-sel">
+            <h4>공동 둥지 <span class="c-badge">L1</span></h4>
+            <dl class="c-stats">
+              <dt>정원</dt><dd>8 / 8</dd>
+              <dt>보온</dt><dd>+1</dd>
+              <dt>난방 목재</dt><dd>2 / 일</dd>
+              <dt>상태</dt><dd>정상</dd>
+            </dl>
+            <p class="c-slots-label">입주 주민 8 / 8</p>
+            <div class="c-slots"><span><img src="/ui/cmd/residents.png" alt="" /></span><span><img src="/ui/cmd/residents.png" alt="" /></span><span><img src="/ui/cmd/residents.png" alt="" /></span><span><img src="/ui/cmd/residents.png" alt="" /></span><span><img src="/ui/cmd/residents.png" alt="" /></span><span><img src="/ui/cmd/residents.png" alt="" /></span><span><img src="/ui/cmd/residents.png" alt="" /></span><span><img src="/ui/cmd/residents.png" alt="" /></span></div>
+          </div>
+          <div class="c-mood" data-mood></div>
+        </div>
+        <div class="c-console__cmd" data-cmd></div>
+      </div>
+    </div></div>
+
+    <p class="variant-title">나. 떠 있는 띠 (Against the Storm식)</p>
+    <p class="variant-note">3D가 화면을 거의 다 씁니다. 아래 가운데 명령 띠, 양쪽 아래에 조언과 선택 정보.</p>
+    <div class="stage-wrap"><div class="stage" id="stage-b">
+      <div class="h-top">
+        <div class="h-top__title"><b>복홀</b><span>1단계 · 남겨진 터전</span></div>
+        <div class="h-res" data-res></div>
+        <div class="h-top__time"><b>1일 09:00</b><span class="h-speed"><i>Ⅱ</i><i class="on">1×</i><i>2×</i><i>4×</i></span></div>
+      </div>
+      <div class="k-panel h-goal"><h4>목표</h4><p>농장 1곳을 건설하세요</p><small>거처 부족 40 / 60</small></div>
+      <div class="k-panel h-weather"><h4>날씨와 온돌</h4><p>맑을 듯합니다</p><small>석탄 8.94/일 · 남은 4.5일</small></div>
+      <div class="k-bubble h-advisor-b"><b>나르미</b><p>목재와 돌을 먼저 확인해.</p></div>
+      <div class="k-panel h-sel-b"><h4>공동 둥지</h4><p>정원 8 / 8 · 보온 +1</p><small>난방 목재 2/일</small></div>
+      <div class="b-band">
+        <div class="b-band__cmd" data-cmd-row></div>
+        <div class="b-band__mood">
+          <div class="k-gauge"><span class="k-gauge__name">희망</span><span class="k-gauge__track"><i style="width:52%;background:var(--cheongja)"></i></span><b>52</b></div>
+          <div class="k-gauge"><span class="k-gauge__name">절망</span><span class="k-gauge__track"><i style="width:28%;background:var(--nakgwan)"></i></span><b>28</b></div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+</main>
+<script>
+  const RES = [["RES_PLANT","풀",120],["RES_MEAT","고기",12],["RES_FISH","어류",24],["RES_WOOD","나무",90],["RES_METAL","철",0]];
+  const SUB = [["RES_WATER","물",180],["RES_COAL","석탄",40]];
+  const all = [...RES, ...SUB];
+  document.getElementById("icon-row").innerHTML = all.map(([id, n]) =>
+    `<figure class="k-icon"><img src="/ui/resources-3d/${id}.png" alt="" width="64" height="64"><figcaption>${n}</figcaption></figure>`).join("");
+  const resHtml = `<div class="h-res__main">${RES.map(([id, n, v]) =>
+    `<span class="h-res__item"><img src="/ui/resources-3d/${id}.png" alt="" width="40" height="40"><span><small>${n}</small><b>${v}</b></span></span>`).join("")}</div>
+    <div class="h-res__sub">${SUB.map(([id, n, v]) => `<span><img src="/ui/resources-3d/${id}.png" alt="" width="20" height="20">${n} ${v}</span>`).join("")}<span>주민 60</span><span>보온 정상</span></div>`;
+  document.querySelectorAll("[data-res]").forEach((el) => { el.innerHTML = resHtml; });
+  const CMD = [["건설","B","build"],["주민","U","residents"],["연구","T","research"],["정책","P","policy"],["지도","M","map"],["경제","E","economy"],["온돌","H","ondol"],["기록","J","records"],["설정","Esc","settings"]];
+  const cmdHtml = ([n, k, ic]) => `<button type="button" class="c-cmd" title="${n} (${k})"><img src="/ui/cmd/${ic}.png" alt=""><span>${n}</span><kbd>${k}</kbd></button>`;
+  // 희망·절망 — 가: 등롱·먹 항아리 (몸통 구멍에 차오름) / 나: 저울
+  const SLOT = { hope: [32.1, 50.3, 33.8, 15.7, 0.546], despair: [41.9, 43.1, 29.9, 12.6, 0.849] };
+  const jar = (k, name, v) => { const [l, r, t, b, ratio] = SLOT[k];
+    return `<figure class="m-obj m-obj--${k}" style="--v:${v};--l:${l}%;--r:${r}%;--t:${t}%;--b:${b}%;aspect-ratio:${ratio}">
+      <span class="m-slot"><i></i></span><img src="/ui/kit/mood_${k}.png" alt=""><figcaption><small>${name}</small><b>${v}</b></figcaption></figure>`; };
+  const moodJars = (hv, dv) => `<div class="m-jars">${jar("hope","희망",hv)}${jar("despair","절망",dv)}</div>`;
+  const scaleRig = (hv, dv) => { // 받침점 기준 좌표(원본 px). 절망이 무거우면 오른쪽이 내려감
+    const th = Math.max(-14, Math.min(14, (dv - hv) * 0.25)), r = th * Math.PI / 180, X = 560, Y = 215;
+    const ring = (x, y) => [x * Math.cos(r) - y * Math.sin(r), x * Math.sin(r) + y * Math.cos(r)];
+    const [lx, ly] = ring(-360, 62), [rx, ry] = ring(358, 62);
+    return `<div class="rig" role="img" aria-label="희망 ${hv}, 절망 ${dv}">
+      <img src="/ui/kit/scale_post.png" alt="" style="left:${X - 240}px;top:${Y - 205}px">
+      <img src="/ui/kit/scale_panL.png" alt="" style="left:${X + lx - 210}px;top:${Y + ly - 30}px">
+      <img src="/ui/kit/scale_panR.png" alt="" style="left:${X + rx - 205}px;top:${Y + ry - 30}px">
+      <img src="/ui/kit/scale_beam.png" alt="" style="left:${X - 472}px;top:${Y - 60}px;transform-origin:472px 60px;transform:rotate(${th}deg)">
+    </div>`; };
+  const moodScale = (hv, dv) => `<div class="m-scale"><span class="m-scale__v"><small>희망</small><b>${hv}</b></span><div class="rig-box">${scaleRig(hv, dv)}</div><span class="m-scale__v"><small>절망</small><b>${dv}</b></span></div>`;
+  document.querySelectorAll("[data-mood]").forEach((el) => { el.innerHTML = moodScale(52, 28); });
+  document.querySelectorAll("[data-mood-a]").forEach((el) => { el.innerHTML = moodJars(+el.dataset.h, +el.dataset.d); });
+  document.querySelectorAll("[data-mood-b]").forEach((el) => { el.innerHTML = moodScale(+el.dataset.h, +el.dataset.d); });
+  document.querySelectorAll("[data-cmd]").forEach((el) => { el.innerHTML = CMD.map(cmdHtml).join(""); });
+  document.querySelectorAll("[data-cmd-row]").forEach((el) => { el.innerHTML = CMD.slice(0, 8).map(cmdHtml).join(""); });
+  const TB_W = { 1: "300px", 7: "300px" }, TB_GROW = [3, 5];
+  document.querySelectorAll(".h-top").forEach((el) => { el.insertAdjacentHTML("afterbegin", `<div class="h-top__frame" aria-hidden="true">${[...Array(9)].map((_, i) => `<img src="/ui/kit/topbar_${i}.png" alt="" class="${TB_GROW.includes(i) ? "grow" : ""}" style="${TB_W[i] ? `width:${TB_W[i]}` : ""}">`).join("")}</div>`); });
+  const fit = () => document.querySelectorAll(".stage").forEach((s) => { s.style.transform = `scale(${s.parentElement.clientWidth / 1920})`; });
+  addEventListener("resize", fit); fit();
+</script>
+</body>
+</html>

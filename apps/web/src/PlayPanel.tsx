@@ -88,14 +88,25 @@ export function PlayPanel({ state, error, busy, onCommand }: Props) {
       ) : null}
       <section className="resource-strip" aria-label="자원 재고">
         {RESOURCE_IDS.map((id) => (
-          <div key={id} className="resource-card">
+          <div
+            key={id}
+            className="resource-card"
+            title={`${GAME_RULES.resources[id].name} ${(state.resources[id] / AMOUNT_SCALE).toLocaleString("ko-KR", { maximumFractionDigits: 4 })}`}
+          >
+            <img
+              className="resource-icon"
+              src={`/ui/resources-3d/${id}.png`}
+              alt=""
+              width={32}
+              height={32}
+            />
             <span className="resource-label">
               {GAME_RULES.resources[id].name}
             </span>
             <strong data-testid={`resource-${id}`}>
-              {(state.resources[id] / AMOUNT_SCALE).toLocaleString("ko-KR", {
-                maximumFractionDigits: 4,
-              })}
+              {Math.floor(state.resources[id] / AMOUNT_SCALE).toLocaleString(
+                "ko-KR",
+              )}
             </strong>
           </div>
         ))}

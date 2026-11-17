@@ -55,7 +55,6 @@ test("검수대·배급소 실제 클릭의 테두리·정보·단일 선택과 
 test("검수·격리품·배급소 현장 명령으로 교환과 배급을 완료하며 숨은 격리품 선택은 해제한다", async ({
   page: p,
 }) => {
-  test.setTimeout(45000);
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(e.message));
   await initial(p);
@@ -96,7 +95,6 @@ test("검수·격리품·배급소 현장 명령으로 교환과 배급을 완�
 test("현장 재배치는 보완 진행량을 보존하고 저장·새로고침 복원에서 선택만 해제한다", async ({
   page: p,
 }) => {
-  test.setTimeout(45000);
   await initial(p);
   await clickSite(p, "site-quarantine");
   await b(p, "현장 보완 인원 배정").click();

@@ -42,7 +42,6 @@ test("품질흐름: 제안 비교와 운송·검사 분리는 실제 검사 전 
 test("품질흐름: 배분과 보완 재고를 중복 없이 표시하고 저장·복원·손상 파일 거부 후에도 유지한다", async ({
   page: p,
 }) => {
-  test.setTimeout(60000);
   await p.setViewportSize({ width: 1600, height: 1200 });
   await receiveProgress(p);
   await b(p, "확장 정상 목재 16 배분").click();
@@ -85,7 +84,6 @@ test("품질흐름: 배분과 보완 재고를 중복 없이 표시하고 저장
 test("품질흐름: 교환 처리4와 정상 배분16을 분리하고 예약·실제 비용·수령 결과를 보존한다", async ({
   page: p,
 }) => {
-  test.setTimeout(60000);
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(e.message));
   await receiveProgress(p);

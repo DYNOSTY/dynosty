@@ -11,6 +11,26 @@ async function ready(page: import("@playwright/test").Page) {
   await expect(
     page.getByRole("button", { name: "건물 예제 선택", exact: true }),
   ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (
+          window as unknown as {
+            __scene: {
+              getTransformNodeByName(
+                name: string,
+              ): { getChildMeshes(): unknown[] } | null;
+            };
+          }
+        ).__scene;
+        return (
+          scene
+            .getTransformNodeByName("example-building-1:glb")
+            ?.getChildMeshes().length ?? 0
+        );
+      }),
+    )
+    .toBeGreaterThan(0);
 }
 
 test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈 바닥에서 해제한다", async ({
@@ -28,6 +48,7 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   );
   // 패널 전환에 따른 장면 폭 변경 없이 실제 테두리 픽셀의 변화를 비교한다.
   await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   const canvas = page.locator("canvas");
   expect(outlinePixels(await canvas.screenshot())).toBe(0);
   await clickExample(page, "building");
@@ -91,7 +112,6 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
     .click();
   await expect(info).toContainText("걷기 표시");
   await expect(info).toContainText("2, 0, 1");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
   await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
@@ -107,7 +127,6 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
   await page
     .getByRole("button", { name: "개발 도구 닫기", exact: true })
     .click();
-  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   await expect(info).toBeVisible();
   await page.reload();
   await expect(info).toBeHidden();

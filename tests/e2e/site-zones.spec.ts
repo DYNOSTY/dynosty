@@ -42,7 +42,6 @@ test("빈 구역의 표식·글자 안내는 유지하고 실제 목재 클릭·
 test("묶음 표시의 저장 복원·사용 후 빈 구역·모드 종료를 확인한다", async ({
   page: p,
 }) => {
-  test.setTimeout(60000);
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(e.message));
   await receiveProgress(p);

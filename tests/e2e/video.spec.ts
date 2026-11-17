@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { openWorkspace } from "./workspace.js";
+import { closeWorkspace, openWorkspace } from "./workspace.js";
 
 const videoPath = fileURLToPath(
   new URL("./fixtures/test-video.webm", import.meta.url),
@@ -93,6 +93,7 @@ test("영상 수동 재생·정지·자연 종료에 저장된 음량·음소거
           .value,
     );
   await expect.poll(gain).toBe(0);
+  await closeWorkspace(page);
   await page.getByRole("button", { name: "설정", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("checkbox", { name: "소리 끄기" }).uncheck();
@@ -102,6 +103,7 @@ test("영상 수동 재생·정지·자연 종료에 저장된 음량·음소거
   await dialog.getByRole("checkbox", { name: "소리 끄기" }).check();
   await expect.poll(gain).toBe(0);
   await dialog.getByRole("button", { name: "설정 닫기" }).click();
+  await openWorkspace(page);
   await page.getByRole("button", { name: "영상 정지", exact: true }).click();
   await expect(page.getByTestId("video-status")).toHaveText("정지");
   await expect(video).toHaveJSProperty("paused", true);

@@ -79,7 +79,6 @@ test("다음 조작 링크는 실제 공급·약정·출발로 이동하고 장�
 test("보완 역할 표지·먼저 배분 링크·장소 이동·빈 바닥·저장 복원을 유지한다", async ({
   page: p,
 }) => {
-  test.setTimeout(60000);
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(e.message));
   await receiveProgress(p);

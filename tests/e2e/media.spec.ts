@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openWorkspace } from "./workspace.js";
+import { closeWorkspace, openWorkspace } from "./workspace.js";
 
 // 테스트용 PCM WAV. 실제 BGM·대사 파일이나 네트워크 음원을 사용하지 않는다.
 function wave(seconds = 1) {
@@ -129,6 +129,7 @@ test("BGM·음성을 함께 재생하고 복원된 음량·음소거와 정지�
     )
     .toBeGreaterThan(0.6);
   await expect.poll(async () => (await output()).paused[0]).toBe(false);
+  await closeWorkspace(page);
   await page.getByRole("button", { name: "설정", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("checkbox", { name: "소리 끄기" }).uncheck();
@@ -138,6 +139,7 @@ test("BGM·음성을 함께 재생하고 복원된 음량·음소거와 정지�
   await dialog.getByRole("checkbox", { name: "소리 끄기" }).check();
   await expect.poll(async () => (await output()).gain).toBe(0);
   await dialog.getByRole("button", { name: "설정 닫기" }).click();
+  await openWorkspace(page);
   await expect.poll(async () => (await output()).paused[0]).toBe(false);
   await page.getByRole("button", { name: "음성 정지", exact: true }).click();
   await expect(page.getByTestId("voice-status")).toHaveText("정지");

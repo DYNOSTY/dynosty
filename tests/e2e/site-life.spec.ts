@@ -37,7 +37,6 @@ test("공급 선택부터 실제 운송·하역·검수 안내가 전환되고 �
 test("교환 운송 저장·새로고침 복원과 재검수·수령·완료 안내를 보존한다", async ({
   page: p,
 }) => {
-  test.setTimeout(60000);
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(e.message));
   await receiveProgress(p);
@@ -78,7 +77,6 @@ test("교환 운송 저장·새로고침 복원과 재검수·수령·완료 안
 test("모바일에서 주민 담당·보완 인원 부족·배급 병행 안내와 선택을 확인한다", async ({
   page: p,
 }) => {
-  test.setTimeout(60000);
   await p.setViewportSize({ width: 375, height: 812 });
   await receiveProgress(p);
   await b(p, "목재 다음 작업 장소 보기").click();

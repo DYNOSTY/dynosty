@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { openWorkspace } from "./workspace.js";
+import { closeWorkspace, openWorkspace } from "./workspace.js";
 
 const key = "dynosty.audio.catalog";
 const shortWave = readFileSync(
@@ -191,6 +191,7 @@ test("종류별 이름 검사와 제거를 처리하고 다른 채널·게임 �
     page.getByRole("button", { name: "BGM 재생", exact: true }),
   ).toBeDisabled();
   expect(JSON.parse((await stored(page)) ?? "{}").entries).toHaveLength(1);
+  await closeWorkspace(page);
   await page.getByRole("button", { name: "설정", exact: true }).click();
   await page
     .getByRole("dialog")

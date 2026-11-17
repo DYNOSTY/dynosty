@@ -225,30 +225,30 @@ export function LaborDemo({
       aria-label="일손 배치·배급 체험판"
     >
       <div className="timber-heading">
-        <p className="eyebrow">조달 확장 체험 · 같은 일손으로 두 요청</p>
-        <h2 className="timber-title">일손을 어디에 보낼까요?</h2>
-      </div>
-      <div className="timber-controls">
         <button
           type="button"
-          className="quiet-button"
-          onClick={() => {
-            command({ type: "pause", paused: true });
-            onExit();
-          }}
-        >
-          생존 예제로 돌아가기
-        </button>
-        <button
-          type="button"
-          className="quiet-button"
+          className="g-knob g-knob--back"
+          aria-label="기존 목재 체험 보기"
+          title="뒤로 · 목재 조달"
           onClick={() => {
             command({ type: "pause", paused: true });
             onClassic();
           }}
-        >
-          기존 목재 체험 보기
-        </button>
+        />
+        <div>
+          <p className="eyebrow">조달 확장 체험 · 같은 일손으로 두 요청</p>
+          <h2 className="timber-title">일손을 어디에 보낼까요?</h2>
+        </div>
+        <button
+          type="button"
+          className="g-knob g-knob--close"
+          aria-label="생존 예제로 돌아가기"
+          title="닫기 (Esc)"
+          onClick={() => {
+            command({ type: "pause", paused: true });
+            onExit();
+          }}
+        />
       </div>
       {selectedSite ? (
         <SitePanel
@@ -278,7 +278,9 @@ export function LaborDemo({
           disabled={busy || done}
           onClick={() => command({ type: "pause", paused: !state.paused })}
         >
-          {state.paused ? "일손 시간 시작" : "일손 일시정지"}
+          <span className="toggle-label">
+            {state.paused ? "일손 시간 시작" : "일손 일시정지"}
+          </span>
         </button>
         <button
           type="button"
