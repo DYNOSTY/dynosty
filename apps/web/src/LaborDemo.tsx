@@ -9,15 +9,16 @@ import {
   laborIron,
   laborNextAt,
   laborReservedIron,
-  laborStock,
   queueRemaining,
-  TIMBER_RULES,
   type TimberCommand,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
 import { ExchangePanel } from "./ExchangePanel.js";
 import type { LaborRequest, LaborResponse } from "./labor-protocol.js";
 import { laborSaveError, loadLabor, saveLabor } from "./labor-save.js";
+import { OfferComparison } from "./OfferComparison.js";
+import { QualityReport } from "./QualityReport.js";
+import { qualityView } from "./quality-view.js";
 import { SitePanel } from "./SitePanel.js";
 import type { SiteId } from "./site-targets.js";
 
@@ -187,7 +188,7 @@ export function LaborDemo({
         {error && !selectedSite ? <p role="alert">{error}</p> : null}
       </section>
     );
-  const stock = laborStock(state),
+  const stock = qualityView(state).bins,
     iron = laborIron(state),
     reservedIron = laborReservedIron(state);
   const t = state.timber,
@@ -388,7 +389,7 @@ export function LaborDemo({
                   "사용가능",
                   "배분",
                   "사용확인",
-                  "교환운송",
+                  "운송(원납품·교환)",
                 ][i]
               }{" "}
               <strong data-testid={`labor-${k}`}>{stock[k]}</strong>
@@ -398,45 +399,19 @@ export function LaborDemo({
         <p data-testid="labor-total">
           물량 합계 {Object.values(stock).reduce((a, b) => a + b, 0)}/20
         </p>
+        <OfferComparison
+          state={state}
+          busy={busy}
+          onChoose={(offer) => wood({ type: "choose", offer })}
+        />
         {t.phase === "select" ? (
-          <>
-            <div className="timber-offers">
-              {(["A", "B"] as const).map((offer) => (
-                <article
-                  className={
-                    t.offer === offer ? "timber-offer selected" : "timber-offer"
-                  }
-                  key={offer}
-                >
-                  <h4>공급 {offer}</h4>
-                  <p>
-                    철재{TIMBER_RULES.offers[offer].cost} · 도착
-                    {TIMBER_RULES.offers[offer].travel / 60}시간
-                  </p>
-                  <p>
-                    {offer === "A"
-                      ? "정상16·젖은4, 보완에2명·4시간"
-                      : "정상20, 보완 일손을 아낌"}
-                  </p>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    aria-pressed={t.offer === offer}
-                    onClick={() => wood({ type: "choose", offer })}
-                  >
-                    확장 제안 {offer} 선택
-                  </button>
-                </article>
-              ))}
-            </div>
-            <button
-              type="button"
-              disabled={busy || !t.offer}
-              onClick={() => wood({ type: "contract" })}
-            >
-              확장 약정하기
-            </button>
-          </>
+          <button
+            type="button"
+            disabled={busy || !t.offer}
+            onClick={() => wood({ type: "contract" })}
+          >
+            확장 약정하기
+          </button>
         ) : null}
         {t.phase === "contracted" ? (
           <>
@@ -582,6 +557,7 @@ export function LaborDemo({
           </button>
         </div>
       ) : null}
+      <QualityReport state={state} />
       <p aria-live="polite" data-testid="labor-save-status">
         {busy ? "일손 저장 처리 중" : status}
       </p>

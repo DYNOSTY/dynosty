@@ -17,6 +17,7 @@ import type {
 } from "@dynosty/game-core";
 import { createLaborVisual } from "./labor-scene.js";
 import { loadModelAssets } from "./model-assets.js";
+import { createQualityVisual } from "./quality-scene.js";
 import { createSceneEntities } from "./scene-entities.js";
 import { observeSceneClicks } from "./scene-input.js";
 import { createSiteSelection } from "./site-selection.js";
@@ -139,6 +140,7 @@ export function mountScene(
   );
   const timberVisual = createTimberVisual(scene);
   const laborVisual = createLaborVisual(scene);
+  const qualityVisual = createQualityVisual(scene);
   const sites = createSiteSelection(scene, (id) => {
     if (id === null && !isSiteId(selected)) return;
     if (id !== null) entities.select(null);
@@ -249,6 +251,7 @@ export function mountScene(
     updateLabor(state) {
       markerState = state;
       laborVisual.update(state);
+      qualityVisual.update(state);
       sites.update(state);
     },
     resetCamera() {
@@ -269,6 +272,7 @@ export function mountScene(
       abort.abort();
       observer.disconnect();
       stopPicking();
+      qualityVisual.dispose();
       timberVisual.dispose();
       sites.dispose();
       laborVisual.dispose();

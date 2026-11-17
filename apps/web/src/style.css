@@ -834,3 +834,80 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+.quality-flow {
+  padding: 1rem;
+  border-top: 1px solid #456650;
+}
+.quality-flow h3 {
+  margin: 0 0 0.75rem;
+}
+.quality-bins {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.4rem;
+}
+.quality-bin {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.6rem;
+  border: 1px solid #486e5a;
+  border-radius: 0.5rem;
+  opacity: 0.7;
+}
+.quality-bin.stocked {
+  opacity: 1;
+  border-width: 2px;
+  background: #254839;
+}
+.quality-bin.bin-quarantine {
+  border-color: #a8b5ff;
+}
+.quality-bin.bin-available,
+.quality-bin.bin-checked {
+  border-color: #f2cf7c;
+}
+.quality-bin.bin-allocated {
+  border-color: #f6a15e;
+}
+.quality-bin.bin-used {
+  border-color: #aee6a0;
+}
+.quality-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.quality-offers table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.quality-offers th,
+.quality-offers td {
+  padding: 0.5rem;
+  border: 1px solid #486e5a;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.quality-offers caption {
+  text-align: left;
+  margin: 0.5rem 0;
+  color: #bdd0bf;
+}
+.quality-report {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid #486e5a;
+  border-radius: 0.5rem;
+}
+.quality-report dl > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #375a4c;
+}
+.quality-report dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
