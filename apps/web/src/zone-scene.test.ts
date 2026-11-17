@@ -8,10 +8,10 @@ import {
 } from "@dynosty/game-core";
 import { expect, it } from "vitest";
 import { createLaborVisual } from "./labor-scene.js";
+import { createLegacyTimberVisual as createTimberVisual } from "./legacy-timber-scene.js";
 import { createQualityVisual } from "./quality-scene.js";
 import { createSiteSelection } from "./site-selection.js";
 import { SCENE_SIGNS, ZONES } from "./site-zones.js";
-import { createTimberVisual } from "./timber-scene.js";
 import { createZoneVisual } from "./zone-scene.js";
 
 function fixture() {

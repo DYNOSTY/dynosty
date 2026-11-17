@@ -1,6 +1,6 @@
 import type { LaborState } from "./labor.js";
+import { TIMBER_RULES, TimberError } from "./legacy-timber.js";
 import { isRecord } from "./save.js";
-import { TIMBER_RULES, TimberError } from "./timber.js";
 
 // 체험 전용 개발값. 본편의 조달 조건을 확정하지 않는다.
 export const EXCHANGE_RULES = {

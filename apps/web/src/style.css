@@ -22,6 +22,10 @@
 * {
   box-sizing: border-box;
 }
+.settlement-heading[hidden],
+.play-baseline-note[hidden] {
+  display: none;
+}
 body {
   margin: 0;
 }
@@ -401,7 +405,7 @@ h1 {
 }
 .resource-strip {
   display: grid;
-  grid-template-columns: repeat(7, minmax(80px, 1fr));
+  grid-template-columns: repeat(9, minmax(70px, 1fr));
   gap: 0.5rem;
   overflow-x: auto;
   padding: 0.7rem 0 0.3rem;
@@ -450,7 +454,7 @@ h1 {
     gap: 0.5rem;
   }
   .resource-strip {
-    grid-template-columns: repeat(7, 85px);
+    grid-template-columns: repeat(9, 85px);
   }
 }
 
@@ -3375,7 +3379,7 @@ body,
   .is-procurement .play-scene > .selection-actions {
     display: flex;
   }
-  .is-procurement .workspace-tools.timber-tools {
+  .play-shell.is-procurement .workspace-tools.timber-tools {
     position: relative;
     inset: auto;
     transform: none;
@@ -3385,6 +3389,12 @@ body,
     padding: 16px;
   }
   .is-procurement .timber-tools .labor-demo {
+    column-count: auto;
+  }
+  .is-procurement .timber-tools .timber-demo {
+    column-count: auto;
+  }
+  .is-procurement section[aria-label="개발 도구 패널"]:not([hidden]) {
     column-count: auto;
   }
   .is-procurement .timber-demo .timber-heading .g-knob--close {
@@ -3577,4 +3587,25 @@ body,
     z-index: 19;
     background: rgb(24 18 14 / 45%);
   }
+}
+.building-health-tooltip {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #b7c989;
+  border-radius: 0.5rem;
+  background: #14271f;
+  color: #f3f5e8;
+  box-shadow: 0 3px 12px #0008;
+}
+.building-health-tooltip progress {
+  width: 10rem;
+  accent-color: #cfe495;
+}
+
+.research-illustration {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
 }

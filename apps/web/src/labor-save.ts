@@ -2,7 +2,7 @@ import {
   isRecord,
   type LaborSave,
   parseLaborSave,
-  TimberError,
+  LegacyTimberError as TimberError,
 } from "@dynosty/game-core";
 import type { ExampleStorage } from "./local-save.js";
 export const LABOR_SAVE_KEY = "dynosty.labor.saves";

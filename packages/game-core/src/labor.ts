@@ -8,8 +8,6 @@ import {
   parseExchange,
   validateExchange,
 } from "./exchange.js";
-import { isRecord } from "./save.js";
-import type { SceneSnapshot } from "./scene.js";
 import {
   advanceTimber,
   commandTimber,
@@ -19,7 +17,9 @@ import {
   type TimberCommand,
   TimberError,
   type TimberState,
-} from "./timber.js";
+} from "./legacy-timber.js";
+import { isRecord } from "./save.js";
+import type { SceneSnapshot } from "./scene.js";
 export const LABOR_RULES = {
   version: 1,
   workers: 4,

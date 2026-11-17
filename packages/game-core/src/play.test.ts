@@ -33,8 +33,8 @@ const facts = (): OutcomeFacts => ({
   mech2: false,
 });
 describe("승인 개발 기준과 시작 상태", () => {
-  it("7개 자원과 60명·독립 상태를 생성하고 추천 조합을 한 데이터에서 읽는다", () => {
-    expect(Object.keys(GAME_RULES.resources)).toHaveLength(7);
+  it("9개 자원과 60명·독립 상태를 생성하고 추천 조합을 한 데이터에서 읽는다", () => {
+    expect(Object.keys(GAME_RULES.resources)).toHaveLength(9);
     const a = createPlayState(),
       b = createPlayState();
     expect(a.citizens).toHaveLength(60);
@@ -63,6 +63,18 @@ describe("승인 개발 기준과 시작 상태", () => {
   );
 });
 describe("식성별 고정 정밀도 소비와 시간", () => {
+  it.each(FOOD_IDS)("%s 식성만 있으면 그 식량만 소비한다", (diet) => {
+    const initial = createPlayState();
+    const only = {
+      ...initial,
+      citizens: initial.citizens.filter((c) => c.diet === diet),
+    };
+    const after = advancePlayMinutes(only, 1440);
+    for (const food of FOOD_IDS)
+      expect(after.resources[food]).toBe(
+        initial.resources[food] - (food === diet ? 20 * AMOUNT_SCALE : 0),
+      );
+  });
   it("분할 진행과 한 번 진행의 날짜·재고·잔여 분자가 정확히 같다", () => {
     const initial = createPlayState();
     let split = initial;
@@ -70,7 +82,7 @@ describe("식성별 고정 정밀도 소비와 시간", () => {
     const one = advancePlayMinutes(initial, 1440);
     expect(split).toEqual(one);
     expect(one.day).toBe(2);
-    expect(one.minute).toBe(0);
+    expect(one.minute).toBe(initial.minute);
     for (const id of FOOD_IDS)
       expect(one.resources[id]).toBe(100 * AMOUNT_SCALE);
     expect(initial.resources.RES_PLANT).toBe(120 * AMOUNT_SCALE);
@@ -95,12 +107,12 @@ describe("식성별 고정 정밀도 소비와 시간", () => {
     const s = createPlayState();
     expect(tickPlay(s, 10000)).toEqual(s);
     const running = setPlayPaused(s, false);
-    expect(tickPlay(running, 10000).minute).toBe(10);
-    const half = tickPlay(running, 50);
-    expect(half.minute).toBe(0);
-    expect(tickPlay(half, 50).minute).toBe(1);
+    expect(tickPlay(running, 10000).minute).toBe(s.minute + 1);
+    const half = tickPlay(running, 500);
+    expect(half.minute).toBe(s.minute);
+    expect(tickPlay(half, 500).minute).toBe(s.minute + 1);
     expect(setPlayPaused(half, true).tickRemainder).toBe(0);
-    expect(tickPlay(setPlayPaused(half, true), 1000).minute).toBe(0);
+    expect(tickPlay(setPlayPaused(half, true), 1000).minute).toBe(s.minute);
   });
   it("식성별 하루분 경고·고갈·보충 해제를 일관되게 계산한다", () => {
     const s = createPlayState();

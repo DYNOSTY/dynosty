@@ -2,7 +2,7 @@ import {
   EXCHANGE_RULES,
   LABOR_RULES,
   type LaborState,
-  TIMBER_RULES,
+  LEGACY_TIMBER_RULES as TIMBER_RULES,
 } from "@dynosty/game-core";
 import { siteProgress } from "./site-progress.js";
 import type { SiteId } from "./site-targets.js";

@@ -10,7 +10,7 @@ import {
   laborNextAt,
   laborReservedIron,
   queueRemaining,
-  type TimberCommand,
+  type LegacyTimberCommand as TimberCommand,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
 import { ExchangePanel } from "./ExchangePanel.js";

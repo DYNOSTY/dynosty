@@ -1,7 +1,7 @@
 import {
   EXCHANGE_RULES,
   type LaborState,
-  TIMBER_RULES,
+  LEGACY_TIMBER_RULES as TIMBER_RULES,
   type TimberOffer,
 } from "@dynosty/game-core";
 import { qualityView } from "./quality-view.js";

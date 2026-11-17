@@ -10,8 +10,8 @@ import {
 } from "@dynosty/game-core";
 import { expect, it } from "vitest";
 import { createLaborVisual } from "./labor-scene.js";
+import { createLegacyTimberVisual as createTimberVisual } from "./legacy-timber-scene.js";
 import { crewActivity, nextTimberStep, transportView } from "./site-life.js";
-import { createTimberVisual } from "./timber-scene.js";
 
 function flow(offer: "A" | "B" = "A") {
   let state = createLaborState(),

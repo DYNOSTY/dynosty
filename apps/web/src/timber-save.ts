@@ -5,9 +5,17 @@ import {
   type TimberSave,
 } from "@dynosty/game-core";
 import type { ExampleStorage } from "./local-save.js";
-export const TIMBER_SAVE_KEY = "dynosty.timber.saves";
+export const TIMBER_SAVE_KEY = "dynosty.timber.saves.v17";
 function archive(storage: ExampleStorage) {
-  const raw = storage.getItem(TIMBER_SAVE_KEY);
+  const raw =
+    storage.getItem(TIMBER_SAVE_KEY) ??
+    storage.getItem("dynosty.timber.saves.v16") ??
+    storage.getItem("dynosty.timber.saves.v15") ??
+    storage.getItem("dynosty.timber.saves.v14") ??
+    storage.getItem("dynosty.timber.saves.v13") ??
+    storage.getItem("dynosty.timber.saves.v12") ??
+    storage.getItem("dynosty.timber.saves.v11") ??
+    storage.getItem("dynosty.timber.saves.v10");
   if (raw === null) return null;
   let v: unknown;
   try {

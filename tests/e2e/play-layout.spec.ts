@@ -1,6 +1,9 @@
+import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
-const wave = new URL("./fixtures/test-audio.wav", import.meta.url).pathname;
+const wave = fileURLToPath(
+  new URL("./fixtures/test-audio.wav", import.meta.url),
+);
 
 test("첫 화면의 중심에 실제 3D 장면을 표시하고 저장·개발 메뉴는 접어 둔다", async ({
   page,

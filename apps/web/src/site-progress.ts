@@ -4,7 +4,7 @@ import {
   LABOR_RULES,
   type LaborState,
   laborStock,
-  TIMBER_RULES,
+  LEGACY_TIMBER_RULES as TIMBER_RULES,
 } from "@dynosty/game-core";
 import { SITE_NAMES, type SiteId } from "./site-targets.js";
 

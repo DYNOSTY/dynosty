@@ -1,3 +1,4 @@
+import { BOKHOL_MAP } from "./bokhol.js";
 import raw from "./game-data.json" with { type: "json" };
 import { isRecord } from "./save.js";
 import type { SceneEntity, SceneSnapshot } from "./scene.js";
@@ -54,7 +55,7 @@ export function parseRules(value: unknown): RuleSet {
   ])
     if (!isRecord(value[key])) fail();
   const resources = value.resources as Record<string, unknown>;
-  if (Object.keys(resources).length !== 7) fail();
+  if (Object.keys(resources).length !== RESOURCE_IDS.length) fail();
   for (const id of RESOURCE_IDS) {
     const r = resources[id];
     if (!isRecord(r)) fail();
@@ -193,6 +194,8 @@ export interface Citizen {
   readonly diet: FoodId;
   readonly age: "adult";
   readonly alive: boolean;
+  readonly mechanicalFrom?: string;
+  readonly health?: "healthy" | "sick" | "dead";
 }
 export interface PlayBuilding {
   readonly id: string;
@@ -212,6 +215,7 @@ export interface PlayState {
   readonly paused: boolean;
   readonly tickRemainder: number;
   readonly citizens: readonly Citizen[];
+  readonly citizenEvents?: readonly string[];
   readonly buildings: readonly PlayBuilding[];
   readonly resources: Readonly<Record<ResourceId, number>>;
   readonly foodCarry: Readonly<Record<FoodId, number>>;
@@ -233,6 +237,7 @@ export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
         diet: p.diet as FoodId,
         age: "adult",
         alive: true,
+        health: "healthy",
       });
   return {
     schemaVersion: 1,
@@ -279,6 +284,11 @@ export function parsePlayState(
     value.citizens.length > 600
   )
     fail();
+  const resourceSource: Record<string, unknown> = {
+    ...value.resources,
+    ...(!("RES_IRON_ORE" in value.resources) ? { RES_IRON_ORE: 0 } : {}),
+    ...(!("RES_STONE" in value.resources) ? { RES_STONE: 0 } : {}),
+  };
   number(value.day, 1, 100_000, true);
   number(value.minute, 0, 1439, true);
   number(value.tickRemainder, 0, 999, true);
@@ -286,7 +296,7 @@ export function parsePlayState(
   number(value.pessimism, 0, 100);
   const resources = {} as Record<ResourceId, number>;
   for (const id of RESOURCE_IDS) {
-    const amount = value.resources[id];
+    const amount = resourceSource[id];
     number(amount, 0, 10_000_000_000, true);
     resources[id] = amount;
   }
@@ -300,6 +310,16 @@ export function parsePlayState(
     carry[id] = c;
     unmet[id] = u;
   }
+  if (
+    value.citizenEvents !== undefined &&
+    (!Array.isArray(value.citizenEvents) ||
+      value.citizenEvents.length > 2000 ||
+      value.citizenEvents.some(
+        (id) => typeof id !== "string" || !id || id.length > 100,
+      ) ||
+      new Set(value.citizenEvents).size !== value.citizenEvents.length)
+  )
+    fail();
   const ids = new Set<string>();
   const citizens = value.citizens.map((p): Citizen => {
     if (!isRecord(p) || p.age !== "adult" || typeof p.alive !== "boolean")
@@ -308,6 +328,12 @@ export function parsePlayState(
     text(p.species);
     const definition = rules.population.find((x) => x.species === p.species);
     if (!definition || p.diet !== definition.diet || ids.has(p.id)) fail();
+    if (
+      p.health !== undefined &&
+      (!["healthy", "sick", "dead"].includes(p.health as string) ||
+        (p.health === "dead") !== !p.alive)
+    )
+      fail();
     ids.add(p.id);
     return {
       id: p.id,
@@ -315,8 +341,28 @@ export function parsePlayState(
       diet: p.diet as FoodId,
       age: "adult",
       alive: p.alive,
+      ...(p.mechanicalFrom !== undefined
+        ? { mechanicalFrom: String(p.mechanicalFrom) }
+        : {}),
+      ...(p.health !== undefined
+        ? { health: p.health as NonNullable<Citizen["health"]> }
+        : {}),
     };
   });
+  const bones = new Set<string>();
+  for (const c of citizens)
+    if (c.mechanicalFrom !== undefined) {
+      const source = citizens.find((p) => p.id === c.mechanicalFrom);
+      if (
+        !source ||
+        source.alive ||
+        source.mechanicalFrom ||
+        bones.has(source.id) ||
+        c.id !== `mecha:${source.id}`
+      )
+        fail();
+      bones.add(source.id);
+    }
   const buildings = value.buildings.map((b): PlayBuilding => {
     if (!isRecord(b) || b.type !== "ondol-nest" || !isRecord(b.position))
       fail();
@@ -325,9 +371,9 @@ export function parsePlayState(
     ids.add(b.id);
     number(b.headingRadians, -Math.PI * 2, Math.PI * 2);
     const p = b.position;
-    number(p.x, -9, 9);
-    number(p.y, -9, 9);
-    number(p.z, -9, 9);
+    number(p.x, -BOKHOL_MAP.coordinateLimit, BOKHOL_MAP.coordinateLimit);
+    number(p.y, -48, 48);
+    number(p.z, -BOKHOL_MAP.coordinateLimit, BOKHOL_MAP.coordinateLimit);
     return {
       id: b.id,
       type: "ondol-nest",
@@ -343,6 +389,9 @@ export function parsePlayState(
     paused: value.paused,
     tickRemainder: value.tickRemainder,
     citizens,
+    ...(value.citizenEvents !== undefined
+      ? { citizenEvents: [...(value.citizenEvents as string[])] }
+      : {}),
     buildings,
     resources,
     foodCarry: carry,
@@ -357,7 +406,7 @@ export function dailyFoodDemand(
 ): Record<FoodId, number> {
   const demand = { RES_PLANT: 0, RES_MEAT: 0, RES_FISH: 0 };
   for (const c of state.citizens)
-    if (c.alive)
+    if (c.alive && !c.mechanicalFrom)
       demand[c.diet] += Math.round(
         rules.food.unitsPerResidentPerDay * AMOUNT_SCALE,
       );
@@ -552,4 +601,119 @@ export function createPlayScene(
       motion: state.paused ? "idle" : "walking",
     });
   return { schemaVersion: 1, entities };
+}
+
+export type CitizenEvent =
+  | { type: "mechanize"; id: string; sourceCitizenId: string }
+  | {
+      type: "arrival";
+      id: string;
+      groups: readonly { species: string; count: number }[];
+    }
+  | {
+      type: "illness" | "recovery" | "death";
+      id: string;
+      citizenIds: readonly string[];
+      severity?: "minor" | "major" | "critical";
+    };
+export function applyCitizenEvent(
+  input: PlayState,
+  event: CitizenEvent,
+): PlayState {
+  const s = parsePlayState(input);
+  text(event.id);
+  if (event.id.length > 100) fail();
+  if (s.citizenEvents?.includes(event.id)) return s;
+  if ((s.citizenEvents?.length ?? 0) >= 2000) fail();
+  let citizens = [...s.citizens];
+  if (event.type === "mechanize") {
+    const source = citizens.find((c) => c.id === event.sourceCitizenId);
+    if (
+      !source ||
+      source.alive ||
+      source.mechanicalFrom ||
+      citizens.length >= 600 ||
+      citizens.some((c) => c.mechanicalFrom === source.id)
+    )
+      fail();
+    citizens.push({
+      ...source,
+      id: `mecha:${source.id}`,
+      alive: true,
+      health: "healthy",
+      mechanicalFrom: source.id,
+    });
+  } else if (event.type === "arrival") {
+    if (
+      !Array.isArray(event.groups) ||
+      !event.groups.length ||
+      event.groups.length > GAME_RULES.population.length
+    )
+      fail();
+    const species = new Set<string>();
+    for (const group of event.groups) {
+      const definition = GAME_RULES.population.find(
+        (p) => p.species === group.species,
+      );
+      if (!definition || species.has(group.species)) fail();
+      species.add(group.species);
+      number(group.count, 1, 600, true);
+      if (citizens.length + group.count > 600) fail();
+      for (let i = 0; i < group.count; i++) {
+        const id = `arrival:${event.id}:${group.species}:${i}`;
+        if (citizens.some((c) => c.id === id)) fail();
+        citizens.push({
+          id,
+          species: group.species,
+          diet: definition.diet as FoodId,
+          age: "adult",
+          alive: true,
+          health: "healthy",
+        });
+      }
+    }
+  } else {
+    if (
+      !["illness", "recovery", "death"].includes(event.type) ||
+      (event.severity !== undefined &&
+        (event.type !== "illness" ||
+          !["minor", "major", "critical"].includes(event.severity))) ||
+      !Array.isArray(event.citizenIds) ||
+      !event.citizenIds.length ||
+      new Set(event.citizenIds).size !== event.citizenIds.length ||
+      event.citizenIds.some(
+        (id) => !citizens.some((c) => c.id === id && c.alive),
+      )
+    )
+      fail();
+    citizens = citizens.map((c) =>
+      event.citizenIds.includes(c.id)
+        ? {
+            ...c,
+            alive: event.type !== "death",
+            health:
+              event.type === "death"
+                ? "dead"
+                : event.type === "illness"
+                  ? "sick"
+                  : "healthy",
+          }
+        : c,
+    );
+  }
+  return parsePlayState({
+    ...s,
+    citizens,
+    citizenEvents: [...(s.citizenEvents ?? []), event.id],
+  });
+}
+export function advancePlayClock(input: PlayState, minutes: number): PlayState {
+  number(minutes, 0, 10080, true);
+  const s = parsePlayState(input),
+    total = s.minute + minutes;
+  return parsePlayState({
+    ...s,
+    day: s.day + Math.floor(total / 1440),
+    minute: total % 1440,
+  });
 }
