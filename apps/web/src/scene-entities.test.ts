@@ -386,3 +386,54 @@ it("실내 휴식은 문까지 걸어간 뒤 숨기고 다음 지시 때 문에�
     engine.dispose();
   }
 });
+it("대기 GLB가 늦게 와도 새 종별 모델을 덮어쓰지 않고 단계 개량은 모델을 교체한다", async () => {
+  const engine = new NullEngine(),
+    scene = new Scene(engine),
+    entities = createSceneEntities(scene);
+  const pending = new Map<
+    string,
+    (v: import("./village.js").GlbVisual) => void
+  >();
+  const visual = {
+    setOutline: vi.fn(),
+    setMotion: vi.fn(),
+    animate: vi.fn(),
+    dispose: vi.fn(),
+  };
+  try {
+    const base = createSceneExample();
+    entities.update(base);
+    entities.setGlb(
+      (kind) => new Promise((resolve) => pending.set(kind, resolve)),
+    );
+    const custom = {
+      ...base,
+      entities: base.entities.map((e) =>
+        e.kind === "resident"
+          ? { ...e, species: "SPINO" }
+          : { ...e, level: 1 as const },
+      ),
+    };
+    entities.update(custom);
+    expect(scene.getMeshById("example-resident-1:back-sail-0")).not.toBeNull();
+    pending.get("resident")?.(visual);
+    await Promise.resolve();
+    expect(visual.dispose).toHaveBeenCalledOnce();
+    expect(scene.getMeshById("example-resident-1:back-sail-0")).not.toBeNull();
+    const original = scene.getMeshById("example-building-1:oval-nest-roof");
+    entities.update({
+      ...custom,
+      entities: custom.entities.map((e) =>
+        e.kind === "building" ? { ...e, level: 3 as const } : e,
+      ),
+    });
+    expect(original?.isDisposed()).toBe(true);
+    expect(
+      scene.getMeshById("example-building-1:court-wing--1.1-ridge"),
+    ).not.toBeNull();
+  } finally {
+    entities.dispose();
+    scene.dispose();
+    engine.dispose();
+  }
+});

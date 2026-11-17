@@ -22,6 +22,12 @@ test("병원 클릭으로 주민별 회복을 보고 저장 후 야간 자동 �
     "hospital-build",
   );
   s = advanceTimber(s, 160);
+  s = commandTimber(
+    s,
+    { type: "facility-staff", id: "build-1", count: 2 },
+    "hospital-staff",
+  );
+  s = advanceTimber(s, 1);
   for (const [i, severity] of (
     ["minor", "major", "critical"] as const
   ).entries()) {

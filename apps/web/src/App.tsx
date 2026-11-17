@@ -437,6 +437,10 @@ export function App() {
       (entity) => entity.id === selectedId && entity.visible,
     ) ?? null;
   const hasPanels = saveOpen || toolsOpen || scoutOpen !== null;
+  const clockWorld = timberOpen ? timberState?.world : playState;
+  const clockMinute = clockWorld?.minute ?? 420;
+  const clockDay = clockWorld?.day ?? 1;
+  const daylight = clockMinute >= 360 && clockMinute < 1080;
   const gameMinutes = playState
     ? (playState.day - 1) * 1440 + playState.minute
     : 0;
@@ -1236,6 +1240,25 @@ export function App() {
         <div className="g-backdrop" aria-hidden="true" onClick={closePopups} />
       ) : null}
       <FpsBadge />
+      <section
+        className="village-clock"
+        aria-label="마을 시간"
+        data-testid="village-clock"
+      >
+        <span>
+          {daylight ? "☀ 낮" : "☾ 밤"} · {clockDay}일차{" "}
+          {String(Math.floor(clockMinute / 60)).padStart(2, "0")}:
+          {String(clockMinute % 60).padStart(2, "0")}
+        </span>
+        <span>
+          {clockMinute >= 540 && clockMinute < 1080
+            ? "일과시간"
+            : clockMinute >= 1080 && clockMinute < 1260
+              ? "야근 지정 시설만 운영"
+              : "휴식시간"}
+        </span>
+        <progress max={1440} value={clockMinute} aria-label="하루 시간" />
+      </section>
       <section className="g-console" aria-label="명령 콘솔">
         <ConsoleFrame />
         <div className="g-console__map">

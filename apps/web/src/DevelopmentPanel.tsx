@@ -51,7 +51,6 @@ export function DevelopmentPanel({
     d = state.town.development;
   const r = RESEARCH_CATALOG.find((r) => r.id === tech),
     issue = researchIssue(state, tech);
-  const active = RESEARCH_CATALOG.find((r) => r.id === d.research?.tech);
   const categories = {
     building: "건물별 개량",
     collection: "자원별 채집",
@@ -68,7 +67,7 @@ export function DevelopmentPanel({
   );
   return (
     <section className="village-service" aria-label="연구와 교역망">
-      <h3>기술 공방 · 연구 · 교역망</h3>
+      <h3>연구소 · 연구 · 교역망</h3>
       <p>
         교역망 {tradeRank(state)}/3 · 성공 {d.tradeCount}회 · 성공1회에2단계,
         누적3회에3단계로 넓어집니다.
@@ -109,9 +108,12 @@ export function DevelopmentPanel({
               .map(([id, n]) => GAME_RULES.resources[id as ResourceId].name + n)
               .join(" · ")
           : ""}{" "}
-        · 공방 인원2명 · 동시1건
+        · 연구원 배치 필요 · 연구소마다 동시1건
       </p>
       <p>{r?.effect}</p>
+      <p className="hint">
+        연구원은 건설 메뉴의 ‘완공 시설’을 펼쳐 연구소별로 배치합니다.
+      </p>
       <button
         type="button"
         disabled={!!issue}
@@ -123,8 +125,19 @@ export function DevelopmentPanel({
         {issue ?? "연구 시작 시 자재 확보 · 완료 후 개량은 별도로 지시합니다."}
       </p>
       <div data-testid="research-status">
-        {d.research && active
-          ? `${active.name} 연구 중 · ${Math.floor((d.research.work / (active.workdays * 540 * 3)) * 100)}%`
+        {d.research.length
+          ? d.research.map((job) => {
+              const active = RESEARCH_CATALOG.find((r) => r.id === job.tech);
+              return (
+                <p key={job.facility}>
+                  {job.facility} · {active?.name} 연구 중 ·{" "}
+                  {Math.floor(
+                    (job.work / ((active?.workdays ?? 1) * 540 * 3)) * 100,
+                  )}
+                  %
+                </p>
+              );
+            })
           : `완료 연구 ${d.completed.length}개`}
       </div>
       <p className="hint">

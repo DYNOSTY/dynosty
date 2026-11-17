@@ -366,6 +366,7 @@ test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각
   await expect(page.getByTestId("resident-routines")).toContainText("식사 중", {
     timeout: 10000,
   });
+  await expect(page.getByTestId("resource-RES_PLANT")).not.toHaveText("120");
   await button(page, "일시정지").click();
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("90");
   await expect(page.getByTestId("resource-RES_PLANT")).not.toHaveText("120");
@@ -521,7 +522,9 @@ test("건물 체력은 마우스를 올리면 나타나며 화재 손상 뒤 직
   await loadFixture(page, createTimberSave(s));
   await hoverHouse(page);
   await expect(page.getByRole("tooltip")).toContainText("온돌 둥지 · 75/100");
-  await expect(page.getByRole("progressbar")).toHaveAttribute("value", "75");
+  await expect(
+    page.getByRole("progressbar", { name: "온돌 둥지 체력" }),
+  ).toHaveAttribute("value", "75");
   await button(page, "저장").hover();
   await expect(page.getByRole("tooltip")).toHaveCount(0);
   await page.getByText("둥지 보수", { exact: true }).click();

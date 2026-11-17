@@ -1,0 +1,172 @@
+import { expect, type Page, test } from "@playwright/test";
+import {
+  advanceTimber,
+  type BuildingKind,
+  commandTimber,
+  createPlayState,
+  createTimberSave,
+  createTimberState,
+  RESEARCH_CATALOG,
+  type TimberState,
+} from "../../packages/game-core/dist/index.js";
+
+let seq = 0;
+const cmd = (s: TimberState, c: Parameters<typeof commandTimber>[1]) =>
+  commandTimber(s, c, `multi-browser-${++seq}`);
+function start() {
+  const w = createPlayState();
+  return createTimberState({
+    ...w,
+    minute: 540,
+    resources: { ...w.resources, RES_WOOD: 5000000, RES_METAL: 5000000 },
+  });
+}
+function build(s: TimberState, kind: BuildingKind, x = 12, z = 12) {
+  s = cmd(s, {
+    type: "plan-building",
+    kind,
+    position: { x, z },
+    headingRadians: Math.PI,
+  });
+  for (let i = 0; i < 500 && s.town.orders.length; i++) s = advanceTimber(s, 1);
+  if (s.town.orders.length) throw Error("건설 미완료");
+  return s;
+}
+const b = (p: Page, n: string) =>
+  p.getByRole("button", { name: n, exact: true });
+async function load(p: Page, s: TimberState) {
+  await p.goto("/");
+  await expect(p.getByTestId("play-scene-status")).toHaveText("3D 준비 완료", {
+    timeout: 90000,
+  });
+  await p.evaluate(
+    (save) =>
+      localStorage.setItem(
+        "dynosty.timber.saves.v17",
+        JSON.stringify({
+          format: "dynosty-timber-archive",
+          storageVersion: 1,
+          current: save,
+          previous: null,
+        }),
+      ),
+    createTimberSave(s),
+  );
+  await b(p, "건설").click();
+  await b(p, "저장").click();
+  await b(p, "진행 불러오기").click();
+  await expect(p.getByTestId("timber-save-status")).toContainText(
+    "불러왔습니다",
+  );
+  await b(p, "저장").click();
+}
+test("두 식당의 인원 지시는 독립적이고 단계별 설계와 중하단 낮밤 시간이 보인다", async ({
+  page,
+}) => {
+  let s = build(build(start(), "restaurant"), "restaurant", 0, 16);
+  for (const f of s.town.facilities)
+    s = cmd(s, { type: "facility-staff", id: f.id, count: 1 });
+  s = advanceTimber(s, 35);
+  await load(page, s);
+  await page.getByText("완공 시설 2곳", { exact: true }).click();
+  await expect(
+    page.getByLabel("build-1 운영 인원", { exact: true }),
+  ).toHaveValue("1");
+  await page.getByLabel("build-2 운영 인원", { exact: true }).selectOption("2");
+  await expect(
+    page.getByLabel("build-2 운영 인원", { exact: true }),
+  ).toHaveValue("2");
+  await expect(
+    page.getByLabel("build-1 운영 인원", { exact: true }),
+  ).toHaveValue("1");
+  await expect(page.getByText(/좌석10 · 직원/)).toHaveCount(2);
+  await page.getByLabel("지을 건물", { exact: true }).selectOption("fishery");
+  await page.getByText("단계별 시설 설계 보기", { exact: true }).click();
+  const art = page.getByAltText("어획막 1~3단계 설계 삽화");
+  await expect(art).toBeVisible();
+  await expect
+    .poll(() => art.evaluate((img) => (img as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(page.getByTestId("village-clock")).toContainText("낮");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByTestId("village-clock")).toBeInViewport();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+test("두 연구소의 동시 연구 완료와 저장 복원은 연구를 중복 적용하지 않는다", async ({
+  page,
+}) => {
+  let s = build(build(start(), "workshop"), "workshop", 0, 16);
+  for (const f of s.town.facilities)
+    s = cmd(s, { type: "facility-staff", id: f.id, count: 2 });
+  s = advanceTimber(s, 35);
+  for (const tech of ["TECH_TRAIL", "UPGRADE_HOME_2"])
+    s = cmd(s, { type: "start-research", tech });
+  s = {
+    ...s,
+    town: {
+      ...s.town,
+      development: {
+        ...s.town.development,
+        research: s.town.development.research.map((j) => ({
+          ...j,
+          work:
+            (RESEARCH_CATALOG.find((r) => r.id === j.tech)?.workdays ?? 1) *
+              540 *
+              3 -
+            1,
+        })),
+      },
+    },
+  };
+  await load(page, s);
+  await b(page, "연구").click();
+  await expect(page.getByTestId("research-status").locator("p")).toHaveCount(2);
+  await b(page, "시간 재개").click();
+  await expect(page.getByTestId("research-status")).toHaveText("완료 연구 2개");
+  await b(page, "일시정지").click();
+  await expect(b(page, "시간 재개")).toBeVisible();
+  await b(page, "저장").click();
+  await b(page, "진행 저장").click();
+  await expect(page.getByTestId("timber-save-status")).toContainText(
+    "저장했습니다",
+  );
+  await b(page, "진행 불러오기").click();
+  await expect(page.getByTestId("research-status")).toHaveText("완료 연구 2개");
+});
+test("어획막의 다섯 인원으로 별도 운반 없이 공동 어류가 즉시 증가한다", async ({
+  page,
+}) => {
+  let s = build(start(), "fishery", 46, 32);
+  s = {
+    ...s,
+    residents: s.residents.map((r, i) => ({
+      ...r,
+      workplaceId: i < 5 ? null : "guard",
+    })),
+  };
+  s = cmd(s, { type: "facility-staff", id: "build-1", count: 5 });
+  s = advanceTimber(s, 35);
+  await load(page, s);
+  await page.getByText("완공 시설 1곳", { exact: true }).click();
+  await expect(
+    page.getByLabel("build-1 운영 인원", { exact: true }),
+  ).toHaveValue("5");
+  const amount = async () =>
+    Number(
+      (await page.getByTestId("resource-RES_FISH").textContent())?.replaceAll(
+        ",",
+        "",
+      ),
+    );
+  const before = await amount();
+  await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
+  await b(page, "시간 재개").click();
+  await expect.poll(amount, { timeout: 15000 }).toBeGreaterThan(before);
+  await expect(page.getByText(/어류 즉시 입고 · 대기/)).toContainText(
+    "운반 중 0",
+  );
+});

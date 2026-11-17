@@ -56,8 +56,14 @@ function fixture(
           chungnyeong: route === "mechanical" ? "mechanical" : "alive",
         },
         research: r
-          ? { tech: r.id, facility: "build-1", work: r.workdays * 540 * 3 - 1 }
-          : null,
+          ? [
+              {
+                tech: r.id,
+                facility: "build-1",
+                work: r.workdays * 540 * 3 - 1,
+              },
+            ]
+          : [],
       },
     },
   } as TimberState;

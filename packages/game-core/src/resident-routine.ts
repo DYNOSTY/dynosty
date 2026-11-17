@@ -47,6 +47,8 @@ export interface ResidentPlaces {
   readonly minute: number;
   readonly seatAvailable?: boolean;
   readonly restaurantStaffed?: boolean;
+  readonly restaurantEmployee?: boolean;
+  readonly eatingMinutes?: number;
   readonly workplace?: GroundPoint | undefined;
   readonly workOpen?: boolean;
   readonly rationAvailable?: boolean;
@@ -95,7 +97,7 @@ export function advanceResidentRoutine<T extends ResidentRoutine>(
     };
   if (r.task !== null)
     return { ...r, routine: "working", request: null, eatingUntil: null };
-  const employee = r.workplaceId === "restaurant";
+  const employee = places.restaurantEmployee ?? r.workplaceId === "restaurant";
   const onShift =
     r.workplaceId !== null &&
     (employee
@@ -189,7 +191,14 @@ export function advanceResidentRoutine<T extends ResidentRoutine>(
           : "restaurant",
       eatingUntil:
         foodAvailable && places.seatAvailable !== false
-          ? now + RESIDENT_ROUTINE_RULES.eatingMinutes
+          ? now +
+            Math.min(
+              30,
+              Math.max(
+                1,
+                places.eatingMinutes ?? RESIDENT_ROUTINE_RULES.eatingMinutes,
+              ),
+            )
           : null,
       hunger:
         foodAvailable && places.seatAvailable !== false

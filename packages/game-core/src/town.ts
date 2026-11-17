@@ -75,15 +75,15 @@ export const BUILDING_RULES: Record<
     name: "병원",
     cost: { RES_WOOD: 30, RES_METAL: 4 },
     work: 240,
-    staff: 0,
-    site: "평탄한 빈 땅 · 병상5/15/25개 · 입원 중24시간 자동 회복",
+    staff: 2,
+    site: "평탄한 빈 땅 · 의료 인원 배치 · 병상5/15/25개",
   },
   workshop: {
-    name: "기술 공방",
+    name: "연구소",
     cost: { RES_WOOD: 16, RES_METAL: 6 },
     work: 240,
     staff: 2,
-    site: "평탄한 빈 땅 · 연구 일손2명 · 동시1건",
+    site: "평탄한 빈 땅 · 연구원 배치 · 연구소마다 동시1건",
   },
   home: {
     name: "온돌 둥지",
@@ -97,7 +97,7 @@ export const BUILDING_RULES: Record<
     cost: { RES_WOOD: 30, RES_METAL: 2 },
     work: 240,
     staff: 2,
-    site: "평탄한 빈 땅 · 마을 한 곳",
+    site: "평탄한 빈 땅 · 여러 곳 건설 가능 · 좌석10/20/40",
   },
   logging: {
     name: "제재소",
@@ -138,7 +138,7 @@ export const BUILDING_RULES: Record<
     name: "어획막",
     cost: { RES_WOOD: 18, RES_METAL: 2 },
     work: 180,
-    staff: 4,
+    staff: 5,
     site: "물고기 못의 육지 쪽 물가 · 결빙 낚시 가능",
   },
   farm: {
@@ -146,28 +146,28 @@ export const BUILDING_RULES: Record<
     cost: { RES_WOOD: 25, RES_METAL: 2 },
     work: 240,
     staff: 4,
-    site: "평탄한 빈 땅 · 물 필요 · 결빙기 석탄 필요",
+    site: "빈 육지 · 구릉에도 배치 · 물 필요 · 결빙기 석탄 필요",
   },
   ranch: {
     name: "목축장",
     cost: { RES_WOOD: 25, RES_STONE: 4 },
     work: 240,
     staff: 4,
-    site: "평탄한 빈 땅 · 풀·물로 가축 사육",
+    site: "빈 육지 · 구릉에도 배치 · 풀·물로 가축 사육",
   },
   scout: {
     name: "정찰 거점",
     cost: { RES_WOOD: 15 },
     work: 180,
-    staff: 0,
-    site: "평탄한 빈 땅 · 유휴 인력2명 파견",
+    staff: 2,
+    site: "평탄한 빈 땅 · 배치 인력2명 파견 · 맵에 한 곳",
   },
   trade: {
     name: "교역소",
     cost: { RES_WOOD: 25, RES_METAL: 2 },
     work: 240,
-    staff: 0,
-    site: "평탄한 빈 땅 · 목재와 식량 교역",
+    staff: 1,
+    site: "평탄한 빈 땅 · 교역 인력1명 배치 · 맵에 한 곳",
   },
 };
 export interface BuildingOrder extends HomePlacement {
@@ -196,6 +196,12 @@ export interface Facility extends HomePlacement {
     stage: "pickup" | "store" | "return";
   } | null;
 }
+export const facilityStaffLimit = (f: Pick<Facility, "kind" | "level">) =>
+  f.kind === "restaurant" || f.kind === "hospital"
+    ? ([2, 4, 6][f.level - 1] ?? 2)
+    : f.kind === "fishery"
+      ? ([5, 10, 20][f.level - 1] ?? 5)
+      : BUILDING_RULES[f.kind].staff;
 export interface Expedition {
   id: string;
   facilityId: string;
@@ -307,10 +313,10 @@ export function buildingIssue(
   )
     return "둥지 수 한도입니다.";
   if (
-    kind === "restaurant" &&
-    (s.restaurantBuilt || s.town.orders.some((o) => o.kind === "restaurant"))
+    ["scout", "trade"].includes(kind) &&
+    [...s.town.facilities, ...s.town.orders].some((f) => f.kind === kind)
   )
-    return "공동 식당은 이미 있거나 건설 대기 중입니다.";
+    return "정찰 거점과 교역소는 맵에 각각 한 곳만 건설할 수 있어요.";
   const rect = { ...p, halfWidth: 2.25, halfDepth: 2.25 };
   const samples = [-1, 0, 1].flatMap((x) =>
     [-1, 0, 1].map((z) => rotatedPoint(p, x * 2.25, z * 2.25)),
@@ -392,7 +398,9 @@ export function buildingIssue(
   );
   const heights = samples.map((q) => bokholElevation(q.x, q.z, amounts));
   if (
-    !["coal", "iron", "quarry", "fishery", "logging"].includes(kind) &&
+    !["coal", "iron", "quarry", "fishery", "logging", "farm", "ranch"].includes(
+      kind,
+    ) &&
     Math.max(...heights) - Math.min(...heights) > 0.12
   )
     return "건물 바닥 전체가 평탄한 땅을 골라 주세요.";
@@ -707,12 +715,16 @@ export function setFacilityStaff(
     !f ||
     !Number.isInteger(count) ||
     count < 0 ||
-    count > BUILDING_RULES[f.kind].staff ||
-    f.kind === "restaurant"
+    count > facilityStaffLimit(f)
   )
     throw Error("운영 인원 지시가 올바르지 않습니다.");
+  const primary = s.town.facilities.find((q) => q.kind === "restaurant");
   return {
     ...s,
+    restaurantWorkerTarget:
+      f.kind === "restaurant" && primary?.id === f.id
+        ? count
+        : s.restaurantWorkerTarget,
     town: {
       ...s.town,
       facilities: s.town.facilities.map((f) =>
@@ -724,12 +736,20 @@ export function setFacilityStaff(
 export function staffTown(input: TimberState): TimberState {
   let s = input;
   for (const f of s.town.facilities) {
-    if (!facilityResource(f) && f.kind !== "workshop") continue;
+    if (
+      !facilityStaffLimit(f) ||
+      (f.kind === "restaurant" &&
+        s.town.facilities.find((q) => q.kind === "restaurant")?.id === f.id)
+    )
+      continue;
+    const away = s.town.trips.find((t) => t.facilityId === f.id);
+    const traveling = new Set(away?.ids ?? []);
     let ids = s.residents
       .filter(
         (r) => r.workplaceId === `facility:${f.id}` && r.health === "healthy",
       )
-      .slice(0, f.target)
+      .sort((a, b) => Number(traveling.has(b.id)) - Number(traveling.has(a.id)))
+      .slice(0, Math.max(f.target, away?.ids.length ?? 0))
       .map((r) => r.id);
     s = {
       ...s,
@@ -848,7 +868,18 @@ function advanceTownProduction(
         Math.hypot(b.position.x - f.position.x, b.position.z - f.position.z),
     )[0];
     const destination = drop ? facilityDoor(drop) : { x: 4.5, z: 0.6 };
-    if (!f.haul && f.buffer >= 5 && workplaceOpen(s.world.minute)) {
+    if (f.kind === "fishery") {
+      const amount = Math.min(f.buffer, storageRoom(s, resource));
+      s = deposit(s, resource, amount);
+      f.buffer -= amount;
+      f.delivered += amount;
+    }
+    if (
+      f.kind !== "fishery" &&
+      !f.haul &&
+      f.buffer >= 5 &&
+      workplaceOpen(s.world.minute)
+    ) {
       const id = freeTownResidents(s, facilityDoor(f), 1)[0];
       if (id) {
         f.haul = { worker: id, cargo: Math.min(5, f.buffer), stage: "pickup" };
@@ -960,9 +991,18 @@ export function dispatchFood(
     throw Error("파견은 일과시간에 지시해 주세요.");
   if (s.town.trips.some((t) => t.facilityId === f.id))
     throw Error("이미 파견 중입니다.");
-  const ids = freeTownResidents(s, facilityDoor(f), f.kind === "scout" ? 2 : 1);
+  const ids = s.residents
+    .filter(
+      (r) =>
+        r.workplaceId === `facility:${f.id}` &&
+        r.health === "healthy" &&
+        !r.task &&
+        !s.town.trips.some((t) => t.ids.includes(r.id)),
+    )
+    .slice(0, f.kind === "scout" ? 2 : 1)
+    .map((r) => r.id);
   if (ids.length !== (f.kind === "scout" ? 2 : 1))
-    throw Error("파견할 유휴 인력이 부족합니다.");
+    throw Error("거점에 파견 인력을 먼저 배치해 주세요.");
   if (
     f.kind === "trade" &&
     s.world.resources.RES_WOOD - s.reservedWood * AMOUNT_SCALE <
@@ -1196,7 +1236,7 @@ export function townValid(s: TimberState): boolean {
   const minimum: Cost = {};
   for (const id of [
     ...t.development.completed,
-    ...(t.development.research ? [t.development.research.tech] : []),
+    ...t.development.research.map((j) => j.tech),
   ]) {
     const r = RESEARCH_CATALOG.find((r) => r.id === id);
     if (!r) return false;
@@ -1266,7 +1306,7 @@ export function townValid(s: TimberState): boolean {
     if (
       (f.kind as string) === "home" ||
       !Number.isInteger(f.target) ||
-      !n(f.target, BUILDING_RULES[f.kind].staff) ||
+      !n(f.target, facilityStaffLimit(f)) ||
       !n(f.progress, 30) ||
       !Number.isInteger(f.yieldRemainder) ||
       !n(f.yieldRemainder, 4) ||
@@ -1319,7 +1359,8 @@ export function townValid(s: TimberState): boolean {
       if (
         !r ||
         reserved.has(id) ||
-        r.workplaceId !== null ||
+        (r.health === "healthy" &&
+          r.workplaceId !== `facility:${trip.facilityId}`) ||
         (r.health === "healthy" && r.task !== `expedition:${trip.id}`)
       )
         return false;
@@ -1338,8 +1379,7 @@ export function townValid(s: TimberState): boolean {
       r.workplaceId?.startsWith("facility:") &&
       !t.facilities.some(
         (f) =>
-          `facility:${f.id}` === r.workplaceId &&
-          (facilityResource(f) || f.kind === "workshop"),
+          `facility:${f.id}` === r.workplaceId && facilityStaffLimit(f) > 0,
       )
     )
       return false;
@@ -1375,7 +1415,11 @@ export function reconcileTownHealth(s: TimberState): TimberState {
     residents: s.residents.map((r) => {
       const trip = trips.find((t) => t.ids.includes(r.id));
       if (trip && r.health === "healthy")
-        return { ...r, task: `expedition:${trip.id}` };
+        return {
+          ...r,
+          task: `expedition:${trip.id}`,
+          workplaceId: `facility:${trip.facilityId}`,
+        };
       if (
         r.task?.startsWith("build-order:") &&
         !orders.some((o) => o.crew.includes(r.id))

@@ -89,7 +89,7 @@ it("시설1~3단계 개량은 재료를 확보하고 공사하며 생산 배율�
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
 it("성공한 교역만 범위를 열고 출발한 파견의 단계·거래량을 보존한다", () => {
-  let s = build(start(), "trade");
+  let s = staffed(build(start(), "trade"), "build-1", 1);
   expect(tradeRank(s)).toBe(1);
   expect(() =>
     cmd(s, { type: "dispatch-food", id: "build-1", food: "RES_FISH", rank: 2 }),
@@ -162,11 +162,11 @@ it("연구는 공방·선행·배치·현장 도착을 요구하고 완료 효�
   let s = build(start(), "workshop");
   s = cmd(s, { type: "start-research", tech: "TECH_TRAIL" });
   s = advanceTimber(s, 10);
-  expect(s.town.development.research?.work).toBe(0);
+  expect(s.town.development.research[0]?.work).toBe(0);
   s = staffed(s, "build-1", 1);
-  expect(s.town.development.research?.work).toBe(0);
+  expect(s.town.development.research[0]?.work).toBeGreaterThan(0);
   s = staffed(s, "build-1");
-  expect(s.town.development.research?.work).toBeGreaterThan(0);
+  expect(s.town.development.research[0]?.work).toBeGreaterThan(0);
   const r = RESEARCH_CATALOG.find((r) => r.id === "TECH_TRAIL");
   if (!r) throw Error("연구 자료 없음");
   s = {
@@ -175,17 +175,19 @@ it("연구는 공방·선행·배치·현장 도착을 요구하고 완료 효�
       ...s.town,
       development: {
         ...s.town.development,
-        research: {
-          tech: r.id,
-          facility: "build-1",
-          work: r.workdays * 540 * 3 - 1,
-        },
+        research: [
+          {
+            tech: r.id,
+            facility: "build-1",
+            work: r.workdays * 540 * 3 - 1,
+          },
+        ],
       },
     },
   };
   s = advanceTimber(s, 1);
   expect(s.town.development.completed).toEqual(["TECH_TRAIL"]);
-  expect(s.town.development.research).toBeNull();
+  expect(s.town.development.research).toEqual([]);
   expect(() =>
     cmd(s, { type: "start-research", tech: "TECH_TRAIL" }),
   ).toThrow();

@@ -27,7 +27,7 @@ export interface DevelopmentState {
   story: ResearchStory;
   electrical: string[];
   grandfathered: string[];
-  research: { tech: string; facility: string; work: number } | null;
+  research: { tech: string; facility: string; work: number }[];
   overtime: {
     target: string;
     day: number;
@@ -43,7 +43,7 @@ export const createDevelopment = (): DevelopmentState => ({
   story: createResearchStory(),
   electrical: [],
   grandfathered: [],
-  research: null,
+  research: [],
   overtime: [],
   tradeCount: 0,
   seed: 13746389,
@@ -251,8 +251,16 @@ export function researchIssue(s: TimberState, id: string): string | null {
       ? "확장 기술 · 본편 잠금"
       : "기반 시스템 연결 전 · 목록만 보존";
   if (hasResearch(s, id)) return "이미 완료한 연구입니다.";
-  if (s.town.development.research)
-    return "공방에서 한 번에 한 연구만 진행합니다.";
+  if (s.town.development.research.some((j) => j.tech === id))
+    return "이미 진행 중인 연구입니다.";
+  if (
+    !s.town.facilities.some(
+      (f) =>
+        f.kind === "workshop" &&
+        !s.town.development.research.some((j) => j.facility === f.id),
+    )
+  )
+    return "빈 연구소가 필요합니다. 연구소마다 한 건씩 동시 연구할 수 있습니다.";
   if (r.requires.some((t) => !hasResearch(s, t)))
     return "선행 연구를 먼저 완료해 주세요.";
   if (r.category === "story") {
@@ -274,7 +282,11 @@ export function startResearch(s: TimberState, id: string): TimberState {
   const issue = researchIssue(s, id);
   if (issue) throw Error(issue);
   const r = catalog.find((r) => r.id === id),
-    f = s.town.facilities.find((f) => f.kind === "workshop");
+    f = s.town.facilities.find(
+      (f) =>
+        f.kind === "workshop" &&
+        !s.town.development.research.some((j) => j.facility === f.id),
+    );
   if (!r || !f) throw Error("연구 자료가 없습니다.");
   const n = payTown(s, r.cost as Partial<Record<ResourceId, number>>);
   return {
@@ -284,7 +296,10 @@ export function startResearch(s: TimberState, id: string): TimberState {
       ...n.town,
       development: {
         ...n.town.development,
-        research: { tech: id, facility: f.id, work: 0 },
+        research: [
+          ...s.town.development.research,
+          { tech: id, facility: f.id, work: 0 },
+        ],
       },
     },
   };
@@ -294,9 +309,8 @@ export function advanceDevelopment(
   minutes: number,
 ): TimberState {
   let s = input;
-  const d = s.town.development,
-    job = d.research;
-  if (job) {
+  for (const job of input.town.development.research) {
+    const d = s.town.development;
     const r = catalog.find((r) => r.id === job.tech),
       f = s.town.facilities.find((f) => f.id === job.facility);
     if (
@@ -318,7 +332,7 @@ export function advanceDevelopment(
           ) < 0.01,
       );
       const power =
-        researchers.length === 2
+        researchers.length > 0
           ? researchers.reduce((n, q) => n + buildingPower(s, q.id), 0)
           : 0;
       const work = job.work + power * minutes * levelProductionRate(f),
@@ -329,7 +343,13 @@ export function advanceDevelopment(
           ...s.town,
           development: {
             ...d,
-            research: done ? null : { ...job, work },
+            research: d.research.flatMap((j) =>
+              j.facility !== job.facility
+                ? [j]
+                : done
+                  ? []
+                  : [{ ...job, work }],
+            ),
             completed: done ? [...d.completed, r.id] : d.completed,
             story:
               done && r.id === "TECH_MECHA2"
@@ -346,7 +366,11 @@ export function advanceDevelopment(
     if (p.day !== s.world.day || !p.enabled) return p;
     const f = s.town.facilities.find((f) => f.id === p.target),
       o = s.town.orders.find((o) => o.id === p.target);
-    if (f?.kind === "workshop" && !job) return p;
+    if (
+      f?.kind === "workshop" &&
+      !s.town.development.research.some((j) => j.facility === f.id)
+    )
+      return p;
     const actors = s.residents.filter(
       (r) =>
         r.health === "healthy" &&
@@ -366,8 +390,7 @@ export function advanceDevelopment(
               ) < 0.01
             : false),
     );
-    if (!actors.length || (f?.kind === "workshop" && actors.length !== 2))
-      return p;
+    if (!actors.length) return p;
     const old = Math.floor(p.minutes / 60),
       total = p.minutes + minutes;
     s = {
@@ -466,11 +489,16 @@ export function developmentValid(s: TimberState): boolean {
     )
       return false;
   }
-  if (d.research !== null && (!d.research || typeof d.research !== "object"))
+  if (
+    !Array.isArray(d.research) ||
+    d.research.length > s.town.facilities.length ||
+    new Set(d.research.map((j) => j?.tech)).size !== d.research.length ||
+    new Set(d.research.map((j) => j?.facility)).size !== d.research.length
+  )
     return false;
-  if (d.research) {
-    const j = d.research,
-      r = catalog.find((r) => r.id === j.tech);
+  for (const j of d.research) {
+    if (!j || typeof j !== "object") return false;
+    const r = catalog.find((r) => r.id === j.tech);
     if (
       !r ||
       !RESEARCH_CONNECTED.includes(r.id) ||

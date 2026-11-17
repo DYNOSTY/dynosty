@@ -34,8 +34,8 @@ export function HospitalPanel({
         병원 {hospitals.length}곳 · 병상 대기 {waiting}명
       </p>
       <p>
-        입원 중에는 밤에도 회복합니다. 회복량을 채우면 자동 퇴원해 일상으로
-        돌아갑니다.
+        건강한 의료 인원을 배치한 병원은 입원 중 밤에도 회복합니다. 회복량을
+        채우면 자동 퇴원해 일상으로 돌아갑니다.
       </p>
       {hospitals.map((f) => {
         const patients = state.town.patients.filter((p) => p.hospital === f.id);
@@ -52,6 +52,15 @@ export function HospitalPanel({
             <p>
               {f.level}단계 · 경상 회복 {hospitalHours(f.level)}시간 ·
               부상2배/중상4배
+            </p>
+            <p>
+              {state.residents.filter(
+                (r) =>
+                  r.workplaceId === `facility:${f.id}` &&
+                  r.health === "healthy",
+              ).length
+                ? "의료 인원 배치됨"
+                : "의료 인원을 배치해야 회복합니다."}
             </p>
             {patients.length === 0 ? (
               <p>치료 중인 주민이 없습니다.</p>

@@ -11,11 +11,13 @@ import {
   type SceneSnapshot,
   validateSceneSnapshot,
 } from "@dynosty/game-core";
+import { facilityModel } from "./facility-model.js";
 import {
   buildModel,
   type ModelAssets,
   type ModelVisual,
 } from "./model-assets.js";
+import { residentModel } from "./resident-model.js";
 import type { GlbVisual } from "./village.js";
 
 type GlbFactory = (
@@ -50,6 +52,7 @@ export function createSceneEntities(
       entity: SceneEntity;
       visual: GlbVisual | ModelVisual | null;
       modelAttempted: boolean;
+      assetKey: string;
       path: GroundPoint[];
       needMarker: Mesh | null;
     }
@@ -135,12 +138,14 @@ export function createSceneEntities(
     setGlb(factory: GlbFactory) {
       glb = factory;
       for (const [id, object] of objects) {
+        if (object.assetKey !== "default") continue;
         const { kind } = object;
         const size = kind === "resident" ? 1 : 1.5;
         object.modelAttempted = true;
         factory(kind, object.mesh, -size / 2)
           .then((visual) => {
-            if (objects.get(id) !== object) return visual.dispose();
+            if (objects.get(id) !== object || object.assetKey !== "default")
+              return visual.dispose();
             object.visual?.dispose();
             object.visual = visual;
             object.modelAttempted = true;
@@ -230,10 +235,23 @@ export function createSceneEntities(
             entity,
             visual: null,
             modelAttempted: false,
+            assetKey: "default",
             path: [],
             needMarker: null,
           };
           objects.set(entity.id, object);
+        }
+        const assetKey =
+          entity.kind === "resident" && entity.species
+            ? `species:${entity.species}`
+            : entity.kind === "building" && entity.level
+              ? `home:${entity.level}`
+              : "default";
+        if (object.assetKey !== assetKey) {
+          object.visual?.dispose();
+          object.visual = null;
+          object.modelAttempted = false;
+          object.assetKey = assetKey;
         }
         object.entity = entity;
         if (
@@ -285,15 +303,22 @@ export function createSceneEntities(
             entity.visible &&
             entity.needsHelp === true,
         );
-        const asset = models[entity.kind];
-        if (glb && !object.modelAttempted) {
+        const asset = object.modelAttempted
+          ? undefined
+          : entity.kind === "resident" && entity.species
+            ? residentModel(entity.species)
+            : entity.kind === "building" && entity.level
+              ? facilityModel("home", entity.level)
+              : models[entity.kind];
+        if (glb && assetKey === "default" && !object.modelAttempted) {
           object.modelAttempted = true;
           const target = object,
             id = entity.id,
             size0 = size;
           glb(entity.kind, object.mesh, -size0 / 2)
             .then((visual) => {
-              if (objects.get(id) !== target) return visual.dispose();
+              if (objects.get(id) !== target || target.assetKey !== assetKey)
+                return visual.dispose();
               target.visual?.dispose();
               target.visual = visual;
               visual.setMotion(

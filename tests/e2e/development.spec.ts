@@ -153,11 +153,13 @@ test("공방 연구가 완료되고 미연결 기술은 실행되지 않으며 �
       ...s.town,
       development: {
         ...s.town.development,
-        research: {
-          tech: tech.id,
-          facility: "build-1",
-          work: tech.workdays * 540 * 3 - 2,
-        },
+        research: [
+          {
+            tech: tech.id,
+            facility: "build-1",
+            work: tech.workdays * 540 * 3 - 2,
+          },
+        ],
       },
     },
   };
@@ -175,6 +177,12 @@ test("공방 연구가 완료되고 미연결 기술은 실행되지 않으며 �
   s = built("trade");
   s = commandTimber(
     s,
+    { type: "facility-staff", id: "build-1", count: 1 },
+    "trade-staff",
+  );
+  s = advanceTimber(s, 1);
+  s = commandTimber(
+    s,
     { type: "dispatch-food", id: "build-1", food: "RES_FISH", rank: 1 },
     "trade",
   );
@@ -183,6 +191,6 @@ test("공방 연구가 완료되고 미연결 기술은 실행되지 않으며 �
   await page.getByText("완공 시설 1곳", { exact: true }).click();
   await page.getByLabel("build-1 교류 범위", { exact: true }).selectOption("2");
   await expect(
-    button(page, "목재8 ↔ 식량16 교역 파견 · 유휴1명"),
+    button(page, "목재8 ↔ 식량16 교역 파견 · 배치1명"),
   ).toBeVisible();
 });

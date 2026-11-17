@@ -213,7 +213,7 @@ it("v12 저장의 입주를 유지해 잠자리를 부여하고 손상된 귀가
     residents: current.residents.map(({ homeSlot: _slot, ...r }) => r),
   };
   const upgraded = parseTimberState(old);
-  expect(upgraded.version).toBe(17);
+  expect(upgraded.version).toBe(18);
   for (const r of upgraded.residents) {
     expect(r.homeId).toBe(current.residents.find((q) => q.id === r.id)?.homeId);
     expect(r.homeSlot).not.toBeNull();

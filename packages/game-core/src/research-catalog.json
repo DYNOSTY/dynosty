@@ -65,7 +65,7 @@
       "RES_WOOD": 12,
       "RES_METAL": 2
     },
-    "workdays": 1.0,
+    "workdays": 1,
     "effect": "둥지 기본 보온 +1; 점유 둥지의 난방 목재 소모 ×0.75",
     "mission": "1",
     "scope": "campaign",
@@ -84,7 +84,7 @@
       "RES_WOOD": 12,
       "RES_METAL": 8
     },
-    "workdays": 1.0,
+    "workdays": 1,
     "effect": "정수 물레방 60→80/일. 강물 양식장 날씨계수 하한0.75.",
     "mission": "2",
     "scope": "campaign",
@@ -103,7 +103,7 @@
       "RES_WOOD": 18,
       "RES_METAL": 6
     },
-    "workdays": 1.0,
+    "workdays": 1,
     "effect": "온상 생산량 ×1.2; 물·목재 기본 투입은 동일",
     "mission": "2",
     "scope": "campaign",
@@ -122,7 +122,7 @@
       "RES_WOOD": 12,
       "RES_METAL": 4
     },
-    "workdays": 1.0,
+    "workdays": 1,
     "effect": "고기·어류 부패율 ×0.4. 풀 부패율은 유지.",
     "mission": "2",
     "scope": "campaign",
@@ -141,7 +141,7 @@
       "RES_WOOD": 10,
       "RES_METAL": 6
     },
-    "workdays": 1.0,
+    "workdays": 1,
     "effect": "망루 해금; 일반 약탈대 경보 +6시간",
     "mission": "2",
     "scope": "campaign",
@@ -179,7 +179,7 @@
       "RES_WOOD": 20,
       "RES_METAL": 8
     },
-    "workdays": 1.0,
+    "workdays": 1,
     "effect": "점유 둥지 기본 보온 +1; 강추위 공급 손실 방지",
     "mission": "3",
     "scope": "campaign",
@@ -198,7 +198,7 @@
       "RES_WOOD": 16,
       "RES_METAL": 10
     },
-    "workdays": 1.0,
+    "workdays": 1,
     "effect": "건물 수리 비용 ×0.75, 공사 재개 지연 제거",
     "mission": "3",
     "scope": "campaign",
@@ -217,7 +217,7 @@
       "RES_WOOD": 12,
       "RES_METAL": 8
     },
-    "workdays": 1.0,
+    "workdays": 1,
     "effect": "변이 개체 신호 교란 대응 해금; 먹이 유인 손실 감소",
     "mission": "3",
     "scope": "campaign",
@@ -236,7 +236,7 @@
       "RES_WOOD": 40,
       "RES_METAL": 30
     },
-    "workdays": 2.0,
+    "workdays": 2,
     "effect": "확장: 수송 자동화; 본편 잠금",
     "mission": "",
     "scope": "extension",
@@ -255,7 +255,7 @@
       "RES_WOOD": 36,
       "RES_METAL": 24
     },
-    "workdays": 2.0,
+    "workdays": 2,
     "effect": "확장: 어류 공급의 계절 변동 완화",
     "mission": "",
     "scope": "extension",
@@ -274,7 +274,7 @@
       "RES_WOOD": 32,
       "RES_METAL": 18
     },
-    "workdays": 2.0,
+    "workdays": 2,
     "effect": "확장: 군락 간 공동 비축·상호 검수",
     "mission": "",
     "scope": "extension",
@@ -293,7 +293,7 @@
       "RES_WOOD": 30,
       "RES_METAL": 30
     },
-    "workdays": 2.0,
+    "workdays": 2,
     "effect": "확장: 대형 군락 방어",
     "mission": "",
     "scope": "extension",
@@ -742,7 +742,7 @@
   },
   {
     "id": "UPGRADE_WORKSHOP_2",
-    "name": "기술 공방 2단계 개량 연구",
+    "name": "연구소 2단계 개량 연구",
     "tier": 1,
     "requires": [],
     "cost": {
@@ -761,7 +761,7 @@
   },
   {
     "id": "UPGRADE_WORKSHOP_3",
-    "name": "기술 공방 3단계 개량 연구",
+    "name": "연구소 3단계 개량 연구",
     "tier": 2,
     "requires": ["UPGRADE_WORKSHOP_2"],
     "cost": {

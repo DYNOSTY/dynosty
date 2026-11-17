@@ -98,7 +98,11 @@ export function advanceHospital(
       const door = facilityDoor(f);
       const arrived =
         Math.hypot(r.position.x - door.x, r.position.z - door.z) < 0.01;
-      if (arrived) p.progress += (minutes * 12) / hospitalHours(f.level);
+      const staffed = s.residents.some(
+        (q) => q.workplaceId === `facility:${f.id}` && q.health === "healthy",
+      );
+      if (arrived && staffed)
+        p.progress += (minutes * 12) / hospitalHours(f.level);
       r = {
         ...r,
         position: arrived

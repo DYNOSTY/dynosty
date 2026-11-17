@@ -40,7 +40,17 @@ it("수역·어군과 결빙 구멍을 전환하고 대기 부지에서 완성 �
     visual.update(s);
     expect(scene.getMeshById("town:build-1")?.isVisible).toBe(false);
     expect(scene.getMeshById("town:build-1")?.rotation.y).toBe(Math.PI / 2);
-    expect(scene.getMeshById("town:build-1:crop00")).not.toBeNull();
+    expect(scene.getMeshById("town:build-1:sprout-0")).not.toBeNull();
+    const first = scene.getMeshById("town:build-1:sprout-0");
+    visual.update({
+      ...s,
+      town: {
+        ...s.town,
+        facilities: s.town.facilities.map((f) => ({ ...f, level: 3 })),
+      },
+    });
+    expect(first?.isDisposed()).toBe(true);
+    expect(scene.getMeshById("town:build-1:high-bay-ridge")).not.toBeNull();
     visual.update(null);
     expect(scene.getMeshById("town:build-1")).toBeNull();
   } finally {

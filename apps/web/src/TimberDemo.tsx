@@ -6,6 +6,7 @@ import {
   BOKHOL_PRODUCTION_SITES,
   type BuildingKind,
   createLogging,
+  facilityStaffLimit,
   formatRation,
   GAME_RULES,
   HAUL_PHASE_NAMES,
@@ -23,6 +24,7 @@ import {
   productionSites,
   RESIDENT_REQUEST_TEXT,
   restaurantOpen,
+  restaurantSeats,
   restaurantStaff,
   TIMBER_RULES,
   type TimberCommand,
@@ -459,7 +461,21 @@ export function TimberDemo({
                   })
                 }
               >
-                {[0, 1, 2].map((n) => (
+                {Array.from(
+                  {
+                    length:
+                      (state.town.facilities.find(
+                        (f) => f.kind === "restaurant",
+                      )
+                        ? facilityStaffLimit(
+                            state.town.facilities.find(
+                              (f) => f.kind === "restaurant",
+                            ) ?? { kind: "restaurant", level: 1 },
+                          )
+                        : 2) + 1,
+                  },
+                  (_, n) => n,
+                ).map((n) => (
                   <option key={n} value={n}>
                     {n}명
                   </option>
@@ -467,10 +483,31 @@ export function TimberDemo({
               </select>
             </label>
             <p data-testid="restaurant-workers">
-              배치 {restaurantStaff(state).assigned}/
-              {state.restaurantWorkerTarget}명 · 현장{" "}
-              {restaurantStaff(state).present}명 · 배급 중{" "}
-              {restaurantStaff(state).serving}명
+              배치{" "}
+              {
+                restaurantStaff(
+                  state,
+                  state.town.facilities.find((f) => f.kind === "restaurant")
+                    ?.id,
+                ).assigned
+              }
+              /{state.restaurantWorkerTarget}명 · 현장{" "}
+              {
+                restaurantStaff(
+                  state,
+                  state.town.facilities.find((f) => f.kind === "restaurant")
+                    ?.id,
+                ).present
+              }
+              명 · 배급 중{" "}
+              {
+                restaurantStaff(
+                  state,
+                  state.town.facilities.find((f) => f.kind === "restaurant")
+                    ?.id,
+                ).serving
+              }
+              명 · 전체 좌석 {restaurantSeats(state)}석
             </p>
             <p className="hint">
               인원수만 정하면 가까운 유휴 주민이 이동합니다. 직원은 자기
@@ -591,6 +628,17 @@ export function TimberDemo({
             </p>
             <details>
               <summary>입주 현황</summary>
+              <details>
+                <summary>종별 주민 설계 보기</summary>
+                <img
+                  className="facility-reference"
+                  src="/art/residents/species-turnaround-v1.png"
+                  alt="세 뿔과 목깃의 트리케라톱스, 두 다리와 깃의 벨로키랍토르, 긴 주둥이와 등돛의 스피노사우루스"
+                  loading="lazy"
+                  width="1536"
+                  height="1024"
+                />
+              </details>
               <ul>
                 {state.homes.map((h, i) => (
                   <li key={h.id}>

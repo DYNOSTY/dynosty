@@ -13,7 +13,7 @@ import {
 import type { GroundPoint } from "./resident-path.js";
 export type RationPolicy = "needs" | "cap";
 export const VILLAGE_RULES = {
-  maxRestaurantStaff: 2,
+  maxRestaurantStaff: 6,
   homeSpace: 20,
   constructionWood: 20,
   constructionMinutes: 30,

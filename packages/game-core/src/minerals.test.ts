@@ -126,7 +126,7 @@ it("v11 이전 숲·재고·진행을 보존하고 새 숲·광물 권역과 초
     world: { ...base.world, resources },
   };
   const loaded = parseTimberState(old);
-  expect(loaded.version).toBe(17);
+  expect(loaded.version).toBe(18);
   expect(loaded.logging.remaining).toBe(120);
   expect(loaded.loggingSites).toHaveLength(12);
   expect(loaded.mineralSites).toHaveLength(6);

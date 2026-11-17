@@ -28,7 +28,8 @@ function build(s = start()) {
   });
   s = advanceTimber(s, 160);
   expect(s.town.facilities[0]?.kind).toBe("hospital");
-  return s;
+  s = cmd(s, { type: "facility-staff", id: "build-1", count: 2 });
+  return advanceTimber(s, 1);
 }
 function injure(
   s: TimberState,
@@ -134,7 +135,7 @@ it("이전 저장의 치료 필요 주민을 보존하며 손상된 병상·회�
   const s = injure(build(), 1, "major");
   const { patients: _patients, ...town } = s.town;
   const migrated = parseTimberState({ ...s, version: 15, town });
-  expect(migrated.version).toBe(17);
+  expect(migrated.version).toBe(18);
   expect(migrated.town.patients[0]).toMatchObject({
     severity: "minor",
     progress: 0,

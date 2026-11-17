@@ -114,7 +114,7 @@ it("기본 공사량은4명 표준 체격 기준30~50초이며 체격에 따른 
     expect(rule.work / 6).toBeGreaterThanOrEqual(30);
 });
 it.each(["farm", "ranch", "fishery", "logging", "quarry"] as const)(
-  "%s 운영·소모·운반 후에만 공동 재고에 입고한다",
+  "%s 운영·소모와 입고 경로를 따르고 어획은 즉시 입고한다",
   (kind) => {
     const point =
       kind === "fishery"
@@ -133,7 +133,8 @@ it.each(["farm", "ranch", "fishery", "logging", "quarry"] as const)(
       s = advanceTimber(s, 1);
       observedBuffer ||= (s.town.facilities[0]?.buffer ?? 0) > 0;
     }
-    expect(observedBuffer).toBe(true);
+    expect(observedBuffer).toBe(kind !== "fishery");
+    if (kind === "fishery") expect(s.town.facilities[0]?.haul).toBeNull();
     expect(s.town.facilities[0]?.delivered).toBeGreaterThan(0);
     expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
     if (kind === "farm" || kind === "ranch")
@@ -170,6 +171,12 @@ it.each(["scout", "trade"] as const)(
     const f = s.town.facilities[0];
     if (!f) throw Error("시설 없음");
     const food: FoodId = kind === "scout" ? "RES_MEAT" : "RES_FISH";
+    s = cmd(s, {
+      type: "facility-staff",
+      id: f.id,
+      count: kind === "scout" ? 2 : 1,
+    });
+    s = advanceTimber(s, 1);
     const before = s.world.resources[food];
     s = cmd(s, { type: "dispatch-food", id: f.id, food });
     expect(s.world.resources[food]).toBe(before);
@@ -212,6 +219,8 @@ it("건설 인력의 질병은 교대하고 정찰대 사망·회복 사건도 �
   s = finish(plan(s, "scout", { ...pose, position: { x: -15, z: -15 } }));
   const f = s.town.facilities[0];
   if (!f) throw Error("거점 없음");
+  s = cmd(s, { type: "facility-staff", id: f.id, count: 2 });
+  s = advanceTimber(s, 1);
   s = cmd(s, { type: "dispatch-food", id: f.id, food: "RES_MEAT" });
   const who = s.town.trips[0]?.ids[0];
   if (!who) throw Error("정찰대 없음");

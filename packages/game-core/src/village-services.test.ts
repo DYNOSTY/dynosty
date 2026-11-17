@@ -110,7 +110,7 @@ it("직원은 영업 중 자기 식당에서 먹고 배급 기록은 저장 복�
   if (!c) throw Error("주민 없음");
   expect(eating?.rationUsed).toBe(speciesRule(c.species).portion);
   s = parseTimberSave(JSON.parse(JSON.stringify(createTimberSave(s)))).state;
-  s = advanceTimber(s, 6);
+  s = advanceTimber(s, 31);
   expect(s.residents.find((r) => r.id === employee.id)?.rationUsed).toBe(
     eating?.rationUsed,
   );

@@ -4,11 +4,13 @@ import {
   type BuildingKind,
   type FoodId,
   facilityResource,
+  facilityStaffLimit,
   GAME_RULES,
   hospitalBeds,
   hospitalHours,
   orderWork,
   productionRate,
+  restaurantStaff,
   STORAGE_SPACE,
   storageCapacity,
   storageResearchLevel,
@@ -16,11 +18,29 @@ import {
   type TimberState,
   townShiftOpen,
   tradeRank,
+  workplaceOpen,
 } from "@dynosty/game-core";
 import { useState } from "react";
 import { BuildingUpgrade } from "./BuildingUpgrade.js";
 import { DevelopmentPanel, OvertimeControl } from "./DevelopmentPanel.js";
 import { HospitalPanel } from "./HospitalPanel.js";
+
+const facilityReferences: Record<BuildingKind, string> = {
+  home: "nest-dining",
+  restaurant: "nest-dining",
+  workshop: "research-hospital",
+  hospital: "research-hospital",
+  logging: "timber-storage",
+  storage: "timber-storage",
+  coal: "mining",
+  iron: "mining",
+  quarry: "mining",
+  fishery: "fishery",
+  farm: "farm-ranch",
+  ranch: "farm-ranch",
+  scout: "scout-trade",
+  trade: "scout-trade",
+};
 export const buildingCost = (kind: BuildingKind) =>
   Object.entries(BUILDING_RULES[kind].cost)
     .map(
@@ -69,6 +89,17 @@ export function TownPanel({
         {BUILDING_RULES[kind].staff}명
       </p>
       <p>{BUILDING_RULES[kind].site}</p>
+      <details className="facility-art">
+        <summary>단계별 시설 설계 보기</summary>
+        <img
+          className="facility-reference"
+          src={`/art/facilities/${facilityReferences[kind]}-levels-v1.png`}
+          alt={`${BUILDING_RULES[kind].name} 1~3단계 설계 삽화`}
+          loading="lazy"
+          width="1494"
+          height="1053"
+        />
+      </details>
       <button type="button" onClick={() => place(kind)}>
         완성 모습으로 배치
       </button>
@@ -127,6 +158,13 @@ export function TownPanel({
                 중 높은 배율, 최고2배
               </p>
             ) : null}
+            {f.kind === "restaurant" ? (
+              <p>
+                좌석{[10, 20, 40][f.level - 1]} · 직원
+                {restaurantStaff(state, f.id).assigned}/{facilityStaffLimit(f)}{" "}
+                · 식사 30분 이내
+              </p>
+            ) : null}
             <BuildingUpgrade state={state} id={f.id} command={command} />
             {f.kind === "hospital" ? (
               <p>
@@ -165,39 +203,35 @@ export function TownPanel({
             {facilityResource(f) || f.kind === "workshop" ? (
               <OvertimeControl state={state} target={f.id} command={command} />
             ) : null}
-            {BUILDING_RULES[f.kind].staff > 0 ? (
+            {facilityStaffLimit(f) > 0 ? (
               <label>
                 {" "}
                 운영 인원{" "}
                 <select
                   aria-label={`${f.id} 운영 인원`}
                   value={
-                    f.kind === "restaurant"
+                    f.kind === "restaurant" &&
+                    state.town.facilities.find((q) => q.kind === "restaurant")
+                      ?.id === f.id
                       ? state.restaurantWorkerTarget
                       : f.target
                   }
                   onChange={(e) =>
-                    command(
-                      f.kind === "restaurant"
-                        ? {
-                            type: "set-restaurant-workers",
-                            count: Number(e.target.value),
-                          }
-                        : {
-                            type: "facility-staff",
-                            id: f.id,
-                            count: Number(e.target.value),
-                          },
-                    )
+                    command({
+                      type: "facility-staff",
+                      id: f.id,
+                      count: Number(e.target.value),
+                    })
                   }
                 >
-                  {[0, 1, 2, 3, 4]
-                    .filter((n) => n <= BUILDING_RULES[f.kind].staff)
-                    .map((n) => (
-                      <option key={n} value={n}>
-                        {n}명
-                      </option>
-                    ))}
+                  {Array.from(
+                    { length: facilityStaffLimit(f) + 1 },
+                    (_, n) => n,
+                  ).map((n) => (
+                    <option key={n} value={n}>
+                      {n}명
+                    </option>
+                  ))}
                 </select>
               </label>
             ) : null}
@@ -211,8 +245,9 @@ export function TownPanel({
               "ranch",
             ].includes(f.kind) ? (
               <p>
-                현장 적재 {f.buffer}/20 · 운반 중 {f.haul?.cargo ?? 0} · 누적
-                입고 {f.delivered}
+                {f.kind === "fishery" ? "어류 즉시 입고 · 대기" : "현장 적재"}{" "}
+                {f.buffer}/20 · 운반 중 {f.haul?.cargo ?? 0} · 누적 입고{" "}
+                {f.delivered}
                 {f.kind === "ranch"
                   ? " · 가축 사육: 풀1·물1 → 고기2"
                   : f.kind === "farm"
@@ -260,7 +295,16 @@ export function TownPanel({
               <>
                 <button
                   type="button"
-                  disabled={state.town.trips.some((t) => t.facilityId === f.id)}
+                  disabled={
+                    !workplaceOpen(state.world.minute) ||
+                    state.town.trips.some((t) => t.facilityId === f.id) ||
+                    state.residents.filter(
+                      (r) =>
+                        r.workplaceId === `facility:${f.id}` &&
+                        r.health === "healthy" &&
+                        !r.task,
+                    ).length < (f.kind === "scout" ? 2 : 1)
+                  }
                   onClick={() =>
                     command({
                       type: "dispatch-food",
@@ -271,13 +315,13 @@ export function TownPanel({
                   }
                 >
                   {f.kind === "scout"
-                    ? `정찰 중 사냥 파견 · 유휴2명 · 고기${[8, 12, 18][range - 1]}`
-                    : `목재${[5, 8, 12][range - 1]} ↔ 식량${[10, 16, 24][range - 1]} 교역 파견 · 유휴1명`}
+                    ? `정찰 중 사냥 파견 · 배치2명 · 고기${[8, 12, 18][range - 1]}`
+                    : `목재${[5, 8, 12][range - 1]} ↔ 식량${[10, 16, 24][range - 1]} 교역 파견 · 배치1명`}
                 </button>
                 <p>
                   {state.town.trips.find((t) => t.facilityId === f.id)
                     ? "이동·활동·복귀 중 · 돌아온 뒤 공동 재고 입고"
-                    : "일과시간에 유휴 주민이 있어야 출발합니다."}
+                    : "일과시간에 거점 직원이 배치되어야 출발합니다."}
                 </p>
               </>
             ) : null}

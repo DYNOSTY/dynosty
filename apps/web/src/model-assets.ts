@@ -103,7 +103,9 @@ export function parseModel(
   }
   if (
     kind === "resident" &&
-    value.parts.filter((p) => isRecord(p) && p.role === "leg").length !== 4
+    ![2, 4].includes(
+      value.parts.filter((p) => isRecord(p) && p.role === "leg").length,
+    )
   )
     return bad();
   return JSON.parse(JSON.stringify(value)) as ModelAsset;

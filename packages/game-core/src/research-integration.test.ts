@@ -66,7 +66,7 @@ function finishResearch(s: TimberState, tech: string) {
   if (!row) throw Error("연구 없음");
   s = { ...s, world: { ...s.world, minute: 600 } };
   s = cmd(s, { type: "start-research", tech });
-  const job = s.town.development.research;
+  const job = s.town.development.research[0];
   if (!job) throw Error("연구 시작 실패");
   s = {
     ...s,
@@ -74,7 +74,7 @@ function finishResearch(s: TimberState, tech: string) {
       ...s.town,
       development: {
         ...s.town.development,
-        research: { ...job, work: row.workdays * 540 * 3 - 1 },
+        research: [{ ...job, work: row.workdays * 540 * 3 - 1 }],
       },
     },
   };
@@ -102,6 +102,8 @@ it("건물별 연구로 공사를 허가하고 둥지 잠자리와 지원 시설
 });
 it("병원 단계별5/15/25병상과 경상12/8/4시간, 경중2/4배를 실제 치료에 적용한다", () => {
   let s = build(lab(), "hospital", 0, 16);
+  s = cmd(s, { type: "facility-staff", id: "build-2", count: 2 });
+  s = advanceTimber(s, 1);
   expect([1, 2, 3].map(hospitalBeds)).toEqual([5, 15, 25]);
   expect([1, 2, 3].map(hospitalHours)).toEqual([12, 8, 4]);
   s = finishResearch(s, "UPGRADE_HOSPITAL_2");
@@ -169,26 +171,26 @@ it("창고가 가득 차면 수레 화물을 유지하고 공간이 난 뒤 한 
   let s = createTimberState({
     ...w,
     minute: 540,
-    resources: { ...w.resources, RES_FISH: 5000000 },
+    resources: { ...w.resources, RES_PLANT: 5000000 },
   });
-  s = build(s, "fishery", 46, 32);
+  s = build(s, "farm", 46, 32);
   s = cmd(s, { type: "facility-staff", id: "build-1", count: 2 });
   s = advanceTimber(s, 180);
   const f = s.town.facilities[0];
   expect(f?.haul).toMatchObject({ stage: "store", cargo: 5 });
   expect(f?.delivered).toBe(0);
-  expect(s.world.resources.RES_FISH).toBe(5000000);
+  expect(s.world.resources.RES_PLANT).toBe(5000000);
   s = {
     ...s,
     world: {
       ...s.world,
-      resources: { ...s.world.resources, RES_FISH: 4960000 },
+      resources: { ...s.world.resources, RES_PLANT: 4960000 },
     },
   };
   s = advanceTimber(s, 1);
   expect(s.town.facilities[0]?.haul?.cargo).toBe(1);
   expect(s.town.facilities[0]?.delivered).toBe(4);
-  expect(s.world.resources.RES_FISH).toBe(5000000);
+  expect(s.world.resources.RES_PLANT).toBe(5000000);
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
 it("반란 전·다른 분기 연구는 거부하고 진압 루트에서 날틀이 정찰 기본10배를 대체한다", () => {
@@ -343,6 +345,7 @@ it("메카는 야간에도 배치된 시설에서 일하고 배급·수면·둥�
     s.world.resources.RES_MEAT,
     s.world.resources.RES_FISH,
   ];
+  const deliveredBefore = secondFacility(s).delivered;
   s = advanceTimber(s, 120);
   const mech = s.residents.find((r) => r.id === `mecha:${source}`);
   expect(mech).toMatchObject({
@@ -351,12 +354,16 @@ it("메카는 야간에도 배치된 시설에서 일하고 배급·수면·둥�
     request: null,
     workplaceId: "facility:build-2",
   });
-  expect(secondFacility(s).buffer).toBeGreaterThan(0);
+  expect(secondFacility(s).delivered).toBeGreaterThan(0);
   expect([
     s.world.resources.RES_PLANT,
     s.world.resources.RES_MEAT,
     s.world.resources.RES_FISH,
-  ]).toEqual(food);
+  ]).toEqual([
+    food[0],
+    food[1],
+    (food[2] ?? 0) + (secondFacility(s).delivered - deliveredBefore) * 10000,
+  ]);
 });
 
 it("공동 목재가 꽉 차면 조달 검수 물량을 보존하고 공간이 난 뒤 자동 정산한다", () => {

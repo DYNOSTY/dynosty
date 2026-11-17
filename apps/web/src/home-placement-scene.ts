@@ -157,7 +157,7 @@ export function createHomePlacementVisual(
           scene,
           root,
           material,
-          kind && kind !== "home" ? facilityModel(kind) : homeAsset,
+          facilityModel(kind ?? "home"),
         );
         for (const m of visual.meshes) {
           m.isPickable = false;

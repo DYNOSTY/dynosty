@@ -55,7 +55,10 @@ export function createTownVisual(scene: Scene) {
     });
     return { pond, holes, fish };
   });
-  const objects = new Map<string, { root: Mesh; visual: ModelVisual | null }>();
+  const objects = new Map<
+    string,
+    { root: Mesh; visual: ModelVisual | null; level: number }
+  >();
   return {
     update(s: TimberState | null) {
       const wanted = new Map<string, "cargo" | "tool">();
@@ -111,34 +114,26 @@ export function createTownVisual(scene: Scene) {
           const root = CreateBox(`town:${f.id}`, { size: 1 }, scene);
           root.material = mat;
           root.isVisible = false;
-          o = { root, visual: null };
+          o = { root, visual: null, level: 0 };
           objects.set(f.id, o);
         }
-        if (!pending && !o.visual)
-          o.visual = buildModel(scene, o.root, mat, facilityModel(f.kind));
+        const level = "level" in f ? f.level : 1;
+        if (!pending && (!o.visual || o.level !== level)) {
+          o.visual?.dispose();
+          o.visual = buildModel(
+            scene,
+            o.root,
+            mat,
+            facilityModel(f.kind, level),
+          );
+          o.level = level;
+        }
         if (pending && !o.visual) {
           o.root.isVisible = true;
           o.root.scaling.set(4, 0.1, 4);
         } else {
           o.root.isVisible = false;
           o.root.scaling.setAll(1);
-        }
-        if (!pending && "level" in f) {
-          let badge = scene.getMeshById(`town-tier:${f.id}`);
-          if (f.level > 1 && !badge) {
-            badge = CreateBox(
-              `town-tier:${f.id}`,
-              { width: 0.35, height: 0.25, depth: 0.35 },
-              scene,
-            );
-            badge.parent = o.root;
-            badge.material = ice;
-            badge.position.set(1.4, 1.8, 0);
-          }
-          if (badge) {
-            badge.setEnabled(f.level > 1);
-            badge.scaling.y = f.level - 1;
-          }
         }
         o.root.position.set(
           f.position.x,
