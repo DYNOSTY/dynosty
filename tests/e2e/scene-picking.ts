@@ -8,7 +8,19 @@ export async function examplePoint(
   kind: "building" | "resident",
   updated = false,
 ) {
+  return worldPoint(
+    page,
+    kind === "building" ? [0, 0.75, -1] : [updated ? 2 : -2, 0.5, 1],
+    false,
+  );
+}
+export async function worldPoint(
+  page: Page,
+  point: readonly [number, number, number],
+  scroll = true,
+) {
   const canvas = page.locator("canvas");
+  if (scroll) await canvas.scrollIntoViewIfNeeded();
   await canvas.evaluate(
     () =>
       new Promise<void>((resolve) =>
@@ -17,8 +29,7 @@ export async function examplePoint(
   );
   const box = await canvas.boundingBox();
   if (!box) throw new Error("장면 캔버스가 없습니다.");
-  const [x, y, z] =
-    kind === "building" ? [0, 0.75, -1] : [updated ? 2 : -2, 0.5, 1];
+  const [x, y, z] = point;
   const depth = 12 - y * 0.5 + (z * Math.sqrt(3)) / 2;
   const focal = box.height / (2 * Math.tan(0.4));
   return {
@@ -40,6 +51,7 @@ export async function clickExample(
 }
 
 export async function clickFloor(page: Page) {
+  await page.locator("canvas").scrollIntoViewIfNeeded();
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("장면 캔버스가 없습니다.");
   await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.85);
