@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
+import { press } from "./labor-tabs.js";
 import { closeWorkspace, openWorkspace } from "./workspace.js";
-import { press, reveal } from "./labor-tabs.js";
 
 const key = "dynosty.audio.catalog";
 const shortWave = readFileSync(
@@ -157,8 +157,7 @@ test("종류별 이름 검사와 제거를 처리하고 다른 채널·게임 �
   await openWorkspace(page);
   await register(page, "BGM", "공통", "bgm.wav");
   await register(page, "음성", "공통", "voice.wav");
-  for (const kind of ["BGM", "음성"])
-    await press(page, `${kind} 재생`);
+  for (const kind of ["BGM", "음성"]) await press(page, `${kind} 재생`);
   await expect(page.getByTestId("voice-status")).toHaveText("재생 중");
   expect((await output(page)).paused).toEqual([false, false]);
   expect((await output(page)).gain).toBe(0);

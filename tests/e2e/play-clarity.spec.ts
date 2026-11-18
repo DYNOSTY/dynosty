@@ -1,11 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
+import { press, reveal } from "./labor-tabs.js";
 import {
   progressButton as b,
   enterProgress,
   receiveProgress,
 } from "./progress-helpers.js";
 import { clickFloor } from "./scene-picking.js";
-import { press, reveal } from "./labor-tabs.js";
 
 async function horizontalOffset(p: Page, id: string) {
   const c = await p.locator("canvas").boundingBox(),

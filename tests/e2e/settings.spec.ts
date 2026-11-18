@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { press, reveal } from "./labor-tabs.js";
+import { press } from "./labor-tabs.js";
 
 const settingsKey = "dynosty.settings";
 const gameKey = "dynosty.example.saves";

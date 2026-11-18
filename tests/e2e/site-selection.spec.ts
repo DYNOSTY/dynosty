@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { SITE_POINTS, type SiteId } from "../../apps/web/src/site-targets.js";
-import { clickFloor, outlinePixels, worldPoint } from "./scene-picking.js";
 import { press, reveal } from "./labor-tabs.js";
+import { clickFloor, outlinePixels, worldPoint } from "./scene-picking.js";
 
 const b = (p: Page, n: string) =>
   p.getByRole("button", { name: n, exact: true });

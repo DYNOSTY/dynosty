@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { press } from "./labor-tabs.js";
 import { closeWorkspace, openWorkspace } from "./workspace.js";
-import { press, reveal } from "./labor-tabs.js";
 
 // 테스트용 PCM WAV. 실제 BGM·대사 파일이나 네트워크 음원을 사용하지 않는다.
 function wave(seconds = 1) {

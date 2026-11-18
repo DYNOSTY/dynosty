@@ -14,15 +14,16 @@ import {
   timberScene,
 } from "@dynosty/game-core";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { BUILDINGS, type BuildingAction, commandGrid } from "./buildings.js";
 import {
   CmdButton,
   CmdFace,
   ConsoleFrame,
   FpsBadge,
   IconText,
-  MoodScale,
   TopFrame,
 } from "./GameHud.js";
+import { LAYOUT } from "./layout.js";
 import {
   loadLocalExample,
   localSaveError,
@@ -53,14 +54,14 @@ import { TimberDemo } from "./TimberDemo.js";
 import { VideoPanel } from "./VideoPanel.js";
 import { CREW_BADGES, cartBadge } from "./visual-badges.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
-import { BUILDINGS, type BuildingAction, commandGrid } from "./buildings.js";
-import { LAYOUT } from "./layout.js";
 import { elevation, MAP_SPAN } from "./world.js";
 
 export function App() {
   const [laborOpen, setLaborOpen] = useState(false);
   // 일손 판은 내용이 길어 탭으로 한 덩어리씩 (프로스트펑크 건물 창처럼)
-  const [laborTab, setLaborTab] = useState<"work" | "request" | "site" | "report" | "save">("work");
+  const [laborTab, setLaborTab] = useState<
+    "work" | "request" | "site" | "report" | "save"
+  >("work");
   const [laborState, setLaborState] = useState<LaborState | null>(null);
   const [siteNotices, setSiteNotices] = useState<SiteNotice[]>([]);
   const priorLabor = useRef<LaborState | null>(null);
@@ -621,7 +622,9 @@ export function App() {
     timberOpen && laborOpen && isSiteId(selectedId) ? selectedId : null;
 
   return (
-    <main className={`play-shell${timberOpen ? ` is-procurement ${laborOpen ? `is-labor labor-tab-${laborTab}` : "is-timber"}` : ""}`}>
+    <main
+      className={`play-shell${timberOpen ? ` is-procurement ${laborOpen ? `is-labor labor-tab-${laborTab}` : "is-timber"}` : ""}`}
+    >
       <header className="play-header">
         <TopFrame />
         <div className="play-brand">
@@ -1172,7 +1175,10 @@ export function App() {
           <CmdFace icon="settings" label="설정" hotkey="Esc" />
         </SettingsMenu>
       </nav>
-      <section className={`g-console${selection ? " is-selected" : " is-idle"}`} aria-label="명령 콘솔">
+      <section
+        className={`g-console${selection ? " is-selected" : " is-idle"}`}
+        aria-label="명령 콘솔"
+      >
         <ConsoleFrame />
         <div className="g-console__map">
           <button
@@ -1224,7 +1230,11 @@ export function App() {
             <div className="g-console__info">
               {selection.building ? (
                 <div className="g-bld">
-                  <img className="g-bld__art" src={`/ui/buildings/${selection.building}.jpg`} alt="" />
+                  <img
+                    className="g-bld__art"
+                    src={`/ui/buildings/${selection.building}.jpg`}
+                    alt=""
+                  />
                   <div className="g-bld__text">
                     <h2>{BUILDINGS[selection.building]?.name ?? "건물"}</h2>
                     <p>{BUILDINGS[selection.building]?.role}</p>
@@ -1240,7 +1250,10 @@ export function App() {
                 </div>
               ) : null}
               {selectedEntity ? (
-                <SelectionPanel entity={selectedEntity} onClear={clearSelection} />
+                <SelectionPanel
+                  entity={selectedEntity}
+                  onClear={clearSelection}
+                />
               ) : null}
             </div>
             <nav className="play-menu g-console__cmd" aria-label="건물 명령">
@@ -1251,11 +1264,18 @@ export function App() {
                     icon={cmd.icon}
                     label={cmd.label}
                     hotkey={cmd.hotkey ?? ""}
-                    disabled={!cmd.action || (cmd.action === "procure" && (!timberReady || timberOpen))}
+                    disabled={
+                      !cmd.action ||
+                      (cmd.action === "procure" && (!timberReady || timberOpen))
+                    }
                     onClick={() => cmd.action && runAction(cmd.action)}
                   />
                 ) : (
-                  <span key={`empty-${i}`} className="g-cmd g-cmd--empty" aria-hidden="true" />
+                  <span
+                    key={`empty-${i}`}
+                    className="g-cmd g-cmd--empty"
+                    aria-hidden="true"
+                  />
                 ),
               )}
             </nav>

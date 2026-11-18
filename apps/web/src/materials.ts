@@ -54,7 +54,9 @@ export const isGlowMaterial = (name: string | undefined) =>
 const hot = (name: string) => name.endsWith("_hot");
 const resolve = (name: string): LibraryId | undefined => {
   const n = hot(name) ? name.slice(0, -4) : name;
-  return (LIBRARY as readonly string[]).includes(n) ? (n as LibraryId) : ALIAS[n];
+  return (LIBRARY as readonly string[]).includes(n)
+    ? (n as LibraryId)
+    : ALIAS[n];
 };
 
 // 위를 보는 면(지붕·데크·계단)에 눈이 쌓인 듯 덮음 — 모델을 고치지 않아도 컨셉 시트처럼 지붕에 두꺼운 눈
@@ -141,7 +143,11 @@ export function createMaterialLibrary(scene: Scene) {
         m.emissiveTexture = tex("window_albedo");
         m.emissiveColor = new Color3(1.15, 0.78, 0.48); // 작은 창도 멀리서 읽히게
         m.bumpTexture = null;
-      } else if (id !== "ice_clear" && id !== "glass_frosted" && !hot(material.name)) {
+      } else if (
+        id !== "ice_clear" &&
+        id !== "glass_frosted" &&
+        !hot(material.name)
+      ) {
         const roof = id === "giwa_sooty" || id === "thatch_sooty";
         SnowCoverPlugin.attach(m, roof ? 0.95 : 0.75, roof ? 0.22 : 0.55);
       }

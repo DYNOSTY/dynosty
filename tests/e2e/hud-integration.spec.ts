@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
+import { press } from "./labor-tabs.js";
 import { clickExample } from "./scene-picking.js";
-import { press, reveal } from "./labor-tabs.js";
 
 type SceneMesh = {
   isVisible: boolean;
@@ -8,7 +8,7 @@ type SceneMesh = {
   getChildMeshes(): SceneMesh[];
 };
 
-const button = (p: Page, name: string) =>
+const _button = (p: Page, name: string) =>
   p.getByRole("button", { name, exact: true });
 async function ready(p: Page) {
   await p.goto("/");

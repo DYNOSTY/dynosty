@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { press } from "./labor-tabs.js";
 import {
   clickExample,
   clickFloor,
   examplePoint,
   outlinePixels,
 } from "./scene-picking.js";
-import { press, reveal } from "./labor-tabs.js";
 
 async function ready(page: import("@playwright/test").Page) {
   await page.goto("/");

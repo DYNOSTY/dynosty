@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { press } from "./labor-tabs.js";
 import {
   progressButton as b,
   enterProgress,
   receiveProgress,
   siteAction,
 } from "./progress-helpers.js";
-import { press, reveal } from "./labor-tabs.js";
 
 const flow = (p: import("@playwright/test").Page, k: string) =>
   p.getByTestId(`flow-${k}`);

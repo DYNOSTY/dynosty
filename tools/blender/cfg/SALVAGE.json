@@ -1,1 +1,16 @@
-{"name":"salvage","beam":{"x0":-3,"x1":1.5,"y0":-2.1,"y1":1.7,"zmin":2.6,"mats":["timber","wood"],"drop":0.25},"props":[{"type":"barrel","x":2.4,"y":-2.3},{"type":"scrap","x":-2.6,"y":1.9,"n":8}]}
+{
+  "name": "salvage",
+  "beam": {
+    "x0": -3,
+    "x1": 1.5,
+    "y0": -2.1,
+    "y1": 1.7,
+    "zmin": 2.6,
+    "mats": ["timber", "wood"],
+    "drop": 0.25
+  },
+  "props": [
+    { "type": "barrel", "x": 2.4, "y": -2.3 },
+    { "type": "scrap", "x": -2.6, "y": 1.9, "n": 8 }
+  ]
+}

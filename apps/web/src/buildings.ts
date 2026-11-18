@@ -17,26 +17,45 @@ export type BuildingInfo = {
   commands: BuildingCommand[];
 };
 
-const locked = (icon: string, label: string): BuildingCommand => ({ icon, label });
+const locked = (icon: string, label: string): BuildingCommand => ({
+  icon,
+  label,
+});
 
 export const BUILDINGS: Record<string, BuildingInfo> = {
   BLD_ONDOL: {
     name: "온돌",
     role: "마을의 난방 중심. 아궁이 불을 구들 고래로 집집마다 보냅니다.",
-    facts: [["종류", "난방"], ["연결", "둥지 8채"]],
-    commands: [locked("ondol", "땔감 넣기"), locked("policy", "난방 세기"), locked("research", "고래 보수")],
+    facts: [
+      ["종류", "난방"],
+      ["연결", "둥지 8채"],
+    ],
+    commands: [
+      locked("ondol", "땔감 넣기"),
+      locked("policy", "난방 세기"),
+      locked("research", "고래 보수"),
+    ],
   },
   BLD_NEST: {
     name: "공동 둥지",
     role: "주민이 모여 자는 집. 온돌 고래에서 온기를 받습니다.",
-    facts: [["종류", "주거"], ["난방", "온돌 연결"]],
+    facts: [
+      ["종류", "주거"],
+      ["난방", "온돌 연결"],
+    ],
     commands: [locked("residents", "주민 보기"), locked("ondol", "난방 확인")],
   },
   BLD_OFFICE: {
     name: "조달소",
     role: "바깥에서 자재를 들여오고 검수해 필요한 곳에 보냅니다.",
-    facts: [["종류", "조달"], ["진행", "마른 목재20"]],
-    commands: [{ icon: "economy", label: "조달", hotkey: "E", action: "procure" }, locked("records", "조달 기록")],
+    facts: [
+      ["종류", "조달"],
+      ["진행", "마른 목재20"],
+    ],
+    commands: [
+      { icon: "economy", label: "조달", hotkey: "E", action: "procure" },
+      locked("records", "조달 기록"),
+    ],
   },
   BLD_WAREHOUSE: {
     name: "갈무리 창고",
@@ -53,13 +72,19 @@ export const BUILDINGS: Record<string, BuildingInfo> = {
   BLD_FORAGE: {
     name: "고사리 채집막",
     role: "눈 밑 고사리·풀을 거두어 식량을 보탭니다.",
-    facts: [["종류", "식량"], ["거둠", "풀"]],
+    facts: [
+      ["종류", "식량"],
+      ["거둠", "풀"],
+    ],
     commands: [locked("residents", "일꾼 배정")],
   },
   BLD_GREENHOUSE: {
     name: "온상 재배소",
     role: "난로로 데운 유리 온상에서 푸성귀를 기릅니다.",
-    facts: [["종류", "식량"], ["거둠", "풀"]],
+    facts: [
+      ["종류", "식량"],
+      ["거둠", "풀"],
+    ],
     commands: [locked("residents", "일꾼 배정")],
   },
   BLD_WATER: {
@@ -71,26 +96,36 @@ export const BUILDINGS: Record<string, BuildingInfo> = {
   BLD_FISHERY: {
     name: "강물 양식장",
     role: "얼음 구멍으로 물고기를 잡아 식량을 보탭니다.",
-    facts: [["종류", "식량"], ["거둠", "어류"]],
+    facts: [
+      ["종류", "식량"],
+      ["거둠", "어류"],
+    ],
     commands: [locked("residents", "일꾼 배정")],
   },
   BLD_SALVAGE: {
     name: "자재 회수장",
     role: "무너진 집터에서 나무와 쇠를 거두어 옵니다.",
-    facts: [["종류", "자재"], ["거둠", "나무"]],
+    facts: [
+      ["종류", "자재"],
+      ["거둠", "나무"],
+    ],
     commands: [locked("residents", "일꾼 배정")],
   },
   BLD_WATCH: {
     name: "망루",
     role: "섬 바깥을 살피고 정찰대를 내보냅니다.",
     facts: [["종류", "정찰"]],
-    commands: [{ icon: "map", label: "정찰 보내기", hotkey: "R", action: "scout" }],
+    commands: [
+      { icon: "map", label: "정찰 보내기", hotkey: "R", action: "scout" },
+    ],
   },
   BLD_GATE: {
     name: "방책 성문",
     role: "마을을 드나드는 문. 정찰대가 여기로 나갑니다.",
     facts: [["종류", "방어"]],
-    commands: [{ icon: "map", label: "정찰 보내기", hotkey: "R", action: "scout" }],
+    commands: [
+      { icon: "map", label: "정찰 보내기", hotkey: "R", action: "scout" },
+    ],
   },
   BLD_CLINIC: {
     name: "회복 둥지",
@@ -105,7 +140,17 @@ export function commandGrid(info: BuildingInfo): Array<BuildingCommand | null> {
   const own = info.commands.slice(0, 7);
   const grid: Array<BuildingCommand | null> = [...own];
   while (grid.length < 7) grid.push(null);
-  grid.push({ icon: "map", label: "가까이 보기", hotkey: "F", action: "focus" });
-  grid.push({ icon: "close", label: "선택 해제", hotkey: "Esc", action: "clear" });
+  grid.push({
+    icon: "map",
+    label: "가까이 보기",
+    hotkey: "F",
+    action: "focus",
+  });
+  grid.push({
+    icon: "close",
+    label: "선택 해제",
+    hotkey: "Esc",
+    action: "clear",
+  });
   return grid;
 }

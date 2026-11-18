@@ -1,1 +1,9 @@
-{"name":"water","roof":["tile","cap"],"patchy":true,"props":[{"type":"lantern","x":-1.05,"y":-1,"z":1.55},{"type":"crates","x":2.4,"y":-2.1,"n":2}]}
+{
+  "name": "water",
+  "roof": ["tile", "cap"],
+  "patchy": true,
+  "props": [
+    { "type": "lantern", "x": -1.05, "y": -1, "z": 1.55 },
+    { "type": "crates", "x": 2.4, "y": -2.1, "n": 2 }
+  ]
+}

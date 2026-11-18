@@ -369,7 +369,11 @@ export function buildWorld(
     ctx.fillRect(0, 0, 256, 256);
     tex.update();
     tex.hasAlpha = true;
-    const heat = CreateDisc("heat-glow", { radius: 13, tessellation: 48 }, scene);
+    const heat = CreateDisc(
+      "heat-glow",
+      { radius: 13, tessellation: 48 },
+      scene,
+    );
     heat.rotation.x = Math.PI / 2;
     heat.position.set(0, 0.08, -1);
     const hm = new StandardMaterial("heat-mat", scene);
@@ -641,7 +645,7 @@ export function buildWorld(
     [52, 18],
     [-20, -46],
     [18, -50],
-  ].forEach(([cx = 0, cz = 0], i) => {
+  ].forEach(([cx = 0, cz = 0], _i) => {
     const yaw = ruinR() * Math.PI;
     for (let k = 0; k < 4; k++) {
       const side = k % 2 ? 1 : -1,

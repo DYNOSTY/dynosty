@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { SITE_POINTS } from "../../apps/web/src/site-targets.js";
+import { press, reveal } from "./labor-tabs.js";
 import {
   progressButton as b,
   enterProgress,
   receiveProgress,
 } from "./progress-helpers.js";
 import { clickFloor, outlinePixels, worldPoint } from "./scene-picking.js";
-import { press, reveal } from "./labor-tabs.js";
 
 test("빈 구역의 표식·글자 안내는 유지하고 실제 목재 클릭·테두리·바닥 해제를 보존한다", async ({
   page: p,

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { SITE_POINTS } from "../../apps/web/src/site-targets.js";
+import { press } from "./labor-tabs.js";
 import {
   progressButton as b,
   progressCard as card,
@@ -8,7 +9,6 @@ import {
   siteAction,
 } from "./progress-helpers.js";
 import { clickFloor, worldPoint } from "./scene-picking.js";
-import { press, reveal } from "./labor-tabs.js";
 
 test("선택하지 않은 세 장소의 상태와 현장 번호를 표시하며 클릭·카메라 입력을 가리지 않는다", async ({
   page: p,
@@ -51,8 +51,7 @@ test("재배치의 부족 이유·진행량을 복원하고 실패 불러오기�
   await expect(p.getByTestId("site-notices")).toContainText("전량 검사 완료");
   await siteAction(p, "격리품", "현장 보완 인원 배정");
   await press(p, "배급소 작업 보기");
-  for (const n of [3, 4])
-    await press(p, `현장 일손 ${n} 배급 준비로 보내기`);
+  for (const n of [3, 4]) await press(p, `현장 일손 ${n} 배급 준비로 보내기`);
   await press(p, "일손 1시간 진행");
   await press(p, "현장 일손 2 배급 준비로 보내기");
   await clickFloor(p);

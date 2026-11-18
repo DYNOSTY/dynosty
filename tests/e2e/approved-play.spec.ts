@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
+import { press } from "./labor-tabs.js";
 import { clickExample } from "./scene-picking.js";
-import { press, reveal } from "./labor-tabs.js";
 
 async function ready(page: Page) {
   await page.goto("/");

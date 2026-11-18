@@ -2,11 +2,15 @@
 import "@babylonjs/loaders/glTF";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
-import { type Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
+import {
+  type Matrix,
+  Quaternion,
+  Vector3,
+} from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
@@ -18,8 +22,8 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
-import { loadSceneAsset as load } from "./scene-assets.js";
 import { createMaterialLibrary, isGlowMaterial } from "./materials.js";
+import { loadSceneAsset as load } from "./scene-assets.js";
 import { elevation, rng } from "./world.js";
 
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
@@ -31,13 +35,45 @@ const OUTLINE = new Color3(0.3, 0.9, 1); // 현장과 대표 모델의 공통 �
 // 블렌더로 컨셉 시트처럼 깎은 판(2026-11-18) — 있으면 이걸 씀 (원본 GLB는 그대로 둠)
 const CARVED: Record<string, string> = Object.fromEntries(
   [
-    "BLD_NEST", "BLD_OFFICE", "BLD_ONDOL", "BLD_WATER", "BLD_FORAGE", "BLD_SALVAGE", "BLD_GREENHOUSE",
-    "BLD_FISHERY", "BLD_WAREHOUSE", "BLD_WORKSHOP", "BLD_WATCH", "BLD_GATE", "BLD_CLINIC",
+    "BLD_NEST",
+    "BLD_OFFICE",
+    "BLD_ONDOL",
+    "BLD_WATER",
+    "BLD_FORAGE",
+    "BLD_SALVAGE",
+    "BLD_GREENHOUSE",
+    "BLD_FISHERY",
+    "BLD_WAREHOUSE",
+    "BLD_WORKSHOP",
+    "BLD_WATCH",
+    "BLD_GATE",
+    "BLD_CLINIC",
   ].map((id) => [id, `${id}_v2`]),
 );
-export const glbFile = (id: string) => `/models/buildings/${CARVED[id] ?? id}.glb`;
+export const glbFile = (id: string) =>
+  `/models/buildings/${CARVED[id] ?? id}.glb`;
 export { LAYOUT } from "./layout.js";
+
 import { LAYOUT } from "./layout.js";
+
+// 공룡마다 원래 몸집 차이는 살리되, 가장 큰 브라키오사우루스도 둥지 문(약 1.38m) 안으로 들어가게
+// [게임 안 키(m), 모델 키] — 모델은 종과 상관없이 비슷한 크기로 만들어져 있어 종별로 따로 줄임
+const RESIDENT_HEIGHT: Record<string, [number, number]> = {
+  R08_Brachiosaurus: [1.3, 3.63],
+  R07_Parasaurolophus: [1.15, 3.38],
+  R10_Iguanodon: [1.12, 3.27],
+  R05_Gallimimus: [1.0, 3.4],
+  R02_Triceratops: [0.95, 2.77],
+  R01_Pachycephalosaurus: [0.95, 3.52],
+  R03_Velociraptor: [0.8, 3.36],
+  R09_Oviraptor: [0.78, 3.49],
+  R04_Ankylosaurus: [0.75, 2.45],
+  R12_Protoceratops: [0.6, 2.28],
+};
+export const residentScale = (file: string) => {
+  const h = RESIDENT_HEIGHT[file];
+  return h ? h[0] / h[1] : RESIDENT_SCALE;
+};
 const RESIDENTS = [
   "R01_Pachycephalosaurus",
   "R02_Triceratops",
@@ -157,7 +193,10 @@ export function createVillage(
   plinthMat.specularColor = Color3.Black();
   // 공용 재질 세트: GLB 재질 이름으로 그을린 기와·나무·초가 등을 입힘 (materials.ts)
   const lib = createMaterialLibrary(scene);
-  const templates = new Map<string, { meshes: Mesh[]; local: Map<Mesh, Matrix>; smoke: Vector3 | null }>();
+  const templates = new Map<
+    string,
+    { meshes: Mesh[]; local: Map<Mesh, Matrix>; smoke: Vector3 | null }
+  >();
   // 누를 수 있는 마을 건물: 건물 뿌리 노드 → LAYOUT 번호
   const buildingNodes = new Map<Node, number>();
   const register = (node: TransformNode, x: number, z: number) => {
@@ -165,7 +204,11 @@ export function createVillage(
     if (i >= 0) buildingNodes.set(node, i);
   };
   // 고른 건물 발밑 금빛 고리 (윤곽선 대신: 인스턴스에도 되고 싸다)
-  const ring = CreateTorus("select-ring", { diameter: 1, thickness: 0.05, tessellation: 64 }, scene);
+  const ring = CreateTorus(
+    "select-ring",
+    { diameter: 1, thickness: 0.05, tessellation: 64 },
+    scene,
+  );
   const ringMat = new StandardMaterial("select-ring-mat", scene);
   ringMat.disableLighting = true;
   // 순금빛 · 색 보정·안개를 받지 않아 어디서나 같은 색 (선택 확인 테스트도 이 색을 셈)
@@ -205,13 +248,18 @@ export function createVillage(
         const inst = src.createInstance(`${node.name}:${src.name}`);
         inst.parent = node;
         inst.rotationQuaternion = new Quaternion();
-        tpl.local.get(src)?.decompose(inst.scaling, inst.rotationQuaternion, inst.position);
+        tpl.local
+          .get(src)
+          ?.decompose(inst.scaling, inst.rotationQuaternion, inst.position);
         inst.isPickable = true;
         inst.computeWorldMatrix(true);
         inst.freezeWorldMatrix();
       }
       shadow(node, radius, depth);
-      if (tpl.smoke) addSmoke(Vector3.TransformCoordinates(tpl.smoke, node.getWorldMatrix()));
+      if (tpl.smoke)
+        addSmoke(
+          Vector3.TransformCoordinates(tpl.smoke, node.getWorldMatrix()),
+        );
       register(node, x, z);
       return;
     }
@@ -239,7 +287,10 @@ export function createVillage(
       const bld = url.split("/").pop()?.replace(".glb", "") ?? "";
       const smokeNode = node
         .getDescendants(false)
-        .find((n): n is TransformNode => /smoke/i.test(n.name) && n instanceof TransformNode);
+        .find(
+          (n): n is TransformNode =>
+            /smoke/i.test(n.name) && n instanceof TransformNode,
+        );
       const chimney = CHIMNEY[bld];
       const at = smokeNode
         ? smokeNode.computeWorldMatrix(true).getTranslation()
@@ -256,9 +307,15 @@ export function createVillage(
       // 다음 채가 인스턴스로 쓸 본(本): 조각마다 이 건물 기준 위치
       const inv = node.getWorldMatrix().clone().invert();
       const local = new Map<Mesh, Matrix>();
-      const meshes = v.meshes.filter((m): m is Mesh => m instanceof Mesh && m.getTotalVertices() > 0);
+      const meshes = v.meshes.filter(
+        (m): m is Mesh => m instanceof Mesh && m.getTotalVertices() > 0,
+      );
       for (const m of meshes) local.set(m, m.getWorldMatrix().multiply(inv));
-      templates.set(url, { meshes, local, smoke: at && smokeNode ? Vector3.TransformCoordinates(at, inv) : null });
+      templates.set(url, {
+        meshes,
+        local,
+        smoke: at && smokeNode ? Vector3.TransformCoordinates(at, inv) : null,
+      });
     }
     if (clip) v.play(clip, r());
     disposers.push(v.dispose);
@@ -371,7 +428,7 @@ export function createVillage(
           work.x,
           work.z,
           r() * Math.PI * 2,
-          RESIDENT_SCALE,
+          residentScale(file),
           "Idle",
           1.3,
           2,
@@ -388,7 +445,7 @@ export function createVillage(
         Math.cos(a) * d,
         Math.sin(a) * d,
         r() * Math.PI * 2,
-        RESIDENT_SCALE,
+        residentScale(file),
         "Idle",
         1.3,
         2,
@@ -550,7 +607,7 @@ export function createVillage(
         const node = new TransformNode(`scout-${m.id}-${k}`, scene);
         node.parent = worldRoot ?? null;
         node.setEnabled(false);
-        const v = instantiate(asset, node, RESIDENT_SCALE, shadow, 1.3, 2);
+        const v = instantiate(asset, node, residentScale(file), shadow, 1.3, 2);
         for (const mesh of v.meshes) mesh.isPickable = false;
         if (parties.get(m.id) !== party) {
           v.dispose();
@@ -688,7 +745,7 @@ export function createVillage(
     const v = instantiate(
       asset,
       node,
-      kind === "building" ? BUILDING_SCALE : RESIDENT_SCALE,
+      kind === "building" ? BUILDING_SCALE : residentScale("R02_Triceratops"),
       shadow,
       kind === "building" ? 4.2 : 1.3,
       kind === "building" ? 4 : 2,
@@ -699,7 +756,12 @@ export function createVillage(
       // 큰 굴뚝 연기 (온돌은 늘 땜)
       (parent as TransformNode).computeWorldMatrix?.(true);
       node.computeWorldMatrix(true);
-      const s = node.getDescendants(false).find((n): n is TransformNode => /smoke/i.test(n.name) && n instanceof TransformNode);
+      const s = node
+        .getDescendants(false)
+        .find(
+          (n): n is TransformNode =>
+            /smoke/i.test(n.name) && n instanceof TransformNode,
+        );
       if (s) addSmoke(s.computeWorldMatrix(true).getTranslation(), 2.2);
     }
     return {

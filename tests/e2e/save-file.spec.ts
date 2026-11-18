@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
+import { press } from "./labor-tabs.js";
 import { openWorkspace } from "./workspace.js";
-import { press, reveal } from "./labor-tabs.js";
 
 const key = "dynosty.example.saves";
 const fileValue = {

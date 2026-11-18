@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { press } from "./labor-tabs.js";
 import { closeWorkspace, openWorkspace } from "./workspace.js";
-import { press, reveal } from "./labor-tabs.js";
 
 const videoPath = fileURLToPath(
   new URL("./fixtures/test-video.webm", import.meta.url),

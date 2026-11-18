@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { press, reveal } from "./labor-tabs.js";
 import {
   progressButton as b,
   enterProgress,
   progressCard,
   receiveProgress,
 } from "./progress-helpers.js";
-import { press, reveal } from "./labor-tabs.js";
 
 test("공급 선택부터 실제 운송·하역·검수 안내가 전환되고 안내를 접어도 게임을 유지한다", async ({
   page: p,
