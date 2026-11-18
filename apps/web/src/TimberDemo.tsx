@@ -32,82 +32,18 @@ import {
   type TimberState,
   townShiftOpen,
   VILLAGE_RULES,
-  visitorOffer,
   warehouseDoor,
   workplaceOpen,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
 import { LaborDemo } from "./LaborDemo.js";
+import { MerchantOffers, merchantCards } from "./MerchantOffers.js";
+import { residentName } from "./resident-names.js";
 import type { SiteId } from "./site-targets.js";
 import { buildingCost, TownPanel } from "./TownPanel.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
 
-const merchantCards = [
-  [
-    "plant",
-    "풀",
-    "백초 아범",
-    "반갑소. 오는 길에 서리 맞기 전의 어린잎을 베어 왔소.",
-    "풀 한 짐을 내겠소. 대신 물통을 채워 주겠소?",
-  ],
-  [
-    "meat",
-    "고기",
-    "피돌이",
-    "어서 오시오! 오늘 사냥감은 살이 제법 올랐소.",
-    "고기를 나누겠소. 훈제할 목재와 바꿉시다.",
-  ],
-  [
-    "fish",
-    "어류",
-    "은빛쇠",
-    "아가미 빛 좀 보시오. 동틀 무렵 얼음 밑에서 건졌다오.",
-    "잡은 물고기를 내겠소. 작살을 벼릴 철재가 필요하오.",
-  ],
-  [
-    "wood",
-    "목재",
-    "거친손",
-    "고리 나리, 결 한번 보시지요. 곧은 것끼리 묶어 왔습니다.",
-    "목재를 드리지요. 무뎌진 도끼를 고칠 철재를 주시겠습니까?",
-  ],
-  [
-    "metal",
-    "철재",
-    "억쇠",
-    "반갑습니다. 쇳소리는 귀를 속이지 못하지요.",
-    "두드려 다듬은 철재가 있습니다. 화덕에 쓸 석탄과 바꾸지요.",
-  ],
-  [
-    "water",
-    "물",
-    "물지게",
-    "먼 길 오느라 목마르셨지요? 바가지부터 받으세요.",
-    "샘물을 길어 왔어요. 물지게를 고칠 목재가 있을까요?",
-  ],
-  [
-    "ore",
-    "철광석",
-    "덕구",
-    "손에 붉은 가루가 묻지요? 골짜기 광맥에서 막 캐 온 겁니다.",
-    "철광석을 내려놓겠습니다. 광부들이 먹을 어류를 주시겠습니까?",
-  ],
-  [
-    "stone",
-    "석재",
-    "바우",
-    "문턱이 닳았구려. 발 디디기 좋은 넓적돌을 골라 왔소.",
-    "다듬은 석재를 내겠소. 돌수레 축에 쓸 목재가 필요하오.",
-  ],
-  [
-    "coal",
-    "석탄",
-    "일식",
-    "하하, 내 얼굴부터 까맣지요? 오늘도 갱에서 곧장 왔습니다.",
-    "석탄을 싣고 왔습니다. 돌아가는 길에 먹을 고기와 바꾸시지요.",
-  ],
-] as const;
 const time = (m: number) => `${Math.floor(m / 60)}시간 ${m % 60}분`;
 const phaseNames = {
   select: "공급 제안 비교",
@@ -261,6 +197,18 @@ export function TimberDemo({
     w.onmessage = (e: MessageEvent<TimberResponse>) => {
       const m = e.data;
       if (m.type === "state") {
+        try {
+          localStorage.setItem(
+            "dynosty.village.resume",
+            JSON.stringify({
+              format: "dynosty-timber",
+              saveVersion: 1,
+              state: m.state,
+            }),
+          );
+        } catch {
+          setError("자동 저장 공간을 확인해 주세요.");
+        }
         setState(m.state);
         onState(m.state);
       } else if (m.type === "exited") {
@@ -296,17 +244,26 @@ export function TimberDemo({
       w.terminate();
       worker.current = null;
       pending.current = null;
+      initialized.current = false;
     };
   }, [onState]);
   useEffect(() => {
     if (world && !initialized.current && worker.current) {
       initialized.current = true;
+      let resume: unknown;
+      try {
+        const raw = localStorage.getItem("dynosty.village.resume");
+        if (raw) resume = JSON.parse(raw);
+      } catch {
+        setError("자동 저장을 읽을 수 없습니다.");
+      }
       worker.current.postMessage({
+        resume,
         type: "init",
         world,
       } satisfies TimberRequest);
     }
-  }, [active, world]);
+  }, [world]);
   useEffect(() => {
     commandRef.current = command;
     return () => {
@@ -334,7 +291,7 @@ export function TimberDemo({
     pause();
     document.addEventListener("visibilitychange", pause);
     return () => document.removeEventListener("visibilitychange", pause);
-  }, [active, laborMode]);
+  }, [laborMode]);
   function placeBuilding(kind: BuildingKind) {
     setError(null);
     setPlacingKind(kind);
@@ -602,7 +559,10 @@ export function TimberDemo({
               식당에서 식사합니다.
             </p>
           </section>
-          <details>
+          <details
+            aria-label="배급 정책"
+            open={focusSection?.label === "배급 정책" || undefined}
+          >
             <summary>종별 배급</summary>
             <label>
               배급 방식{" "}
@@ -698,47 +658,7 @@ export function TimberDemo({
               <p>
                 <strong>거래 제안</strong> · {merchant[4]}
               </p>
-              {state.riskyMerchants?.includes(state.merchantItem!) && (
-                <p>
-                  지난 납품에 규격 미달품이 있었습니다. 이번에는 값을 낮추거나
-                  대량 계약의 물량을 더 받을 수 있습니다.
-                </p>
-              )}
-              {(["A", "B"] as const).map((option) => {
-                const o = visitorOffer(state, option);
-                return (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    key={option}
-                    onClick={() =>
-                      command({
-                        type: "visit-decision",
-                        item: state.merchantItem!,
-                        day: state.world.day,
-                        option,
-                      })
-                    }
-                  >
-                    {option} · {merchantCards[o.paymentIndex]?.[1]} {o.cost}개로{" "}
-                    {merchant[1]} {o.quantity}개 계약
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  command({
-                    type: "visit-decision",
-                    item: state.merchantItem!,
-                    day: state.world.day,
-                    option: "decline",
-                  })
-                }
-              >
-                이번 거래 거절
-              </button>
+              <MerchantOffers state={state} command={command} busy={busy} />
             </aside>
           )}
           {state.merchantRepair && (
@@ -846,9 +766,9 @@ export function TimberDemo({
                         .filter((r) => r.homeId === h.id && r.health !== "dead")
                         .map((r) => (
                           <li key={r.id}>
-                            주민{" "}
-                            {state.residents.findIndex((q) => q.id === r.id) +
-                              1}{" "}
+                            {residentName(
+                              state.residents.findIndex((q) => q.id === r.id),
+                            )}{" "}
                             · 고정 잠자리 {(r.homeSlot ?? 0) + 1}
                           </li>
                         ))}
@@ -1056,94 +976,97 @@ export function TimberDemo({
               ) : null;
             })}
           </section>
-          {state.phase === "select" ? (
-            <>
-              <div className="timber-offers">
-                {(["A", "B"] as const).map((id) => {
-                  const o = TIMBER_RULES.offers[id];
-                  return (
-                    <article
-                      key={id}
-                      className={`timber-offer${state.offer === id ? " selected" : ""}`}
-                    >
-                      <h3>
-                        제안 {id} ·{" "}
-                        {id === "A" ? "저렴한 자재" : "규격 적합 자재"}
-                      </h3>
-                      <p>
-                        철재{o.cost} ↔ 목재20 · 운송{o.travel}분
-                      </p>
-                      <p>
-                        {id === "A"
-                          ? "정상16 · 젖은4는 인력2명이 자동 보완"
-                          : "정상20 · 도착 후 전량 검수"}
-                      </p>
-                      <p>
-                        검수{TIMBER_RULES.inspectionMinutes}분
-                        {id === "A"
-                          ? ` · 보완${TIMBER_RULES.repairMinutes}분`
-                          : ""}
-                      </p>
-                      <button
-                        type="button"
-                        aria-pressed={state.offer === id}
-                        disabled={busy}
-                        onClick={() => command({ type: "choose", offer: id })}
+          <section aria-label="조달 계약">
+            {state.phase === "select" ? (
+              <>
+                <div className="timber-offers">
+                  {(["A", "B"] as const).map((id) => {
+                    const o = TIMBER_RULES.offers[id];
+                    return (
+                      <article
+                        key={id}
+                        className={`timber-offer${state.offer === id ? " selected" : ""}`}
                       >
-                        제안 {id} 선택
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                disabled={busy || !state.offer}
-                onClick={() => command({ type: "contract" })}
-              >
-                선택한 제안 계약
-              </button>
-            </>
-          ) : (
-            <>
-              <p>
-                {state.paused ? "일시정지" : "자동 업무 진행 중"} · 주민을 개별
-                선택할 필요가 없습니다.
-              </p>
-              <section className="timber-stock" aria-label="이번 계약 물량">
-                {(
-                  [
-                    ["cart", "수레 위"],
-                    ["waiting", "검사 대기"],
-                    ["quarantine", "격리"],
-                    ["available", "공동 입고분"],
-                    ["used", "공동 사용분"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <div key={key}>
-                    <span className="timber-stock-label">{label}</span>
-                    <strong
-                      className="timber-stock-value"
-                      data-testid={`timber-${key}`}
-                    >
-                      {state.stock[key]}
-                    </strong>
-                  </div>
-                ))}
-              </section>
-              <p>
-                도착지는 {warehouseDoor(state) ? "공동 저장소" : "임시 야적장"}
-                입니다. 합격 물자는 즉시 공동 재고에 더하며 건물마다 배분하지
-                않습니다.
-              </p>
-              {state.phase === "waiting-labor" ? (
-                <p role="status">
-                  젖은 목재를 보완할 유휴 일손2명이 필요합니다. 배치된 주민을
-                  강제로 빼오지 않습니다.
+                        <h3>
+                          제안 {id} ·{" "}
+                          {id === "A" ? "저렴한 자재" : "규격 적합 자재"}
+                        </h3>
+                        <p>
+                          철재{o.cost} ↔ 목재20 · 운송{o.travel}분
+                        </p>
+                        <p>
+                          {id === "A"
+                            ? "정상16 · 젖은4는 인력2명이 자동 보완"
+                            : "정상20 · 도착 후 전량 검수"}
+                        </p>
+                        <p>
+                          검수{TIMBER_RULES.inspectionMinutes}분
+                          {id === "A"
+                            ? ` · 보완${TIMBER_RULES.repairMinutes}분`
+                            : ""}
+                        </p>
+                        <button
+                          type="button"
+                          aria-pressed={state.offer === id}
+                          disabled={busy}
+                          onClick={() => command({ type: "choose", offer: id })}
+                        >
+                          제안 {id} 선택
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  disabled={busy || !state.offer}
+                  onClick={() => command({ type: "contract" })}
+                >
+                  선택한 제안 계약
+                </button>
+              </>
+            ) : (
+              <>
+                <p>
+                  {state.paused ? "일시정지" : "자동 업무 진행 중"} · 주민을
+                  개별 선택할 필요가 없습니다.
                 </p>
-              ) : null}
-            </>
-          )}
+                <section className="timber-stock" aria-label="이번 계약 물량">
+                  {(
+                    [
+                      ["cart", "수레 위"],
+                      ["waiting", "검사 대기"],
+                      ["quarantine", "격리"],
+                      ["available", "공동 입고분"],
+                      ["used", "공동 사용분"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <div key={key}>
+                      <span className="timber-stock-label">{label}</span>
+                      <strong
+                        className="timber-stock-value"
+                        data-testid={`timber-${key}`}
+                      >
+                        {state.stock[key]}
+                      </strong>
+                    </div>
+                  ))}
+                </section>
+                <p>
+                  도착지는{" "}
+                  {warehouseDoor(state) ? "공동 저장소" : "임시 야적장"}
+                  입니다. 합격 물자는 즉시 공동 재고에 더하며 건물마다 배분하지
+                  않습니다.
+                </p>
+                {state.phase === "waiting-labor" ? (
+                  <p role="status">
+                    젖은 목재를 보완할 유휴 일손2명이 필요합니다. 배치된 주민을
+                    강제로 빼오지 않습니다.
+                  </p>
+                ) : null}
+              </>
+            )}
+          </section>
           {state.settledAt !== null ? (
             <section className="timber-result" data-testid="timber-result">
               <h3>목재20 조달 완료</h3>
@@ -1322,9 +1245,9 @@ export function TimberDemo({
             <ul data-testid="resident-routines">
               {state.residents
                 .filter((r) => r.health !== "dead")
-                .map((r, i) => (
+                .map((r) => (
                   <li key={r.id}>
-                    {i + 1}번 주민
+                    {residentName(state.residents.indexOf(r))}
                     {r.workplaceId === "restaurant"
                       ? "(식당 직원)"
                       : r.workplaceId?.startsWith("logging")

@@ -13,12 +13,14 @@ let state = createVillageGame(),
 let initialized = false;
 const send = (m: TimberResponse) => self.postMessage(m);
 const publish = () => send({ type: "state", state });
-publish();
 self.onmessage = (event: MessageEvent<TimberRequest>) => {
   const m = event.data;
   try {
     if (m.type === "init") {
-      if (!initialized) state = createVillageGame();
+      if (!initialized)
+        state = m.resume
+          ? { ...parseTimberSave(m.resume).state, paused: true }
+          : createVillageGame();
       initialized = true;
     } else if (m.type === "exit") {
       state = { ...state, paused: true, remainder: 0 };

@@ -70,6 +70,7 @@ import {
 } from "./resident-routine.js";
 import { isRecord } from "./save.js";
 import type { SceneSnapshot } from "./scene.js";
+import { SCOUT_SITES } from "./scout-sites.js";
 import { storageRoom, warehouseDoor } from "./storage.js";
 import {
   createResearchStory,
@@ -199,6 +200,8 @@ export interface TimberState {
   readonly world: PlayState;
   readonly initialWood: number;
   readonly initialIron: number;
+  readonly chapter?: 2;
+  readonly scoutDepartures?: Record<string, number>;
   readonly yardDryAt?: number | undefined;
   readonly woodSpent: number;
   readonly logging: LoggingState;
@@ -285,6 +288,8 @@ export type TimberCommand =
     }
   | { type: "facility-staff"; id: string; count: number }
   | { type: "dispatch-food"; id: string; food: FoodId; rank?: 1 | 2 | 3 }
+  | { type: "begin-chapter-two" }
+  | { type: "scout-sites"; ids: string[]; recall?: boolean }
   | { type: "cold-weather"; cold: boolean }
   | {
       type: "queue-work";
@@ -1883,6 +1888,14 @@ export function parseTimberState(value: unknown): TimberState {
     num(value[key], 10_000_000_000);
   num(value.remainder, 999);
   num(value.buildingHealth, 100);
+  if (value.chapter !== undefined && value.chapter !== 2) fail("단계 오류");
+  if (value.scoutDepartures !== undefined) {
+    if (!isRecord(value.scoutDepartures)) fail("정찰 기록 오류");
+    for (const [id, start] of Object.entries(value.scoutDepartures)) {
+      if (!SCOUT_SITES.some((site) => site.id === id)) fail("정찰 거점 오류");
+      num(start);
+    }
+  }
   if (value.yardDryAt !== undefined) num(value.yardDryAt);
   num(value.reservedWood, 20);
   for (const key of ["startedAt", "due", "settledAt", "repairCompletedAt"])
@@ -2484,6 +2497,40 @@ export function commandTimber(
     case "set-overtime":
       n = setOvertime(s, command.target, command.enabled);
       break;
+    case "begin-chapter-two": {
+      const now = (s.world.day - 1) * 1440 + s.world.minute;
+      if (
+        !SCOUT_SITES.every(
+          (site) =>
+            now - (s.scoutDepartures?.[site.id] ?? Infinity) >= site.hours * 60,
+        )
+      )
+        fail("정찰 결과를 기다려 주세요.");
+      n = note(
+        { ...s, chapter: 2 },
+        "지도층 생존자가 귀환했습니다. 다섯 마을과의 교류를 회복하세요.",
+      );
+      break;
+    }
+    case "scout-sites": {
+      const departures = { ...s.scoutDepartures };
+      const now = (s.world.day - 1) * 1440 + s.world.minute;
+      for (const id of command.ids) {
+        const site = SCOUT_SITES.find((q) => q.id === id);
+        if (!site) fail("알 수 없는 정찰 거점");
+        const start = departures[id];
+        if (command.recall) {
+          if (start !== undefined && now - start < site.hours * 60)
+            delete departures[id];
+        } else if (start === undefined) departures[id] = now;
+      }
+      n = {
+        ...s,
+        scoutDepartures: departures,
+        paused: command.recall ? s.paused : false,
+      };
+      break;
+    }
     case "cold-weather":
       if (typeof command.cold !== "boolean") fail();
       n = { ...s, town: { ...s.town, cold: command.cold } };

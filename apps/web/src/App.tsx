@@ -8,15 +8,24 @@ import type {
 } from "@dynosty/game-core";
 import {
   AMOUNT_SCALE,
+  BUILDING_RULES,
   type BuildingKind,
   type HomePlacement,
   type LaborState,
   laborScene,
+  RESEARCH_CATALOG,
   TIMBER_RULES,
   type TimberState,
   timberScene,
 } from "@dynosty/game-core";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   CmdButton,
   CmdFace,
@@ -33,10 +42,12 @@ import {
   saveLocalExample,
 } from "./local-save.js";
 import { MediaPanel } from "./MediaPanel.js";
+import { MerchantOffers, merchantCards } from "./MerchantOffers.js";
 import { PlayPanel } from "./PlayPanel.js";
 import { PlaySavePanel } from "./PlaySavePanel.js";
 import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { QualityFlow } from "./QualityFlow.js";
+import { residentName } from "./resident-names.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SelectionPanel } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
@@ -58,6 +69,7 @@ import {
 } from "./site-targets.js";
 import { SCENE_SIGNS } from "./site-zones.js";
 import { TimberDemo } from "./TimberDemo.js";
+import { buildingCost, facilityReferences } from "./TownPanel.js";
 import { VideoPanel } from "./VideoPanel.js";
 import { CREW_BADGES, cartBadge } from "./visual-badges.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
@@ -103,10 +115,48 @@ export function App() {
   const savePanelId = useId();
   const toolsPanelId = useId();
   const scoutPanelId = useId();
-  // 정찰: 거점별 상태(출발한 게임 시각). 기획서 규칙이 게임 엔진에 들어오기 전까지 화면 쪽 시안
-  const [scouts, setScouts] = useState<
-    Record<string, { status: "going" | "found"; start: number }>
-  >({});
+  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [reports, setReports] = useState<string[]>([]);
+  const lastResearch = useRef<string[] | null>(null);
+  useEffect(() => {
+    if (!timberState) return;
+    const current = timberState.town.development.completed;
+    const previous = lastResearch.current;
+    if (previous && current.length > previous.length) {
+      const names = current
+        .filter((id) => !previous.includes(id))
+        .map((id) => RESEARCH_CATALOG.find((r) => r.id === id)?.name ?? id);
+      setReports((old) => [...old, ...names]);
+    } else if (previous && current.length < previous.length) setReports([]);
+    lastResearch.current = current;
+  }, [timberState]);
+  const [buildPage, setBuildPage] = useState(0);
+  const [placementHint, setPlacementHint] = useState("");
+  useEffect(() => {
+    if (
+      !consoleOpen ||
+      villageSection?.label !== "건설과 식량 수급" ||
+      placementHint
+    )
+      return;
+    function changePage(event: KeyboardEvent) {
+      if (
+        !(event.key === "ArrowLeft" || event.key === "ArrowRight") ||
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLSelectElement
+      )
+        return;
+      event.preventDefault();
+      setBuildPage((page) =>
+        Math.min(
+          Math.ceil(Object.keys(BUILDING_RULES).length / 5) - 1,
+          Math.max(0, page + (event.key === "ArrowRight" ? 1 : -1)),
+        ),
+      );
+    }
+    window.addEventListener("keydown", changePage);
+    return () => window.removeEventListener("keydown", changePage);
+  }, [consoleOpen, villageSection, placementHint]);
   const [scoutOpen, setScoutOpen] = useState<string | null>(null);
   const pinRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const saveMenuRef = useRef<HTMLButtonElement>(null);
@@ -132,7 +182,7 @@ export function App() {
   useEffect(() => {
     if (sceneStatus === "준비 완료")
       sceneRef.current?.setSelectionEnabled(true);
-  }, [timberOpen, laborOpen, toolsOpen, sceneStatus]);
+  }, [sceneStatus]);
   const [assetWarning, setAssetWarning] = useState<string | null>(null);
   const [workerError, setWorkerError] = useState<string | null>(null);
 
@@ -160,7 +210,7 @@ export function App() {
             setPlaySaveStatus("게임을 저장했습니다.");
           } else if (message.type === "play-loaded") {
             setPlaySaveStatus("게임을 불러왔습니다. 일시정지 상태입니다.");
-            setScouts({});
+
             sceneRef.current?.resetScouting();
           } else setPlaySaveFailure(message.message);
         } catch (error) {
@@ -306,7 +356,7 @@ export function App() {
     sceneRef.current.update(display);
     sceneRef.current.updateTimber(timberState);
     setAppliedSnapshot(display);
-  }, [timberOpen, timberState, sceneStatus, laborOpen]);
+  }, [timberState, sceneStatus, laborOpen]);
   useEffect(() => {
     if (
       !timberOpen ||
@@ -398,7 +448,6 @@ export function App() {
   function commandPlay(command: PlayCommand) {
     if (playSaveBusy) return;
     if (command.type === "new-game") {
-      setScouts({});
       sceneRef.current?.resetScouting();
     }
     setExampleClock(false);
@@ -458,6 +507,20 @@ export function App() {
   const gameMinutes = displayedWorld
     ? (displayedWorld.day - 1) * 1440 + displayedWorld.minute
     : 0;
+  const departures = timberState?.scoutDepartures;
+  const scouts = useMemo(() => {
+    const scouts: Record<string, { status: "found" | "going"; start: number }> =
+      {};
+    for (const site of SCOUT_SITES) {
+      const start = departures?.[site.id];
+      if (start !== undefined)
+        scouts[site.id] = {
+          start,
+          status: gameMinutes - start >= site.hours * 60 ? "found" : "going",
+        };
+    }
+    return scouts;
+  }, [departures, gameMinutes]);
   const scoutSite = SCOUT_SITES.find((site) => site.id === scoutOpen) ?? null;
   const foundCount = SCOUT_SITES.filter(
     (site) => scouts[site.id]?.status === "found",
@@ -484,23 +547,16 @@ export function App() {
     if (sceneStatus === "준비 완료" && playMinute !== undefined)
       sceneRef.current?.setClock(playMinute);
   }, [playMinute, sceneStatus]);
+  const foundSites = SCOUT_SITES.filter(
+    (site) => scouts[site.id]?.status === "found",
+  )
+    .map((site) => site.id)
+    .join(",");
   useEffect(() => {
-    if (!playState) return;
-    const done = SCOUT_SITES.filter((site) => {
-      const run = scouts[site.id];
-      return (
-        run?.status === "going" && gameMinutes - run.start >= site.hours * 60
-      );
-    });
-    if (!done.length) return;
-    setScouts((prev) => {
-      const next = { ...prev };
-      for (const site of done)
-        next[site.id] = { status: "found", start: prev[site.id]?.start ?? 0 };
-      return next;
-    });
-    for (const site of done) sceneRef.current?.revealSite(site.id);
-  }, [gameMinutes, scouts, playState]);
+    if (sceneStatus === "준비 완료")
+      for (const id of foundSites.split(",").filter(Boolean))
+        sceneRef.current?.revealSite(id);
+  }, [foundSites, sceneStatus]);
   // 정찰대를 실제로 걷게: 진행 중 정찰 목록과 게임 시각을 장면에 넘김
   useEffect(() => {
     if (sceneStatus !== "준비 완료") return;
@@ -630,7 +686,15 @@ export function App() {
       </>
     );
   }
+  const visitor =
+    timberState?.merchantItem === undefined
+      ? null
+      : merchantCards[timberState.merchantItem];
+  const daylight = (playMinute ?? 540) >= 360 && (playMinute ?? 540) < 1080;
+  const showTrade =
+    !!visitor && consoleOpen && villageSection?.label === "교역소 방문";
   function openVillageSection(section: string) {
+    setConsoleOpen(true);
     if (!timberOpen) openTimber();
     setVillageSection({ label: section });
   }
@@ -655,7 +719,7 @@ export function App() {
   const openVillageRef = useRef(openVillageSection);
   openVillageRef.current = openVillageSection;
   const openTimberRef = useRef(openTimber);
-  openTimberRef.current = openTimber;
+  openTimberRef.current = () => openVillageSection("교역소 방문");
   const closeRef = useRef(closePopups);
   closeRef.current = closePopups;
   const saveOpenRef = useRef(saveOpen);
@@ -681,6 +745,7 @@ export function App() {
       if (key === "e") openTimberRef.current();
       if (key === "b") openVillageRef.current("건설과 식량 수급");
       if (key === "u") openVillageRef.current("거주지");
+      if (key === "p") openVillageRef.current("배급 정책");
       if (key === "t") openVillageRef.current("연구와 교역망");
       if (key === "j") {
         if (timberOpenRef.current) {
@@ -709,7 +774,10 @@ export function App() {
     timberOpen && laborOpen && isSiteId(selectedId) ? selectedId : null;
 
   return (
-    <main className={`play-shell${timberOpen ? " is-procurement" : ""}`}>
+    <main
+      data-section={saveOpen || toolsOpen ? undefined : villageSection?.label}
+      className={`play-shell${timberOpen ? " is-procurement" : ""}`}
+    >
       <header className="play-header">
         <TopFrame />
         <div className="play-brand">
@@ -723,7 +791,11 @@ export function App() {
         <div className="g-quest">
           <img src="/ui/cmd/map.png" alt="" />
           <div className="g-quest__body">
-            <span>1단계 목표 · 정찰</span>
+            <span>
+              {timberState?.chapter === 2
+                ? "2단계 · 끊어진 길을 잇다"
+                : "1단계 목표 · 정찰"}
+            </span>
             <span className="g-pips" aria-hidden="true">
               {SCOUT_SITES.map((site) => (
                 <i
@@ -740,9 +812,39 @@ export function App() {
             </span>
           </div>
           <b>
-            {foundCount} / {SCOUT_GOAL}
+            {timberState?.chapter === 2
+              ? "다섯 마을과 교류 회복"
+              : `${foundCount} / ${SCOUT_GOAL}`}
           </b>
         </div>
+        {foundCount === 5 && timberState?.chapter !== 2 && (
+          <button
+            type="button"
+            className="scout-all"
+            onClick={() =>
+              villageCommand.current?.({ type: "begin-chapter-two" })
+            }
+          >
+            생존자 귀환 · 2단계 시작 · 끊어진 길을 잇다
+          </button>
+        )}
+        {foundCount < 5 && (
+          <small>다섯 곳의 정찰을 마치고 지도층 생존자 귀환</small>
+        )}
+        {Object.keys(scouts).length < 5 && (
+          <button
+            type="button"
+            className="scout-all"
+            onClick={() =>
+              villageCommand.current?.({
+                type: "scout-sites",
+                ids: SCOUT_SITES.map((s) => s.id),
+              })
+            }
+          >
+            남은 거점 모두 정찰
+          </button>
+        )}
         {/* 발견한 거점: 교역 가능 */}
         {SCOUT_SITES.filter((site) => scouts[site.id]?.status === "found").map(
           (site) => (
@@ -791,11 +893,11 @@ export function App() {
           const st = scouts[site.id]?.status ?? "unknown";
           return (
             <button
+              type="button"
               key={site.id}
               ref={(el) => {
                 pinRefs.current[site.id] = el;
               }}
-              type="button"
               className={`g-pin is-${st}`}
               style={{ left: -9999, top: -9999 }}
               onClick={() => openOnly(() => setScoutOpen(site.id))}
@@ -834,7 +936,6 @@ export function App() {
           busy={playSaveBusy}
           onCommand={(command) => {
             if (command.type === "new-game") {
-              setScouts({});
               sceneRef.current?.resetScouting();
               villageCommand.current?.({ type: "restart" });
             } else if (command.type === "pause")
@@ -1110,13 +1211,10 @@ export function App() {
                       type="button"
                       disabled={!playState}
                       onClick={() => {
-                        setScouts((prev) => ({
-                          ...prev,
-                          [scoutSite.id]: {
-                            status: "going",
-                            start: gameMinutes,
-                          },
-                        }));
+                        villageCommand.current?.({
+                          type: "scout-sites",
+                          ids: [scoutSite.id],
+                        });
                         setScoutOpen(null);
                       }}
                     >
@@ -1128,10 +1226,10 @@ export function App() {
                       type="button"
                       className="quiet-button"
                       onClick={() =>
-                        setScouts((prev) => {
-                          const next = { ...prev };
-                          delete next[scoutSite.id];
-                          return next;
+                        villageCommand.current?.({
+                          type: "scout-sites",
+                          ids: [scoutSite.id],
+                          recall: true,
                         })
                       }
                     >
@@ -1140,8 +1238,8 @@ export function App() {
                   ) : null}
                 </div>
                 <p className="hint">
-                  정찰 시안은 저장되지 않으며 인원·식량 재고에 반영하지
-                  않습니다. 게임 시간이 흘러야 돌아옵니다.
+                  정찰대는 게임 시간이 흐르면 돌아옵니다. 파견 기록은 마을과
+                  함께 자동 저장됩니다.
                 </p>
               </section>
             ) : null}
@@ -1282,16 +1380,68 @@ export function App() {
       {hasPanels && !timberOpen ? (
         <div className="g-backdrop" aria-hidden="true" onClick={closePopups} />
       ) : null}
-      <FpsBadge />
-      <section className="g-console" aria-label="명령 콘솔">
-        <div
-          className="g-scout-faces"
-          role="group"
-          aria-label="파견 중인 정찰대"
+      <div className="g-console__map">
+        <button
+          type="button"
+          className="g-minimap"
+          aria-label="지도: 누른 곳으로 시점 이동"
+          onClick={(event) => {
+            const r = event.currentTarget.getBoundingClientRect();
+            const x = ((event.clientX - r.left) / r.width - 0.5) * MAP_SPAN;
+            const z = (0.5 - (event.clientY - r.top) / r.height) * MAP_SPAN;
+            sceneRef.current?.panTo(x, z);
+          }}
         >
-          {SCOUT_SITES.filter(
-            (site) => scouts[site.id]?.status === "going",
-          ).map((site) => (
+          {minimap ? <img src={minimap} alt="" /> : null}
+          {cameraInfo ? (
+            <span
+              className="g-minimap__view"
+              style={{
+                left: `${(cameraInfo.x / MAP_SPAN + 0.5) * 100}%`,
+                top: `${(0.5 - cameraInfo.z / MAP_SPAN) * 100}%`,
+                transform: `translate(-50%, -50%) rotate(${cameraInfo.heading}rad)`,
+              }}
+            />
+          ) : null}
+        </button>
+        <button
+          type="button"
+          className="g-home"
+          title="가운데로 돌아가기"
+          aria-label="시점을 가운데로"
+          onClick={() => sceneRef.current?.resetCamera()}
+        >
+          ⌂
+        </button>
+        <button
+          ref={toolsMenuRef}
+          type="button"
+          className="g-dev"
+          aria-expanded={toolsOpen}
+          aria-controls={toolsPanelId}
+          onClick={() => toggleAuxiliary("tools")}
+        >
+          개발 도구
+        </button>
+      </div>
+      <FpsBadge />
+      {reports.length > 0 && !visitor && (
+        <button
+          type="button"
+          className="guide-report"
+          onClick={() => setReports((old) => old.slice(1))}
+        >
+          <img alt="" src="/ui/cmd/research.png" />
+          <span>
+            영실 · 연구 완료
+            <small>고리님, ‘{reports[0]}’ 연구를 마쳤습니다.</small>
+          </span>{" "}
+          ✓
+        </button>
+      )}
+      <section className="g-scout-faces" aria-label="파견 중인 정찰대">
+        {SCOUT_SITES.filter((site) => scouts[site.id]?.status === "going").map(
+          (site) => (
             <button
               key={site.id}
               type="button"
@@ -1300,55 +1450,136 @@ export function App() {
             >
               {scoutFace(site)}
             </button>
-          ))}
-        </div>
+          ),
+        )}
+      </section>
 
+      <button
+        type="button"
+        className="guide-toggle"
+        hidden={reports.length > 0 && !visitor}
+        aria-label={
+          consoleOpen ? "명령 접기" : visitor ? "거래 제안 열기" : "명령 열기"
+        }
+        aria-expanded={consoleOpen}
+        onClick={() => {
+          if (visitor && !showTrade) {
+            openVillageSection("교역소 방문");
+            return;
+          }
+          setConsoleOpen(!consoleOpen);
+          if (consoleOpen) {
+            closePopups();
+            cancelHomePlacement();
+            setPlacementHint("");
+          }
+        }}
+      >
+        <img
+          alt=""
+          src={
+            visitor
+              ? "/art/merchants/" + visitor[0] + ".png"
+              : `/art/advisers/${daylight ? "nareumi" : "dali"}/neutral.png`
+          }
+        />
+        <span>
+          {visitor?.[2] ?? (daylight ? "나르미" : "달이")}
+          <small>
+            {visitor
+              ? showTrade
+                ? visitor[4]
+                : visitor[3]
+              : !daylight
+                ? foundCount === 5
+                  ? "고리님, 정찰대가 모두 돌아왔어요. 오늘 밤은 둥지에 빈자리가 있는지 살펴봐요."
+                  : Object.keys(scouts).length > foundCount
+                    ? "아직 마을 밖에 있는 이들이 있어요. 정찰대 얼굴에 손을 올리면 남은 길을 알 수 있어요."
+                    : "등불이 하나둘 켜지네요. 주민 명단을 펼쳐 보세요. 오늘 잘 곳을 찾은 이들을 짚어 드릴게요."
+                : foundCount === 5
+                  ? timberState?.chapter === 2
+                    ? "고리님, 다섯 길이 열렸어요. 이웃이 내놓은 물목을 우리 곳간과 견주어 볼까요?"
+                    : "생존자들이 돌아왔어요. 의뢰에서 2단계를 시작하세요."
+                  : Object.keys(scouts).length
+                    ? "정찰대 얼굴에 커서를 대면 귀환 시간을 볼 수 있어요."
+                    : "지도에서 미탐색 거점을 눌러 보세요."}
+          </small>
+        </span>
+        <b aria-hidden="true">
+          {consoleOpen && (!visitor || showTrade) ? "‹" : "›"}
+        </b>
+      </button>
+      <section
+        className={`g-console ${consoleOpen ? "" : "console-folded"}`}
+        aria-label="명령 콘솔"
+      >
         <ConsoleFrame />
-        <div className="g-console__map">
-          <button
-            type="button"
-            className="g-minimap"
-            aria-label="지도: 누른 곳으로 시점 이동"
-            onClick={(event) => {
-              const r = event.currentTarget.getBoundingClientRect();
-              const x = ((event.clientX - r.left) / r.width - 0.5) * MAP_SPAN;
-              const z = (0.5 - (event.clientY - r.top) / r.height) * MAP_SPAN;
-              sceneRef.current?.panTo(x, z);
-            }}
-          >
-            {minimap ? <img src={minimap} alt="" /> : null}
-            {cameraInfo ? (
-              <span
-                className="g-minimap__view"
-                style={{
-                  left: `${(cameraInfo.x / MAP_SPAN + 0.5) * 100}%`,
-                  top: `${(0.5 - cameraInfo.z / MAP_SPAN) * 100}%`,
-                  transform: `translate(-50%, -50%) rotate(${cameraInfo.heading}rad)`,
-                }}
-              />
-            ) : null}
-          </button>
-          <button
-            type="button"
-            className="g-home"
-            title="가운데로 돌아가기"
-            aria-label="시점을 가운데로"
-            onClick={() => sceneRef.current?.resetCamera()}
-          >
-            ⌂
-          </button>
-          <button
-            ref={toolsMenuRef}
-            type="button"
-            className="g-dev"
-            aria-expanded={toolsOpen}
-            aria-controls={toolsPanelId}
-            onClick={() => toggleAuxiliary("tools")}
-          >
-            개발 도구
-          </button>
-        </div>
         <div className="g-console__info">
+          {showTrade && timberState ? (
+            <section className="trade-deck" aria-label="상인 계약 선택">
+              <MerchantOffers
+                state={timberState}
+                command={(cmd) => villageCommand.current?.(cmd)}
+              />
+            </section>
+          ) : timberOpen && villageSection?.label === "건설과 식량 수급" ? (
+            <section className="building-shelf" aria-label="건물 목록">
+              <button
+                type="button"
+                aria-label="이전 건물"
+                disabled={!buildPage}
+                onClick={() => setBuildPage(buildPage - 1)}
+              >
+                ←
+              </button>
+              {(Object.keys(BUILDING_RULES) as BuildingKind[])
+                .slice(buildPage * 5, buildPage * 5 + 5)
+                .map((kind) => (
+                  <button
+                    type="button"
+                    key={kind}
+                    onClick={() =>
+                      beginHomePlacement(
+                        (pose) => {
+                          villageCommand.current?.({
+                            type: "plan-building",
+                            kind,
+                            ...pose,
+                          });
+                          cancelHomePlacement();
+                          setPlacementHint("");
+                        },
+                        (message) => setPlacementHint(message),
+                        kind,
+                      )
+                    }
+                  >
+                    <img
+                      src={`/art/facilities/${facilityReferences[kind]}-levels-v1.png`}
+                      alt=""
+                    />
+                    <b>{BUILDING_RULES[kind].name}</b>
+                    <small>{buildingCost(kind)}</small>
+                  </button>
+                ))}
+              <button
+                type="button"
+                aria-label="다음 건물"
+                disabled={buildPage === 2}
+                onClick={() => setBuildPage(buildPage + 1)}
+              >
+                →
+              </button>
+              <button
+                type="button"
+                className="building-management"
+                onClick={() => openVillageSection("완공 시설")}
+              >
+                시설 운영
+              </button>
+              {placementHint && <output>{placementHint}</output>}
+            </section>
+          ) : null}
           {villageInfo ? (
             <section
               className="g-idle selection-info"
@@ -1361,6 +1592,15 @@ export function App() {
           ) : selectedEntity ? (
             <SelectionPanel
               entity={selectedEntity}
+              residentName={
+                selectedEntity.kind === "resident" && timberState
+                  ? residentName(
+                      timberState.residents.findIndex(
+                        (r) => r.id === selectedEntity.id,
+                      ),
+                    )
+                  : undefined
+              }
               onClear={clearSelection}
               notices={
                 selectedEntity.id === "notice-board"
@@ -1425,14 +1665,19 @@ export function App() {
             disabled={!timberReady}
             onClick={() => openVillageSection("연구와 교역망")}
           />
-          <CmdButton icon="policy" label="정책" hotkey="P" disabled />
+          <CmdButton
+            icon="policy"
+            label="정책"
+            hotkey="P"
+            onClick={() => openVillageSection("배급 정책")}
+          />
           <CmdButton icon="map" label="지도" hotkey="M" disabled />
           <CmdButton
             icon="economy"
             label="조달"
             hotkey="E"
-            disabled={!timberReady || timberOpen}
-            onClick={openTimber}
+            disabled={!timberReady}
+            onClick={() => openVillageSection("교역소 방문")}
           />
           <CmdButton icon="ondol" label="온돌" hotkey="H" disabled />
           <CmdButton

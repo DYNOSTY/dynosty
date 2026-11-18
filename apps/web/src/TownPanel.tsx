@@ -26,7 +26,7 @@ import { BuildingUpgrade } from "./BuildingUpgrade.js";
 import { DevelopmentPanel, OvertimeControl } from "./DevelopmentPanel.js";
 import { HospitalPanel } from "./HospitalPanel.js";
 
-const facilityReferences: Record<BuildingKind, string> = {
+export const facilityReferences: Record<BuildingKind, string> = {
   home: "nest-dining",
   restaurant: "nest-dining",
   workshop: "research-hospital",

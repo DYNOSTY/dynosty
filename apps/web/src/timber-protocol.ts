@@ -5,7 +5,7 @@ import type {
   TimberState,
 } from "@dynosty/game-core";
 export type TimberRequest =
-  | { type: "init"; world: PlayState }
+  | { type: "init"; world: PlayState; resume?: unknown }
   | { type: "exit" }
   | { type: "command"; id: string; command: TimberCommand }
   | { type: "save"; requestId: number }

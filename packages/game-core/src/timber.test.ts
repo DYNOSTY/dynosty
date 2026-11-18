@@ -354,3 +354,23 @@ it("야적장의 젖은 목재는 건조 후 돌아오고 저장소에서는 젖
   expect(covered.yardDryAt).toBeUndefined();
   expect(covered.world.resources.RES_WOOD).toBe(start.world.resources.RES_WOOD);
 });
+
+it("다섯 정찰의 귀환 전에는 2단계를 열 수 없고 귀환과 단계는 저장에 남는다", () => {
+  const initial = createTimberState();
+  const sent = commandTimber(
+    initial,
+    { type: "scout-sites", ids: ["reed", "pine", "forge", "hunt", "record"] },
+    "scouts",
+  );
+  expect(() =>
+    commandTimber(sent, { type: "begin-chapter-two" }, "early"),
+  ).toThrow();
+  const loaded = parseTimberSave(createTimberSave(sent)).state;
+  expect(loaded.scoutDepartures).toEqual(sent.scoutDepartures);
+  const later = {
+    ...loaded,
+    world: { ...loaded.world, day: loaded.world.day + 3 },
+  };
+  const next = commandTimber(later, { type: "begin-chapter-two" }, "return");
+  expect(parseTimberSave(createTimberSave(next)).state.chapter).toBe(2);
+});

@@ -2,17 +2,23 @@ import type { SceneEntity } from "@dynosty/game-core";
 
 type Props = {
   entity: SceneEntity | null;
+  residentName?: string | undefined;
   notices?: string[] | undefined;
   onClear: () => void;
 };
 
-export function SelectionPanel({ entity, notices, onClear }: Props) {
+export function SelectionPanel({
+  entity,
+  notices,
+  residentName,
+  onClear,
+}: Props) {
   if (!entity) return null;
   const name = notices
     ? "복홀 방 게시판"
     : entity.kind === "building"
       ? "건물 예제 · 온돌 둥지"
-      : "주민 예제 · 트리케라톱스";
+      : (residentName ?? "마을 주민");
   return (
     <section className="workspace-panel selection-info" aria-label="선택 정보">
       <div aria-live="polite" aria-atomic="true">

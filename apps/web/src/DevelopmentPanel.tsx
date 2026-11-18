@@ -77,6 +77,26 @@ export function DevelopmentPanel({
     story: "후반 이야기",
     legacy: "기존 자료 · 연결 전",
   };
+  const motifs: Record<string, string> = {
+    TECH_SEED: "싹",
+    TECH_INSPECTION: "검",
+    TECH_TRAIL: "길",
+    TECH_INSULATION: "솜",
+    TECH_PUMP: "샘",
+    TECH_CULTURE: "밭",
+    TECH_SMOKE: "불",
+    TECH_WATCH: "망",
+    TECH_ROUTES: "로",
+    TECH_SHELTER: "집",
+    TECH_REPAIR: "틀",
+    TECH_BEHAVIOR: "발",
+    TECH_MECHA: "뼈",
+    TECH_AQUACULTURE: "못",
+    TECH_FEDERATION: "맹",
+    TECH_FORT: "성",
+    TECH_FLIGHT: "날",
+    TECH_ELECTRICAL: "전",
+  };
   const dead = state.world.citizens.filter(
     (c) =>
       !c.alive &&
@@ -94,6 +114,42 @@ export function DevelopmentPanel({
         정찰 연구 배율×{scoutSpeedRate(state)} · 현재 정찰대에 적용되는
         속도입니다. 교역 이동 시간은 별도로 계산합니다.
       </p>
+      <section className="research-icons" aria-label="연구 도감">
+        {visibleResearch.map((entry) => {
+          const resource = entry.target.startsWith("RES_") ? entry.target : "";
+          const img =
+            resource && !["RES_STONE", "RES_IRON_ORE"].includes(resource)
+              ? "/ui/resources-3d/" + resource + ".png"
+              : "/ui/cmd/" +
+                ({
+                  building: "build",
+                  collection: "economy",
+                  movement: "map",
+                  storage: "records",
+                  story: "research",
+                  legacy: "research",
+                }[entry.category as keyof typeof categories] ?? "research") +
+                ".png";
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              aria-pressed={entry.id === selected}
+              disabled={d.completed.includes(entry.id)}
+              onClick={() => setTech(entry.id)}
+            >
+              <img src={img} alt="" />
+              <b aria-hidden="true">
+                {motifs[entry.id] ?? entry.name.slice(0, 2)}
+              </b>
+              <span>{entry.name}</span>
+              <small>
+                {d.completed.includes(entry.id) ? "완료" : entry.tier + "단계"}
+              </small>
+            </button>
+          );
+        })}
+      </section>
       <label>
         연구 기술{" "}
         <select

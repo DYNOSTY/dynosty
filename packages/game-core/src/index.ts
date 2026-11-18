@@ -139,6 +139,7 @@ export {
   residentPath,
 } from "./resident-path.js";
 export * from "./resident-routine.js";
+export * from "./scout-sites.js";
 export * from "./storage.js";
 export * from "./story-research.js";
 export * from "./timber.js";

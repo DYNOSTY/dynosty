@@ -3854,3 +3854,258 @@ body,
 .g-console__info {
   grid-template-columns: minmax(0, 1fr) auto;
 }
+
+.play-shell > .g-console__map {
+  position: fixed;
+  top: 64px;
+  left: 12px;
+  width: 98px;
+  height: 98px;
+  z-index: 5;
+  background: #ead6af;
+  border: 2px solid #62432c;
+  border-radius: 8px;
+}
+.play-shell > .g-console__map .g-minimap {
+  width: 100%;
+  height: 100%;
+}
+.guide-toggle,
+.guide-report {
+  position: fixed;
+  bottom: 8px;
+  left: 10px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 260px;
+  padding: 4px 10px 4px 4px;
+  color: #362717;
+  background: #f3e2c4;
+  border: 2px solid #65472d;
+  border-radius: 8px;
+  text-align: left;
+}
+.guide-toggle img,
+.guide-report img {
+  width: 48px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.guide-toggle small,
+.guide-report small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.guide-toggle[hidden] {
+  display: none;
+}
+.play-shell:has(.console-folded) .g-console {
+  transform: translateY(110%);
+  visibility: hidden;
+}
+.play-shell .g-scout-faces {
+  position: fixed;
+  bottom: 185px;
+  right: 12px;
+  visibility: visible;
+}
+.guide-toggle:has(+ .g-console:not(.console-folded)),
+.guide-report:has(~ .g-console:not(.console-folded)) {
+  bottom: 170px;
+}
+.g-console__info:has(.building-shelf) > :not(.building-shelf) {
+  display: none;
+}
+.g-console__info:has(.building-shelf) {
+  display: block;
+}
+.building-shelf {
+  display: grid;
+  grid-template-columns: auto repeat(5, minmax(0, 1fr)) auto;
+  align-items: stretch;
+  gap: 4px;
+  height: 100%;
+  position: relative;
+}
+.building-shelf button,
+.research-icons button {
+  color: #302318;
+  background: #f3e3c7;
+  border: 1px solid #947953;
+  padding: 3px;
+  min-width: 0;
+}
+.building-shelf img {
+  display: block;
+  width: 100%;
+  height: 56px;
+  object-fit: cover;
+}
+.building-shelf small,
+.building-shelf b {
+  display: block;
+}
+.building-shelf output {
+  position: absolute;
+  bottom: 100%;
+  background: #302318;
+  color: white;
+  padding: 4px;
+}
+.research-icons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.research-icons img {
+  width: 30px;
+  height: 30px;
+  display: block;
+  margin: auto;
+}
+.research-icons small {
+  display: block;
+}
+.research-icons button[aria-pressed="true"] {
+  border: 2px solid #764c23;
+}
+.play-shell[data-section="건설과 식량 수급"]
+  .workspace-tools:not(:has([aria-label="개발 도구 패널"]:not([hidden]))) {
+  display: none;
+}
+.play-shell:is(
+    [data-section="거주지"],
+    [data-section="연구와 교역망"],
+    [data-section="배급 정책"]
+  )
+  .timber-demo
+  > :not(.timber-heading) {
+  display: none;
+}
+.play-shell[data-section="거주지"] .timber-demo > [aria-label="거주지"],
+.play-shell[data-section="배급 정책"] .timber-demo > [aria-label="배급 정책"],
+.play-shell[data-section="연구와 교역망"]
+  .timber-demo
+  > [aria-label="건설과 식량 수급"] {
+  display: block;
+}
+.play-shell[data-section="연구와 교역망"]
+  [aria-label="건설과 식량 수급"]
+  > :not([aria-label="연구와 교역망"]) {
+  display: none;
+}
+.scout-all {
+  background: #f8e9ca;
+  color: #362717;
+  border: 1px solid #785739;
+  padding: 5px 9px;
+}
+@media (min-width: 761px) {
+  .play-shell .g-console__info {
+    grid-column: 1 / 3;
+    padding-left: 20px;
+  }
+  .play-shell:has(.console-folded) .play-scene {
+    bottom: 0;
+  }
+  .play-shell > .g-console__map .g-home {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+}
+
+.building-shelf .building-management {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  padding: 4px 8px;
+}
+
+.play-shell > .g-scout-faces {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 4px;
+  z-index: 6;
+}
+.play-shell:has(.g-console:not(.console-folded)) > .g-scout-faces {
+  bottom: 180px;
+}
+@media (max-width: 760px) {
+  .play-shell .g-quests > .scout-all,
+  .play-shell .g-quests > small,
+  .play-shell .g-quests > .g-quest:first-of-type {
+    display: block;
+  }
+  .play-shell > .g-console__map {
+    position: relative;
+    top: auto;
+    left: auto;
+  }
+  .building-shelf {
+    overflow-x: auto;
+    grid-template-columns: auto repeat(5, minmax(64px, 1fr)) auto;
+  }
+}
+
+.play-shell[data-section="교역소 방문"]
+  .timber-demo
+  > :not(.timber-heading):not([aria-label="교역소 방문"]):not(
+    [aria-label="조달 계약"]
+  ):not(.timber-status):not([role="alert"]) {
+  display: none;
+}
+.play-shell:has(.building-shelf) .g-console__info {
+  overflow: visible;
+}
+
+.research-icons button {
+  position: relative;
+}
+.research-icons button > b {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  border-radius: 2px;
+  background: #7d3929;
+  color: #fff4d9;
+  padding: 2px 3px;
+  font-size: 10px;
+}
+
+.guide-toggle,
+.guide-report {
+  max-width: min(430px, calc(100vw - 24px));
+  padding: 6px 12px 6px 6px;
+  gap: 10px;
+}
+.guide-toggle img,
+.guide-report img {
+  width: 70px;
+  height: 78px;
+  flex-shrink: 0;
+}
+.guide-toggle small,
+.guide-report small {
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: normal;
+}
+.guide-toggle b {
+  font-size: 24px;
+}
+.trade-deck {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.play-shell:has(.trade-deck) .workspace-tools {
+  display: none;
+}

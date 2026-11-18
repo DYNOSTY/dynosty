@@ -7,6 +7,7 @@ import {
   type TimberState,
 } from "@dynosty/game-core";
 import { useEffect, useRef } from "react";
+import { residentName } from "./resident-names.js";
 
 const injuryNames = { minor: "경상", major: "부상", critical: "중상" };
 export function HospitalPanel({
@@ -79,8 +80,9 @@ export function HospitalPanel({
                   return (
                     <li key={p.resident}>
                       주민{" "}
-                      {state.residents.findIndex((r) => r.id === p.resident) +
-                        1}{" "}
+                      {residentName(
+                        state.residents.findIndex((r) => r.id === p.resident),
+                      )}{" "}
                       · {species} · {injuryNames[p.severity]} ·{" "}
                       {atHospital(state, r) ? "입원 중" : "병원으로 이동 중"}
                       <progress
