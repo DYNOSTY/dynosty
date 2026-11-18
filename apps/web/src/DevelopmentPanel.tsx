@@ -49,8 +49,18 @@ export function DevelopmentPanel({
 }) {
   const [tech, setTech] = useState("TECH_TRAIL"),
     d = state.town.development;
-  const r = RESEARCH_CATALOG.find((r) => r.id === tech),
-    issue = researchIssue(state, tech);
+  const visibleResearch = RESEARCH_CATALOG.filter(
+    (entry) =>
+      entry.category !== "story" ||
+      showDevTools ||
+      d.story.rebellion ||
+      d.completed.includes(entry.id),
+  );
+  const selected = visibleResearch.some((entry) => entry.id === tech)
+    ? tech
+    : "TECH_TRAIL";
+  const r = visibleResearch.find((entry) => entry.id === selected),
+    issue = researchIssue(state, selected);
   const categories = {
     building: "건물별 개량",
     collection: "자원별 채집",
@@ -73,33 +83,36 @@ export function DevelopmentPanel({
         누적3회에3단계로 넓어집니다.
       </p>
       <p>
-        정찰 연구 배율×{scoutSpeedRate(state)} · 1.5→2배로 대체, 날틀은
-        기본10배. 나르미×1.25는 날틀 이전에만 적용합니다. 교역 이동에는 적용하지
-        않습니다.
+        정찰 연구 배율×{scoutSpeedRate(state)} · 현재 정찰대에 적용되는
+        속도입니다. 교역 이동 시간은 별도로 계산합니다.
       </p>
       <label>
         연구 기술{" "}
         <select
           aria-label="연구 기술"
-          value={tech}
+          value={selected}
           onChange={(e) => setTech(e.target.value)}
         >
-          {Object.entries(categories).map(([category, label]) => (
-            <optgroup key={category} label={label}>
-              {RESEARCH_CATALOG.filter((r) => r.category === category).map(
-                (r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                    {d.completed.includes(r.id)
-                      ? " · 완료"
-                      : !RESEARCH_CONNECTED.includes(r.id)
-                        ? " · 연결 전"
-                        : ""}
-                  </option>
-                ),
-              )}
-            </optgroup>
-          ))}
+          {Object.entries(categories)
+            .filter(([key]) =>
+              visibleResearch.some((entry) => entry.category === key),
+            )
+            .map(([category, label]) => (
+              <optgroup key={category} label={label}>
+                {visibleResearch
+                  .filter((r) => r.category === category)
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                      {d.completed.includes(r.id)
+                        ? " · 완료"
+                        : !RESEARCH_CONNECTED.includes(r.id)
+                          ? " · 연결 전"
+                          : ""}
+                    </option>
+                  ))}
+              </optgroup>
+            ))}
         </select>
       </label>
       <p>
@@ -117,7 +130,7 @@ export function DevelopmentPanel({
       <button
         type="button"
         disabled={!!issue}
-        onClick={() => command({ type: "start-research", tech })}
+        onClick={() => command({ type: "start-research", tech: selected })}
       >
         연구 시작
       </button>
@@ -154,18 +167,20 @@ export function DevelopmentPanel({
           ))}
         </ul>
       </details>
-      <p>
-        후반 분기:{" "}
-        {d.story.route === "flight"
-          ? "반란 진압 · 날틀"
-          : d.story.route === "mechanical"
-            ? "충녕 시해 · 기계 부활"
-            : d.story.route === "dictatorship"
-              ? "양녕과의 독재"
-              : d.story.rebellion
-                ? "반란 진행 중"
-                : "반란 전"}
-      </p>
+      {(showDevTools || d.story.rebellion) && (
+        <p>
+          후반 분기:{" "}
+          {d.story.route === "flight"
+            ? "반란 진압 · 날틀"
+            : d.story.route === "mechanical"
+              ? "충녕 시해 · 기계 부활"
+              : d.story.route === "dictatorship"
+                ? "양녕과의 독재"
+                : d.story.rebellion
+                  ? "반란 진행 중"
+                  : "반란 전"}
+        </p>
+      )}
       {d.completed.includes("TECH_FLIGHT") ? (
         <figure>
           <img
@@ -224,8 +239,8 @@ export function DevelopmentPanel({
       </p>
       <p className="hint">
         야근은 지정 업무만 당일18~21시입니다. 수당·추가 식량은 없습니다. 개발용:
-        실제 야근1시간에 비관+1, 부상 위험1%/인시. 메카를 제외한 주민의
-        식사·귀가 규칙은 유지합니다.
+        실제 야근1시간에 비관+1, 부상 위험1%/인시. 일반 주민의 식사·귀가 규칙은
+        유지합니다.
       </p>
       {showDevTools ? (
         <details>

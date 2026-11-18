@@ -92,6 +92,14 @@ async function load(p: Page, s: TimberState) {
   );
   await button(p, "저장").click();
 }
+test("초기 연구 화면은 후반 사건과 기술을 공개하지 않는다", async ({
+  page,
+}) => {
+  await load(page, createTimberState(createPlayState()));
+  const panel = page.getByRole("region", { name: "연구와 교역망" });
+  await expect(panel.getByLabel("연구 기술")).toBeAttached();
+  await expect(panel).not.toContainText(/반란|시해|날틀|전기자극기|메카/);
+});
 test("반란 진압 노선의 날틀 연구 완료가10배와 새 삽화를 표시한다", async ({
   page,
 }) => {
