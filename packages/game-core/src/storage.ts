@@ -1,8 +1,31 @@
-import { productionSites } from "./logging.js";
+import { loggingSiteRules, productionSites } from "./logging.js";
 import { AMOUNT_SCALE, type ResourceId } from "./play.js";
+import type { GroundPoint } from "./resident-path.js";
 import type { TimberState } from "./timber.js";
+import { facilityDoor } from "./town.js";
 
 export const STORAGE_SPACE = [500, 1000, 2000] as const;
+export function warehouseDoor(
+  s: TimberState,
+  from?: GroundPoint,
+): GroundPoint | undefined {
+  const doors = [
+    ...s.town.facilities.filter((f) => f.kind === "storage").map(facilityDoor),
+    ...productionSites(s)
+      .filter((site) => site.storageBuilt)
+      .map((site) => {
+        const p = loggingSiteRules(site.siteId).storage;
+        return { x: p.x, z: p.z + 3.2 };
+      }),
+  ];
+  if (from)
+    doors.sort(
+      (a, b) =>
+        Math.hypot(a.x - from.x, a.z - from.z) -
+        Math.hypot(b.x - from.x, b.z - from.z),
+    );
+  return doors[0];
+}
 export function storageResearchLevel(s: TimberState): number {
   const completed = s.town.development.completed;
   return completed.includes("SPACE_3")
@@ -39,7 +62,8 @@ export function storageRoom(
     Math.floor(
       storageCapacity(s) -
         s.world.resources[resource] / AMOUNT_SCALE -
-        reserved,
+        reserved -
+        (resource === "RES_WOOD" && s.yardDryAt ? 1 : 0),
     ),
   );
 }

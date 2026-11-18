@@ -71,9 +71,7 @@ test("실제 Worker 시간이 흐르고 일시정지·탭 비활성 뒤 수동 �
 }) => {
   await ready(page);
   await page.getByRole("button", { name: "게임 시작", exact: true }).click();
-  await expect(page.getByTestId("play-clock")).not.toHaveText(
-    "1일차 · 00:00",
-  );
+  await expect(page.getByTestId("play-clock")).not.toHaveText("1일차 · 00:00");
   await expect
     .poll(async () =>
       Number((await stock(page).textContent())?.replaceAll(",", "")),
@@ -281,4 +279,70 @@ test("대표 모델 요청 실패는 명확히 안내하고 대체 표시로 게
     page.getByRole("region", { name: "선택 정보", exact: true }),
   ).toContainText("주민 예제");
   await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
+});
+
+test("저울 설명은 가리킬 때 나타나고 상단 재고는 같은 간격의 정수로 표시된다", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1320, height: 880 });
+  await ready(page);
+  const hope = page.locator(".g-mood__v").first();
+  await expect(hope).toBeHidden();
+  await page.getByRole("button", { name: "희망과 절망 확인" }).hover();
+  await expect(hope).toBeVisible();
+  await page.getByRole("button", { name: "게임 시작", exact: true }).click();
+  await expect
+    .poll(async () => Number(await stock(page).textContent()))
+    .toBeLessThan(120);
+  for (const n of await page.locator(".resource-card strong").allTextContents())
+    expect(n).toMatch(/^[\d,]+$/);
+  const cells = await page
+    .locator(".resource-card")
+    .evaluateAll((items) =>
+      items.map((el) => el.getBoundingClientRect().width),
+    );
+  expect(Math.max(...cells) - Math.min(...cells)).toBeLessThan(1);
+  await page.getByRole("button", { name: "일시정지", exact: true }).click();
+  await page.getByTestId("play-population").evaluate((el) => {
+    el.textContent = "주민 9999명";
+  });
+  await page.locator(".resource-card strong").evaluateAll((items) => {
+    for (const el of items) el.textContent = "99,999";
+  });
+  for (const width of [1100, 1320, 1920]) {
+    await page.setViewportSize({ width, height: 880 });
+    const fits = await page.locator(".resource-card").evaluateAll((items) =>
+      items.every((el) => {
+        const bounds = el.getBoundingClientRect();
+        return [...el.querySelectorAll("img,strong")].every((child) => {
+          const rect = child.getBoundingClientRect();
+          return rect.left >= bounds.left && rect.right <= bounds.right;
+        });
+      }),
+    );
+    expect(fits).toBe(true);
+    const summary = await page
+      .locator(".settlement-heading p")
+      .evaluate((el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return range.getBoundingClientRect().right;
+      });
+    expect(summary).toBeLessThan(
+      (await page.locator(".g-top__frame img").nth(2).boundingBox())!.x,
+    );
+    const frame = page.locator(".g-top__frame img.grow");
+    const left = await frame.first().boundingBox();
+    const right = await frame.last().boundingBox();
+    const plant = await page
+      .locator(".resource-card img")
+      .first()
+      .boundingBox();
+    const coal = await page.getByTestId("resource-RES_COAL").boundingBox();
+    expect(plant!.x).toBeGreaterThanOrEqual(left!.x + 8);
+    expect(coal!.x + coal!.width).toBeLessThanOrEqual(
+      right!.x + right!.width - 8,
+    );
+  }
+  await expect(hope).toBeHidden();
 });

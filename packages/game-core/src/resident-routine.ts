@@ -106,29 +106,33 @@ export function advanceResidentRoutine<T extends ResidentRoutine>(
     r.health === "healthy";
   if (onShift && !employee && !places.workplace)
     return { ...r, routine: "working", request: null, eatingUntil: null };
-  if (r.routine === "eating") {
+  const workFirst =
+    (onShift && !employee) || (r.health === "healthy" && r.nextWork !== null);
+  if (r.routine === "eating" && !workFirst) {
     if (r.eatingUntil !== null && now >= r.eatingUntil)
       r = { ...r, eatingUntil: null, routine: "idle" };
     else return r;
   }
   const hungry = r.hunger >= RESIDENT_ROUTINE_RULES.hungryAt;
-  const request = !hungry
-    ? null
-    : !places.restaurant
-      ? "no-restaurant"
-      : !restaurantOpen(places.minute)
-        ? "restaurant-closed"
-        : !employee && places.restaurantStaffed === false
-          ? "no-staff"
-          : places.rationAvailable === false
-            ? "ration-exhausted"
-            : !foodAvailable
-              ? "no-food"
-              : places.seatAvailable === false
-                ? "waiting-seat"
-                : null;
+  const request =
+    workFirst || !hungry
+      ? null
+      : !places.restaurant
+        ? "no-restaurant"
+        : !restaurantOpen(places.minute)
+          ? "restaurant-closed"
+          : !employee && places.restaurantStaffed === false
+            ? "no-staff"
+            : places.rationAvailable === false
+              ? "ration-exhausted"
+              : !foodAvailable
+                ? "no-food"
+                : places.seatAvailable === false
+                  ? "waiting-seat"
+                  : null;
   r = { ...r, request };
   const dining =
+    !workFirst &&
     hungry &&
     places.restaurant !== null &&
     restaurantOpen(places.minute) &&

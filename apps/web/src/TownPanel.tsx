@@ -18,6 +18,7 @@ import {
   type TimberState,
   townShiftOpen,
   tradeRank,
+  warehouseDoor,
   workplaceOpen,
 } from "@dynosty/game-core";
 import { useState } from "react";
@@ -144,6 +145,10 @@ export function TownPanel({
       ))}
       <details>
         <summary>완공 시설 {state.town.facilities.length}곳</summary>
+        <p>
+          각 일터의 운영 인원을 정하면 주민이 출근합니다. 온돌 둥지와 공동
+          저장소에는 상주 인원이 필요하지 않습니다.
+        </p>
         {state.town.facilities.map((f) => (
           <article key={f.id}>
             <strong>
@@ -162,7 +167,19 @@ export function TownPanel({
               <p>
                 좌석{[10, 20, 40][f.level - 1]} · 직원
                 {restaurantStaff(state, f.id).assigned}/{facilityStaffLimit(f)}{" "}
-                · 식사 30분 이내
+                · 배식 중 {restaurantStaff(state, f.id).serving}명 · 식사 중{" "}
+                {
+                  state.residents.filter(
+                    (r) =>
+                      r.routine === "eating" &&
+                      r.diningSeat !== null &&
+                      Math.floor(r.diningSeat / 40) ===
+                        state.town.facilities
+                          .filter((site) => site.kind === "restaurant")
+                          .findIndex((site) => site.id === f.id),
+                  ).length
+                }
+                명 · 식사 30분 이내
               </p>
             ) : null}
             <BuildingUpgrade state={state} id={f.id} command={command} />
@@ -330,7 +347,11 @@ export function TownPanel({
       </details>
       <HospitalPanel state={state} selected={selectedHospital} />
       <p>
-        공동 저장 용량: 품목별 {storageCapacity(state)} · 꽉 차면 새 입고 대기
+        {warehouseDoor(state)
+          ? "공동 저장소"
+          : "임시 야적장 · 눈이 녹으면 목재가 젖을 수 있음"}
+        {state.yardDryAt ? " · 목재 1개 건조 중" : ""} · 공동 저장 용량: 품목별{" "}
+        {storageCapacity(state)} · 꽉 차면 새 입고 대기
       </p>
       <details>
         <summary>온돌 둥지 개량 {state.homes.length}곳</summary>

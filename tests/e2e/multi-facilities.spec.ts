@@ -80,6 +80,15 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상�
   await expect(
     page.getByLabel("build-1 운영 인원", { exact: true }),
   ).toHaveValue("1");
+  await b(page, "생존 예제로 돌아가기").click();
+  await b(page, "주민").click();
+  await b(page, "건설").click();
+  await expect(
+    page.getByLabel("build-2 운영 인원", { exact: true }),
+  ).toHaveValue("2");
+  await expect(
+    page.getByLabel("build-1 운영 인원", { exact: true }),
+  ).toHaveValue("1");
   await expect(page.getByText(/좌석10 · 직원/)).toHaveCount(2);
   await page.getByLabel("지을 건물", { exact: true }).selectOption("fishery");
   await page.getByText("단계별 시설 설계 보기", { exact: true }).click();
@@ -136,6 +145,13 @@ test("두 연구소의 동시 연구 완료와 저장 복원은 연구를 중복
     "저장했습니다",
   );
   await b(page, "진행 불러오기").click();
+  for (const tech of ["TECH_TRAIL", "UPGRADE_HOME_2"]) {
+    await expect(
+      page
+        .getByLabel("연구 기술", { exact: true })
+        .locator(`option[value="${tech}"]`),
+    ).toBeDisabled();
+  }
   await expect(page.getByTestId("research-status")).toHaveText("완료 연구 2개");
 });
 test("어획막의 다섯 인원으로 별도 운반 없이 공동 어류가 즉시 증가한다", async ({
@@ -243,5 +259,32 @@ test("복홀 운영 화면의 밤과 낮 조명이 마을 시각을 따른다", 
     );
     await expect.poll(light).toBe(minute === 0 ? 0.72 : 1);
     await expect(page.locator(".village-clock, .play-time")).toHaveCount(0);
+  }
+});
+
+test("희망과 절망 중 높은 쪽 저울 접시가 내려간다", async ({ page }) => {
+  const base = start();
+  for (const [optimism, pessimism] of [
+    [80, 20],
+    [20, 80],
+    [50, 50],
+  ] as const) {
+    await load(page, {
+      ...base,
+      paused: true,
+      world: { ...base.world, optimism, pessimism },
+    });
+    const scale = page.getByRole("figure", {
+      name: `희망 ${optimism}, 절망 ${pessimism}`,
+    });
+    await expect(scale).toBeVisible();
+    const offsets = await scale
+      .locator("img[src*=scale_pan]")
+      .evaluateAll((images) =>
+        images.map((img) => parseFloat((img as HTMLElement).style.top)),
+      );
+    expect(Math.sign(offsets[0]! - offsets[1]!)).toBe(
+      Math.sign(optimism - pessimism),
+    );
   }
 });

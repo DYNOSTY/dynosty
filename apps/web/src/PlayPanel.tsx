@@ -102,29 +102,30 @@ export function PlayPanel({
         </div>
       ) : null}
       <section className="resource-strip" aria-label="자원 재고">
-        {RESOURCE_IDS.map((id) => (
-          <div
-            key={id}
-            className="resource-card"
-            title={`${GAME_RULES.resources[id].name} ${(state.resources[id] / AMOUNT_SCALE).toLocaleString("ko-KR", { maximumFractionDigits: 4 })}`}
-          >
-            <img
-              className="resource-icon"
-              src={`/ui/resources-3d/${id === "RES_IRON_ORE" ? "RES_METAL" : id === "RES_STONE" ? "RES_COAL" : id}.png`}
-              alt=""
-              width={32}
-              height={32}
-            />
-            <span className="resource-label">
-              {GAME_RULES.resources[id].name}
-            </span>
-            <strong data-testid={`resource-${id}`}>
-              {(state.resources[id] / AMOUNT_SCALE).toLocaleString("ko-KR", {
-                maximumFractionDigits: 4,
-              })}
-            </strong>
-          </div>
-        ))}
+        {RESOURCE_IDS.map((id) => {
+          const amount = Math.floor(
+            state.resources[id] / AMOUNT_SCALE,
+          ).toLocaleString("ko-KR");
+          return (
+            <div
+              key={id}
+              className="resource-card"
+              title={`${GAME_RULES.resources[id].name} ${amount}`}
+            >
+              <img
+                className="resource-icon"
+                src={`/ui/resources-3d/${id === "RES_IRON_ORE" ? "RES_METAL" : id === "RES_STONE" ? "RES_COAL" : id}.png`}
+                alt=""
+                width={32}
+                height={32}
+              />
+              <span className="resource-label">
+                {GAME_RULES.resources[id].name}
+              </span>
+              <strong data-testid={`resource-${id}`}>{amount}</strong>
+            </div>
+          );
+        })}
       </section>
       <p className="hint" data-testid="population-diets">
         {GAME_RULES.population

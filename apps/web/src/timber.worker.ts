@@ -2,13 +2,13 @@
 import {
   commandTimber,
   createTimberSave,
-  createTimberState,
+  createVillageGame,
   parseTimberSave,
   tickTimber,
 } from "@dynosty/game-core";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 
-let state = createTimberState(),
+let state = createVillageGame(),
   last = performance.now();
 let initialized = false;
 const send = (m: TimberResponse) => self.postMessage(m);
@@ -18,8 +18,7 @@ self.onmessage = (event: MessageEvent<TimberRequest>) => {
   const m = event.data;
   try {
     if (m.type === "init") {
-      if (!initialized)
-        state = { ...createTimberState(m.world), paused: false };
+      if (!initialized) state = createVillageGame();
       initialized = true;
     } else if (m.type === "exit") {
       state = { ...state, paused: true, remainder: 0 };
@@ -27,7 +26,10 @@ self.onmessage = (event: MessageEvent<TimberRequest>) => {
       publish();
       return;
     } else if (m.type === "command")
-      state = commandTimber(state, m.command, m.id);
+      state =
+        m.command.type === "restart"
+          ? createVillageGame()
+          : commandTimber(state, m.command, m.id);
     else if (m.type === "save") {
       send({
         type: "saved",

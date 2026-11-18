@@ -2,6 +2,8 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { GlbVisual } from "./village.js";
 import type { Scene } from "@babylonjs/core/scene";
 import {
   type BuildingKind,
@@ -24,6 +26,11 @@ export function createHomePlacementVisual(
   ground: Mesh,
   state: () => TimberState | null,
   elevation: (x: number, z: number) => number,
+  nestModel?: (
+    kind: "building",
+    parent: TransformNode,
+    offset: number,
+  ) => Promise<GlbVisual>,
 ) {
   const root = CreateBox("home-placement-preview", { size: 1.5 }, scene);
   const material = new StandardMaterial("home-placement-material", scene);
@@ -47,6 +54,26 @@ export function createHomePlacementVisual(
     pending = false,
     position: HomePlacement["position"] | null = null,
     heading = Math.PI;
+  const nest = new TransformNode("placement-round-nest", scene);
+  nest.parent = root;
+  nest.setEnabled(false);
+  let round: GlbVisual | null = null;
+  function syncNest() {
+    const show = !!round && active && (!kind || kind === "home");
+    nest.setEnabled(show);
+    for (const mesh of visual?.meshes ?? []) mesh.setEnabled(!show);
+  }
+  void nestModel?.("building", nest, -0.75)
+    .then((model) => {
+      if (nest.isDisposed()) {
+        model.dispose();
+        return;
+      }
+      round = model;
+      for (const mesh of nest.getChildMeshes()) mesh.isPickable = false;
+      syncNest();
+    })
+    .catch(() => {});
   let kind: BuildingKind | null = null,
     homeAsset: ModelAsset | null = null;
   const issueFor = (s: TimberState, p: HomePlacement) =>
@@ -172,6 +199,7 @@ export function createHomePlacementVisual(
         return;
       }
       active = true;
+      syncNest();
       pending = false;
       position = null;
       heading = Math.PI;
@@ -209,6 +237,8 @@ export function createHomePlacementVisual(
     dispose() {
       window.removeEventListener("keydown", key, true);
       visual?.dispose();
+      round?.dispose();
+      nest.dispose();
       root.dispose();
       material.dispose();
     },

@@ -42,7 +42,7 @@ import {
 } from "./resident-path.js";
 import { workplaceOpen } from "./resident-routine.js";
 import { isRecord } from "./save.js";
-import { storageRoom } from "./storage.js";
+import { storageRoom, warehouseDoor } from "./storage.js";
 import type { TimberState } from "./timber.js";
 import { assignHomes, speciesRule, VILLAGE_RULES } from "./village-services.js";
 
@@ -244,7 +244,7 @@ export const buildingPower = (s: TimberState, id: string) =>
 export const facilityDoor = (f: HomePlacement) => rotatedPoint(f, 0, 3.2);
 export const townObstacles = (s: TimberState) => [
   ...s.homes.map(homeObstacle),
-  { x: 4.5, z: 2.8 },
+  ...(warehouseDoor(s) ? [] : [{ x: 4.5, z: 2.8 }]),
   ...s.town.facilities.map((f) => ({
     ...f.position,
     headingRadians: f.headingRadians,
@@ -347,7 +347,10 @@ export function buildingIssue(
     )
   )
     return "건물 또는 건설 대기 부지와 겹쳐요.";
-  if (Math.hypot(p.position.x - 4.5, p.position.z - 2.8) < 5)
+  if (
+    !warehouseDoor(s) &&
+    Math.hypot(p.position.x - 4.5, p.position.z - 2.8) < 5
+  )
     return "공동 야적장과 겹쳐요.";
   if (
     s.restaurantBuilt &&
@@ -485,9 +488,26 @@ export function planBuilding(
     stage: "waiting",
     workDone: 0,
   };
+  if (!n.construction && townShiftOpen(n, order.id)) {
+    order.crew = freeTownResidents(n, facilityDoor(order), 4);
+    if (order.crew.length) order.stage = "collect";
+  }
   return {
     ...n,
     paused: false,
+    residents: n.residents.map((r) =>
+      order.crew.includes(r.id)
+        ? {
+            ...r,
+            task: `build-order:${order.id}`,
+            routine: "working",
+            request: null,
+            diningSeat: null,
+            eatingUntil: null,
+            insideHome: false,
+          }
+        : r,
+    ),
     town: {
       ...n.town,
       nextId: n.town.nextId + 1,
@@ -537,155 +557,197 @@ export const orderResting = (s: TimberState, id: string) =>
 export function advanceTown(input: TimberState, minutes: number): TimberState {
   if (!minutes) return input;
   let s = input;
-  const first = s.town.orders[0];
-  const open = first ? townShiftOpen(s, first.id) : false;
-  if (
-    first &&
-    !s.construction &&
-    (open ||
-      s.residents.some((r) => r.health === "healthy" && isMechanical(s, r.id)))
-  ) {
-    const o = {
-      ...first,
-      crew: first.crew.filter((id) =>
-        s.residents.some((r) => r.id === id && r.health === "healthy"),
-      ),
-    };
-    const extra = freeTownResidents(s, facilityDoor(o), s.residents.length)
-      .filter((id) => open || isMechanical(s, id))
-      .slice(0, 4 - o.crew.length);
-    o.crew = [...o.crew, ...extra];
-    const active = o.crew.filter((id) => open || isMechanical(s, id));
-    if (active.length) {
-      if (o.stage === "waiting") o.stage = "collect";
-      const goal = o.stage === "collect" ? { x: 4.5, z: 0.6 } : facilityDoor(o);
-      s = {
-        ...s,
-        residents: s.residents.map((r) => {
-          if (first.crew.includes(r.id) && !o.crew.includes(r.id))
-            return { ...r, task: null };
-          if (!active.includes(r.id)) return r;
-          return {
-            ...r,
-            position: moveOnGround(
-              r.position,
-              goal,
-              minutes,
-              2,
-              townObstacles(s),
-            ),
-            task: `build-order:${o.id}`,
-            routine: "working",
-            insideHome: false,
-            eatingUntil: null,
-            diningSeat: null,
-            request: null,
-          };
-        }),
+  for (const first of input.town.orders) {
+    const open = first ? townShiftOpen(s, first.id) : false;
+    if (
+      first &&
+      !s.construction &&
+      (open ||
+        s.residents.some(
+          (r) => r.health === "healthy" && isMechanical(s, r.id),
+        ))
+    ) {
+      const o = {
+        ...first,
+        crew: first.crew.filter((id) =>
+          s.residents.some((r) => r.id === id && r.health === "healthy"),
+        ),
       };
-      const arrived = active.every((id) => {
-        const r = s.residents.find((r) => r.id === id) ?? invalidTown();
-        return Math.hypot(r.position.x - goal.x, r.position.z - goal.z) < 0.01;
-      });
-      if (arrived && o.stage === "collect") o.stage = "deliver";
-      else if (arrived && o.stage === "deliver") o.stage = "build";
-      else if (o.stage === "build")
-        o.workDone +=
-          active.reduce((n, id) => {
-            const r = s.residents.find((r) => r.id === id) ?? invalidTown();
-            return (
-              n +
-              (Math.hypot(r.position.x - goal.x, r.position.z - goal.z) < 0.01
-                ? buildingPower(s, id)
-                : 0)
-            );
-          }, 0) * minutes;
-    }
-    s = { ...s, town: { ...s.town, orders: [o, ...s.town.orders.slice(1)] } };
-    if (o.workDone >= orderWork(o)) {
-      let residents = s.residents.map((r) =>
-        o.crew.includes(r.id)
-          ? { ...r, task: null, routine: "idle" as const }
-          : r,
-      );
-      if (o.upgradeTarget) {
+      const extra = (
+        o.crew.length < 4
+          ? freeTownResidents(s, facilityDoor(o), s.residents.length)
+          : []
+      )
+        .filter((id) => open || isMechanical(s, id))
+        .slice(0, 4 - o.crew.length);
+      o.crew = [...o.crew, ...extra];
+      const active = o.crew.filter((id) => open || isMechanical(s, id));
+      if (active.length) {
+        if (o.stage === "waiting") o.stage = "collect";
+        const goal =
+          o.stage === "collect"
+            ? (warehouseDoor(s, o.position) ?? { x: 4.5, z: 0.6 })
+            : facilityDoor(o);
         s = {
           ...s,
-          town: {
-            ...s.town,
-            facilities: s.town.facilities.map((f) =>
-              f.id === o.upgradeTarget
-                ? { ...f, level: o.upgradeLevel ?? f.level }
-                : f,
-            ),
-          },
+          residents: s.residents.map((r) => {
+            if (first.crew.includes(r.id) && !o.crew.includes(r.id))
+              return { ...r, task: null };
+            if (!active.includes(r.id)) return r;
+            return {
+              ...r,
+              position: moveOnGround(
+                r.position,
+                goal,
+                minutes,
+                2,
+                townObstacles(s),
+              ),
+              task: `build-order:${o.id}`,
+              routine: "working",
+              insideHome: false,
+              eatingUntil: null,
+              diningSeat: null,
+              request: null,
+            };
+          }),
         };
-        s = {
-          ...s,
-          homes: s.homes.map((h) =>
-            h.id === o.upgradeTarget
-              ? {
-                  ...h,
-                  level: o.upgradeLevel ?? h.level ?? 1,
-                  capacity: 20 + ((o.upgradeLevel ?? 1) - 1) * 10,
-                }
-              : h,
-          ),
-        };
-        residents = assignHomes(residents, s.world.citizens, s.homes);
-      } else if (o.kind === "home") {
-        const homes = [
-          ...s.homes,
-          {
-            id: `dwelling-${s.homes.length + 1}`,
-            position: o.position,
-            headingRadians: o.headingRadians,
-            capacity: VILLAGE_RULES.homeSpace,
-          },
-        ];
-        residents = assignHomes(
-          residents,
-          s.world.citizens,
-          s.buildingHealth > 0
-            ? homes
-            : homes.filter((h) => h.id !== "example-building-1"),
-        );
-        s = {
-          ...s,
-          homes,
-          world: {
-            ...s.world,
-            buildings: homes.map((h) => ({
-              id: h.id,
-              type: "ondol-nest",
-              position: { ...h.position, y: 0 },
-              headingRadians: h.headingRadians ?? Math.PI,
-            })),
-          },
-        };
-      } else {
-        const f: Facility = {
-          ...o,
-          kind: o.kind,
-          level: 1,
-          target: 0,
-          progress: 0,
-          yieldRemainder: 0,
-          buffer: 0,
-          delivered: 0,
-          haul: null,
-        };
-        s = {
-          ...s,
-          restaurantBuilt: s.restaurantBuilt || o.kind === "restaurant",
-          town: { ...s.town, facilities: [...s.town.facilities, f] },
-        };
+        const arrived = active.every((id) => {
+          const r = s.residents.find((r) => r.id === id) ?? invalidTown();
+          return (
+            Math.hypot(r.position.x - goal.x, r.position.z - goal.z) < 0.01
+          );
+        });
+        if (arrived && o.stage === "collect") o.stage = "deliver";
+        else if (arrived && o.stage === "deliver") o.stage = "build";
+        else if (o.stage === "build")
+          o.workDone +=
+            active.reduce((n, id) => {
+              const r = s.residents.find((r) => r.id === id) ?? invalidTown();
+              return (
+                n +
+                (Math.hypot(r.position.x - goal.x, r.position.z - goal.z) < 0.01
+                  ? buildingPower(s, id)
+                  : 0)
+              );
+            }, 0) * minutes;
       }
       s = {
         ...s,
-        residents,
-        town: { ...s.town, orders: s.town.orders.slice(1) },
+        town: {
+          ...s.town,
+          orders: s.town.orders.map((q) => (q.id === o.id ? o : q)),
+        },
       };
+      if (o.workDone >= orderWork(o)) {
+        let residents = s.residents.map((r) =>
+          o.crew.includes(r.id)
+            ? { ...r, task: null, routine: "idle" as const }
+            : r,
+        );
+        if (o.upgradeTarget) {
+          s = {
+            ...s,
+            town: {
+              ...s.town,
+              facilities: s.town.facilities.map((f) =>
+                f.id === o.upgradeTarget
+                  ? { ...f, level: o.upgradeLevel ?? f.level }
+                  : f,
+              ),
+            },
+          };
+          s = {
+            ...s,
+            homes: s.homes.map((h) =>
+              h.id === o.upgradeTarget
+                ? {
+                    ...h,
+                    level: o.upgradeLevel ?? h.level ?? 1,
+                    capacity: 20 + ((o.upgradeLevel ?? 1) - 1) * 10,
+                  }
+                : h,
+            ),
+          };
+          residents = assignHomes(residents, s.world.citizens, s.homes);
+        } else if (o.kind === "home") {
+          const homes = [
+            ...s.homes,
+            {
+              id: `dwelling-${s.homes.length + 1}`,
+              position: o.position,
+              headingRadians: o.headingRadians,
+              capacity: VILLAGE_RULES.homeSpace,
+            },
+          ];
+          residents = assignHomes(
+            residents,
+            s.world.citizens,
+            s.buildingHealth > 0
+              ? homes
+              : homes.filter((h) => h.id !== "example-building-1"),
+          );
+          s = {
+            ...s,
+            homes,
+            world: {
+              ...s.world,
+              buildings: homes.map((h) => ({
+                id: h.id,
+                type: "ondol-nest",
+                position: { ...h.position, y: 0 },
+                headingRadians: h.headingRadians ?? Math.PI,
+              })),
+            },
+          };
+        } else {
+          const f: Facility = {
+            ...o,
+            kind: o.kind,
+            level: 1,
+            target:
+              o.kind === "workshop"
+                ? 0
+                : Math.min(o.crew.length, BUILDING_RULES[o.kind].staff),
+            progress: 0,
+            yieldRemainder: 0,
+            buffer: 0,
+            delivered: 0,
+            haul: null,
+          };
+          const firstRestaurant =
+            f.kind === "restaurant" &&
+            !s.town.facilities.some((site) => site.kind === "restaurant");
+          const retained = o.crew.slice(0, f.target);
+          residents = residents.map((r) =>
+            retained.includes(r.id)
+              ? {
+                  ...r,
+                  workplaceId: firstRestaurant
+                    ? "restaurant"
+                    : `facility:${f.id}`,
+                  insideHome: false,
+                }
+              : r,
+          );
+          s = {
+            ...s,
+            restaurantWorkerTarget: firstRestaurant
+              ? f.target
+              : s.restaurantWorkerTarget,
+            restaurantBuilt: s.restaurantBuilt || o.kind === "restaurant",
+            town: { ...s.town, facilities: [...s.town.facilities, f] },
+          };
+        }
+        s = {
+          ...s,
+          residents,
+          town: {
+            ...s.town,
+            orders: s.town.orders.filter((q) => q.id !== o.id),
+          },
+        };
+      }
     }
   }
   return advanceHospital(
@@ -861,13 +923,7 @@ function advanceTownProduction(
       f.buffer += Math.min(amount, 20 - f.buffer);
     }
     f.progress = Math.min(f.progress, 30);
-    const warehouses = s.town.facilities.filter((q) => q.kind === "storage");
-    const drop = warehouses.sort(
-      (a, b) =>
-        Math.hypot(a.position.x - f.position.x, a.position.z - f.position.z) -
-        Math.hypot(b.position.x - f.position.x, b.position.z - f.position.z),
-    )[0];
-    const destination = drop ? facilityDoor(drop) : { x: 4.5, z: 0.6 };
+    const destination = warehouseDoor(s, f.position) ?? { x: 4.5, z: 0.6 };
     if (f.kind === "fishery") {
       const amount = Math.min(f.buffer, storageRoom(s, resource));
       s = deposit(s, resource, amount);

@@ -56,11 +56,19 @@ export function DevelopmentPanel({
       d.story.rebellion ||
       d.completed.includes(entry.id),
   );
-  const selected = visibleResearch.some((entry) => entry.id === tech)
+  const incomplete = visibleResearch.filter(
+    (entry) => !d.completed.includes(entry.id),
+  );
+  const selected = incomplete.some((entry) => entry.id === tech)
     ? tech
-    : "TECH_TRAIL";
+    : (incomplete.find((entry) => RESEARCH_CONNECTED.includes(entry.id))?.id ??
+      incomplete[0]?.id ??
+      "");
+
   const r = visibleResearch.find((entry) => entry.id === selected),
-    issue = researchIssue(state, selected);
+    issue = selected
+      ? researchIssue(state, selected)
+      : "모든 연구가 완료되었습니다.";
   const categories = {
     building: "건물별 개량",
     collection: "자원별 채집",
@@ -102,7 +110,11 @@ export function DevelopmentPanel({
                 {visibleResearch
                   .filter((r) => r.category === category)
                   .map((r) => (
-                    <option key={r.id} value={r.id}>
+                    <option
+                      key={r.id}
+                      value={r.id}
+                      disabled={d.completed.includes(r.id)}
+                    >
                       {r.name}
                       {d.completed.includes(r.id)
                         ? " · 완료"

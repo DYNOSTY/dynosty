@@ -9,7 +9,6 @@ import type {
 import {
   AMOUNT_SCALE,
   type BuildingKind,
-  createPlaySave,
   type HomePlacement,
   type LaborState,
   laborScene,
@@ -82,6 +81,9 @@ export function App() {
     null,
   );
   const [selectedHospital, setSelectedHospital] = useState<string | null>(null);
+  const villageCommand = useRef<
+    ((command: import("@dynosty/game-core").TimberCommand) => void) | null
+  >(null);
   const [timberOpen, setTimberOpen] = useState(false);
   const [timberState, setTimberState] = useState<TimberState | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -97,7 +99,7 @@ export function App() {
   const [villageSection, setVillageSection] = useState<{
     label: string;
   } | null>(null);
-  const [villageExitRequest, setVillageExitRequest] = useState(0);
+
   const savePanelId = useId();
   const toolsPanelId = useId();
   const scoutPanelId = useId();
@@ -129,9 +131,7 @@ export function App() {
   const [minimap, setMinimap] = useState<string | null>(null);
   useEffect(() => {
     if (sceneStatus === "준비 완료")
-      sceneRef.current?.setSelectionEnabled(
-        !timberOpen || laborOpen || toolsOpen,
-      );
+      sceneRef.current?.setSelectionEnabled(true);
   }, [timberOpen, laborOpen, toolsOpen, sceneStatus]);
   const [assetWarning, setAssetWarning] = useState<string | null>(null);
   const [workerError, setWorkerError] = useState<string | null>(null);
@@ -268,7 +268,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (timberOpen) return;
+    if (timberState) return;
     sceneRef.current?.updateTimber(null);
     sceneRef.current?.updateLabor(null);
     if (!snapshot || sceneStatus !== "준비 완료" || !sceneRef.current) return;
@@ -278,10 +278,9 @@ export function App() {
     } catch {
       setSceneStatus("3D 표시 정보 오류 — 전달 형식을 확인해 주세요");
     }
-  }, [snapshot, sceneStatus, timberOpen]);
+  }, [snapshot, sceneStatus, timberState]);
   useEffect(() => {
     if (
-      !timberOpen ||
       laborOpen ||
       !timberState ||
       sceneStatus !== "준비 완료" ||
@@ -289,7 +288,21 @@ export function App() {
     )
       return;
     sceneRef.current.updateLabor(null);
-    const display = timberScene(timberState);
+    const village = timberScene(timberState);
+    const display: SceneSnapshot = {
+      ...village,
+      entities: [
+        ...village.entities,
+        {
+          id: "notice-board",
+          kind: "building",
+          position: { x: 0, y: 0, z: 4 },
+          headingRadians: Math.PI,
+          visible: true,
+          highlighted: false,
+        },
+      ],
+    };
     sceneRef.current.update(display);
     sceneRef.current.updateTimber(timberState);
     setAppliedSnapshot(display);
@@ -433,17 +446,17 @@ export function App() {
     (entity) => entity.kind === "resident",
   );
 
-  const villageInfo =
-    !timberOpen && selectedId
-      ? sceneRef.current?.villageInfo(selectedId)
-      : undefined;
+  const villageInfo = selectedId
+    ? sceneRef.current?.villageInfo(selectedId)
+    : undefined;
+  const displayedWorld = timberState?.world ?? playState;
   const selectedEntity =
     appliedSnapshot?.entities.find(
       (entity) => entity.id === selectedId && entity.visible,
     ) ?? null;
   const hasPanels = saveOpen || toolsOpen || scoutOpen !== null;
-  const gameMinutes = playState
-    ? (playState.day - 1) * 1440 + playState.minute
+  const gameMinutes = displayedWorld
+    ? (displayedWorld.day - 1) * 1440 + displayedWorld.minute
     : 0;
   const scoutSite = SCOUT_SITES.find((site) => site.id === scoutOpen) ?? null;
   const foundCount = SCOUT_SITES.filter(
@@ -466,7 +479,7 @@ export function App() {
     ? laborOpen
       ? (laborState?.elapsed ?? 0) % 1440
       : timberState?.world.minute
-    : playState?.minute;
+    : (timberState?.world.minute ?? playState?.minute);
   useEffect(() => {
     if (sceneStatus === "준비 완료" && playMinute !== undefined)
       sceneRef.current?.setClock(playMinute);
@@ -507,7 +520,7 @@ export function App() {
     if (sceneStatus === "준비 완료")
       sceneRef.current?.setGameMinutes(gameMinutes);
   }, [gameMinutes, sceneStatus]);
-  const villageVisible = timberOpen && !laborOpen;
+  const villageVisible = !!timberState && !laborOpen;
   const gatePending =
     villageVisible &&
     (timberState?.mission === "register-policy" ||
@@ -593,7 +606,9 @@ export function App() {
     setSaveOpen(false);
     setToolsOpen(false);
     setScoutOpen(null);
-    if (timberOpen) setVillageExitRequest((request) => request + 1);
+    setTimberOpen(false);
+    setLaborOpen(false);
+    setVillageSection(null);
   }
   function openOnly(open: () => void) {
     closePopups();
@@ -601,7 +616,7 @@ export function App() {
   }
   function openTimber() {
     if (!timberReady) return;
-    if (!playState?.paused) commandPlay({ type: "pause", paused: true });
+
     openOnly(() => setTimberOpen(true));
   }
   function scoutFace(site: (typeof SCOUT_SITES)[number]) {
@@ -620,10 +635,13 @@ export function App() {
     setVillageSection({ label: section });
   }
   function toggleAuxiliary(panel: "save" | "tools") {
+    if (panel === "save" && !timberOpen) {
+      setTimberOpen(true);
+      setSaveOpen(true);
+      return;
+    }
     if (!timberOpen) {
-      openOnly(() =>
-        panel === "save" ? setSaveOpen(!saveOpen) : setToolsOpen(!toolsOpen),
-      );
+      openOnly(() => setToolsOpen(!toolsOpen));
       return;
     }
     if (panel === "save") setSaveOpen(!saveOpen);
@@ -651,6 +669,7 @@ export function App() {
         if (document.querySelector('[data-testid="home-placement-status"]'))
           return;
         closeRef.current();
+        sceneRef.current?.select(null);
         return;
       }
       if (
@@ -795,12 +814,13 @@ export function App() {
       <div>
         <PlayPanel
           compact={timberOpen}
-          day={shownDay}
+          day={timberState?.world.day ?? shownDay}
           minute={playMinute}
           state={
-            timberOpen && timberState
+            timberState
               ? {
                   ...timberState.world,
+                  paused: timberState.paused,
                   resources: {
                     ...timberState.world.resources,
                     RES_WOOD:
@@ -812,9 +832,18 @@ export function App() {
           }
           error={playError}
           busy={playSaveBusy}
-          onCommand={commandPlay}
+          onCommand={(command) => {
+            if (command.type === "new-game") {
+              setScouts({});
+              sceneRef.current?.resetScouting();
+              villageCommand.current?.({ type: "restart" });
+            } else if (command.type === "pause")
+              villageCommand.current?.(command);
+            else if (command.type === "advance-day")
+              villageCommand.current?.({ type: "advance", minutes: 1440 });
+          }}
         />
-        {timberOpen ? (
+        {toolsOpen && timberOpen ? (
           <p className="hint">
             공동 재고 · 운송 중·검사 대기·격리 물량은 사용 가능 재고에서
             제외합니다.
@@ -915,11 +944,13 @@ export function App() {
             >
               <span>
                 {buildingHover.name}
-                {buildingHover.health !== undefined
+                {buildingHover.health !== undefined &&
+                buildingHover.health < 100
                   ? ` · ${buildingHover.health}/100`
                   : ""}
               </span>
-              {buildingHover.health !== undefined ? (
+              {buildingHover.health !== undefined &&
+              buildingHover.health < 100 ? (
                 <progress
                   max={100}
                   value={buildingHover.health}
@@ -951,7 +982,11 @@ export function App() {
               />
             </>
           ) : null}
-          <fieldset className="selection-actions" aria-label="예제 대상 선택">
+          <fieldset
+            hidden={!toolsOpen}
+            className="selection-actions"
+            aria-label="예제 대상 선택"
+          >
             <button
               type="button"
               className="quiet-button"
@@ -1006,7 +1041,7 @@ export function App() {
         >
           <TimberDemo
             active={timberOpen}
-            exitRequest={villageExitRequest}
+            commandRef={villageCommand}
             focusSection={villageSection}
             selectedHospital={selectedHospital}
             world={playState}
@@ -1023,15 +1058,7 @@ export function App() {
             onView={(point, distance) =>
               sceneRef.current?.focus(point, distance)
             }
-            onExit={(world) => {
-              const requestId = ++nextRequestRef.current;
-              pendingPlaySaveRef.current = requestId;
-              setPlaySaveBusy(true);
-              workerRef.current?.postMessage({
-                type: "load-play",
-                requestId,
-                data: createPlaySave(world),
-              } satisfies GameCommand);
+            onExit={() => {
               setTimberOpen(false);
             }}
           />
@@ -1336,7 +1363,7 @@ export function App() {
               entity={selectedEntity}
               onClear={clearSelection}
               notices={
-                !timberOpen && selectedEntity.id === "example-building-1"
+                selectedEntity.id === "notice-board"
                   ? [
                       ...(timberState
                         ? [
@@ -1371,7 +1398,10 @@ export function App() {
               <p>건물이나 주민을 누르면 이 자리에 정보가 나옵니다.</p>
             </div>
           )}
-          <MoodScale hope={null} despair={null} />
+          <MoodScale
+            hope={displayedWorld?.optimism ?? null}
+            despair={displayedWorld?.pessimism ?? null}
+          />
         </div>
         <nav className="play-menu g-console__cmd" aria-label="게임 메뉴">
           <CmdButton

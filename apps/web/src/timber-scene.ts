@@ -10,6 +10,7 @@ import {
   TIMBER_RULES,
   type TimberState,
   timberCartPosition,
+  warehouseDoor,
   workplaceOpen,
 } from "@dynosty/game-core";
 import { createLoggingVisual } from "./logging-scene.js";
@@ -317,7 +318,16 @@ export function createTimberVisual(scene: Scene) {
         handles.rotation.z = 0;
       if (!["transport", "parking"].includes(s.phase))
         handles.rotation.z = handleAngle;
-      base.rotation.y = 0;
+      const door = warehouseDoor(s, TIMBER_RULES.cartStart);
+      const drop = door ?? TIMBER_RULES.yard;
+      warehouse.setEnabled(!door);
+      waiting.position.set(drop.x - 1.35, 0.25, drop.z + 0.4);
+      quarantine.position.set(drop.x - 1.35, 0.175, drop.z - 0.9);
+      accepted.position.set(drop.x, 0.175, drop.z + 0.85);
+      base.rotation.y = Math.atan2(
+        TIMBER_RULES.cartStart.z - drop.z,
+        drop.x - TIMBER_RULES.cartStart.x,
+      );
       base.setEnabled(s.contractId !== null);
       cargo.setEnabled(s.stock.cart > 0);
       cargo.scaling.y = Math.max(0.01, s.stock.cart / 20);
@@ -386,11 +396,11 @@ export function createTimberVisual(scene: Scene) {
       // 짐의 이동이 기준이다. 운송 주민은 수레 앞 연결 위치를 따라간다.
       if (resident) {
         resident.position.set(
-          base.position.x + TIMBER_RULES.pullOffset,
+          base.position.x + Math.cos(base.rotation.y) * TIMBER_RULES.pullOffset,
           0.5,
-          base.position.z,
+          base.position.z - Math.sin(base.rotation.y) * TIMBER_RULES.pullOffset,
         );
-        resident.rotation.y = Math.PI / 2;
+        resident.rotation.y = Math.PI / 2 + base.rotation.y;
         if (parking) resident.position.y = 0.5;
       }
     },

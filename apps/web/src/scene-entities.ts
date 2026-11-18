@@ -25,6 +25,7 @@ type GlbFactory = (
   kind: SceneEntity["kind"],
   parent: Mesh,
   offsetY: number,
+  level?: number,
 ) => Promise<GlbVisual>;
 
 import {
@@ -139,16 +140,29 @@ export function createSceneEntities(
     setGlb(factory: GlbFactory) {
       glb = factory;
       for (const [id, object] of objects) {
-        if (object.assetKey !== "default") continue;
+        if (
+          object.assetKey !== "default" &&
+          !object.assetKey.startsWith("home:")
+        )
+          continue;
+        const key = object.assetKey;
         const { kind } = object;
         const size = kind === "resident" ? 1 : 1.5;
         object.modelAttempted = true;
-        factory(kind, object.mesh, -size / 2)
+        factory(
+          kind,
+          object.mesh,
+          -size / 2,
+          object.entity.kind === "building" ? object.entity.level : undefined,
+        )
           .then((visual) => {
-            if (objects.get(id) !== object || object.assetKey !== "default")
+            if (objects.get(id) !== object || object.assetKey !== key)
               return visual.dispose();
             object.visual?.dispose();
             object.visual = visual;
+            visual.setLit?.(
+              object.entity.kind === "building" && !!object.entity.lit,
+            );
             object.modelAttempted = true;
             object.mesh.isVisible = false;
             visual.setOutline(selectedId === id);
@@ -243,7 +257,8 @@ export function createSceneEntities(
           objects.set(entity.id, object);
         }
         const assetKey =
-          showBoard && entity.id === "example-building-1"
+          entity.id === "notice-board" ||
+          (showBoard && entity.id === "example-building-1")
             ? "notice-board"
             : entity.kind === "resident" && entity.species
               ? `species:${entity.species}`
@@ -315,17 +330,29 @@ export function createSceneEntities(
               : entity.kind === "building" && entity.level
                 ? facilityModel("home", entity.level)
                 : models[entity.kind];
-        if (glb && assetKey === "default" && !object.modelAttempted) {
+        if (
+          glb &&
+          (assetKey === "default" || assetKey.startsWith("home:")) &&
+          !object.modelAttempted
+        ) {
           object.modelAttempted = true;
           const target = object,
             id = entity.id,
             size0 = size;
-          glb(entity.kind, object.mesh, -size0 / 2)
+          glb(
+            entity.kind,
+            object.mesh,
+            -size0 / 2,
+            entity.kind === "building" ? entity.level : undefined,
+          )
             .then((visual) => {
               if (objects.get(id) !== target || target.assetKey !== assetKey)
                 return visual.dispose();
               target.visual?.dispose();
               target.visual = visual;
+              visual.setLit?.(
+                target.entity.kind === "building" && !!target.entity.lit,
+              );
               visual.setMotion(
                 target.entity.kind === "resident"
                   ? target.entity.motion
@@ -353,6 +380,8 @@ export function createSceneEntities(
           }
         }
         if (entity.kind === "building") {
+          if (object.visual && "setLit" in object.visual)
+            object.visual.setLit?.(entity.lit ?? false);
           for (const mesh of "meshes" in (object.visual ?? {})
             ? (object.visual as ModelVisual).meshes
             : [])

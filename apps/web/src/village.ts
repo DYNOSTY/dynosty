@@ -79,6 +79,7 @@ const villageNames: Record<string, string> = {
 };
 export interface GlbVisual {
   setOutline(value: boolean): void;
+  setLit?(lit: boolean): void;
   setMotion(value: string): void;
   animate(delta: number): void;
   dispose(): void;
@@ -275,7 +276,9 @@ export function createVillage(
     }
   };
   const face = (x: number, z: number) => Math.atan2(-x, -z); // +Z가 마당 쪽
-  const jobs: Array<Promise<void>> = LAYOUT.map(([id, x, z]) =>
+  const jobs: Array<Promise<void>> = LAYOUT.filter(
+    ([id]) => id !== "BLD_NEST",
+  ).map(([id, x, z]) =>
     place(
       `/models/buildings/${id}.glb`,
       x,
@@ -396,7 +399,6 @@ export function createVillage(
   puff.update();
   puff.hasAlpha = true;
   const CHIMNEY: Record<string, number> = {
-    BLD_NEST: 1.95,
     BLD_OFFICE: 2.5,
     BLD_WORKSHOP: 3,
     BLD_GREENHOUSE: 2.4,
@@ -655,6 +657,7 @@ export function createVillage(
     kind: "building" | "resident",
     parent: Node,
     offsetY: number,
+    level = 1,
   ): Promise<GlbVisual> {
     const asset = await load(
       scene,
@@ -669,13 +672,34 @@ export function createVillage(
     const v = instantiate(
       asset,
       node,
-      kind === "building" ? BUILDING_SCALE : RESIDENT_SCALE,
+      kind === "building"
+        ? BUILDING_SCALE * (1 + (level - 1) * 0.06)
+        : RESIDENT_SCALE,
       shadow,
       kind === "building" ? 4.2 : 1.3,
       kind === "building" ? 4 : 2,
     );
+    const lamp =
+      kind === "building" && light
+        ? CreateBox(
+            node.name + "-door-light",
+            { width: 1.1, height: 0.95, depth: 0.06 },
+            scene,
+          )
+        : null;
+    if (lamp && light) {
+      lamp.parent = node;
+      lamp.position.set(0, 1, 2.95);
+      lamp.material = light.warmMat;
+      lamp.isPickable = false;
+      light.glow.addIncludedOnlyMesh(lamp);
+      lamp.setEnabled(false);
+    }
     v.play("Idle", 0);
     return {
+      setLit(value) {
+        lamp?.setEnabled(value);
+      },
       setOutline(value) {
         for (const m of v.meshes) {
           m.outlineColor = OUTLINE;
@@ -697,6 +721,9 @@ export function createVillage(
   return {
     ready,
     entityVisual,
+    setPreviewResidentsVisible(visible: boolean) {
+      for (const walker of walkers) walker.node.setEnabled(visible);
+    },
     targets,
     mark,
     setRunning,

@@ -33,6 +33,7 @@ import {
   townShiftOpen,
   VILLAGE_RULES,
   visitorOffer,
+  warehouseDoor,
   workplaceOpen,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
@@ -113,7 +114,7 @@ const phaseNames = {
   relief: "유휴 주민이 업무 교대하러 이동",
   "crew-wait": "교대할 유휴 인력 대기",
   approaching: "운송 주민 자동 배정",
-  transport: "야적장으로 운송",
+  transport: "입고 장소로 운송",
   parking: "수레 내려놓기",
   releasing: "손잡이에서 물러나기",
   unloading: "자동 하역",
@@ -128,7 +129,7 @@ const phaseNames = {
 };
 type Props = {
   active: boolean;
-  exitRequest: number;
+  commandRef: { current: ((c: TimberCommand) => void) | null };
   focusSection?: { label: string } | null;
   onLaborState: (state: LaborState, reset?: boolean) => void;
   onLaborModeChange: (mode: boolean) => void;
@@ -151,7 +152,7 @@ type Props = {
 };
 export function TimberDemo({
   active,
-  exitRequest,
+  commandRef,
   focusSection,
   onLaborState,
   onLaborModeChange,
@@ -298,7 +299,7 @@ export function TimberDemo({
     };
   }, [onState]);
   useEffect(() => {
-    if (active && world && !initialized.current && worker.current) {
+    if (world && !initialized.current && worker.current) {
       initialized.current = true;
       worker.current.postMessage({
         type: "init",
@@ -307,9 +308,11 @@ export function TimberDemo({
     }
   }, [active, world]);
   useEffect(() => {
-    if (exitRequest > 0)
-      worker.current?.postMessage({ type: "exit" } satisfies TimberRequest);
-  }, [exitRequest]);
+    commandRef.current = command;
+    return () => {
+      commandRef.current = null;
+    };
+  });
   function command(c: TimberCommand) {
     if (busy || !worker.current) return;
     setError(null);
@@ -321,7 +324,7 @@ export function TimberDemo({
   }
   useEffect(() => {
     const pause = () => {
-      if (document.hidden || !active || laborMode)
+      if (document.hidden || laborMode)
         worker.current?.postMessage({
           type: "command",
           id: `${session.current}-${++counter.current}`,
@@ -374,6 +377,9 @@ export function TimberDemo({
     }
   }, [state?.construction, error, active, placingHome, onCancelHomePlacement]);
   useEffect(() => () => onCancelHomePlacement(), [onCancelHomePlacement]);
+  useEffect(() => {
+    if (!active) setLaborMode(false);
+  }, [active]);
   const merchant =
     state?.merchantItem === undefined
       ? undefined
@@ -392,7 +398,11 @@ export function TimberDemo({
       className="timber-demo"
       aria-label="마른 목재20 체험판"
     >
-      <button type="button" onClick={() => setLaborMode(true)}>
+      <button
+        hidden={!showDevTools}
+        type="button"
+        onClick={() => setLaborMode(true)}
+      >
         일손 배치·배급 체험하기
       </button>
       <div className="timber-heading">
@@ -404,11 +414,7 @@ export function TimberDemo({
           type="button"
           className="g-knob g-knob--close"
           aria-label="생존 예제로 돌아가기"
-          onClick={() =>
-            worker.current?.postMessage({
-              type: "exit",
-            } satisfies TimberRequest)
-          }
+          onClick={() => state && onExit(state.world)}
         />
       </div>
       {!state ? (
@@ -1126,8 +1132,9 @@ export function TimberDemo({
                 ))}
               </section>
               <p>
-                도착지는 야적장입니다. 합격 물자는 즉시 공동 재고에 더하며
-                건물마다 배분하지 않습니다.
+                도착지는 {warehouseDoor(state) ? "공동 저장소" : "임시 야적장"}
+                입니다. 합격 물자는 즉시 공동 재고에 더하며 건물마다 배분하지
+                않습니다.
               </p>
               {state.phase === "waiting-labor" ? (
                 <p role="status">
@@ -1194,38 +1201,37 @@ export function TimberDemo({
               </h3>
             </section>
           ) : null}
-          <details>
-            <summary>둥지 보수</summary>
-            <p>
-              보수는 손상 건물에 직접 명령합니다. 공동 목재20과 가까운 유휴
-              주민1명이 필요합니다.
-            </p>
-            <button
-              type="button"
-              disabled={
-                busy ||
-                state.phase !== "ready" ||
-                state.buildingHealth <= 0 ||
-                state.buildingHealth >= 100 ||
-                state.world.resources.RES_WOOD / AMOUNT_SCALE < 20
-              }
-              onClick={() => command({ type: "use" })}
-            >
-              건물 보수 명령
-            </button>
-            {state.repairWorkerId ? (
-              <p data-testid="repair-worker">
-                보수 배정:{" "}
-                {state.residents.findIndex(
-                  (r) => r.id === state.repairWorkerId,
-                ) + 1}
-                번 주민
+          {state.buildingHealth > 0 && state.buildingHealth < 100 && (
+            <details>
+              <summary>둥지 보수</summary>
+              <p>
+                보수는 손상 건물에 직접 명령합니다. 공동 목재20과 가까운 유휴
+                주민1명이 필요합니다.
               </p>
-            ) : null}
-            {state.buildingHealth === 100 ? (
-              <p>정상 건물 · 보수 불필요</p>
-            ) : null}
-          </details>
+              <button
+                type="button"
+                disabled={
+                  busy ||
+                  state.phase !== "ready" ||
+                  state.buildingHealth <= 0 ||
+                  state.buildingHealth >= 100 ||
+                  state.world.resources.RES_WOOD / AMOUNT_SCALE < 20
+                }
+                onClick={() => command({ type: "use" })}
+              >
+                건물 보수 명령
+              </button>
+              {state.repairWorkerId ? (
+                <p data-testid="repair-worker">
+                  보수 배정:{" "}
+                  {state.residents.findIndex(
+                    (r) => r.id === state.repairWorkerId,
+                  ) + 1}
+                  번 주민
+                </p>
+              ) : null}
+            </details>
+          )}
           {saveOpen ? (
             <div className="timber-controls">
               <button
@@ -1281,14 +1287,7 @@ export function TimberDemo({
               <button type="button" onClick={() => setRestart(true)}>
                 체험 초기화
               </button>
-              <button
-                type="button"
-                onClick={() =>
-                  worker.current?.postMessage({
-                    type: "exit",
-                  } satisfies TimberRequest)
-                }
-              >
+              <button type="button" onClick={() => onExit(state.world)}>
                 마을 현황으로
               </button>
               {restart ? (

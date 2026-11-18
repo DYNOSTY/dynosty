@@ -189,6 +189,8 @@ it("어획막은 물가에 지어 배치 인원만으로 운반 없이 즉시 �
 });
 it("의료 인원 없이는 회복량이 오르지 않고 배치하면 여러 병원에서 치료한다", () => {
   let s = build(build(start(), "hospital"), "hospital", 0, 16);
+  for (const f of s.town.facilities)
+    s = cmd(s, { type: "facility-staff", id: f.id, count: 0 });
   const ids = s.residents.slice(0, 8).map((r) => r.id);
   s = cmd(s, {
     type: "citizen-event",

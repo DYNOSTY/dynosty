@@ -70,7 +70,7 @@ import {
 } from "./resident-routine.js";
 import { isRecord } from "./save.js";
 import type { SceneSnapshot } from "./scene.js";
-import { storageRoom } from "./storage.js";
+import { storageRoom, warehouseDoor } from "./storage.js";
 import {
   createResearchStory,
   mechanizeCitizen,
@@ -199,6 +199,7 @@ export interface TimberState {
   readonly world: PlayState;
   readonly initialWood: number;
   readonly initialIron: number;
+  readonly yardDryAt?: number | undefined;
   readonly woodSpent: number;
   readonly logging: LoggingState;
   readonly loggingSites: readonly LoggingState[];
@@ -416,6 +417,20 @@ function createVillageResident(
     routine: "idle",
   };
 }
+export function createVillageGame(): TimberState {
+  const world = createPlayState();
+  const resources = { ...world.resources };
+  for (const id of Object.keys(resources) as (keyof typeof resources)[])
+    resources[id] *= 5;
+  const village = createTimberState({ ...world, resources, minute: 9 * 60 });
+  return {
+    ...village,
+    residents: village.residents.map((r) => ({
+      ...r,
+      hunger: Math.floor(r.hunger / 2),
+    })),
+  };
+}
 export function createTimberState(
   inputWorld: PlayState = createPlayState(),
 ): TimberState {
@@ -501,8 +516,19 @@ function note(s: TimberState, text: string): TimberState {
     history: [...s.history, { id: s.history.length, minute: s.elapsed, text }],
   };
 }
-function front(p: GroundPoint): GroundPoint {
-  return { x: p.x + TIMBER_RULES.pullOffset, z: p.z };
+function dropPoint(s: TimberState) {
+  return warehouseDoor(s, TIMBER_RULES.cartStart) ?? TIMBER_RULES.yard;
+}
+function front(s: TimberState, p: GroundPoint): GroundPoint {
+  const d = dropPoint(s);
+  const angle = Math.atan2(
+    d.z - TIMBER_RULES.cartStart.z,
+    d.x - TIMBER_RULES.cartStart.x,
+  );
+  return {
+    x: p.x + Math.cos(angle) * TIMBER_RULES.pullOffset,
+    z: p.z + Math.sin(angle) * TIMBER_RULES.pullOffset,
+  };
 }
 const constructionSite = (
   kind: "restaurant" | "home" | "logging" | "storage",
@@ -515,7 +541,6 @@ const habitableHomes = (homes: readonly VillageHome[], health: number) =>
 export const villageObstacles = (s: TimberState): GroundObstacle[] => [
   ...townObstacles(s),
   ...(s.construction?.kind === "home" ? [homeObstacle(s.construction)] : []),
-  TIMBER_RULES.yard,
 ];
 const restaurants = (s: TimberState) =>
   s.town.facilities.filter((f) => f.kind === "restaurant");
@@ -645,6 +670,8 @@ function diningSeats(s: TimberState): Map<string, number> {
       r.routine === "eating" &&
       r.diningSeat !== null &&
       !isDiningEmployee(s, r) &&
+      !r.nextWork &&
+      !(r.workplaceId && residentShiftOpen(s, r.id)) &&
       !admitted.has(r.id)
     )
       seats.set(r.id, r.diningSeat);
@@ -661,7 +688,8 @@ function diningSeats(s: TimberState): Map<string, number> {
             s.construction?.workerId === r.id))) &&
       !isDiningEmployee(s, r) &&
       (residentMeal(s, r).amount > 0 || r.routine === "eating") &&
-      !(r.workplaceId && workplaceOpen(s.world.minute)) &&
+      !r.nextWork &&
+      !(r.workplaceId && residentShiftOpen(s, r.id)) &&
       (r.hunger >= RESIDENT_ROUTINE_RULES.hungryAt || r.routine === "eating"),
   );
   const facilities = restaurants(s);
@@ -1016,12 +1044,16 @@ function destination(s: TimberState, id: string): GroundPoint {
       s.suspended?.destinations[s.workerIds.indexOf(id)] ??
       fail("교대 목적지가 없습니다.")
     );
-  if (s.phase === "approaching") return front(TIMBER_RULES.cartStart);
-  if (s.phase === "releasing") return { x: 7.5, z: 4.8 };
+  if (s.phase === "approaching") return front(s, TIMBER_RULES.cartStart);
+  if (s.phase === "releasing")
+    return { x: front(s, dropPoint(s)).x, z: front(s, dropPoint(s)).z + 2 };
   if (s.phase === "returning")
     return s.returnTo ?? fail("복귀 목적지가 없습니다.");
   if (s.phase === "drying-travel")
-    return { x: 4.5 + s.workerIds.indexOf(id) * 2, z: 0.8 };
+    return {
+      x: dropPoint(s).x + s.workerIds.indexOf(id) * 2,
+      z: warehouseDoor(s) ? dropPoint(s).z : 0.8,
+    };
   return TIMBER_RULES.repairSite;
 }
 function pathLength(
@@ -1169,7 +1201,11 @@ function finishProcurement(s: TimberState): TimberState {
   );
 }
 function startDrying(s: TimberState): TimberState {
-  const ids = eligible(s, { x: 4.5, z: 0.8 }, 2);
+  const ids = eligible(
+    s,
+    warehouseDoor(s, TIMBER_RULES.cartStart) ?? { x: 4.5, z: 0.8 },
+    2,
+  );
   if (ids.length < 2) return stop(s, "waiting-labor");
   return note(
     schedule(s, "drying-travel", ids),
@@ -1309,7 +1345,7 @@ function completeStep(s: TimberState): TimberState {
     case "approaching":
       return note(
         schedule(finishMovement(s), "transport", s.workerIds),
-        "수레를 인계받아 야적장으로 운송합니다.",
+        "수레를 인계받아 입고 장소로 운송합니다.",
       );
     case "transport":
       return note(
@@ -1318,14 +1354,14 @@ function completeStep(s: TimberState): TimberState {
             ...s,
             residents: s.residents.map((r) =>
               s.workerIds.includes(r.id)
-                ? { ...r, position: front(TIMBER_RULES.yard) }
+                ? { ...r, position: front(s, dropPoint(s)) }
                 : r,
             ),
           },
           "parking",
           s.workerIds,
         ),
-        "야적장에 멈춰 수레 손잡이를 내려놓습니다.",
+        "하역 위치에 멈춰 수레 손잡이를 내려놓습니다.",
       );
     case "parking":
       return note(
@@ -1847,6 +1883,7 @@ export function parseTimberState(value: unknown): TimberState {
     num(value[key], 10_000_000_000);
   num(value.remainder, 999);
   num(value.buildingHealth, 100);
+  if (value.yardDryAt !== undefined) num(value.yardDryAt);
   num(value.reservedWood, 20);
   for (const key of ["startedAt", "due", "settledAt", "repairCompletedAt"])
     if (value[key] !== null) num(value[key]);
@@ -2204,7 +2241,8 @@ export function parseTimberState(value: unknown): TimberState {
         (s.stock.available +
           s.stock.used +
           loggingSites(s).reduce((sum, l) => sum + l.delivered, 0) -
-          s.woodSpent) *
+          s.woodSpent -
+          (s.yardDryAt ? 1 : 0)) *
           AMOUNT_SCALE ||
     s.world.resources.RES_METAL !==
       s.initialIron -
@@ -2346,6 +2384,22 @@ export function advanceTimber(
       elapsed: nextTime,
       world: advancePlayClock(s.world, elapsed),
     };
+    if (s.yardDryAt && s.elapsed >= s.yardDryAt) {
+      s = note(
+        {
+          ...s,
+          yardDryAt: undefined,
+          world: {
+            ...s.world,
+            resources: {
+              ...s.world.resources,
+              RES_WOOD: s.world.resources.RES_WOOD + AMOUNT_SCALE,
+            },
+          },
+        },
+        "야적장에서 젖었던 목재 1개가 말라 다시 쓸 수 있습니다.",
+      );
+    }
     if (s.phase === "unloading") {
       const moved = Math.floor(
         (20 * (s.elapsed - (s.startedAt ?? 0))) / TIMBER_RULES.unloadMinutes,
@@ -2433,6 +2487,28 @@ export function commandTimber(
     case "cold-weather":
       if (typeof command.cold !== "boolean") fail();
       n = { ...s, town: { ...s.town, cold: command.cold } };
+      if (
+        s.town.cold &&
+        !command.cold &&
+        !warehouseDoor(s) &&
+        !s.yardDryAt &&
+        s.world.resources.RES_WOOD >= (s.reservedWood + 1) * AMOUNT_SCALE
+      ) {
+        n = note(
+          {
+            ...n,
+            yardDryAt: s.elapsed + 60,
+            world: {
+              ...s.world,
+              resources: {
+                ...s.world.resources,
+                RES_WOOD: s.world.resources.RES_WOOD - AMOUNT_SCALE,
+              },
+            },
+          },
+          "눈이 녹아 야적장 목재 1개가 젖었습니다. 한 시간 동안 말립니다.",
+        );
+      }
       break;
     case "restart":
       return { ...createTimberState(), processed: [id] };
@@ -2763,7 +2839,7 @@ export function commandTimber(
       const offer = TIMBER_RULES.offers[s.offer];
       if (s.world.resources.RES_METAL < offer.cost * AMOUNT_SCALE)
         fail("공동 철재가 부족합니다.");
-      const ids = eligible(s, front(TIMBER_RULES.cartStart), 1);
+      const ids = eligible(s, front(s, TIMBER_RULES.cartStart), 1);
       if (!ids.length) fail("운송을 맡을 도달 가능한 유휴 주민이 없습니다.");
       n = note(
         schedule(
@@ -3007,7 +3083,8 @@ export function timberCartPosition(s: TimberState): GroundPoint {
     return s.suspended?.cart ?? fail("교대 수레 위치가 없습니다.");
   if (s.phase === "select" || s.phase === "approaching")
     return { ...TIMBER_RULES.cartStart };
-  if (s.phase !== "transport") return { ...TIMBER_RULES.yard };
+  const drop = dropPoint(s);
+  if (s.phase !== "transport") return drop;
   const t = Math.min(
     1,
     Math.max(
@@ -3017,17 +3094,15 @@ export function timberCartPosition(s: TimberState): GroundPoint {
     ),
   );
   return {
-    x:
-      TIMBER_RULES.cartStart.x +
-      (TIMBER_RULES.yard.x - TIMBER_RULES.cartStart.x) * t,
-    z: TIMBER_RULES.yard.z,
+    x: TIMBER_RULES.cartStart.x + (drop.x - TIMBER_RULES.cartStart.x) * t,
+    z: TIMBER_RULES.cartStart.z + (drop.z - TIMBER_RULES.cartStart.z) * t,
   };
 }
 function movePosition(s: TimberState, id: string): GroundPoint {
   const resident = s.residents.find((r) => r.id === id);
   if (!resident) return { x: 0, z: 0 };
   if (s.phase === "transport" && id === s.transportWorkerId)
-    return front(timberCartPosition(s));
+    return front(s, timberCartPosition(s));
   if (
     !s.workerIds.includes(id) ||
     ![

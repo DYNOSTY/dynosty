@@ -3664,10 +3664,12 @@ body,
   z-index: 1;
   transform: translateX(-50%);
   display: flex;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   white-space: nowrap;
-  gap: 4px;
+  gap: 0;
+  line-height: 1;
   transition:
     left 0.6s,
     top 0.6s;
@@ -3710,4 +3712,145 @@ body,
   .g-console__info {
     grid-template-rows: minmax(0, 1fr);
   }
+}
+
+.mood-inspect {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: help;
+}
+.g-mood:not(:hover):not(:focus-within) :is(.g-mood__v, figcaption) {
+  visibility: hidden;
+}
+.settlement-heading p,
+.resource-card strong {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--meok);
+}
+@media (min-width: 761px) {
+  .settlement-heading p {
+    font-size: var(--hud-num);
+  }
+}
+@media (min-width: 1100px) {
+  .play-shell {
+    --population-width: 205px;
+    --controls-width: 174px;
+  }
+  .g-top__frame img.inset:nth-child(2),
+  .settlement-heading > div:first-child {
+    width: var(--population-width);
+  }
+  .g-top__frame img.inset:nth-child(8),
+  .play-controls {
+    width: var(--controls-width);
+  }
+  .settlement-heading > div:first-child {
+    padding-inline: 4px;
+    white-space: nowrap;
+  }
+  .play-controls {
+    padding-inline: 2px;
+    justify-content: center;
+  }
+  .resource-strip {
+    left: calc(var(--population-width) + 57px);
+    right: calc(var(--controls-width) + 55px);
+    max-width: 1120px;
+    margin-inline: auto;
+    transform: none;
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+  }
+  .resource-card {
+    justify-content: center;
+    padding-inline: 2px;
+  }
+}
+
+@media (min-width: 1100px) and (max-width: 1279px) {
+  .resource-strip .resource-card {
+    grid-template-columns: 18px auto;
+    column-gap: 2px;
+  }
+  .resource-strip .resource-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .resource-strip .resource-card strong {
+    font-size: 14px;
+  }
+}
+
+.play-scene .selection-actions[hidden] {
+  display: none;
+}
+.g-console__info > .g-mood {
+  --rs: 0.085;
+  position: relative;
+  z-index: 5;
+  align-self: center;
+  justify-self: center;
+  width: 100px;
+  height: 84px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+}
+.g-console__info > .g-mood .g-mood__v {
+  min-width: 22px;
+  border-radius: 3px;
+  background: #faeed7;
+  color: #382719;
+  padding: 1px 3px;
+}
+.g-console__info > .g-mood .g-mood__v small {
+  font-size: 10px;
+  color: inherit;
+}
+.g-console__info > .g-mood .g-mood__v b {
+  font-size: 11px;
+}
+@media (min-width: 761px) {
+  .is-procurement .play-workspace.has-tools {
+    inset: 55px 0 175px;
+    display: block;
+  }
+  .is-procurement .play-scene,
+  .is-procurement .scene-viewport {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+    width: 100%;
+    border-radius: 0;
+    overflow: hidden;
+  }
+  .is-procurement .scene-heading,
+  .is-procurement .scene-footer {
+    display: none;
+  }
+  .play-shell.is-procurement .workspace-tools.timber-tools {
+    position: absolute;
+    inset: 8px 12px 8px auto;
+    width: clamp(300px, 29vw, 410px);
+    height: auto;
+    max-height: none;
+    color: #342820;
+    background-color: #f4e4c9;
+  }
+
+  .timber-tools .hint {
+    color: #5b4632;
+  }
+}
+
+.g-console__info {
+  grid-template-columns: minmax(0, 1fr) auto;
 }

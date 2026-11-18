@@ -139,6 +139,11 @@ export function MoodScale({
       }
     >
       <div className="rig-box">
+        <button
+          type="button"
+          className="mood-inspect"
+          aria-label="희망과 절망 확인"
+        />
         <span
           className="g-mood__v"
           style={{

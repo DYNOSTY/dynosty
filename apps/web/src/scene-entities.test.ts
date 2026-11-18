@@ -404,7 +404,10 @@ it("대기 GLB가 늦게 와도 새 종별 모델을 덮어쓰지 않고 단계 
     const base = createSceneExample();
     entities.update(base);
     entities.setGlb(
-      (kind) => new Promise((resolve) => pending.set(kind, resolve)),
+      (kind, _parent, _offset, level) =>
+        new Promise((resolve) =>
+          pending.set(level ? kind + level : kind, resolve),
+        ),
     );
     const custom = {
       ...base,
@@ -420,17 +423,17 @@ it("대기 GLB가 늦게 와도 새 종별 모델을 덮어쓰지 않고 단계 
     await Promise.resolve();
     expect(visual.dispose).toHaveBeenCalledOnce();
     expect(scene.getMeshById("example-resident-1:back-sail-0")).not.toBeNull();
-    const original = scene.getMeshById("example-building-1:oval-nest-roof");
+    const original = { ...visual, dispose: vi.fn() };
+    pending.get("building1")?.(original);
+    await Promise.resolve();
     entities.update({
       ...custom,
       entities: custom.entities.map((e) =>
         e.kind === "building" ? { ...e, level: 3 as const } : e,
       ),
     });
-    expect(original?.isDisposed()).toBe(true);
-    expect(
-      scene.getMeshById("example-building-1:court-wing--1.1-ridge"),
-    ).not.toBeNull();
+    expect(original.dispose).toHaveBeenCalledOnce();
+    expect(pending.has("building3")).toBe(true);
   } finally {
     entities.dispose();
     scene.dispose();

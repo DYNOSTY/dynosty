@@ -175,7 +175,14 @@ export function mountScene(
   );
   const worldRoot = new TransformNode("island-world", scene);
   for (const mesh of scene.meshes) if (!mesh.parent) mesh.parent = worldRoot;
-  const village = createVillage(scene, shadow, { glow, warmMat }, worldRoot);
+  const previewVillage = new TransformNode("preview-village", scene);
+  previewVillage.parent = worldRoot;
+  const village = createVillage(
+    scene,
+    shadow,
+    { glow, warmMat },
+    previewVillage,
+  );
   const fog = createFog(scene, SCOUT_SITES);
   const landmarks = createLandmarks(scene, SCOUT_SITES, glow, warmMat);
   for (const node of [...scene.meshes, ...scene.transformNodes])
@@ -194,7 +201,10 @@ export function mountScene(
     "procurement-ground-material",
     scene,
   );
-  demoMaterial.diffuseColor = new Color3(0.48, 0.57, 0.5);
+  demoMaterial.diffuseColor =
+    season === "winter"
+      ? new Color3(0.82, 0.83, 0.88)
+      : new Color3(0.48, 0.57, 0.5);
   demoGround.material = demoMaterial;
   demoGround.isPickable = true;
   demoGround.setEnabled(false);
@@ -253,8 +263,12 @@ export function mountScene(
     const positions = ground.getVerticesData(VertexBuffer.PositionKind),
       indices = ground.getIndices();
     if (positions && indices) {
-      for (let i = 0; i < positions.length; i += 3)
-        positions[i + 1] = elevation(positions[i] ?? 0, positions[i + 2] ?? 0);
+      for (let i = 0; i < positions.length; i += 3) {
+        const x = positions[i] ?? 0,
+          z = positions[i + 2] ?? 0;
+        positions[i + 1] =
+          elevation(x, z) - (s && Math.hypot(x, z) < ISLAND_RADIUS ? 0.65 : 0);
+      }
       const normals: number[] = [];
       VertexData.ComputeNormals(positions, indices, normals);
       ground.updateVerticesData(VertexBuffer.PositionKind, positions);
@@ -320,6 +334,7 @@ export function mountScene(
     ground,
     () => villageState,
     (x, z) => elevation(x, z),
+    village.entityVisual,
   );
   const abort = new AbortController();
   let disposed = false;
@@ -392,8 +407,7 @@ export function mountScene(
     onHospitalSelect(null);
     if (!selectionEnabled) return;
     const site = sites.idForMesh(picked);
-    if (!demoActive && picked?.metadata?.villageTarget)
-      select(picked.metadata.villageTarget);
+    if (picked?.metadata?.villageTarget) select(picked.metadata.villageTarget);
     else if (site) select(site);
     else {
       if (selected?.startsWith("village:")) select(null);
@@ -738,18 +752,15 @@ export function mountScene(
       if (active !== demoActive) {
         demoActive = active;
         if (selected?.startsWith("village:")) select(null);
-        worldRoot.setEnabled(!active);
+        worldRoot.setEnabled(true);
+        previewVillage.setEnabled(true);
+        village.setPreviewResidentsVisible(!active);
         demoGround.setEnabled(active);
         camera.upperRadiusLimit = active ? 720 : 140;
         if (softwareRenderer) engine.setHardwareScalingLevel(active ? 1 : 2);
         if (!active) resetWorldCamera();
       }
-      if (state && !villageState) {
-        camera.radius = 32;
-        camera.beta = Math.PI / 3;
-        camera.alpha = -Math.PI / 2;
-        camera.setTarget(Vector3.Zero(), false, true, true);
-      }
+      if (state && !villageState) resetWorldCamera();
       updateGround(state);
       entities.setElevation(elevation);
       villageState = state;

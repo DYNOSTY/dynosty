@@ -330,3 +330,27 @@ describe("자동 조달", () => {
     expect(worker?.position.z).toBe(TIMBER_RULES.yard.z);
   });
 });
+
+it("야적장의 젖은 목재는 건조 후 돌아오고 저장소에서는 젖지 않는다", () => {
+  const start = createTimberState();
+  const thaw = (state: TimberState) =>
+    commandTimber(
+      commandTimber(state, { type: "cold-weather", cold: true }, "freeze"),
+      { type: "cold-weather", cold: false },
+      "thaw",
+    );
+  const wet = thaw(start);
+  expect(wet.world.resources.RES_WOOD).toBe(
+    start.world.resources.RES_WOOD - AMOUNT_SCALE,
+  );
+  expect(
+    advanceTimber(parseTimberSave(createTimberSave(wet)).state, 60).world
+      .resources.RES_WOOD,
+  ).toBe(start.world.resources.RES_WOOD);
+  const covered = thaw({
+    ...start,
+    logging: { ...start.logging, storageBuilt: true },
+  });
+  expect(covered.yardDryAt).toBeUndefined();
+  expect(covered.world.resources.RES_WOOD).toBe(start.world.resources.RES_WOOD);
+});

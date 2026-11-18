@@ -11,6 +11,7 @@ import {
   type GroundPoint,
   residentPath,
 } from "./resident-path.js";
+import { warehouseDoor } from "./storage.js";
 import type { TimberState } from "./timber.js";
 
 export interface HomePlacement {
@@ -32,7 +33,10 @@ export const homeEntrance = (p: HomePlacement): GroundPoint => ({
 export const homeWorkPosition = (p: HomePlacement, slot: number) =>
   rotatedPoint(p, (slot - 1) * 1.6, 2.4);
 export function homeWorkSlots(s: TimberState, p: HomePlacement): number[] {
-  const obstacles = [...s.homes.map(homeObstacle), { x: 4.5, z: 2.8 }];
+  const obstacles = [
+    ...s.homes.map(homeObstacle),
+    ...(warehouseDoor(s) ? [] : [{ x: 4.5, z: 2.8 }]),
+  ];
   return [1, 0, 2].filter((slot) => {
     const q = homeWorkPosition(p, slot);
     return residentPath(q, q, obstacles).length > 0;
@@ -168,7 +172,7 @@ export function homePlacementIssue(
       halfDepth: d,
     });
   if (
-    overlaps({ x: 4.5, z: 2.8 }, 3, 3) ||
+    (!warehouseDoor(s) && overlaps({ x: 4.5, z: 2.8 }, 3, 3)) ||
     (s.restaurantBuilt && overlaps({ x: -4.3, z: 6 }, 4.6, 5))
   )
     return "시설이나 자재 작업 공간과 겹쳐요.";

@@ -120,3 +120,46 @@ it("신규와 기존 모두 같은 건강 상태를 따르고 사망자는 업�
     ).routine,
   ).toBe("resting");
 });
+
+it("배고픈 주민은 출근·예약 작업을 먼저 수행하고 퇴근 뒤 식당을 찾는다", () => {
+  const job = { x: 4, z: 0 };
+  const r = {
+    ...resident(),
+    hunger: 500,
+    routine: "restaurant" as const,
+    request: "waiting-seat" as const,
+  };
+  const shift = {
+    ...places,
+    minute: 540,
+    workplace: job,
+    seatAvailable: false,
+  };
+  const atWork = advanceResidentRoutine(
+    { ...r, workplaceId: "facility:mill" },
+    1,
+    1,
+    2,
+    shift,
+    true,
+  );
+  expect(atWork).toMatchObject({
+    position: job,
+    routine: "working",
+    request: null,
+  });
+  expect(
+    advanceResidentRoutine(atWork, 2, 1, 2, { ...shift, minute: 1080 }, true)
+      .routine,
+  ).toBe("restaurant");
+  expect(
+    advanceResidentRoutine(
+      { ...r, nextWork: { id: "build", position: job } },
+      1,
+      1,
+      2,
+      shift,
+      true,
+    ),
+  ).toMatchObject({ position: job, task: "build", request: null });
+});

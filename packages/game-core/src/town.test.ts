@@ -5,6 +5,7 @@ import {
   commandTimber,
   createTimberSave,
   createTimberState,
+  createVillageGame,
   parseTimberSave,
   parseTimberState,
   type TimberCommand,
@@ -251,4 +252,53 @@ it("대기 부지의 입구나 주민이 서 있는 곳을 덮는 배치를 거�
       headingRadians: 0,
     }),
   ).toContain("출입구");
+});
+
+it("식당 대기 중인 유휴 인력은 명령 즉시 좌석을 놓고 건설에 배정된다", () => {
+  const initial = start();
+  const s = plan(
+    {
+      ...initial,
+      residents: initial.residents.map((r) => ({
+        ...r,
+        routine: "restaurant",
+        request: "waiting-seat",
+        hunger: 500,
+      })),
+    },
+    "home",
+  );
+  const crew = s.town.orders[0]!.crew;
+  expect(crew).toHaveLength(4);
+  for (const r of s.residents.filter((r) => crew.includes(r.id)))
+    expect(r).toMatchObject({
+      routine: "working",
+      request: null,
+      diningSeat: null,
+      task: "build-order:build-1",
+    });
+});
+
+it("새 마을의 첫 식당은 공사 인부가 배식을 맡고 주민이 식사를 마친다", () => {
+  const initial = createVillageGame();
+  expect(initial.world.minute).toBe(540);
+  expect(initial.world.resources.RES_WOOD).toBe(6000000);
+  const order = plan(initial, "restaurant");
+  const crew = order.town.orders[0]?.crew ?? [];
+  expect(crew).toHaveLength(4);
+  let s = finish(order);
+  expect(
+    s.residents
+      .filter((r) => r.workplaceId === "restaurant")
+      .map((r) => r.id)
+      .every((id) => crew.includes(id)),
+  ).toBe(true);
+  expect(s.restaurantWorkerTarget).toBe(2);
+  s = advanceTimber(s, 180);
+  expect(
+    s.residents.some(
+      (r) =>
+        r.workplaceId === null && r.lastMeal !== null && r.routine !== "eating",
+    ),
+  ).toBe(true);
 });

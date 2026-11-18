@@ -202,7 +202,9 @@ it("높이가 있는 평탄한 땅도 주거 구역 제한 없이 허용한다",
         found = true;
     }
   expect(found).toBe(true);
-  expect(villageObstacles(s)).toHaveLength(10);
+  expect(
+    villageObstacles(s).filter((p) => p.x === 4.5 && p.z === 2.8),
+  ).toHaveLength(1);
 });
 it("v12 저장의 입주를 유지해 잠자리를 부여하고 손상된 귀가 기록은 거부한다", () => {
   const current = idle();

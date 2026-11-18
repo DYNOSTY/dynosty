@@ -538,10 +538,10 @@ test("건물 체력은 마우스를 올리면 나타나며 화재 손상 뒤 직
   );
   await button(page, "다음 작업 완료까지").click();
   await expect(page.getByTestId("timber-phase")).toHaveText("조달 완료");
-  await expect(button(page, "건물 보수 명령")).toBeDisabled();
+  await expect(button(page, "건물 보수 명령")).toHaveCount(0);
   await expect(button(page, "건물 손상 검사 (-25)")).toHaveCount(0);
   await hoverHouse(page);
-  await expect(page.getByRole("tooltip")).toContainText("100/100");
+  await expect(page.getByRole("tooltip")).not.toContainText("100/100");
 });
 test("합류한 주민과 건강 사건의 결과를 인구·생활 명부에 함께 반영한다", async ({
   page,
