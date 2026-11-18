@@ -4109,3 +4109,62 @@ body,
 .play-shell:has(.trade-deck) .workspace-tools {
   display: none;
 }
+
+.docked-portrait {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  justify-self: center;
+  max-width: 78%;
+  pointer-events: none;
+}
+.docked-portrait img {
+  display: block;
+  width: 100%;
+  max-height: 110px;
+  object-fit: contain;
+  border-radius: 5px;
+}
+.play-shell .g-console:has(.docked-portrait) .g-console__info {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+.g-console .guide-lines {
+  align-self: center;
+  color: #382719;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.g-console .guide-lines small {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+.trade-deck .guide-lines {
+  flex-basis: 100%;
+}
+.play-shell .dock-close {
+  position: absolute;
+  z-index: 5;
+  top: -19px;
+  left: 16px;
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-content: center;
+  border-radius: 50%;
+  background: #f5e4c7;
+  color: #422d1d;
+  border: 2px solid #735237;
+  padding: 0;
+  font-size: 20px;
+}
+@media (max-width: 760px) {
+  .docked-portrait img {
+    max-width: 52px;
+  }
+  .play-shell .g-console:has(.docked-portrait) {
+    grid-template-columns: 60px minmax(0, 1fr) auto;
+  }
+}

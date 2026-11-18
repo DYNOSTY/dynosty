@@ -773,6 +773,40 @@ export function App() {
   const selectedSite =
     timberOpen && laborOpen && isSiteId(selectedId) ? selectedId : null;
 
+  const portrait = (
+    <img
+      alt=""
+      src={
+        visitor
+          ? "/art/merchants/" + visitor[0] + ".png"
+          : `/art/advisers/${daylight ? "nareumi" : "dali"}/neutral.png`
+      }
+    />
+  );
+  const dialogue = (
+    <span className="guide-lines">
+      {visitor?.[2] ?? (daylight ? "나르미" : "달이")}
+      <small>
+        {visitor
+          ? showTrade
+            ? visitor[4]
+            : visitor[3]
+          : !daylight
+            ? foundCount === 5
+              ? "고리님, 정찰대가 모두 돌아왔어요. 오늘 밤은 둥지에 빈자리가 있는지 살펴봐요."
+              : Object.keys(scouts).length > foundCount
+                ? "아직 마을 밖에 있는 이들이 있어요. 정찰대 얼굴에 손을 올리면 남은 길을 알 수 있어요."
+                : "등불이 하나둘 켜지네요. 주민 명단을 펼쳐 보세요. 오늘 잘 곳을 찾은 이들을 짚어 드릴게요."
+            : foundCount === 5
+              ? timberState?.chapter === 2
+                ? "고리님, 다섯 길이 열렸어요. 이웃이 내놓은 물목을 우리 곳간과 견주어 볼까요?"
+                : "생존자들이 돌아왔어요. 의뢰에서 2단계를 시작하세요."
+              : Object.keys(scouts).length
+                ? "정찰대 얼굴에 커서를 대면 귀환 시간을 볼 수 있어요."
+                : "지도에서 미탐색 거점을 눌러 보세요."}
+      </small>
+    </span>
+  );
   return (
     <main
       data-section={saveOpen || toolsOpen ? undefined : villageSection?.label}
@@ -1457,7 +1491,7 @@ export function App() {
       <button
         type="button"
         className="guide-toggle"
-        hidden={reports.length > 0 && !visitor}
+        hidden={consoleOpen || (reports.length > 0 && !visitor)}
         aria-label={
           consoleOpen ? "명령 접기" : visitor ? "거래 제안 열기" : "명령 열기"
         }
@@ -1475,36 +1509,8 @@ export function App() {
           }
         }}
       >
-        <img
-          alt=""
-          src={
-            visitor
-              ? "/art/merchants/" + visitor[0] + ".png"
-              : `/art/advisers/${daylight ? "nareumi" : "dali"}/neutral.png`
-          }
-        />
-        <span>
-          {visitor?.[2] ?? (daylight ? "나르미" : "달이")}
-          <small>
-            {visitor
-              ? showTrade
-                ? visitor[4]
-                : visitor[3]
-              : !daylight
-                ? foundCount === 5
-                  ? "고리님, 정찰대가 모두 돌아왔어요. 오늘 밤은 둥지에 빈자리가 있는지 살펴봐요."
-                  : Object.keys(scouts).length > foundCount
-                    ? "아직 마을 밖에 있는 이들이 있어요. 정찰대 얼굴에 손을 올리면 남은 길을 알 수 있어요."
-                    : "등불이 하나둘 켜지네요. 주민 명단을 펼쳐 보세요. 오늘 잘 곳을 찾은 이들을 짚어 드릴게요."
-                : foundCount === 5
-                  ? timberState?.chapter === 2
-                    ? "고리님, 다섯 길이 열렸어요. 이웃이 내놓은 물목을 우리 곳간과 견주어 볼까요?"
-                    : "생존자들이 돌아왔어요. 의뢰에서 2단계를 시작하세요."
-                  : Object.keys(scouts).length
-                    ? "정찰대 얼굴에 커서를 대면 귀환 시간을 볼 수 있어요."
-                    : "지도에서 미탐색 거점을 눌러 보세요."}
-          </small>
-        </span>
+        {portrait}
+        {dialogue}
         <b aria-hidden="true">
           {consoleOpen && (!visitor || showTrade) ? "‹" : "›"}
         </b>
@@ -1514,9 +1520,42 @@ export function App() {
         aria-label="명령 콘솔"
       >
         <ConsoleFrame />
+        {consoleOpen && (
+          <>
+            <div className="docked-portrait">{portrait}</div>
+            <button
+              className="dock-close"
+              type="button"
+              aria-label="명령 접기"
+              onClick={() => {
+                setConsoleOpen(false);
+                closePopups();
+                cancelHomePlacement();
+                setPlacementHint("");
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                aria-hidden="true"
+              >
+                <path
+                  d="M8.5 2.5 3.5 7l5 4.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </>
+        )}
         <div className="g-console__info">
           {showTrade && timberState ? (
             <section className="trade-deck" aria-label="상인 계약 선택">
+              {dialogue}
               <MerchantOffers
                 state={timberState}
                 command={(cmd) => villageCommand.current?.(cmd)}
@@ -1633,10 +1672,7 @@ export function App() {
               }
             />
           ) : (
-            <div className="g-idle">
-              <h2>복홀 본진</h2>
-              <p>건물이나 주민을 누르면 이 자리에 정보가 나옵니다.</p>
-            </div>
+            dialogue
           )}
           <MoodScale
             hope={displayedWorld?.optimism ?? null}
