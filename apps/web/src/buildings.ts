@@ -135,22 +135,23 @@ export const BUILDINGS: Record<string, BuildingInfo> = {
   },
 };
 
-/** 9칸: 건물 명령 + 빈 칸 + 늘 있는 '가까이 보기'·'선택 해제' */
-export function commandGrid(info: BuildingInfo): Array<BuildingCommand | null> {
-  const own = info.commands.slice(0, 7);
-  const grid: Array<BuildingCommand | null> = [...own];
-  while (grid.length < 7) grid.push(null);
-  grid.push({
+/** 9칸: 건물 명령 + 빈 칸 + 늘 있는 가까이 보기·선택 해제 (칸마다 고정 이름) */
+export function commandGrid(
+  info: BuildingInfo,
+): Array<{ slot: string; cmd: BuildingCommand | null }> {
+  const cells: Array<BuildingCommand | null> = info.commands.slice(0, 7);
+  while (cells.length < 7) cells.push(null);
+  cells.push({
     icon: "map",
     label: "가까이 보기",
     hotkey: "F",
     action: "focus",
   });
-  grid.push({
+  cells.push({
     icon: "close",
     label: "선택 해제",
     hotkey: "Esc",
     action: "clear",
   });
-  return grid;
+  return cells.map((cmd, n) => ({ slot: `slot-${n + 1}`, cmd }));
 }

@@ -1257,10 +1257,10 @@ export function App() {
               ) : null}
             </div>
             <nav className="play-menu g-console__cmd" aria-label="건물 명령">
-              {selection.grid.map((cmd, i) =>
+              {selection.grid.map(({ slot, cmd }) =>
                 cmd ? (
                   <CmdButton
-                    key={cmd.label}
+                    key={slot}
                     icon={cmd.icon}
                     label={cmd.label}
                     hotkey={cmd.hotkey ?? ""}
@@ -1272,7 +1272,7 @@ export function App() {
                   />
                 ) : (
                   <span
-                    key={`empty-${i}`}
+                    key={slot}
                     className="g-cmd g-cmd--empty"
                     aria-hidden="true"
                   />
