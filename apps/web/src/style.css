@@ -3635,46 +3635,12 @@ body,
   border-radius: 8px;
 }
 
-.village-clock {
-  position: absolute;
-  bottom: 25.5%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4;
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  max-width: 85vw;
-  padding: 0.35rem 0.9rem;
-  border: 1px solid #73532c;
-  border-radius: 1rem;
-  background: #f1e3c5;
-  color: #332719;
-  font-size: 0.8rem;
-  pointer-events: none;
-}
-.village-clock progress {
-  width: 6rem;
-  height: 0.5rem;
-  accent-color: #9a783d;
-}
 .facility-reference {
   display: block;
   width: 100%;
   height: auto;
   margin-block: 0.6rem;
 }
-@media (max-width: 700px) {
-  .village-clock {
-    bottom: 26%;
-    font-size: 0.65rem;
-    gap: 0.4rem;
-  }
-  .village-clock progress {
-    width: 3rem;
-  }
-}
-
 .village-visitor-marker {
   position: absolute;
   transform: translate(-50%, -100%);
@@ -3688,4 +3654,60 @@ body,
   width: 34px;
   height: 34px;
   cursor: pointer;
+}
+
+.g-mood .rig-box {
+  position: relative;
+}
+.g-mood .g-mood__v {
+  position: absolute;
+  z-index: 1;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  white-space: nowrap;
+  gap: 4px;
+  transition:
+    left 0.6s,
+    top 0.6s;
+}
+.g-mood .g-mood__v small {
+  font-weight: 800;
+  color: var(--meok);
+}
+.play-controls[hidden] {
+  display: none;
+}
+
+.g-console__info {
+  min-height: 0;
+}
+.g-console .selection-info {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  padding-right: 28px;
+  box-sizing: border-box;
+}
+.g-console .selection-info ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.g-console .selection-clear {
+  position: absolute;
+  right: 2px;
+  top: 0;
+  background: transparent;
+  border: 0;
+}
+@media (min-width: 761px) {
+  .g-console {
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .g-console__info {
+    grid-template-rows: minmax(0, 1fr);
+  }
 }

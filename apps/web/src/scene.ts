@@ -58,7 +58,8 @@ const CAMERA_TARGET = new Vector3(0, 0, -7);
 import { createTownVisual } from "./town-scene.js";
 
 export interface SceneController {
-  update(snapshot: SceneSnapshot): void;
+  villageInfo(id: string): { name: string; detail: string } | undefined;
+  update(snapshot: SceneSnapshot, showBoard?: boolean): void;
   select(id: string | null): void;
   focusSite(id: SiteId): boolean;
   dispose(): void;
@@ -223,6 +224,7 @@ export function mountScene(
   let selected: string | null = null;
   const publishSelection = (id: string | null) => {
     if (id !== selected) {
+      village.mark(id?.startsWith("village:") ? id : null);
       selected = id;
       onSelectionChange(id);
     }
@@ -298,7 +300,11 @@ export function mountScene(
     sites = createSiteSelection(scene, onSiteSelection);
   }
   const select = (id: string | null) => {
-    if (isSiteId(id)) {
+    if (id === null || village.targets.has(id)) {
+      entities.select(null);
+      sites.select(null);
+      publishSelection(id);
+    } else if (isSiteId(id)) {
       entities.select(null);
       sites.select(id);
     } else {
@@ -386,8 +392,11 @@ export function mountScene(
     onHospitalSelect(null);
     if (!selectionEnabled) return;
     const site = sites.idForMesh(picked);
-    if (site) select(site);
+    if (!demoActive && picked?.metadata?.villageTarget)
+      select(picked.metadata.villageTarget);
+    else if (site) select(site);
     else {
+      if (selected?.startsWith("village:")) select(null);
       sites.select(null);
       entities.selectMesh(picked);
     }
@@ -536,7 +545,7 @@ export function mountScene(
     if (diff < -720) diff += 1440;
     if (diff > 720) diff -= 1440;
     clockShown = (clockShown + diff * Math.min(1, dt * 3) + 1440) % 1440;
-    setTime(demoActive ? 12 * 60 : clockShown);
+    setTime(clockShown);
     village.animate(dt);
     fog.animate(dt);
     landmarks.animate(dt);
@@ -728,6 +737,7 @@ export function mountScene(
       camera.upperRadiusLimit = active ? 720 : 140;
       if (active !== demoActive) {
         demoActive = active;
+        if (selected?.startsWith("village:")) select(null);
         worldRoot.setEnabled(!active);
         demoGround.setEnabled(active);
         camera.upperRadiusLimit = active ? 720 : 140;
@@ -967,6 +977,7 @@ export function mountScene(
         k = d > PAN_LIMIT ? PAN_LIMIT / d : 1;
       camera.target.set(x * k, 0, z * k); // 각도·거리는 그대로 두고 바라보는 점만 옮김
     },
+    villageInfo: (id) => village.targets.get(id),
     update: entities.update,
     select,
     dispose() {

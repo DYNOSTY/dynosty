@@ -53,6 +53,30 @@ const RESIDENTS = [
   "R12_Protoceratops",
 ];
 
+const villageNames: Record<string, string> = {
+  BLD_OFFICE: "관아",
+  BLD_NEST: "온돌 둥지",
+  BLD_WAREHOUSE: "갈무리 창고",
+  BLD_WORKSHOP: "공방",
+  BLD_FORAGE: "채집막",
+  BLD_GREENHOUSE: "온상 재배소",
+  BLD_WATER: "물터",
+  BLD_FISHERY: "어획막",
+  BLD_WATCH: "망루",
+  BLD_CLINIC: "병원",
+  BLD_SALVAGE: "자재 회수장",
+  BLD_GATE: "마을 문",
+  R01_Pachycephalosaurus: "파키케팔로사우루스",
+  R02_Triceratops: "트리케라톱스",
+  R03_Velociraptor: "벨로키랍토르",
+  R04_Ankylosaurus: "안킬로사우루스",
+  R05_Gallimimus: "갈리미무스",
+  R07_Parasaurolophus: "파라사우롤로푸스",
+  R08_Brachiosaurus: "브라키오사우루스",
+  R09_Oviraptor: "오비랍토르",
+  R10_Iguanodon: "이구아노돈",
+  R12_Protoceratops: "프로토케라톱스",
+};
 export interface GlbVisual {
   setOutline(value: boolean): void;
   setMotion(value: string): void;
@@ -128,6 +152,24 @@ export function createVillage(
   light?: Light,
   worldRoot?: TransformNode,
 ) {
+  const targets = new Map<
+    string,
+    { name: string; detail: string; meshes: AbstractMesh[] }
+  >();
+  let marked: string | null = null;
+  function mark(id: string | null) {
+    if (marked === id) return;
+    if (marked)
+      for (const m of targets.get(marked)?.meshes ?? [])
+        m.renderOutline = false;
+    marked = id;
+    if (id)
+      for (const m of targets.get(id)?.meshes ?? []) {
+        m.outlineColor = OUTLINE;
+        m.outlineWidth = 0.025;
+        m.renderOutline = true;
+      }
+  }
   let disposed = false;
   let scoutGeneration = 0;
   const landmarkVisuals = new Map<
@@ -176,8 +218,21 @@ export function createVillage(
     node.rotation.y = yaw;
     nodes.push(node);
     const v = instantiate(asset, node, scale, shadow, radius, depth);
+    const model = node.name.replace(".glb", "");
+    const id = "village:" + model + ":" + x + ":" + z;
+    const detail = !role
+      ? "복홀 · 마을 시설"
+      : role === "walk"
+        ? "복홀 · 마을 주민"
+        : "복홀 · 작업장과 창고 사이 운반 담당";
+    targets.set(id, {
+      name: villageNames[model] ?? model,
+      detail,
+      meshes: v.meshes,
+    });
     for (const m of v.meshes) {
-      m.isPickable = false;
+      m.isPickable = true;
+      m.metadata = { ...m.metadata, villageTarget: id };
       // 건물 밑 돌판(상자 1개)이 눈밭 위 흰 네모로 튀어 보임 → 둘레 눈 색으로 덮음
       if (!role && m.material?.name === "stone" && m.getTotalVertices() <= 36)
         m.material = plinthMat;
@@ -642,6 +697,8 @@ export function createVillage(
   return {
     ready,
     entityVisual,
+    targets,
+    mark,
     setRunning,
     animate,
     setMissions,

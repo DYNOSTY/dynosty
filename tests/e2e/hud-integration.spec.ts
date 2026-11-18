@@ -41,6 +41,7 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
     const scene = (
       window as unknown as {
         __scene: {
+          getMeshById(id: string): SceneMesh | null;
           getEngine(): {
             getGlInfo(): unknown;
             getHardwareScalingLevel(): number;
@@ -58,8 +59,7 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
         scene.getTransformNodeByName("BLD_OFFICE.glb")?.getChildMeshes()
           .length ?? 0,
       representativeMeshes:
-        scene.getTransformNodeByName("example-building-1:glb")?.getChildMeshes()
-          .length ?? 0,
+        scene.getMeshById("example-building-1")?.getChildMeshes().length ?? 0,
     };
   });
   expect(renderer.villageMeshes).toBeGreaterThan(0);
@@ -185,7 +185,7 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
   await clickExample(page, "building");
   await expect(
     page.getByRole("region", { name: "선택 정보", exact: true }),
-  ).toContainText("건물 예제");
+  ).toContainText("복홀 방 게시판");
   await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
   expect(errors).toEqual([]);
 });

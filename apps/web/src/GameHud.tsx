@@ -138,11 +138,27 @@ export function MoodScale({
         ready ? `희망 ${hope}, 절망 ${despair}` : "희망·절망 규칙 준비 중"
       }
     >
-      <span className="g-mood__v">
-        <small>희망</small>
-        <b>{ready ? hope : "—"}</b>
-      </span>
       <div className="rig-box">
+        <span
+          className="g-mood__v"
+          style={{
+            left: ((X + lx) / 1120) * 100 + "%",
+            top: ((Y + ly + 480) / 930) * 100 + "%",
+          }}
+        >
+          <small>희망</small>
+          {ready && <b>{hope}</b>}
+        </span>
+        <span
+          className="g-mood__v"
+          style={{
+            left: ((X + rx) / 1120) * 100 + "%",
+            top: ((Y + ry + 480) / 930) * 100 + "%",
+          }}
+        >
+          <small>절망</small>
+          {ready && <b>{despair}</b>}
+        </span>
         <div className="rig">
           <img
             src="/ui/kit/scale_post.png"
@@ -171,10 +187,7 @@ export function MoodScale({
           />
         </div>
       </div>
-      <span className="g-mood__v">
-        <small>절망</small>
-        <b>{ready ? despair : "—"}</b>
-      </span>
+
       {ready ? null : <figcaption>민심 규칙 준비 중</figcaption>}
     </figure>
   );

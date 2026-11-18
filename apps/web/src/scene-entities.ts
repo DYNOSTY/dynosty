@@ -1,3 +1,4 @@
+import { noticeBoard } from "./notice-board.js";
 import "@babylonjs/core/Rendering/outlineRenderer";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -208,7 +209,7 @@ export function createSceneEntities(
         object.visual?.animate(delta);
       }
     },
-    update(snapshot: SceneSnapshot) {
+    update(snapshot: SceneSnapshot, showBoard = false) {
       // 부적합한 입력이 기존 장면을 일부만 바꾸지 않게 먼저 검사한다.
       validateSceneSnapshot(snapshot);
       const ids = new Set(snapshot.entities.map((entity) => entity.id));
@@ -242,11 +243,13 @@ export function createSceneEntities(
           objects.set(entity.id, object);
         }
         const assetKey =
-          entity.kind === "resident" && entity.species
-            ? `species:${entity.species}`
-            : entity.kind === "building" && entity.level
-              ? `home:${entity.level}`
-              : "default";
+          showBoard && entity.id === "example-building-1"
+            ? "notice-board"
+            : entity.kind === "resident" && entity.species
+              ? `species:${entity.species}`
+              : entity.kind === "building" && entity.level
+                ? `home:${entity.level}`
+                : "default";
         if (object.assetKey !== assetKey) {
           object.visual?.dispose();
           object.visual = null;
@@ -305,11 +308,13 @@ export function createSceneEntities(
         );
         const asset = object.modelAttempted
           ? undefined
-          : entity.kind === "resident" && entity.species
-            ? residentModel(entity.species)
-            : entity.kind === "building" && entity.level
-              ? facilityModel("home", entity.level)
-              : models[entity.kind];
+          : assetKey === "notice-board"
+            ? noticeBoard
+            : entity.kind === "resident" && entity.species
+              ? residentModel(entity.species)
+              : entity.kind === "building" && entity.level
+                ? facilityModel("home", entity.level)
+                : models[entity.kind];
         if (glb && assetKey === "default" && !object.modelAttempted) {
           object.modelAttempted = true;
           const target = object,

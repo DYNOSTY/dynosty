@@ -61,7 +61,7 @@ async function load(p: Page, s: TimberState) {
   );
   await b(p, "저장").click();
 }
-test("두 식당의 인원 지시는 독립적이고 단계별 설계와 중하단 낮밤 시간이 보인다", async ({
+test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상단 시각이 보인다", async ({
   page,
 }) => {
   let s = build(build(start(), "restaurant"), "restaurant", 0, 16);
@@ -88,9 +88,9 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 중하�
   await expect
     .poll(() => art.evaluate((img) => (img as HTMLImageElement).naturalWidth))
     .toBeGreaterThan(0);
-  await expect(page.getByTestId("village-clock")).toContainText("낮");
+  await expect(page.getByTestId("play-clock")).toContainText("일차");
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByTestId("village-clock")).toBeInViewport();
+  await expect(page.getByTestId("play-clock")).toBeInViewport();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -228,4 +228,20 @@ test("방문 상인의 초상과 재협상 · 계약 입고", async ({ page }) =
     .getByRole("button", { name: /A · 철재 3개로 목재 8개 계약/ })
     .click();
   await expect(visit).toHaveCount(0);
+});
+
+test("복홀 운영 화면의 밤과 낮 조명이 마을 시각을 따른다", async ({ page }) => {
+  const s = start();
+  const light = () =>
+    page.evaluate(() =>
+      Number(document.documentElement.style.getPropertyValue("--daylight")),
+    );
+  for (const minute of [0, 720]) {
+    await load(page, { ...s, paused: true, world: { ...s.world, minute } });
+    await expect(page.getByTestId("play-clock")).toContainText(
+      minute === 0 ? "00:00" : "12:00",
+    );
+    await expect.poll(light).toBe(minute === 0 ? 0.72 : 1);
+    await expect(page.locator(".village-clock, .play-time")).toHaveCount(0);
+  }
 });

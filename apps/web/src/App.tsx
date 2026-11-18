@@ -273,7 +273,7 @@ export function App() {
     sceneRef.current?.updateLabor(null);
     if (!snapshot || sceneStatus !== "준비 완료" || !sceneRef.current) return;
     try {
-      sceneRef.current.update(snapshot);
+      sceneRef.current.update(snapshot, true);
       setAppliedSnapshot(snapshot);
     } catch {
       setSceneStatus("3D 표시 정보 오류 — 전달 형식을 확인해 주세요");
@@ -433,15 +433,15 @@ export function App() {
     (entity) => entity.kind === "resident",
   );
 
+  const villageInfo =
+    !timberOpen && selectedId
+      ? sceneRef.current?.villageInfo(selectedId)
+      : undefined;
   const selectedEntity =
     appliedSnapshot?.entities.find(
       (entity) => entity.id === selectedId && entity.visible,
     ) ?? null;
   const hasPanels = saveOpen || toolsOpen || scoutOpen !== null;
-  const clockWorld = timberOpen ? timberState?.world : playState;
-  const clockMinute = clockWorld?.minute ?? 420;
-  const clockDay = clockWorld?.day ?? 1;
-  const daylight = clockMinute >= 360 && clockMinute < 1080;
   const gameMinutes = playState
     ? (playState.day - 1) * 1440 + playState.minute
     : 0;
@@ -462,7 +462,11 @@ export function App() {
   useEffect(() => {
     if (sceneStatus === "준비 완료") sceneRef.current?.setRunning(running);
   }, [running, sceneStatus]);
-  const playMinute = playState?.minute;
+  const playMinute = timberOpen
+    ? laborOpen
+      ? (laborState?.elapsed ?? 0) % 1440
+      : timberState?.world.minute
+    : playState?.minute;
   useEffect(() => {
     if (sceneStatus === "준비 완료" && playMinute !== undefined)
       sceneRef.current?.setClock(playMinute);
@@ -693,16 +697,6 @@ export function App() {
           <p className="eyebrow">3D 생존 · 도시 경영</p>
           <h1>DYNOSTY</h1>
         </div>
-        <div className="play-time" aria-live="polite">
-          <span>
-            {timberOpen
-              ? "조달 체험 시간"
-              : exampleClock
-                ? "연결 예제 시간"
-                : "게임 시간"}
-          </span>
-          <strong>{shownDay ? `${shownDay}일차` : "계산 준비 중"}</strong>
-        </div>
       </header>
       <section className="g-quests" aria-label="의뢰">
         <h2>의뢰</h2>
@@ -801,6 +795,8 @@ export function App() {
       <div>
         <PlayPanel
           compact={timberOpen}
+          day={shownDay}
+          minute={playMinute}
           state={
             timberOpen && timberState
               ? {
@@ -940,7 +936,7 @@ export function App() {
             <span>
               {timberOpen && laborOpen
                 ? "검수대 · 격리품 · 배급소"
-                : "대표 주민 1종 · 온돌 둥지"}
+                : "대표 주민 1종 · 복홀 방 게시판"}
             </span>
           </div>
           {timberOpen && laborOpen && laborState ? (
@@ -1260,25 +1256,6 @@ export function App() {
         <div className="g-backdrop" aria-hidden="true" onClick={closePopups} />
       ) : null}
       <FpsBadge />
-      <section
-        className="village-clock"
-        aria-label="마을 시간"
-        data-testid="village-clock"
-      >
-        <span>
-          {daylight ? "☀ 낮" : "☾ 밤"} · {clockDay}일차{" "}
-          {String(Math.floor(clockMinute / 60)).padStart(2, "0")}:
-          {String(clockMinute % 60).padStart(2, "0")}
-        </span>
-        <span>
-          {clockMinute >= 540 && clockMinute < 1080
-            ? "일과시간"
-            : clockMinute >= 1080 && clockMinute < 1260
-              ? "야근 지정 시설만 운영"
-              : "휴식시간"}
-        </span>
-        <progress max={1440} value={clockMinute} aria-label="하루 시간" />
-      </section>
       <section className="g-console" aria-label="명령 콘솔">
         <div
           className="g-scout-faces"
@@ -1345,8 +1322,49 @@ export function App() {
           </button>
         </div>
         <div className="g-console__info">
-          {selectedEntity ? (
-            <SelectionPanel entity={selectedEntity} onClear={clearSelection} />
+          {villageInfo ? (
+            <section
+              className="g-idle selection-info"
+              aria-label="선택 정보"
+              aria-live="polite"
+            >
+              <h2>{villageInfo.name}</h2>
+              <p>{villageInfo.detail}</p>
+            </section>
+          ) : selectedEntity ? (
+            <SelectionPanel
+              entity={selectedEntity}
+              onClear={clearSelection}
+              notices={
+                !timberOpen && selectedEntity.id === "example-building-1"
+                  ? [
+                      ...(timberState
+                        ? [
+                            "정책 시행 · " +
+                              (timberState.rationPolicy === "cap"
+                                ? "식단별 상한 배급"
+                                : "필요량에 따른 배급"),
+                          ]
+                        : []),
+                      ...(timberState?.town.orders.some(
+                        (o) => o.stage === "waiting",
+                      )
+                        ? ["인부 급구 · 건설 현장에서 일손을 기다립니다."]
+                        : []),
+                      ...SCOUT_SITES.filter(
+                        (site) => scouts[site.id]?.status === "going",
+                      ).map(
+                        (site) =>
+                          "정찰 파견 · " +
+                          site.name +
+                          " · " +
+                          leftHours(site.id) +
+                          "시간 남음",
+                      ),
+                    ]
+                  : undefined
+              }
+            />
           ) : (
             <div className="g-idle">
               <h2>복홀 본진</h2>

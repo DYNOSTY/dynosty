@@ -14,6 +14,8 @@ type Props = {
   busy: boolean;
   onCommand: (command: PlayCommand) => void;
   compact?: boolean;
+  day?: number | undefined;
+  minute?: number | undefined;
 };
 export function PlayPanel({
   state,
@@ -21,6 +23,8 @@ export function PlayPanel({
   busy,
   onCommand,
   compact = false,
+  day,
+  minute,
 }: Props) {
   const [confirm, setConfirm] = useState(false);
   if (!state)
@@ -32,20 +36,24 @@ export function PlayPanel({
       </section>
     );
   const warnings = compact ? [] : foodWarnings(state);
-  const clock = `${state.day}일 · ${String(Math.floor(state.minute / 60)).padStart(2, "0")}:${String(state.minute % 60).padStart(2, "0")}`;
+  const minutes = minute ?? state.minute;
+  const clock = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
   return (
     <section className="settlement-dashboard" aria-label="복홀 현황">
-      <div className="settlement-heading" hidden={compact}>
+      <div className="settlement-heading">
         <div>
           <h2 className="settlement-title">복홀 현황</h2>
           <p>
             <span data-testid="play-population">
               주민 {state.citizens.filter((c) => c.alive).length}명
             </span>{" "}
-            · <span data-testid="play-clock">생존 {clock}</span>
+            ·{" "}
+            <span data-testid="play-clock">
+              <span>{day ?? state.day}일차</span> · {clock}
+            </span>
           </p>
         </div>
-        <div className="play-controls">
+        <div className="play-controls" hidden={compact}>
           <button
             type="button"
             disabled={busy}

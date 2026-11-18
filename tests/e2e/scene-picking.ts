@@ -10,7 +10,7 @@ export async function examplePoint(
 ) {
   return worldPoint(
     page,
-    kind === "building" ? [0, 0.75, -1] : [updated ? 2 : -2, 0.5, 1],
+    kind === "building" ? [0, 1.87, -1] : [updated ? 2 : -2, 0.5, 1],
     false,
   );
 }
@@ -68,6 +68,11 @@ export async function clickExample(
 }
 
 export async function clickFloor(page: Page) {
+  if (!(await page.locator(".is-procurement").count())) {
+    const point = await worldPoint(page, [3, 0, -3]);
+    await page.mouse.click(point.x, point.y);
+    return;
+  }
   const canvas = page.locator("canvas");
   await canvas.evaluate((el) =>
     el.scrollIntoView({

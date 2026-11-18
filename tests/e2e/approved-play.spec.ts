@@ -72,7 +72,7 @@ test("실제 Worker 시간이 흐르고 일시정지·탭 비활성 뒤 수동 �
   await ready(page);
   await page.getByRole("button", { name: "게임 시작", exact: true }).click();
   await expect(page.getByTestId("play-clock")).not.toHaveText(
-    "생존 1일 · 00:00",
+    "1일차 · 00:00",
   );
   await expect
     .poll(async () =>
@@ -262,7 +262,7 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   await clickExample(page, "building");
   await expect(
     page.getByRole("region", { name: "선택 정보", exact: true }),
-  ).toContainText("온돌 둥지");
+  ).toContainText("복홀 방 게시판");
   expect(errors).toEqual([]);
 });
 
