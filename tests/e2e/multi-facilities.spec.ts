@@ -6,6 +6,7 @@ import {
   createPlayState,
   createTimberSave,
   createTimberState,
+  dailyFoodDemand,
   RESEARCH_CATALOG,
   type TimberState,
 } from "../../packages/game-core/dist/index.js";
@@ -150,7 +151,28 @@ test("어획막의 다섯 인원으로 별도 운반 없이 공동 어류가 즉
   };
   s = cmd(s, { type: "facility-staff", id: "build-1", count: 5 });
   s = advanceTimber(s, 35);
-  await load(page, s);
+  const demand = dailyFoodDemand(s.world);
+  await load(page, {
+    ...s,
+    paused: true,
+    world: {
+      ...s.world,
+      resources: {
+        ...s.world.resources,
+        RES_PLANT: demand.RES_PLANT,
+        RES_MEAT: 0,
+        RES_FISH: demand.RES_MEAT + demand.RES_FISH - 1,
+      },
+    },
+  });
+  const worried = page.getByAltText("걱정스러운 나르미");
+  await expect(worried).toBeAttached();
+  await expect
+    .poll(() =>
+      worried.evaluate((img) => (img as HTMLImageElement).naturalWidth),
+    )
+    .toBe(512);
+  await expect(page.getByText(/오늘 먹일 식량이 모자랍니다/)).toHaveCount(1);
   await page.getByText("완공 시설 1곳", { exact: true }).click();
   await expect(
     page.getByLabel("build-1 운영 인원", { exact: true }),
@@ -166,6 +188,8 @@ test("어획막의 다섯 인원으로 별도 운반 없이 공동 어류가 즉
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
   await b(page, "시간 재개").click();
   await expect.poll(amount, { timeout: 15000 }).toBeGreaterThan(before);
+  await expect(page.getByAltText("평상시의 나르미")).toBeAttached();
+  await expect(page.getByText(/오늘 먹일 식량이 모자랍니다/)).toHaveCount(0);
   await expect(page.getByText(/어류 즉시 입고 · 대기/)).toContainText(
     "운반 중 0",
   );
