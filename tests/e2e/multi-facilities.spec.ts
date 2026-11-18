@@ -186,6 +186,12 @@ test("방문 상인의 초상과 재협상 · 계약 입고", async ({ page }) =
   await b(page, "복홀 전체 보기").click();
   await b(page, "입촌 요청").click();
   await expect(b(page, "받아준다")).toBeFocused();
+  for (const name of [/나르미$/, /아픈 주민을 걱정하는 달이/]) {
+    const image = page.getByRole("img", { name });
+    await expect
+      .poll(() => image.evaluate((e) => (e as HTMLImageElement).naturalWidth))
+      .toBe(512);
+  }
   await b(page, "교역소 상인 방문").click();
   const visit = page.getByLabel("교역소 방문");
   await expect(visit).toContainText("거친손");

@@ -379,6 +379,12 @@ export function TimberDemo({
       ? undefined
       : merchantCards[state.merchantItem];
   const demand = state && dailyFoodDemand(state.world);
+  const stock = state?.world.resources;
+  const foodShortage =
+    demand &&
+    stock &&
+    (stock.RES_PLANT < demand.RES_PLANT ||
+      stock.RES_MEAT + stock.RES_FISH < demand.RES_MEAT + demand.RES_FISH);
   const metal = (state?.world.resources.RES_METAL ?? 0) / AMOUNT_SCALE;
   const classic = (
     <section
@@ -647,6 +653,17 @@ export function TimberDemo({
           </details>
           {demand && (
             <p>
+              <img
+                width="64"
+                height="64"
+                src={
+                  foodShortage
+                    ? "/art/advisers/nareumi/concern.png"
+                    : "/art/advisers/nareumi/neutral.png"
+                }
+                alt={foodShortage ? "걱정스러운 나르미" : "평상시의 나르미"}
+              />{" "}
+              {foodShortage && "고리님, 오늘 먹일 식량이 모자랍니다. "}
               나르미 · 하루 필요량 / 공동 재고{" "}
               {(["RES_PLANT", "RES_MEAT", "RES_FISH"] as const)
                 .map(
@@ -1133,6 +1150,12 @@ export function TimberDemo({
             <section aria-label="다음 임무" data-testid="next-mission">
               <h3>❗ 마을 문에 주민 3명이 도착했습니다</h3>
               <p>
+                <img
+                  width="64"
+                  height="64"
+                  src="/art/advisers/dali/concern.png"
+                  alt="아픈 주민을 걱정하는 달이"
+                />{" "}
                 달이 ·{" "}
                 {(state.scoutVisitors ?? 0) > 0
                   ? "정찰대와 함께 도착"
@@ -1160,6 +1183,12 @@ export function TimberDemo({
           {state.mission === "village-orders" ? (
             <section data-testid="next-mission">
               <h3>
+                <img
+                  width="64"
+                  height="64"
+                  src="/art/advisers/dali/neutral.png"
+                  alt="평상시의 달이"
+                />{" "}
                 달이 · 현재 인구{" "}
                 {state.world.citizens.filter((c) => c.alive).length}명
               </h3>
