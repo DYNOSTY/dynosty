@@ -190,7 +190,7 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   expect(loaded.some((x) => x.endsWith("ondol-nest.json"))).toBe(true);
   // 블렌더로 깎은 판(_v2)을 먼저 씀
   expect(loaded.some((x) => /BLD_NEST(_v2)?.glb$/.test(x))).toBe(true);
-  expect(loaded.some((x) => x.endsWith("R02_Triceratops.glb"))).toBe(true);
+  expect(loaded.some((x) => /R02_Triceratops(_v2)?.glb$/.test(x))).toBe(true);
   const canvas = page.locator("canvas");
   const idle = await canvas.screenshot();
   await expect

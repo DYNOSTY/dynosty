@@ -70,6 +70,8 @@ const RESIDENT_HEIGHT: Record<string, [number, number]> = {
   R04_Ankylosaurus: [0.75, 2.45],
   R12_Protoceratops: [0.6, 2.28],
 };
+/** 겨울 차림(목도리·등불·짚 발싸개·눈)을 입힌 판 — tools/blender/dino.py */
+export const residentGlb = (file: string) => `/models/residents/${file}_v2.glb`;
 export const residentScale = (file: string) => {
   const h = RESIDENT_HEIGHT[file];
   return h ? h[0] / h[1] : RESIDENT_SCALE;
@@ -424,7 +426,7 @@ export function createVillage(
       const work = spot(haul[0]);
       jobs.push(
         place(
-          `/models/residents/${file}.glb`,
+          residentGlb(file),
           work.x,
           work.z,
           r() * Math.PI * 2,
@@ -441,7 +443,7 @@ export function createVillage(
       d = 5 + r() * 3;
     jobs.push(
       place(
-        `/models/residents/${file}.glb`,
+        residentGlb(file),
         Math.cos(a) * d,
         Math.sin(a) * d,
         r() * Math.PI * 2,
@@ -602,7 +604,7 @@ export function createVillage(
         "R05_Gallimimus",
         "R03_Velociraptor",
       ].entries()) {
-        const asset = await load(scene, `/models/residents/${file}.glb`);
+        const asset = await load(scene, residentGlb(file));
         if (disposed || parties.get(m.id) !== party) return;
         const node = new TransformNode(`scout-${m.id}-${k}`, scene);
         node.parent = worldRoot ?? null;
@@ -736,7 +738,7 @@ export function createVillage(
       scene,
       kind === "building"
         ? glbFile("BLD_ONDOL") // 가운데 온돌: 난방의 중심 (블렌더로 만든 화덕·큰 굴뚝·구들 고래)
-        : "/models/residents/R02_Triceratops.glb",
+        : residentGlb("R02_Triceratops"),
     );
     if (disposed || parent.isDisposed()) throw new Error("종료한 대상입니다.");
     const node = new TransformNode(`${parent.name}:glb`, scene);
