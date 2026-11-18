@@ -164,16 +164,14 @@ export function TimberDemo({
           }}
         />
       </div>
-      <button type="button" disabled={busy} onClick={() => setLaborMode(true)}>
-        일손 배치·배급 체험하기
-      </button>
-      <p className="hint">
-        비가 새는 둥지에 마른 목재20이 필요합니다. 사용 준비 기한은12시간입니다.
-      </p>
       {!state ? (
         <p>체험판을 준비하고 있습니다.</p>
       ) : (
-        <>
+        <div className="tm-grid">
+          <div className="tm-left">
+          <p className="hint">
+            비가 새는 둥지에 마른 목재20이 필요합니다. 사용 준비 기한은12시간입니다.
+          </p>
           <div className="timber-status">
             <span data-testid="timber-clock">
               경과 {time(state.elapsed)} / 기한12시간
@@ -245,6 +243,17 @@ export function TimberDemo({
               계속해 마칠 수 있습니다.
             </p>
           ) : null}
+          {state.phase === "select" ? (
+            <p className="tm-goal">
+              목표: 마른 목재20을 둥지에 배분하고 사용 준비를 확인하세요.
+              가격뿐 아니라 보완에 쓸 일손도 비교하세요.
+            </p>
+          ) : null}
+          <button type="button" disabled={busy} onClick={() => setLaborMode(true)}>
+            일손 배치·배급 체험하기
+          </button>
+          </div>
+          <div className="tm-right">
           {!["select", "contracted"].includes(state.phase) ? (
             <section className="timber-stock" aria-label="목재 처리 상태">
               {(
@@ -271,10 +280,6 @@ export function TimberDemo({
           ) : null}
           {state.phase === "select" ? (
             <>
-              <p>
-                목표: 마른 목재20을 둥지에 배분하고 사용 준비를 확인하세요.
-                가격뿐 아니라 보완에 쓸 일손도 비교하세요.
-              </p>
               <div className="timber-offers">
                 {(["A", "B"] as TimberOffer[]).map((id) => {
                   const o = TIMBER_RULES.offers[id];
@@ -335,6 +340,7 @@ export function TimberDemo({
               </div>
               <button
                 type="button"
+                className="tm-contract"
                 disabled={busy || !state.offer}
                 onClick={() => command({ type: "contract" })}
               >
@@ -553,7 +559,8 @@ export function TimberDemo({
               ))}
             </ol>
           </details>
-        </>
+          </div>
+        </div>
       )}
       {error ? <p role="alert">{error}</p> : null}
     </section>

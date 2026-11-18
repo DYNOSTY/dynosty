@@ -102,7 +102,7 @@ export function CmdFace({
 }): ReactNode {
   return (
     <>
-      <img src={`/ui/cmd/${icon}.png`} alt="" />
+      <img src={icon === "close" ? "/ui/kit/knob_close.png" : `/ui/cmd/${icon}.png`} alt="" />
       <span>{label}</span>
       <span className="g-hotkey" aria-hidden="true">
         {hotkey}

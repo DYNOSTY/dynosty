@@ -91,24 +91,24 @@ const PALETTE = {
   },
   // 혹한: 잿빛 눈, 진창 길, 바깥은 더 어둡게. 채도를 낮추고 눈보라 안개로 먼 곳을 지움
   winter: {
-    snowA: [0.8, 0.8, 0.85],
-    snowB: [0.9, 0.9, 0.93],
-    dirt: [0.52, 0.48, 0.47],
-    lip: [0.86, 0.86, 0.9],
-    waste: [0.68, 0.68, 0.73],
-    fog: [0.7, 0.7, 0.76],
-    fogDensity: 0.0105,
-    sun: [0.86, 0.89, 1],
-    skyDay: [0.86, 0.87, 0.95],
-    skyNight: [0.6, 0.62, 0.74],
-    skyGround: [0.42, 0.41, 0.5],
+    snowA: [0.74, 0.79, 0.88],
+    snowB: [0.86, 0.9, 0.97],
+    dirt: [0.34, 0.31, 0.31],
+    lip: [0.84, 0.88, 0.95],
+    waste: [0.6, 0.65, 0.74],
+    fog: [0.6, 0.66, 0.77],
+    fogDensity: 0.0125,
+    sun: [0.78, 0.86, 1],
+    skyDay: [0.76, 0.83, 0.98],
+    skyNight: [0.42, 0.5, 0.7],
+    skyGround: [0.28, 0.31, 0.42],
     sunMax: 0.6,
-    pine: [0.17, 0.24, 0.22],
-    pineB: [0.21, 0.29, 0.26],
+    pine: [0.11, 0.16, 0.17],
+    pineB: [0.15, 0.21, 0.22],
     cap: [0.86, 0.87, 0.91],
     rock: [0.42, 0.41, 0.43],
     ice: [0.72, 0.78, 0.84],
-    saturation: -32,
+    saturation: -18,
   },
 } as const;
 export type Season = keyof typeof PALETTE;
@@ -201,6 +201,14 @@ export function buildWorld(
     ip.colorCurvesEnabled = true;
     const curves = new ColorCurves();
     curves.globalSaturation = P.saturation;
+    if (season === "winter") {
+      curves.shadowsHue = 215;
+      curves.shadowsDensity = 45;
+      curves.midtonesHue = 210;
+      curves.midtonesDensity = 18;
+      curves.highlightsHue = 35;
+      curves.highlightsDensity = 10;
+    }
     ip.colorCurves = curves;
   }
 
@@ -214,10 +222,10 @@ export function buildWorld(
     blurKernelSize: 24,
     mainTextureRatio: 0.25,
   });
-  glow.intensity = 0.9;
+  glow.intensity = 1.1;
   const warmMat = new StandardMaterial("warm-light", scene);
   warmMat.disableLighting = true;
-  warmMat.emissiveColor = new Color3(1, 0.62, 0.28);
+  warmMat.emissiveColor = new Color3(1, 0.55, 0.18); // 차가운 세상 속 유일한 주황
 
   const vertexMat = (name: string) => {
     const m = new StandardMaterial(name, scene);
@@ -349,6 +357,30 @@ export function buildWorld(
   }
   const normals: number[] = [];
   VertexData.ComputeNormals(pos, idx, normals);
+  // 가운데 온돌 = 난방의 중심. 둘레만 주황빛이 번져 차가운 섬과 대비 (프로스트펑크 톤)
+  if (season === "winter") {
+    const tex = new DynamicTexture("heat-tex", 256, scene, false);
+    const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+    const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    g.addColorStop(0, "rgba(255,150,70,0.5)");
+    g.addColorStop(0.4, "rgba(255,120,50,0.2)");
+    g.addColorStop(1, "rgba(255,100,40,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 256, 256);
+    tex.update();
+    tex.hasAlpha = true;
+    const heat = CreateDisc("heat-glow", { radius: 13, tessellation: 48 }, scene);
+    heat.rotation.x = Math.PI / 2;
+    heat.position.set(0, 0.08, -1);
+    const hm = new StandardMaterial("heat-mat", scene);
+    hm.disableLighting = true;
+    hm.diffuseColor = Color3.Black();
+    hm.emissiveTexture = tex;
+    hm.opacityTexture = tex;
+    hm.alphaMode = 1; // 더하기
+    heat.material = hm;
+    heat.isPickable = false;
+  }
   const ground = new Mesh("ground", scene);
   const vd = new VertexData();
   vd.positions = pos;
@@ -699,20 +731,20 @@ export function buildWorld(
     flake.update();
     flake.hasAlpha = true;
     // 눈은 카메라 주변(±32m)에만 내림 → 개수를 줄여도 보이는 밀도는 같음
-    snow = new ParticleSystem("snow", 2600, scene);
+    snow = new ParticleSystem("snow", 3800, scene);
     snow.particleTexture = flake;
     snow.emitter = new Vector3(8, 30, -4);
     snow.minEmitBox = new Vector3(-26, 0, -32);
     snow.maxEmitBox = new Vector3(38, 0, 32);
-    snow.direction1 = new Vector3(-2.2, -1, 0.6);
-    snow.direction2 = new Vector3(-1.4, -1, 1.1);
+    snow.direction1 = new Vector3(-3.6, -1, 0.7);
+    snow.direction2 = new Vector3(-2.4, -1, 1.3);
     snow.minEmitPower = 3;
     snow.maxEmitPower = 5;
     snow.minLifeTime = 6;
     snow.maxLifeTime = 9;
     snow.minSize = 0.12;
-    snow.maxSize = 0.26;
-    snow.emitRate = 380;
+    snow.maxSize = 0.32;
+    snow.emitRate = 620;
     snow.color1 = new Color4(1, 1, 1, 0.9);
     snow.color2 = new Color4(0.86, 0.88, 0.95, 0.75);
     snow.colorDead = new Color4(1, 1, 1, 0);
@@ -744,7 +776,7 @@ export function buildWorld(
     sky.diffuse = c3(mix(P.skyNight, P.skyDay, daylight));
     const warm = smooth(0, 0.18, daylight) * (1 - smooth(0.18, 0.5, daylight));
     sun.diffuse = c3(mix(P.sun, [1, 0.72, 0.55], warm));
-    glow.intensity = 0.55 + 0.6 * (1 - daylight); // 밤일수록 불빛이 번짐
+    glow.intensity = 0.85 + 0.7 * (1 - daylight); // 밤일수록 불빛이 번짐
     // 배경 밝기는 20단계로만 바꿈 (매 프레임 바꾸면 화면 전체를 다시 그려 느려짐)
     const level = (0.72 + (0.28 * Math.round(daylight * 20)) / 20).toFixed(3);
     if (level !== lastLevel) {

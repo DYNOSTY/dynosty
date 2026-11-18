@@ -53,6 +53,8 @@ export interface SceneController {
   minimap(): Promise<string | null>;
   /** 미니맵을 누른 곳으로 시점 이동 */
   panTo(x: number, z: number): void;
+  /** 고른 건물 가까이 (선택 id 기준: bld:번호 · 건물 예제) */
+  focusSelected(): void;
   /** 게임 진행 중이면 주민이 걷고 굴뚝 연기가 남 */
   setRunning(running: boolean): void;
   /** 게임 시각(하루 안의 분) → 낮밤 */
@@ -204,7 +206,18 @@ export function mountScene(
     if (id !== null) entities.select(null);
     publishSelection(id);
   });
+  // 마을 건물은 "bld:번호"로 고름 (조달 현장·예제 대상과 같은 선택 줄)
+  const selectBuilding = (i: number | null) => {
+    village.highlight(i);
+    if (i === null) return;
+    sites.select(null);
+    entities.select(null);
+    publishSelection(`bld:${i}`);
+  };
   const select = (id: string | null) => {
+    const bld = id?.startsWith("bld:") ? Number(id.slice(4)) : null;
+    if (bld !== null) return selectBuilding(bld);
+    village.highlight(null);
     if (isSiteId(id)) {
       entities.select(null);
       sites.select(id);
@@ -262,9 +275,12 @@ export function mountScene(
     });
   const stopPicking = observeSceneClicks(canvas, (x, y) => {
     const mesh = scene.pick(x, y)?.pickedMesh ?? null,
-      site = sites.idForMesh(mesh);
+      site = sites.idForMesh(mesh),
+      bld = village.buildingForMesh(mesh);
     if (site) select(site);
+    else if (bld !== null) selectBuilding(bld);
     else {
+      village.highlight(null);
       sites.select(null);
       entities.selectMesh(mesh);
     }
@@ -310,7 +326,7 @@ export function mountScene(
     if (diff < -720) diff += 1440;
     if (diff > 720) diff -= 1440;
     clockShown = (clockShown + diff * Math.min(1, dt * 3) + 1440) % 1440;
-    setTime(demoActive ? 12 * 60 : clockShown);
+    setTime(demoActive ? 16 * 60 : clockShown); // 조달 중엔 해가 낮은 오후 — 눈밭이 하얗게 날리지 않게
     village.animate(dt);
     fog.animate(dt);
     landmarks.animate(dt);
@@ -526,12 +542,14 @@ export function mountScene(
       const active = state !== null;
       if (active !== demoActive) {
         demoActive = active;
-        worldRoot.setEnabled(!active);
-        demoGround.setEnabled(active);
+        // 조달은 따로 떨어진 판이 아니라 섬 광장(온돌 둥지 둘레)에서 진행 — 세계가 이어지게
         camera.upperRadiusLimit = active ? 48 : 140;
         if (softwareRenderer) engine.setHardwareScalingLevel(active ? 1 : 2);
-        if (active) resetSceneCamera(camera);
-        else resetWorldCamera();
+        resetWorldCamera();
+        if (active) {
+          camera.radius = 24;
+          camera.target.set(2, 0, -1);
+        }
       }
       timberVisual.update(state);
     },
@@ -551,6 +569,13 @@ export function mountScene(
       if (selected !== id) return false;
       focusSiteCamera(camera, id);
       return true;
+    },
+    focusSelected() {
+      const id = selected;
+      const at = id?.startsWith("bld:") ? LAYOUT[Number(id.slice(4))] : id ? (["", 0, -1] as const) : null;
+      if (!at) return;
+      camera.target.set(at[1], 1, at[2]);
+      camera.radius = 16;
     },
     resetCamera() {
       if (demoActive) resetSceneCamera(camera);
