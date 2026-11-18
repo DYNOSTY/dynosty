@@ -3,6 +3,7 @@ import "@babylonjs/loaders/glTF";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { type Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -167,7 +168,12 @@ export function createVillage(
   const ring = CreateTorus("select-ring", { diameter: 1, thickness: 0.05, tessellation: 64 }, scene);
   const ringMat = new StandardMaterial("select-ring-mat", scene);
   ringMat.disableLighting = true;
-  ringMat.emissiveColor = new Color3(1, 0.78, 0.4);
+  // 순금빛 · 색 보정·안개를 받지 않아 어디서나 같은 색 (선택 확인 테스트도 이 색을 셈)
+  ringMat.emissiveColor = new Color3(1, 0.85, 0.05);
+  ringMat.diffuseColor = Color3.Black();
+  ringMat.fogEnabled = false;
+  ringMat.imageProcessingConfiguration = new ImageProcessingConfiguration();
+  ringMat.imageProcessingConfiguration.isEnabled = false;
   ring.material = ringMat;
   ring.isPickable = false;
   ring.setEnabled(false);
@@ -698,6 +704,16 @@ export function createVillage(
     }
     return {
       setOutline(value) {
+        if (kind === "building") {
+          ring.setEnabled(value);
+          if (value) {
+            node.computeWorldMatrix(true);
+            const p = node.getAbsolutePosition();
+            ring.position.set(p.x, p.y + 0.12, p.z + 0.3);
+            ring.scaling.setAll(10.5);
+          }
+          return;
+        }
         for (const m of v.meshes) {
           m.outlineColor = OUTLINE;
           m.outlineWidth = 0.025;

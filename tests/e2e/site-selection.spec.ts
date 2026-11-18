@@ -1,13 +1,14 @@
 import { expect, type Page, test } from "@playwright/test";
 import { SITE_POINTS, type SiteId } from "../../apps/web/src/site-targets.js";
 import { clickFloor, outlinePixels, worldPoint } from "./scene-picking.js";
+import { press, reveal } from "./labor-tabs.js";
 
 const b = (p: Page, n: string) =>
   p.getByRole("button", { name: n, exact: true });
 async function enter(p: Page) {
   await p.goto("/");
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
+  await press(p, "마른 목재20 조달 체험하기");
+  await press(p, "일손 배치·배급 체험하기");
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 }
 async function clickSite(p: Page, id: SiteId) {
@@ -22,11 +23,11 @@ async function initial(p: Page) {
     "확장 수레 출발",
     "다음 일손 사건까지",
   ])
-    await b(p, n).click();
+    await press(p, n);
   await clickSite(p, "site-inspection");
-  await b(p, "현장 전량 검사 시작").click();
-  await b(p, "현장 다음 사건까지").click();
-  await b(p, "현장 정상분 16 수령").click();
+  await press(p, "현장 전량 검사 시작");
+  await press(p, "현장 다음 사건까지");
+  await press(p, "현장 정상분 16 수령");
 }
 test("검수대·배급소 실제 클릭의 테두리·정보·단일 선택과 빈 바닥 해제를 확인한다", async ({
   page: p,
@@ -36,20 +37,26 @@ test("검수대·배급소 실제 클릭의 테두리·정보·단일 선택과 
     before = outlinePixels(await canvas.screenshot());
   await clickSite(p, "site-inspection");
   await expect(p.getByTestId("site-name")).toHaveText("검수대");
+  await reveal(p, "검수대 선택");
   await expect(b(p, "검수대 선택")).toHaveAttribute("aria-pressed", "true");
   const outlined = outlinePixels(await canvas.screenshot());
   expect(outlined).toBeGreaterThan(before + 10);
   await clickSite(p, "site-ration");
   await expect(p.getByTestId("site-name")).toHaveText("배급소");
+  await reveal(p, "검수대 선택");
   await expect(b(p, "검수대 선택")).toHaveAttribute("aria-pressed", "false");
+  await reveal(p, "현장 일손 1 배급 준비로 보내기");
   await expect(b(p, "현장 일손 1 배급 준비로 보내기")).toBeDisabled();
-  await b(p, "건물 예제 선택").click();
+  await press(p, "건물 예제 선택");
   await expect(p.getByTestId("site-name")).toHaveCount(0);
+  await reveal(p, "건물 예제 선택");
   await expect(b(p, "건물 예제 선택")).toHaveAttribute("aria-pressed", "true");
   await clickSite(p, "site-inspection");
+  await reveal(p, "건물 예제 선택");
   await expect(b(p, "건물 예제 선택")).toHaveAttribute("aria-pressed", "false");
   await clickFloor(p);
   await expect(p.getByTestId("site-name")).toHaveCount(0);
+  await reveal(p, "검수대 선택");
   await expect(b(p, "검수대 선택")).toHaveAttribute("aria-pressed", "false");
 });
 test("검수·격리품·배급소 현장 명령으로 교환과 배급을 완료하며 숨은 격리품 선택은 해제한다", async ({
@@ -58,36 +65,38 @@ test("검수·격리품·배급소 현장 명령으로 교환과 배급을 완�
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(e.message));
   await initial(p);
-  await b(p, "확장 정상 목재 16 배분").click();
+  await press(p, "확장 정상 목재 16 배분");
   await clickSite(p, "site-quarantine");
   await expect(p.getByTestId("site-name")).toHaveText("격리품");
   await expect(
     p.getByRole("region", { name: "격리품 현장 정보" }),
   ).toContainText("4개");
-  await b(p, "현장 불량4 교환 요청").click();
-  await b(p, "현장 교환 회수 출발").click();
+  await press(p, "현장 불량4 교환 요청");
+  await press(p, "현장 교환 회수 출발");
   await expect(p.getByTestId("site-name")).toHaveCount(0);
+  await reveal(p, "격리품 선택");
   await expect(b(p, "격리품 선택")).toBeDisabled();
   await clickSite(p, "site-ration");
+  await reveal(p, "현장 일손 1 배급 준비로 보내기");
   await expect(b(p, "현장 일손 1 배급 준비로 보내기")).toBeDisabled();
   for (const n of [2, 3, 4])
-    await b(p, `현장 일손 ${n} 배급 준비로 보내기`).click();
-  await b(p, "현장 다음 사건까지").click();
-  await b(p, "현장 다음 사건까지").click();
+    await press(p, `현장 일손 ${n} 배급 준비로 보내기`);
+  await press(p, "현장 다음 사건까지");
+  await press(p, "현장 다음 사건까지");
   await expect(p.getByTestId("site-status")).toContainText("완료 · 10시간 0분");
   await clickSite(p, "site-inspection");
-  await b(p, "현장 다음 사건까지").click();
-  await b(p, "현장 교환품4 재검수 시작").click();
+  await press(p, "현장 다음 사건까지");
+  await press(p, "현장 교환품4 재검수 시작");
   await expect(
     p.getByRole("region", { name: "검수대 현장 정보" }),
   ).toContainText("120분");
-  await b(p, "현장 다음 사건까지").click();
-  await b(p, "현장 합격 교환품4 수령").click();
+  await press(p, "현장 다음 사건까지");
+  await press(p, "현장 합격 교환품4 수령");
   await expect(
     p.getByRole("region", { name: "검수대 현장 정보" }),
   ).toContainText("0개");
-  await b(p, "확장 정상 목재 4 배분").click();
-  await b(p, "확장 목재 사용 확인").click();
+  await press(p, "확장 정상 목재 4 배분");
+  await press(p, "확장 목재 사용 확인");
   await expect(p.getByTestId("labor-used")).toHaveText("20");
   await expect(p.getByTestId("labor-result")).toContainText("철재3 남음");
   expect(errors).toEqual([]);
@@ -97,14 +106,14 @@ test("현장 재배치는 보완 진행량을 보존하고 저장·새로고침 
 }) => {
   await initial(p);
   await clickSite(p, "site-quarantine");
-  await b(p, "현장 보완 인원 배정").click();
-  await b(p, "일손 1시간 진행").click();
+  await press(p, "현장 보완 인원 배정");
+  await press(p, "일손 1시간 진행");
   await clickSite(p, "site-ration");
-  await b(p, "현장 일손 2 배급 준비로 보내기").click();
+  await press(p, "현장 일손 2 배급 준비로 보내기");
   await expect(p.getByTestId("labor-repair")).toContainText(
     "60/240분 · 배정 1/2명",
   );
-  await b(p, "일손 체험 저장").click();
+  await press(p, "일손 체험 저장");
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
@@ -113,15 +122,16 @@ test("현장 재배치는 보완 진행량을 보존하고 저장·새로고침 
   );
   expect(save).not.toContain("site-preview");
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await press(p, "마른 목재20 조달 체험하기");
+  await press(p, "일손 배치·배급 체험하기");
+  await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-clock")).toContainText("9시간 0분");
   await expect(p.getByTestId("site-name")).toHaveCount(0);
   await clickSite(p, "site-quarantine");
   await expect(
     p.getByRole("region", { name: "격리품 현장 정보" }),
   ).toContainText("60/240분");
+  await reveal(p, "현장 불량4 교환 요청");
   await expect(b(p, "현장 불량4 교환 요청")).toBeDisabled();
   await clickSite(p, "site-ration");
   await expect(p.getByTestId("crew-2-job")).toHaveText("배급 준비");
@@ -134,7 +144,7 @@ test("손상 저장 불러오기 실패는 현재 선택·진행·원문을 보�
 }) => {
   await initial(p);
   await clickSite(p, "site-quarantine");
-  await b(p, "일손 체험 저장").click();
+  await press(p, "일손 체험 저장");
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
@@ -143,9 +153,10 @@ test("손상 저장 불러오기 실패는 현재 선택·진행·원문을 보�
     localStorage.setItem("dynosty.labor.saves", text);
     return text;
   });
-  await b(p, "일손 체험 불러오기").click();
+  await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("site-name")).toHaveText("격리품");
   await expect(p.getByRole("alert")).toContainText("손상");
+  await reveal(p, "격리품 선택");
   await expect(b(p, "격리품 선택")).toHaveAttribute("aria-pressed", "true");
   expect(
     await p.evaluate(() => localStorage.getItem("dynosty.labor.saves")),
@@ -164,14 +175,15 @@ test("장소 전환은Worker를 초기화하지 않고 모드 종료·재시작�
     await clickSite(p, id);
   await expect(p.getByTestId("labor-clock")).toContainText("8시간 0분");
   await expect(p.getByTestId("labor-iron")).toContainText("철재 4");
-  await b(p, "기존 목재 체험 보기").click();
+  await press(p, "기존 목재 체험 보기");
   await expect(p.getByTestId("site-name")).toHaveCount(0);
+  await reveal(p, "검수대 선택");
   await expect(b(p, "검수대 선택")).toHaveCount(0);
-  await b(p, "일손 배치·배급 체험하기").click();
+  await press(p, "일손 배치·배급 체험하기");
   await expect(p.getByTestId("labor-clock")).toContainText("8시간 0분");
   await clickSite(p, "site-inspection");
-  await b(p, "일손 체험 다시 시작").click();
-  await b(p, "새 일손 체험 확인").click();
+  await press(p, "일손 체험 다시 시작");
+  await press(p, "새 일손 체험 확인");
   await expect(p.getByTestId("site-name")).toHaveCount(0);
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 });
@@ -189,7 +201,7 @@ test("카메라 드래그는 장소 선택을 바꾸지 않고 바닥 클릭만 
   });
   await p.mouse.up();
   await expect(p.getByTestId("site-name")).toHaveText("검수대");
-  await b(p, "기본 시점").click();
+  await press(p, "기본 시점");
   await clickFloor(p);
   await expect(p.getByTestId("site-name")).toHaveCount(0);
 });
@@ -210,7 +222,7 @@ test.describe("작은 터치 화면", () => {
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    await b(p, "현장 선택 해제").click();
+    await press(p, "현장 선택 해제");
     await expect(p.getByTestId("site-name")).toHaveCount(0);
     await expect(p.locator("canvas")).toBeFocused();
   });

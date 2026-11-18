@@ -95,7 +95,9 @@ export function outlinePixels(buffer: Buffer) {
     const r = image.data[i] ?? 0,
       g = image.data[i + 1] ?? 0,
       b = image.data[i + 2] ?? 0;
-    if (r < 135 && g > 205 && b > 225) count += 1;
+    // 하늘색 윤곽선(주민) 또는 금빛 고리(건물·온돌)
+    // 금빛 고리는 색 보정을 받지 않아 늘 (255,217,13) — 창 불빛·석등과 섞이지 않게 그 색만
+    if ((r < 135 && g > 205 && b > 225) || (r > 249 && Math.abs(g - 217) < 7 && b < 22)) count += 1;
   }
   return count;
 }

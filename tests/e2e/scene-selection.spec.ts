@@ -5,6 +5,7 @@ import {
   examplePoint,
   outlinePixels,
 } from "./scene-picking.js";
+import { press, reveal } from "./labor-tabs.js";
 
 async function ready(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -47,8 +48,8 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
     localStorage.setItem("dynosty.example.saves", "keep saved data"),
   );
   // 패널 전환에 따른 장면 폭 변경 없이 실제 테두리 픽셀의 변화를 비교한다.
-  await page.getByRole("button", { name: "저장", exact: true }).click();
-  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
+  await press(page, "저장");
+  await press(page, "저장 닫기");
   const canvas = page.locator("canvas");
   expect(outlinePixels(await canvas.screenshot())).toBe(0);
   await clickExample(page, "building");
@@ -106,27 +107,19 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
   await clickExample(page, "resident");
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
   await expect(info).toContainText("대기 표시");
-  await page.getByRole("button", { name: "개발 도구", exact: true }).click();
-  await page
-    .getByRole("button", { name: "3D 연결 예제 바꾸기", exact: true })
-    .click();
+  await press(page, "개발 도구");
+  await press(page, "3D 연결 예제 바꾸기");
   await expect(info).toContainText("걷기 표시");
   await expect(info).toContainText("2, 0, 1");
-  await page.getByRole("button", { name: "예제 저장", exact: true }).click();
+  await press(page, "예제 저장");
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
   );
-  await page
-    .getByRole("button", { name: "3D 연결 예제 바꾸기", exact: true })
-    .click();
+  await press(page, "3D 연결 예제 바꾸기");
   await expect(info).toContainText("대기 표시");
-  await page
-    .getByRole("button", { name: "저장 불러오기", exact: true })
-    .click();
+  await press(page, "저장 불러오기");
   await expect(info).toContainText("걷기 표시");
-  await page
-    .getByRole("button", { name: "개발 도구 닫기", exact: true })
-    .click();
+  await press(page, "개발 도구 닫기");
   await expect(info).toBeVisible();
   await page.reload();
   await expect(info).toBeHidden();
@@ -147,7 +140,7 @@ test.describe("좁은 터치 화면", () => {
       .focus();
     await page.keyboard.press("Enter");
     await expect(info).toContainText("주민 예제");
-    await page.getByRole("button", { name: "선택 해제", exact: true }).click();
+    await press(page, "선택 해제");
     await expect(info).toBeHidden();
     await expect(page.locator("canvas")).toBeFocused();
     expect(

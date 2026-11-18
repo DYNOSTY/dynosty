@@ -10,6 +10,8 @@ import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { CreateScreenshotUsingRenderTarget } from "@babylonjs/core/Misc/screenshotTools";
 import { Scene } from "@babylonjs/core/scene";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { Node } from "@babylonjs/core/node";
 import type {
   LaborState,
   SceneSnapshot,
@@ -274,7 +276,16 @@ export function mountScene(
       assetsReady = !disposed;
     });
   const stopPicking = observeSceneClicks(canvas, (x, y) => {
-    const mesh = scene.pick(x, y)?.pickedMesh ?? null,
+    // 주민과 건물이 겹치면 주민이 먼저 (작은 주민이 큰 지붕에 가려 못 고르는 일 없게)
+    const hits = scene.multiPick(x, y) ?? [];
+    const isResident = (m: AbstractMesh | null) => {
+      for (let n: Node | null = m; n; n = n.parent) if (/resident/i.test(n.name)) return true;
+      return false;
+    };
+    const mesh =
+      hits.find((h) => isResident(h.pickedMesh))?.pickedMesh ??
+      scene.pick(x, y)?.pickedMesh ??
+      null,
       site = sites.idForMesh(mesh),
       bld = village.buildingForMesh(mesh);
     if (site) select(site);

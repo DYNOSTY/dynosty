@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 import { closeWorkspace, openWorkspace } from "./workspace.js";
+import { press, reveal } from "./labor-tabs.js";
 
 const key = "dynosty.audio.catalog";
 const shortWave = readFileSync(
@@ -48,9 +49,7 @@ async function register(
     .getByLabel(`${kind} 파일`, { exact: true })
     .setInputFiles(file(fileName));
   await page.getByLabel(`${kind} 이름`, { exact: true }).fill(name);
-  await page
-    .getByRole("button", { name: `${kind} 목록 추가`, exact: true })
-    .click();
+  await press(page, `${kind} 목록 추가`);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -87,13 +86,11 @@ test("이름 변경은 재생을 유지하고 여러 음원의 연결을 전환�
   await openWorkspace(page);
   await register(page, "BGM", "아침", "morning.wav");
   const morningId = await page.getByLabel("BGM 음원 목록").inputValue();
-  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
+  await press(page, "BGM 재생");
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
   const first = (await output(page)).urls[0];
   await page.getByLabel("BGM 이름", { exact: true }).fill("새벽");
-  await page
-    .getByRole("button", { name: "BGM 이름 변경", exact: true })
-    .click();
+  await press(page, "BGM 이름 변경");
   expect((await output(page)).paused).toEqual([false]);
   expect((await output(page)).urls[0]).toBe(first);
   await expect(page.getByLabel("BGM 음원 목록")).toHaveValue(morningId);
@@ -102,7 +99,7 @@ test("이름 변경은 재생을 유지하고 여러 음원의 연결을 전환�
   const eveningId = await page.getByLabel("BGM 음원 목록").inputValue();
   await page.getByLabel("BGM 음원 목록").selectOption(morningId);
   await expect(page.getByText("morning.wav", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
+  await press(page, "BGM 재생");
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
   await page.getByLabel("BGM 음원 목록").selectOption(eveningId);
   await expect(page.getByText("evening.wav", { exact: true })).toBeVisible();
@@ -123,9 +120,7 @@ test("이름 변경은 재생을 유지하고 여러 음원의 연결을 전환�
   ).toBeDisabled();
   await expect(page.getByTestId("bgm-status")).toHaveText("파일 연결 필요");
   await page.getByLabel("BGM 이름", { exact: true }).fill("추후 BGM");
-  await page
-    .getByRole("button", { name: "BGM 목록 추가", exact: true })
-    .click();
+  await press(page, "BGM 목록 추가");
   await expect(
     page
       .getByRole("group", { name: "BGM", exact: true })
@@ -136,7 +131,7 @@ test("이름 변경은 재생을 유지하고 여러 음원의 연결을 전환�
     .getByLabel("BGM 파일", { exact: true })
     .setInputFiles(file("new-morning.wav"));
   expect((await output(page)).paused).toEqual([]);
-  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
+  await press(page, "BGM 재생");
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
   expect(JSON.parse((await stored(page)) ?? "{}").entries[0]).toMatchObject({
     id: morningId,
@@ -163,28 +158,20 @@ test("종류별 이름 검사와 제거를 처리하고 다른 채널·게임 �
   await register(page, "BGM", "공통", "bgm.wav");
   await register(page, "음성", "공통", "voice.wav");
   for (const kind of ["BGM", "음성"])
-    await page
-      .getByRole("button", { name: `${kind} 재생`, exact: true })
-      .click();
+    await press(page, `${kind} 재생`);
   await expect(page.getByTestId("voice-status")).toHaveText("재생 중");
   expect((await output(page)).paused).toEqual([false, false]);
   expect((await output(page)).gain).toBe(0);
   const before = await stored(page);
-  await page
-    .getByRole("button", { name: "BGM 목록 추가", exact: true })
-    .click();
+  await press(page, "BGM 목록 추가");
   await expect(page.getByRole("alert")).toContainText("중복");
   expect(await stored(page)).toBe(before);
   await page.getByLabel("BGM 이름", { exact: true }).fill(" ");
-  await page
-    .getByRole("button", { name: "BGM 이름 변경", exact: true })
-    .click();
+  await press(page, "BGM 이름 변경");
   await expect(page.getByRole("alert")).toContainText("1~80자");
   expect(await stored(page)).toBe(before);
   const bgmUrl = (await output(page)).urls[0];
-  await page
-    .getByRole("button", { name: "BGM 목록에서 제거", exact: true })
-    .click();
+  await press(page, "BGM 목록에서 제거");
   expect((await output(page)).paused).toEqual([true, false]);
   expect((await output(page)).revoked).toContain(bgmUrl);
   await expect(
@@ -192,7 +179,7 @@ test("종류별 이름 검사와 제거를 처리하고 다른 채널·게임 �
   ).toBeDisabled();
   expect(JSON.parse((await stored(page)) ?? "{}").entries).toHaveLength(1);
   await closeWorkspace(page);
-  await page.getByRole("button", { name: "설정", exact: true }).click();
+  await press(page, "설정");
   await page
     .getByRole("dialog")
     .getByRole("checkbox", { name: "소리 끄기" })
@@ -210,7 +197,7 @@ test("목록 저장 실패 시 기존 목록·연결·재생을 보존하고 다
   await openWorkspace(page);
   await register(page, "BGM", "아침", "old.wav");
   const id = await page.getByLabel("BGM 음원 목록").inputValue();
-  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
+  await press(page, "BGM 재생");
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
   const before = await stored(page);
   const url = (await output(page)).urls[0];
@@ -237,9 +224,7 @@ test("목록 저장 실패 시 기존 목록·연결·재생을 보존하고 다
   expect((await output(page)).urls[0]).toBe(url);
   expect((await output(page)).paused).toEqual([false]);
   await expect(page.getByText("old.wav", { exact: true })).toBeVisible();
-  await page
-    .getByRole("button", { name: "BGM 목록에서 제거", exact: true })
-    .click();
+  await press(page, "BGM 목록에서 제거");
   expect(await stored(page)).toBe(before);
   await expect(page.getByLabel("BGM 음원 목록")).toHaveValue(id);
   await page.getByLabel("BGM 음원 목록").selectOption("");
@@ -257,7 +242,7 @@ test("목록 저장 실패 시 기존 목록·연결·재생을 보존하고 다
   await expect(
     page.getByText("replacement.wav", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
+  await press(page, "BGM 재생");
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
 });
 
@@ -267,9 +252,7 @@ test("손상된 목록을 덮어쓰지 않고 직접 재생과 미연결 항목 
   await page.goto("/");
   await openWorkspace(page);
   await page.getByLabel("음성 이름", { exact: true }).fill("추후 녹음");
-  await page
-    .getByRole("button", { name: "음성 목록 추가", exact: true })
-    .click();
+  await press(page, "음성 목록 추가");
   await expect(page.getByTestId("voice-status")).toHaveText("파일 연결 필요");
   expect(
     JSON.parse((await stored(page)) ?? "{}").entries[0].fileName,
@@ -281,6 +264,6 @@ test("손상된 목록을 덮어쓰지 않고 직접 재생과 미연결 항목 
   await register(page, "BGM", "새 음원", "local.wav");
   await expect(page.getByRole("alert")).toContainText("덮어쓰지 않았습니다");
   expect(await stored(page)).toBe("{broken");
-  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
+  await press(page, "BGM 재생");
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
 });

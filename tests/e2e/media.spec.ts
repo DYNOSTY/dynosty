@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { closeWorkspace, openWorkspace } from "./workspace.js";
+import { press, reveal } from "./labor-tabs.js";
 
 // 테스트용 PCM WAV. 실제 BGM·대사 파일이나 네트워크 음원을 사용하지 않는다.
 function wave(seconds = 1) {
@@ -99,9 +100,9 @@ test("BGM·음성을 함께 재생하고 복원된 음량·음소거와 정지�
         (window as unknown as { mediaProbe: Probe }).mediaProbe.contexts.length,
     ),
   ).toBe(0);
-  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
+  await press(page, "BGM 재생");
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
-  await page.getByRole("button", { name: "음성 재생", exact: true }).click();
+  await press(page, "음성 재생");
   await expect(page.getByTestId("voice-status")).toHaveText("재생 중");
   const output = () =>
     page.evaluate(() => {
@@ -130,7 +131,7 @@ test("BGM·음성을 함께 재생하고 복원된 음량·음소거와 정지�
     .toBeGreaterThan(0.6);
   await expect.poll(async () => (await output()).paused[0]).toBe(false);
   await closeWorkspace(page);
-  await page.getByRole("button", { name: "설정", exact: true }).click();
+  await press(page, "설정");
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("checkbox", { name: "소리 끄기" }).uncheck();
   await expect.poll(async () => (await output()).gain).toBeCloseTo(0.35, 6);
@@ -141,10 +142,10 @@ test("BGM·음성을 함께 재생하고 복원된 음량·음소거와 정지�
   await dialog.getByRole("button", { name: "설정 닫기" }).click();
   await openWorkspace(page);
   await expect.poll(async () => (await output()).paused[0]).toBe(false);
-  await page.getByRole("button", { name: "음성 정지", exact: true }).click();
+  await press(page, "음성 정지");
   await expect(page.getByTestId("voice-status")).toHaveText("정지");
   await expect.poll(async () => (await output()).paused).toEqual([false, true]);
-  await page.getByRole("button", { name: "BGM 정지", exact: true }).click();
+  await press(page, "BGM 정지");
   await expect.poll(async () => (await output()).paused).toEqual([true, true]);
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.example.saves")),
@@ -163,7 +164,7 @@ test("음성 자연 종료와 BGM 파일 교체·참조 해제를 처리한다",
     mimeType: "audio/wav",
     buffer: wave(),
   });
-  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
+  await press(page, "BGM 재생");
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
   const oldUrl = await page.evaluate(
     () =>
@@ -180,7 +181,7 @@ test("음성 자연 종료와 BGM 파일 교체·참조 해제를 처리한다",
       () => (window as unknown as { mediaProbe: Probe }).mediaProbe.revoked,
     ),
   ).toContain(oldUrl);
-  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
+  await press(page, "BGM 재생");
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
   expect(
     await page.evaluate(
@@ -193,7 +194,7 @@ test("음성 자연 종료와 BGM 파일 교체·참조 해제를 처리한다",
     mimeType: "audio/wav",
     buffer: wave(0.15),
   });
-  await page.getByRole("button", { name: "음성 재생", exact: true }).click();
+  await press(page, "음성 재생");
   await expect(page.getByTestId("voice-status")).toHaveText("재생 완료");
   await page.getByLabel("음성 파일", { exact: true }).setInputFiles({
     name: "wrong.txt",

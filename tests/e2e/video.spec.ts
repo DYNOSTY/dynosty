@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { closeWorkspace, openWorkspace } from "./workspace.js";
+import { press, reveal } from "./labor-tabs.js";
 
 const videoPath = fileURLToPath(
   new URL("./fixtures/test-video.webm", import.meta.url),
@@ -75,7 +76,7 @@ test("영상 수동 재생·정지·자연 종료에 저장된 음량·음소거
   ).toBe(0);
   const video = page.getByLabel("선택한 영상", { exact: true });
   await expect(video).toHaveJSProperty("paused", true);
-  await page.getByRole("button", { name: "영상 재생", exact: true }).click();
+  await press(page, "영상 재생");
   await expect(page.getByTestId("video-status")).toHaveText("재생 중");
   await expect(video).toHaveJSProperty("videoWidth", 64);
   await expect(video).toHaveJSProperty("videoHeight", 36);
@@ -94,7 +95,7 @@ test("영상 수동 재생·정지·자연 종료에 저장된 음량·음소거
     );
   await expect.poll(gain).toBe(0);
   await closeWorkspace(page);
-  await page.getByRole("button", { name: "설정", exact: true }).click();
+  await press(page, "설정");
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("checkbox", { name: "소리 끄기" }).uncheck();
   await expect.poll(gain).toBe(0.25);
@@ -104,11 +105,11 @@ test("영상 수동 재생·정지·자연 종료에 저장된 음량·음소거
   await expect.poll(gain).toBe(0);
   await dialog.getByRole("button", { name: "설정 닫기" }).click();
   await openWorkspace(page);
-  await page.getByRole("button", { name: "영상 정지", exact: true }).click();
+  await press(page, "영상 정지");
   await expect(page.getByTestId("video-status")).toHaveText("정지");
   await expect(video).toHaveJSProperty("paused", true);
   await expect(video).toHaveJSProperty("currentTime", 0);
-  await page.getByRole("button", { name: "영상 재생", exact: true }).click();
+  await press(page, "영상 재생");
   await expect(page.getByTestId("video-status")).toHaveText("재생 완료", {
     timeout: 12_000,
   });
@@ -130,11 +131,11 @@ test("영상 정지·파일 교체가 BGM을 멈추지 않고 이전 파일 참�
   await page.goto("/");
   await openWorkspace(page);
   await page.getByLabel("BGM 파일", { exact: true }).setInputFiles(audioPath);
-  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
+  await press(page, "BGM 재생");
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
   const input = page.getByLabel("영상 파일", { exact: true });
   await input.setInputFiles(videoPath);
-  await page.getByRole("button", { name: "영상 재생", exact: true }).click();
+  await press(page, "영상 재생");
   await expect(page.getByTestId("video-status")).toHaveText("재생 중");
   const url = await page
     .getByLabel("선택한 영상", { exact: true })
@@ -150,9 +151,9 @@ test("영상 정지·파일 교체가 BGM을 멈추지 않고 이전 파일 참�
       () => (window as unknown as { videoProbe: Probe }).videoProbe.revoked,
     ),
   ).toContain(url);
-  await page.getByRole("button", { name: "영상 재생", exact: true }).click();
+  await press(page, "영상 재생");
   await expect(page.getByTestId("video-status")).toHaveText("재생 중");
-  await page.getByRole("button", { name: "영상 정지", exact: true }).click();
+  await press(page, "영상 정지");
   await expect
     .poll(() =>
       page.evaluate(
