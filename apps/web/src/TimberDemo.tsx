@@ -6,6 +6,7 @@ import {
   BOKHOL_PRODUCTION_SITES,
   type BuildingKind,
   createLogging,
+  dailyFoodDemand,
   facilityStaffLimit,
   formatRation,
   GAME_RULES,
@@ -31,6 +32,7 @@ import {
   type TimberState,
   townShiftOpen,
   VILLAGE_RULES,
+  visitorOffer,
   workplaceOpen,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
@@ -40,6 +42,71 @@ import { buildingCost, TownPanel } from "./TownPanel.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
 
+const merchantCards = [
+  [
+    "plant",
+    "풀",
+    "백초 아범",
+    "반갑소. 오는 길에 서리 맞기 전의 어린잎을 베어 왔소.",
+    "풀 한 짐을 내겠소. 대신 물통을 채워 주겠소?",
+  ],
+  [
+    "meat",
+    "고기",
+    "피돌이",
+    "어서 오시오! 오늘 사냥감은 살이 제법 올랐소.",
+    "고기를 나누겠소. 훈제할 목재와 바꿉시다.",
+  ],
+  [
+    "fish",
+    "어류",
+    "은빛쇠",
+    "아가미 빛 좀 보시오. 동틀 무렵 얼음 밑에서 건졌다오.",
+    "잡은 물고기를 내겠소. 작살을 벼릴 철재가 필요하오.",
+  ],
+  [
+    "wood",
+    "목재",
+    "거친손",
+    "고리 나리, 결 한번 보시지요. 곧은 것끼리 묶어 왔습니다.",
+    "목재를 드리지요. 무뎌진 도끼를 고칠 철재를 주시겠습니까?",
+  ],
+  [
+    "metal",
+    "철재",
+    "억쇠",
+    "반갑습니다. 쇳소리는 귀를 속이지 못하지요.",
+    "두드려 다듬은 철재가 있습니다. 화덕에 쓸 석탄과 바꾸지요.",
+  ],
+  [
+    "water",
+    "물",
+    "물지게",
+    "먼 길 오느라 목마르셨지요? 바가지부터 받으세요.",
+    "샘물을 길어 왔어요. 물지게를 고칠 목재가 있을까요?",
+  ],
+  [
+    "ore",
+    "철광석",
+    "덕구",
+    "손에 붉은 가루가 묻지요? 골짜기 광맥에서 막 캐 온 겁니다.",
+    "철광석을 내려놓겠습니다. 광부들이 먹을 어류를 주시겠습니까?",
+  ],
+  [
+    "stone",
+    "석재",
+    "바우",
+    "문턱이 닳았구려. 발 디디기 좋은 넓적돌을 골라 왔소.",
+    "다듬은 석재를 내겠소. 돌수레 축에 쓸 목재가 필요하오.",
+  ],
+  [
+    "coal",
+    "석탄",
+    "일식",
+    "하하, 내 얼굴부터 까맣지요? 오늘도 갱에서 곧장 왔습니다.",
+    "석탄을 싣고 왔습니다. 돌아가는 길에 먹을 고기와 바꾸시지요.",
+  ],
+] as const;
 const time = (m: number) => `${Math.floor(m / 60)}시간 ${m % 60}분`;
 const phaseNames = {
   select: "공급 제안 비교",
@@ -303,6 +370,11 @@ export function TimberDemo({
     }
   }, [state?.construction, error, active, placingHome, onCancelHomePlacement]);
   useEffect(() => () => onCancelHomePlacement(), [onCancelHomePlacement]);
+  const merchant =
+    state?.merchantItem === undefined
+      ? undefined
+      : merchantCards[state.merchantItem];
+  const demand = state && dailyFoodDemand(state.world);
   const metal = (state?.world.resources.RES_METAL ?? 0) / AMOUNT_SCALE;
   const classic = (
     <section
@@ -569,8 +641,99 @@ export function TimberDemo({
               부족분을 서로 대체합니다. 상한으로 부족한 영양은 허기로 남습니다.
             </p>
           </details>
+          {demand && (
+            <p>
+              나르미 · 하루 필요량 / 공동 재고{" "}
+              {(["RES_PLANT", "RES_MEAT", "RES_FISH"] as const)
+                .map(
+                  (item, i) =>
+                    ["풀", "고기", "어류"][i] +
+                    " " +
+                    demand[item] / AMOUNT_SCALE +
+                    " / " +
+                    state.world.resources[item] / AMOUNT_SCALE,
+                )
+                .join(" · ")}
+            </p>
+          )}
+          {merchant && (
+            <aside aria-label="교역소 방문" className="village-service">
+              <h3>
+                ❗ 교역소 · {merchant[1]} 상인 {merchant[2]} 방문
+              </h3>
+              <img
+                src={"/art/merchants/" + merchant[0] + ".png"}
+                alt={merchant[1] + " 상인 " + merchant[2] + "의 초상"}
+                width="112"
+                height="112"
+              />
+              <p>“{merchant[3]}”</p>
+              <p>
+                <strong>거래 제안</strong> · {merchant[4]}
+              </p>
+              {state.riskyMerchants?.includes(state.merchantItem!) && (
+                <p>
+                  지난 납품에 규격 미달품이 있었습니다. 이번에는 값을 낮추거나
+                  대량 계약의 물량을 더 받을 수 있습니다.
+                </p>
+              )}
+              {(["A", "B"] as const).map((option) => {
+                const o = visitorOffer(state, option);
+                return (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    key={option}
+                    onClick={() =>
+                      command({
+                        type: "visit-decision",
+                        item: state.merchantItem!,
+                        day: state.world.day,
+                        option,
+                      })
+                    }
+                  >
+                    {option} · {merchantCards[o.paymentIndex]?.[1]} {o.cost}개로{" "}
+                    {merchant[1]} {o.quantity}개 계약
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  command({
+                    type: "visit-decision",
+                    item: state.merchantItem!,
+                    day: state.world.day,
+                    option: "decline",
+                  })
+                }
+              >
+                이번 거래 거절
+              </button>
+            </aside>
+          )}
+          {state.merchantRepair && (
+            <p role="status">
+              교역소 보완 · {merchantCards[state.merchantRepair.item]?.[1]}{" "}
+              {state.merchantRepair.quantity}개 · 남은 작업{" "}
+              {state.merchantRepair.work}인분(분)
+            </p>
+          )}
           <section aria-label="거주지" className="village-service">
             <h3>온돌 둥지</h3>
+            {state.residents.some((r) => r.health !== "dead" && !r.homeId) && (
+              <strong role="status" style={{ color: "#ff6961" }}>
+                ❗ 둥지 없는 주민{" "}
+                {
+                  state.residents.filter(
+                    (r) => r.health !== "dead" && !r.homeId,
+                  ).length
+                }
+                명
+              </strong>
+            )}
             <p data-testid="housing-status">
               둥지 {state.homes.length}곳 · 입주{" "}
               {
@@ -961,39 +1124,41 @@ export function TimberDemo({
               </p>
             </section>
           ) : null}
-          {state.mission === "register-policy" ? (
+          {state.mission === "register-policy" ||
+          (state.scoutVisitors ?? 0) > 0 ? (
             <section aria-label="다음 임무" data-testid="next-mission">
-              <h3>다음 임무 · P01 복홀 호구와 먹이 장부</h3>
-              <p>주민을 맞이하고 필요한 먹이를 기록할 원칙을 정하세요.</p>
+              <h3>❗ 마을 문에 주민 3명이 도착했습니다</h3>
+              <p>
+                달이 ·{" "}
+                {(state.scoutVisitors ?? 0) > 0
+                  ? "정찰대와 함께 도착"
+                  : "마을 문 방문"}{" "}
+                · 트리케라톱스 2명, 벨로키랍토르 1명. 한 명은 치료가 필요합니다.
+              </p>
               <button
                 type="button"
-                onClick={() =>
-                  command({ type: "set-policy", policy: "relief" })
-                }
+                disabled={busy}
+                onClick={() => command({ type: "gate-decision", accept: true })}
               >
-                구휼 장부 우선
+                받아준다
               </button>
-              <p>새로운 주민의 안착을 먼저 살핍니다.</p>
               <button
                 type="button"
+                disabled={busy}
                 onClick={() =>
-                  command({ type: "set-policy", policy: "registry" })
+                  command({ type: "gate-decision", accept: false })
                 }
               >
-                호패 대조 우선
+                돌려보낸다 · 절망 상승
               </button>
-              <p>주민과 식단을 대조해 재고를 예측합니다.</p>
             </section>
           ) : null}
           {state.mission === "village-orders" ? (
             <section data-testid="next-mission">
-              <h3>P01 장부 원칙 결정</h3>
-              <p>
-                {state.policy === "relief"
-                  ? "구휼 장부 우선"
-                  : "호패 대조 우선"}
-                을 기록했습니다. 다음 마을 운영 명령을 기다립니다.
-              </p>
+              <h3>
+                달이 · 현재 인구{" "}
+                {state.world.citizens.filter((c) => c.alive).length}명
+              </h3>
             </section>
           ) : null}
           <details>

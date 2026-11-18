@@ -397,7 +397,7 @@ test("계약 한 번으로 주민 선택 없이 전 과정과 공동 재고·다
   await contract(page, "A");
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
   await expect(page.getByTestId("next-mission")).toContainText(
-    "P01 복홀 호구와 먹이 장부",
+    "마을 문에 주민",
     { timeout: 26000 },
   );
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("140");
@@ -405,9 +405,9 @@ test("계약 한 번으로 주민 선택 없이 전 과정과 공동 재고·다
   await expect(page.getByTestId("timber-workers")).toHaveText(
     "유휴 일손 60/60",
   );
-  await button(page, "구휼 장부 우선").click();
+  await button(page, "받아준다").click();
   await expect(page.getByTestId("next-mission")).toContainText(
-    "P01 장부 원칙 결정",
+    "현재 인구 63명",
   );
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("140");
 });
@@ -421,9 +421,9 @@ test("B도 직접 수령이나 배분 없이 공동 재고에 입고한다", asy
   await expect(page.getByTestId("timber-result")).toContainText(
     "공동 재고 정산 완료",
   );
-  await button(page, "호패 대조 우선").click();
+  await button(page, "돌려보낸다 · 절망 상승").click();
   await expect(page.getByTestId("next-mission")).toContainText(
-    "호패 대조 우선",
+    "현재 인구 60명",
   );
 });
 

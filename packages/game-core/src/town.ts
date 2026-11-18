@@ -774,7 +774,7 @@ export function staffTown(input: TimberState): TimberState {
   }
   return s;
 }
-function deposit(s: TimberState, r: ResourceId, n: number): TimberState {
+export function deposit(s: TimberState, r: ResourceId, n: number): TimberState {
   return {
     ...s,
     world: {
@@ -1136,6 +1136,8 @@ function advanceTrips(input: TimberState, minutes: number): TimberState {
           residents: s.residents.map((r) =>
             t.ids.includes(r.id) ? { ...r, task: null } : r,
           ),
+          scoutVisitors:
+            t.kind === "hunt" ? (s.scoutVisitors ?? 0) + 1 : s.scoutVisitors,
           town: { ...s.town, trips: s.town.trips.filter((q) => q.id !== t.id) },
         };
         continue;

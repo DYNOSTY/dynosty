@@ -170,3 +170,27 @@ test("어획막의 다섯 인원으로 별도 운반 없이 공동 어류가 즉
     "운반 중 0",
   );
 });
+
+test("방문 상인의 초상과 재협상 · 계약 입고", async ({ page }) => {
+  let s = build(start(), "trade");
+  const post = s.town.facilities[0]!;
+  s = cmd(s, { type: "facility-staff", id: post.id, count: 1 });
+  s = advanceTimber(s, 35);
+  await load(page, {
+    ...s,
+    paused: true,
+    merchantItem: 3,
+    riskyMerchants: [3],
+  });
+  const visit = page.getByLabel("교역소 방문");
+  await expect(visit).toContainText("거친손");
+  const portrait = visit.getByRole("img", { name: "목재 상인 거친손의 초상" });
+  await expect
+    .poll(() => portrait.evaluate((e) => (e as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(visit).toContainText("지난 납품");
+  await visit
+    .getByRole("button", { name: /A · 철재 3개로 목재 8개 계약/ })
+    .click();
+  await expect(visit).toHaveCount(0);
+});

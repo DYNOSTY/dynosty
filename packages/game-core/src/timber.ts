@@ -81,10 +81,12 @@ import {
   advanceTown,
   type BuildingKind,
   createTown,
+  deposit,
   dispatchFood,
   facilityDoor,
   facilityStaffLimit,
   orderResting,
+  payTown,
   planBuilding,
   reconcileTownHealth,
   setFacilityStaff,
@@ -249,6 +251,12 @@ export interface TimberState {
   readonly reservedWood: number;
   readonly settledAt: number | null;
   readonly repairCompletedAt: number | null;
+  readonly scoutVisitors?: number | undefined;
+  readonly riskyMerchants?: readonly number[];
+  readonly merchantRepair?:
+    | { item: number; quantity: number; work: number }
+    | undefined;
+  readonly merchantItem?: number | undefined;
   readonly mission: "procurement" | "register-policy" | "village-orders";
   readonly policy: RegisterPolicy | null;
   readonly stock: {
@@ -297,6 +305,13 @@ export type TimberCommand =
   | { type: "advance"; minutes: number }
   | { type: "pause"; paused: boolean }
   | { type: "speed"; speed: 1 | 3 }
+  | {
+      type: "visit-decision";
+      item: number;
+      day: number;
+      option: "A" | "B" | "decline";
+    }
+  | { type: "gate-decision"; accept: boolean }
   | { type: "set-policy"; policy: RegisterPolicy };
 export class TimberError extends Error {}
 function fail(message = "게임 상태가 올바르지 않습니다."): never {
@@ -1845,6 +1860,24 @@ export function parseTimberState(value: unknown): TimberState {
     )
   )
     fail();
+  if (value.scoutVisitors !== undefined) num(value.scoutVisitors, 1000000);
+  if (value.riskyMerchants !== undefined) {
+    if (
+      !Array.isArray(value.riskyMerchants) ||
+      new Set(value.riskyMerchants).size !== value.riskyMerchants.length
+    )
+      fail();
+    for (const item of value.riskyMerchants) num(item, 8);
+  }
+  if (value.merchantRepair !== undefined) {
+    const r = value.merchantRepair;
+    if (!isRecord(r)) fail();
+    num(r.item, 8);
+    num(r.quantity, 4);
+    num(r.work, 30);
+    if (!r.quantity) fail();
+  }
+  if (value.merchantItem !== undefined) num(value.merchantItem, 8);
   if (value.residents.length > 600) fail();
   const ids = new Set<string>();
   for (const r of value.residents) {
@@ -2220,7 +2253,7 @@ export function parseTimberState(value: unknown): TimberState {
         s.stock.available + s.stock.used !== 20
   )
     fail("임무 정산이 올바르지 않습니다.");
-  if (s.mission === "village-orders" ? s.policy === null : s.policy !== null)
+  if (s.mission !== "village-orders" && s.policy !== null)
     fail("장부 정책 선택이 올바르지 않습니다.");
   if (
     s.processed.length > 1999 ||
@@ -2247,6 +2280,46 @@ export function parseTimberState(value: unknown): TimberState {
     previous = h.minute;
   }
   return s;
+}
+const merchantGoods = [
+  "RES_PLANT",
+  "RES_MEAT",
+  "RES_FISH",
+  "RES_WOOD",
+  "RES_METAL",
+  "RES_WATER",
+  "RES_IRON_ORE",
+  "RES_STONE",
+  "RES_COAL",
+] as const;
+const paymentItems = [5, 3, 4, 4, 8, 3, 2, 3, 1] as const;
+function merchantStaff(s: TimberState) {
+  const post = s.town.facilities.find((f) => f.kind === "trade");
+  return post
+    ? s.residents.filter(
+        (r) =>
+          r.workplaceId === "facility:" + post.id &&
+          r.health === "healthy" &&
+          !r.task,
+      ).length
+    : 0;
+}
+export function visitorOffer(s: TimberState, option: "A" | "B") {
+  const item = s.merchantItem;
+  if (item === undefined) throw Error("방문 상인이 없습니다.");
+  const level = s.town.facilities.find((f) => f.kind === "trade")?.level ?? 1;
+  const risk = s.riskyMerchants?.includes(item);
+  const payment = paymentItems[item]!;
+  return {
+    goods: merchantGoods[item]!,
+    payment: merchantGoods[payment]!,
+    paymentIndex: payment,
+    cost: (option === "A" ? 4 : 7) - (risk ? 1 : 0),
+    quantity:
+      (option === "A" ? 8 : 16) +
+      (level - 1) * 2 +
+      (risk && option === "B" ? 2 : 0),
+  };
 }
 export function advanceTimber(
   input: TimberState,
@@ -2278,6 +2351,46 @@ export function advanceTimber(
         (20 * (s.elapsed - (s.startedAt ?? 0))) / TIMBER_RULES.unloadMinutes,
       );
       s = { ...s, stock: { ...s.stock, cart: 20 - moved, waiting: moved } };
+    }
+    if (
+      !s.merchantRepair &&
+      s.world.day !== input.world.day &&
+      s.world.minute === 0 &&
+      s.town.facilities.some(
+        (f) =>
+          f.kind === "trade" &&
+          s.residents.some(
+            (r) =>
+              r.workplaceId === "facility:" + f.id && r.health === "healthy",
+          ),
+      )
+    ) {
+      const roll = Math.random();
+      s = {
+        ...s,
+        merchantItem: roll < 0.5 ? Math.floor(roll * 18) : undefined,
+      };
+    }
+    const repair = s.merchantRepair;
+    if (
+      repair &&
+      s.world.minute >= 540 &&
+      s.world.minute < 1080 &&
+      merchantStaff(s) > 0
+    ) {
+      const work = Math.max(0, repair.work - merchantStaff(s));
+      if (
+        !work &&
+        storageRoom(s, merchantGoods[repair.item]!) >= repair.quantity
+      )
+        s = note(
+          {
+            ...deposit(s, merchantGoods[repair.item]!, repair.quantity),
+            merchantRepair: undefined,
+          },
+          "교역소 직원이 보완을 마쳐 공동 재고에 입고했습니다.",
+        );
+      else s = { ...s, merchantRepair: { ...repair, work } };
     }
     s = resumeResidents(s, elapsed);
     if (s.due === s.elapsed) s = completeStep(s);
@@ -2726,6 +2839,100 @@ export function commandTimber(
       )
         n = stop({ ...n, reservedWood: 0, repairWorkerId: null }, "ready");
       break;
+    case "visit-decision": {
+      if (
+        command.item !== s.merchantItem ||
+        command.day !== s.world.day ||
+        s.merchantItem === undefined ||
+        !["A", "B", "decline"].includes(command.option)
+      )
+        fail("방문 제안이 바뀌었습니다.");
+      if (command.option === "decline") {
+        n = { ...s, merchantItem: undefined };
+        break;
+      }
+      if (!merchantStaff(s) || s.merchantRepair)
+        fail("교역소에 거래를 맡을 직원이 필요합니다.");
+      const offer = visitorOffer(s, command.option);
+      if (storageRoom(s, offer.goods) < offer.quantity)
+        fail("저장 공간이 부족합니다.");
+      const paid = payTown(s, { [offer.payment]: offer.cost });
+      const bad = Math.random() < 0.3 ? 2 : 0;
+      n = note(
+        {
+          ...deposit(paid, offer.goods, offer.quantity - bad),
+          merchantItem: undefined,
+          riskyMerchants: bad
+            ? [...new Set([...(s.riskyMerchants ?? []), command.item])]
+            : (s.riskyMerchants ?? []),
+          merchantRepair: bad
+            ? { item: command.item, quantity: bad, work: 20 }
+            : undefined,
+        },
+        bad
+          ? "검수 결과 2개 규격 미달 · 교역소 직원 보완 대기"
+          : "검수 완료 · 전량 공동 입고",
+      );
+      break;
+    }
+    case "gate-decision": {
+      const scout = (s.scoutVisitors ?? 0) > 0;
+      if (
+        (!scout && s.mission !== "register-policy") ||
+        typeof command.accept !== "boolean"
+      )
+        fail();
+      const visit = "gate-" + s.processed.length;
+      if (command.accept) {
+        n = commandTimber(
+          s,
+          {
+            type: "citizen-event",
+            event: {
+              type: "arrival",
+              id: visit,
+              groups: [
+                { species: "R02", count: 2 },
+                { species: "R03", count: 1 },
+              ],
+            },
+          },
+          visit + "-arrive",
+        );
+        n = commandTimber(
+          n,
+          {
+            type: "citizen-event",
+            event: {
+              type: "illness",
+              id: visit + "-sick",
+              citizenIds: ["arrival:" + visit + ":R02:0"],
+              severity: "minor",
+            },
+          },
+          visit + "-care",
+        );
+      } else {
+        n = {
+          ...s,
+          world: {
+            ...s.world,
+            pessimism: Math.min(100, s.world.pessimism + 1),
+          },
+        };
+      }
+      n = note(
+        {
+          ...n,
+          scoutVisitors: scout ? (s.scoutVisitors ?? 1) - 1 : s.scoutVisitors,
+          mission: scout ? s.mission : "village-orders",
+        },
+        command.accept
+          ? "달이: 주민 3명이 합류했습니다. 한 명은 치료가 필요합니다."
+          : "입촌을 거절해 절망이 올랐습니다.",
+      );
+      break;
+    }
     case "set-policy":
       if (
         s.mission !== "register-policy" ||
