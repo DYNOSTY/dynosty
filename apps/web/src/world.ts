@@ -15,6 +15,7 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { Scene } from "@babylonjs/core/scene";
+import { LOGGING_SITES } from "./layout.js";
 import { SCOUT_SITES } from "./scout-sites.js";
 
 export const ISLAND_RADIUS = 70;
@@ -103,8 +104,8 @@ const PALETTE = {
     skyNight: [0.42, 0.5, 0.7],
     skyGround: [0.28, 0.31, 0.42],
     sunMax: 0.6,
-    pine: [0.11, 0.16, 0.17],
-    pineB: [0.15, 0.21, 0.22],
+    pine: [0.13, 0.24, 0.2],
+    pineB: [0.16, 0.28, 0.23],
     cap: [0.86, 0.87, 0.91],
     rock: [0.42, 0.41, 0.43],
     ice: [0.72, 0.78, 0.84],
@@ -145,7 +146,8 @@ export function frustum(
   const top = segs * 2;
   for (let i = 0; i < segs; i++) {
     const j = (i + 1) % segs;
-    ind.push(i, segs + j, j, i, segs + i, segs + j, segs + i, top, segs + j);
+    // 바깥을 보게(시계 반대 → 시계): 예전엔 면이 안쪽을 봐서 나무·바위가 빛을 못 받고 검게 보였음
+    ind.push(i, j, segs + j, i, segs + j, segs + i, segs + i, segs + j, top);
   }
   for (let i = 0; i < pos.length / 3; i++) {
     const shade = 0.88 + r() * 0.24;
@@ -162,6 +164,63 @@ export function frustum(
   vd.colors = colors;
   return vd;
 }
+// 소나무 한 층: 가지 끝이 별처럼 튀어나오고 끝이 아래로 처진 치마 (off로 눈 층과 가지 끝을 맞춤)
+function pineTier(
+  r: () => number,
+  off: number,
+  y0: number,
+  h: number,
+  rb: number,
+  rt: number,
+  segs: number,
+  col: readonly number[],
+  droop: number,
+  notch: number,
+  dark: number,
+  cap = true,
+) {
+  const pos: number[] = [],
+    ind: number[] = [],
+    colors: number[] = [];
+  for (let i = 0; i < segs; i++) {
+    const a = off + (i / segs) * Math.PI * 2,
+      tip = i % 2 === 0,
+      k = (tip ? 1 : notch) * (1 + (r() - 0.5) * 0.16);
+    pos.push(
+      Math.cos(a) * rb * k,
+      y0 - (tip ? droop * (0.8 + r() * 0.4) : 0),
+      Math.sin(a) * rb * k,
+    );
+  }
+  for (let i = 0; i < segs; i++) {
+    const a = off + (i / segs) * Math.PI * 2;
+    pos.push(Math.cos(a) * rt, y0 + h, Math.sin(a) * rt);
+  }
+  pos.push(0, y0 + h, 0);
+  const top = segs * 2;
+  for (let i = 0; i < segs; i++) {
+    const j = (i + 1) % segs;
+    // 바깥을 보게(시계 반대 → 시계): 예전엔 면이 안쪽을 봐서 나무·바위가 빛을 못 받고 검게 보였음
+    ind.push(i, j, segs + j, i, segs + j, segs + i);
+    if (cap) ind.push(segs + i, segs + j, top);
+  }
+  // 아래 테두리(가지 끝·밑면 쪽)는 어둡게, 위로 갈수록 밝게
+  for (let i = 0; i < pos.length / 3; i++) {
+    const shade = (i < segs ? dark : 1) * (0.92 + r() * 0.16);
+    colors.push(
+      (col[0] ?? 0) * shade,
+      (col[1] ?? 0) * shade,
+      (col[2] ?? 0) * shade,
+      1,
+    );
+  }
+  const vd = new VertexData();
+  vd.positions = pos;
+  vd.indices = ind;
+  vd.colors = colors;
+  return vd;
+}
+
 export function mergedMesh(
   name: string,
   parts: VertexData[],
@@ -464,39 +523,78 @@ export function buildWorld(
 
   // ── 나무·그루터기·죽은 나무·바위 ──
   const treeMat = vertexMat("pine-material");
-  const pines = [0, 1, 2].map((v) => {
+  // 눈 쌓인 전나무(컨셉 시트): 별 모양 가지 층 + 층마다 위를 덮은 눈 (가지 끝 초록은 남김)
+  // far: 마을에서 먼 숲(40m~)용 — 층·가지를 줄인 같은 모양 (점 개수 약 1/3)
+  const makePine = (v: number, name = `pine-${v}`, far = false) => {
     const tr = rng(100 + v),
       parts: VertexData[] = [];
-    parts.push(frustum(tr, 0, 1.2, 0.17, 0.11, 6, [0.3, 0.22, 0.18], 0));
-    const tiers = 4 + v;
+    parts.push(frustum(tr, 0, 1.1, 0.17, 0.1, 6, [0.27, 0.2, 0.17], 0));
+    const tiers = far ? 4 + v : 6 + v,
+      height = 3.3 + v * 0.55;
     for (let k = 0; k < tiers; k++) {
       const t = k / tiers,
-        y = 0.8 + t * (2.6 + v * 0.5),
-        rb = 1.35 * (1 - t * 0.78) + 0.15,
-        h = 1.05 - t * 0.25;
+        y = 0.75 + t * height,
+        rb = 1.45 * (1 - t * 0.8) + 0.12,
+        h = 0.95 - t * 0.3,
+        off = tr() * Math.PI,
+        segs = far ? 8 : 10;
       parts.push(
-        frustum(tr, y, h, rb, rb * 0.25, 9, k % 2 ? P.pineB : P.pine, 0.35),
+        pineTier(
+          tr,
+          off,
+          y,
+          h,
+          rb,
+          rb * 0.18,
+          segs,
+          k % 2 ? P.pineB : P.pine,
+          0.22 * h,
+          0.66,
+          0.62,
+          !P.cap, // 눈이 덮으면 윗면은 안 보이니 안 그림
+        ),
       );
       if (P.cap)
         parts.push(
-          frustum(tr, y + h * 0.42, h * 0.62, rb * 0.62, 0.02, 9, P.cap, 0.25),
+          pineTier(
+            tr,
+            off,
+            y + h * 0.26,
+            h * 0.82,
+            rb * 0.88,
+            rb * 0.2,
+            segs,
+            P.cap,
+            0.12 * h,
+            0.72,
+            0.86,
+          ),
         );
     }
-    return mergedMesh(`pine-${v}`, parts, scene, treeMat);
-  });
+    // 꼭대기 눈 뾰족
+    if (P.cap)
+      parts.push(frustum(tr, 0.75 + height, 0.45, 0.18, 0.01, 6, P.cap, 0.1));
+    return mergedMesh(name, parts, scene, treeMat);
+  };
+  const pines = [0, 1, 2].map((v) => makePine(v));
+  const pinesFar = [0, 1, 2].map((v) => makePine(v, `pine-far-${v}`, true));
+  const pineAt = (d: number, n: number) =>
+    (d > 40 ? pinesFar : pines)[n % 3] as Mesh;
   const cap = P.cap ?? [0.5, 0.45, 0.4];
-  const stump = mergedMesh(
-    "stump",
-    (() => {
-      const sr = rng(55);
-      return [
-        frustum(sr, 0, 0.42, 0.28, 0.24, 7, [0.33, 0.25, 0.2], 0.2),
-        frustum(sr, 0.42, 0.06, 0.25, 0.2, 7, cap, 0.1),
-      ];
-    })(),
-    scene,
-    treeMat,
-  );
+  const makeStump = (name = "stump") =>
+    mergedMesh(
+      name,
+      (() => {
+        const sr = rng(55);
+        return [
+          frustum(sr, 0, 0.42, 0.28, 0.24, 7, [0.33, 0.25, 0.2], 0.2),
+          frustum(sr, 0.42, 0.06, 0.25, 0.2, 7, cap, 0.1),
+        ];
+      })(),
+      scene,
+      treeMat,
+    );
+  const stump = makeStump();
   const deadTrees = [0, 1].map((v) => {
     const dr = rng(70 + v),
       bark = [0.24, 0.21, 0.21],
@@ -543,7 +641,10 @@ export function buildWorld(
     nearRoad(x, z, 2.8) ||
     Math.hypot(x - POND.x, z - POND.z) < POND.r + 1.2 ||
     Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r + 1.5 ||
-    SCOUT_SITES.some((s) => Math.hypot(x - s.x, z - s.z) < 8); // 거점 자리는 비워 둠 (발견 모형)
+    SCOUT_SITES.some((s) => Math.hypot(x - s.x, z - s.z) < 8) || // 거점 자리는 비워 둠 (발견 모형)
+    LOGGING_SITES.some(
+      ([lx, lz]) => Math.hypot(x - lx * 1.12, z - lz * 1.12) < 4.2,
+    ); // 벌목터 나무는 logging.ts가 따로 심음
   const r = rng(42);
   const put = (
     src: Mesh,
@@ -571,22 +672,28 @@ export function buildWorld(
     if (blocked(x, z)) continue;
     const s = 0.7 + r() * 0.7,
       roll = r();
-    // 마을 둘레(22~34m)는 땔감으로 베어 낸 그루터기 벌판
-    if (d > 21 && d < 34) {
+    // 마을 둘레(22~27m)는 땔감으로 베어 낸 그루터기 벌판, 27m부터 숲 가장자리
+    if (d > 27 && d < 34) {
+      if (roll < 0.16) put(pineAt(d, n), x, z, s, `pine-${n}`, 1.4);
+      else if (roll < 0.18)
+        put(stump, x, z, 0.8 + r() * 0.5, `stump-${n}`, 0.4);
+      continue;
+    }
+    if (d > 21 && d <= 27) {
       if (roll < 0.035) put(stump, x, z, 0.8 + r() * 0.5, `stump-${n}`, 0.4);
       else if (roll < 0.04)
         put(deadTrees[n % 2] as Mesh, x, z, s, `dead-${n}`, 0.7);
       continue;
     }
     if (d <= 21) {
-      if (roll < 0.05) put(pines[n % 3] as Mesh, x, z, s, `pine-${n}`, 1.4);
+      if (roll < 0.05) put(pineAt(d, n), x, z, s, `pine-${n}`, 1.4);
       continue;
     }
     // 바깥: 숲, 군데군데 죽은 나무와 바위
-    if (roll < 0.11) put(pines[n % 3] as Mesh, x, z, s * 1.1, `pine-${n}`, 1.4);
-    else if (roll < 0.125)
+    if (roll < 0.22) put(pineAt(d, n), x, z, s * 1.1, `pine-${n}`, 1.4);
+    else if (roll < 0.235)
       put(deadTrees[n % 2] as Mesh, x, z, s, `dead-${n}`, 0.7);
-    else if (roll < 0.135 || (d > R - 3 && roll < 0.3)) {
+    else if (roll < 0.245 || (d > R - 3 && roll < 0.4)) {
       put(
         rocks[n % 2] as Mesh,
         x,
@@ -797,5 +904,13 @@ export function buildWorld(
   const followSnow = (x: number, z: number) => {
     if (snow) (snow.emitter as Vector3).set(x + 8, 26, z - 4);
   };
-  return { shadow, setTime, glow, warmMat, followSnow };
+  return {
+    shadow,
+    setTime,
+    glow,
+    warmMat,
+    followSnow,
+    makePine: (name: string) => makePine(0, name),
+    makeStump,
+  };
 }

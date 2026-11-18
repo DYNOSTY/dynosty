@@ -104,6 +104,15 @@ class SnowCoverPlugin extends MaterialPluginBase {
   }
 }
 
+/** 공룡 주민: 머리·어깨·등짐처럼 위를 보는 곳에 눈 (빛나는 등불·눈 덩이는 그대로) */
+const snowed = new WeakSet<Material>();
+export function snowOnResident(material: Material | null) {
+  if (!material || snowed.has(material)) return;
+  snowed.add(material);
+  if (/lamp|snow/i.test(material.name)) return;
+  SnowCoverPlugin.attach(material, 0.5, 0.6); // 살짝 덮이게 — 담요 누빔 색이 보이도록
+}
+
 export function createMaterialLibrary(scene: Scene) {
   const cache = new Map<string, Texture>();
   const tex = (file: string) => {

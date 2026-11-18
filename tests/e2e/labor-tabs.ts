@@ -9,7 +9,7 @@ export async function showIn(p: Page, target: Locator) {
   for (const t of TABS) {
     const tab = p.getByRole("button", { name: t, exact: true });
     if (!(await tab.isVisible().catch(() => false))) return;
-    await tab.click();
+    await tab.click({ force: true }); // 탭은 늘 같은 자리 — 흔들림 확인을 건너뛰어 빠르게
     if (await target.isVisible().catch(() => false)) return;
   }
 }

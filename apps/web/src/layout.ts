@@ -24,3 +24,11 @@ export const LAYOUT: Array<[string, number, number]> = [
   ["BLD_NEST", -5.75, -9.96],
   ["BLD_NEST", 5.75, -9.96],
 ];
+
+// 벌목터: 숲 가장자리(반지름 약 27m) — 큰길(동서·남북)·건물·정찰 거점·호수를 비킨 세 곳 (logging.ts)
+// 자재 회수장 뒤(남동) · 채집막 뒤(북서) · 망루 뒤(남서)
+export const LOGGING_SITES: Array<[number, number]> = [
+  [15.5, -22.1],
+  [-19.1, 19.1],
+  [-23.4, -13.5],
+];

@@ -22,7 +22,11 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
-import { createMaterialLibrary, isGlowMaterial } from "./materials.js";
+import {
+  createMaterialLibrary,
+  isGlowMaterial,
+  snowOnResident,
+} from "./materials.js";
 import { loadSceneAsset as load } from "./scene-assets.js";
 import { elevation, rng } from "./world.js";
 
@@ -70,7 +74,7 @@ const RESIDENT_HEIGHT: Record<string, [number, number]> = {
   R04_Ankylosaurus: [0.75, 2.45],
   R12_Protoceratops: [0.6, 2.28],
 };
-/** 겨울 차림(목도리·등불·짚 발싸개·눈)을 입힌 판 — tools/blender/dino.py */
+/** 겨울 차림(컨셉 시트 재질 누빔·비늘, 털 테두리·목도리·짚 장화·등불·등짐) — tools/blender/tex.py → dino2.py */
 export const residentGlb = (file: string) => `/models/residents/${file}_v2.glb`;
 export const residentScale = (file: string) => {
   const h = RESIDENT_HEIGHT[file];
@@ -96,12 +100,12 @@ export interface GlbVisual {
   dispose(): void;
 }
 
-type Shadow = (
+export type Shadow = (
   at: TransformNode,
   radius: number,
   depth?: number,
 ) => InstancedMesh | null;
-function instantiate(
+export function instantiate(
   container: AssetContainer,
   parent: TransformNode,
   scale: number,
@@ -126,6 +130,7 @@ function instantiate(
   }
   const blob = shadow(parent, radius, depth);
   const groups = inst.animationGroups;
+  if (inst.skeletons.length) for (const m of meshes) snowOnResident(m.material);
   for (const g of groups) g.stop();
   let playing: AnimationGroup | undefined;
   const play = (clip: string, offset = 0) => {

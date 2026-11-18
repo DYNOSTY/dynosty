@@ -20,6 +20,7 @@ import type {
 import { createFog } from "./fog.js";
 import { createLaborVisual } from "./labor-scene.js";
 import { createLandmarks } from "./landmarks.js";
+import { createLogging } from "./logging.js";
 import { type MarkerRect, placeMarker } from "./marker-layout.js";
 import { loadModelAssets } from "./model-assets.js";
 import { createQualityVisual } from "./quality-scene.js";
@@ -106,6 +107,7 @@ export function mountScene(
     engine.getGlInfo().renderer,
   );
   if (softwareRenderer) engine.setHardwareScalingLevel(2);
+  let lastRender = 0;
   const scene = new Scene(engine);
   const camera = new ArcRotateCamera(
     "camera",
@@ -135,14 +137,23 @@ export function mountScene(
     new URLSearchParams(location.search).get("season") === "summer"
       ? "summer"
       : "winter";
-  const { shadow, setTime, glow, warmMat, followSnow } = buildWorld(
-    scene,
-    LAYOUT.map(([, x, z]) => [x, z] as [number, number]),
-    season,
-  );
+  const { shadow, setTime, glow, warmMat, followSnow, makePine, makeStump } =
+    buildWorld(
+      scene,
+      LAYOUT.map(([, x, z]) => [x, z] as [number, number]),
+      season,
+    );
   const worldRoot = new TransformNode("island-world", scene);
   for (const mesh of scene.meshes) if (!mesh.parent) mesh.parent = worldRoot;
   const village = createVillage(scene, shadow, { glow, warmMat }, worldRoot);
+  // 나무가 곧 자원: 숲 가장자리 벌목터에서 찍고 쓰러뜨리는 연출
+  const logging = createLogging({
+    scene,
+    shadow,
+    makePine,
+    makeStump,
+    worldRoot,
+  });
   const fog = createFog(scene, SCOUT_SITES);
   const landmarks = createLandmarks(scene, SCOUT_SITES, glow, warmMat);
   for (const node of [...scene.meshes, ...scene.transformNodes])
@@ -340,6 +351,7 @@ export function mountScene(
     clockShown = (clockShown + diff * Math.min(1, dt * 3) + 1440) % 1440;
     setTime(demoActive ? 16 * 60 : clockShown); // 조달 중엔 해가 낮은 오후 — 눈밭이 하얗게 날리지 않게
     village.animate(dt);
+    logging.animate(dt);
     fog.animate(dt);
     landmarks.animate(dt);
     if (runningNow) gameMin = Math.min(gameMin + dt * 10, gameMinSync + 10);
@@ -433,7 +445,12 @@ export function mountScene(
     entities.animate(engine.getDeltaTime() / 1000);
     timberVisual.animate(engine.getDeltaTime() / 1000);
     laborVisual.animate(engine.getDeltaTime() / 1000);
-    scene.render();
+    // 그래픽카드 없는 소프트웨어 렌더러는 한 장에 1초 이상 걸려 단추·글자까지 굳음
+    // → 3D는 1초에 한 번만 다시 그리고, 나머지 화면(조작·시계)은 바로 반응하게
+    if (!softwareRenderer || now - lastRender >= 1000) {
+      lastRender = now;
+      scene.render();
+    }
     if (markerLayer) {
       const width = canvas.clientWidth,
         height = canvas.clientHeight;
@@ -556,7 +573,6 @@ export function mountScene(
         demoActive = active;
         // 조달은 따로 떨어진 판이 아니라 섬 광장(온돌 둥지 둘레)에서 진행 — 세계가 이어지게
         camera.upperRadiusLimit = active ? 48 : 140;
-        if (softwareRenderer) engine.setHardwareScalingLevel(active ? 1 : 2);
         resetWorldCamera();
         if (active) {
           camera.radius = 24;
@@ -678,6 +694,7 @@ export function mountScene(
     setRunning(running: boolean) {
       runningNow = running;
       village.setRunning(running);
+      logging.setRunning(running);
     },
     setClock(minute: number) {
       clockTarget = ((minute % 1440) + 1440) % 1440;
@@ -706,6 +723,7 @@ export function mountScene(
       laborVisual.dispose();
       entities.dispose();
       village.dispose();
+      logging.dispose();
       fog.dispose();
       scene.dispose();
       engine.dispose();
