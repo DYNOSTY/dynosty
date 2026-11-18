@@ -547,12 +547,6 @@ export function App() {
             el.style.top = pt.y + "px";
             continue;
           }
-          if (id.startsWith("party:")) {
-            // 화면 밖이면 멀리 치움 (React가 다시 그려도 위치는 이 값 그대로)
-            el.style.left = `${pt.visible ? pt.x : -9999}px`;
-            el.style.top = `${pt.visible ? pt.y : -9999}px`;
-            continue;
-          }
           // 정찰 거점: 화면 밖이면 그 방향 가장자리에 화살표로 붙임 (RTS 방식)
           // 표식 상자가 통째로 들어오게 반 폭만큼 안쪽
           const hw = el.offsetWidth / 2 + 16;
@@ -605,6 +599,17 @@ export function App() {
     if (!timberReady) return;
     if (!playState?.paused) commandPlay({ type: "pause", paused: true });
     openOnly(() => setTimberOpen(true));
+  }
+  function scoutFace(site: (typeof SCOUT_SITES)[number]) {
+    const detail = `${site.name} 정찰 중 · ${leftHours(site.id)}시간 남음`;
+    return (
+      <>
+        <img src="/ui/cmd/residents.png" alt={detail} />
+        <span aria-hidden="true" className="g-scout-detail">
+          {detail}
+        </span>
+      </>
+    );
   }
   function openVillageSection(section: string) {
     if (!timberOpen) openTimber();
@@ -725,30 +730,6 @@ export function App() {
             {foundCount} / {SCOUT_GOAL}
           </b>
         </div>
-        {/* 진행 중 정찰: 남은 시간 막대 */}
-        {SCOUT_SITES.filter((site) => scouts[site.id]?.status === "going").map(
-          (site) => (
-            <button
-              key={site.id}
-              type="button"
-              className="g-quest g-quest--btn"
-              onClick={() => openOnly(() => setScoutOpen(site.id))}
-            >
-              <img src="/ui/cmd/residents.png" alt="" />
-              <span className="g-quest__body">
-                <span>{site.name} 정찰 중</span>
-                <span className="g-bar" aria-hidden="true">
-                  <i
-                    style={{
-                      width: `${Math.round((1 - leftHours(site.id) / site.hours) * 100)}%`,
-                    }}
-                  />
-                </span>
-              </span>
-              <b>{leftHours(site.id)}시간</b>
-            </button>
-          ),
-        )}
         {/* 발견한 거점: 교역 가능 */}
         {SCOUT_SITES.filter((site) => scouts[site.id]?.status === "found").map(
           (site) => (
@@ -793,22 +774,6 @@ export function App() {
       </section>
       {/* 정찰 거점 표식 (3D 위치를 따라감) */}
       <div className="g-pins">
-        {SCOUT_SITES.filter((site) => scouts[site.id]?.status === "going").map(
-          (site) => (
-            <span
-              key={`party-${site.id}`}
-              ref={(el) => {
-                pinRefs.current[`party:${site.id}`] =
-                  el as unknown as HTMLButtonElement | null;
-              }}
-              className="g-party"
-              style={{ left: -9999, top: -9999 }}
-            >
-              <img src="/ui/cmd/residents.png" alt="" />
-              정찰대 → {site.name}
-            </span>
-          ),
-        )}
         {SCOUT_SITES.map((site) => {
           const st = scouts[site.id]?.status ?? "unknown";
           return (
@@ -1315,6 +1280,25 @@ export function App() {
         <progress max={1440} value={clockMinute} aria-label="하루 시간" />
       </section>
       <section className="g-console" aria-label="명령 콘솔">
+        <div
+          className="g-scout-faces"
+          role="group"
+          aria-label="파견 중인 정찰대"
+        >
+          {SCOUT_SITES.filter(
+            (site) => scouts[site.id]?.status === "going",
+          ).map((site) => (
+            <button
+              key={site.id}
+              type="button"
+              className="g-scout-face"
+              onClick={() => openOnly(() => setScoutOpen(site.id))}
+            >
+              {scoutFace(site)}
+            </button>
+          ))}
+        </div>
+
         <ConsoleFrame />
         <div className="g-console__map">
           <button

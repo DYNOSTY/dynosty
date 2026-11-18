@@ -104,9 +104,23 @@ test("정찰 시안은 발견 표시를 갱신하고 게임 불러오기·새 �
   ).toContainText("저장되지 않으며 인원·식량 재고에 반영하지 않습니다");
   const food = await page.getByTestId("resource-RES_PLANT").textContent();
   await button(page, "정찰대 보내기").click();
+  const face = page
+    .getByRole("group", { name: "파견 중인 정찰대" })
+    .getByRole("button", { name: /갈대나루 정찰 중/ });
   await expect(
-    page.getByRole("region", { name: "의뢰", exact: true }),
-  ).toContainText("갈대나루 정찰 중");
+    page.getByRole("button", { name: /갈대나루 정찰 중/ }),
+  ).toHaveCount(1);
+  const bounds = await face.boundingBox();
+  const consoleBounds = await page.locator(".g-console").boundingBox();
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(consoleBounds!.y);
+  expect(bounds!.x).toBeGreaterThan(
+    consoleBounds!.x + consoleBounds!.width * 0.8,
+  );
+  const detail = face.locator(".g-scout-detail");
+  await expect(detail).toBeHidden();
+  await face.hover();
+  await expect(detail).toBeVisible();
+  await expect(detail).toHaveText(/갈대나루 정찰 중 · \d+시간 남음/);
   await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
   await expect(page.getByTestId("resource-RES_PLANT")).toHaveText(food ?? "");
   await button(page, "1일 진행").click();

@@ -2831,27 +2831,53 @@ body {
   margin: 0;
 }
 
-/* 걷는 정찰대 머리 위 표식 */
-.g-party {
+/* 명령 콘솔 위 파견 중인 정찰대 */
+.g-console > .g-scout-faces {
   position: absolute;
-  transform: translate(-50%, -100%);
-  display: inline-flex;
-  align-items: center;
+  bottom: calc(100% + 6px);
+  right: 16px;
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
-  padding: 2px 8px 2px 2px;
-  border-radius: 999px;
-  background: rgb(52 67 106 / 88%);
-  color: var(--hanji);
-  font: 600 12px / 1.4 var(--font-body);
-  white-space: nowrap;
-  pointer-events: none;
 }
-.g-party img {
-  width: 20px;
-  height: 20px;
+.g-console > .g-scout-faces:empty {
+  display: none;
+}
+.g-scout-face {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(52 67 106 / 88%);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.g-scout-face img {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
-
+.g-scout-detail {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #222a39;
+  color: white;
+  white-space: nowrap;
+  font: 600 13px / 1.4 var(--font-body);
+  text-shadow: none;
+}
+.g-scout-face:is(:hover, :focus-visible) {
+  z-index: 3;
+}
+.g-scout-face:is(:hover, :focus-visible) .g-scout-detail {
+  display: block;
+}
 /* ═══ 누를 때 흔들림 없음 + 글자 4단계 · 8px 여백 (doc-layout) ═══ */
 :root {
   --hud-t1: 18px;
@@ -2935,8 +2961,7 @@ body {
     height: 32px;
   }
   /* 표식 */
-  .g-pin,
-  .g-party {
+  .g-pin {
     font-size: var(--hud-t3);
   }
   /* 콘솔 */
