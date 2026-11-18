@@ -589,7 +589,11 @@ export function mountScene(
       const out: Record<string, ScreenPoint> = {};
       for (const pt of [...tracked, ...partyPts]) {
         const sp = Vector3.Project(
-          new Vector3(pt.x, pt.y, pt.z),
+          new Vector3(
+            pt.x,
+            pt.y + (pt.id.startsWith("visitor-") ? elevation(pt.x, pt.z) : 0),
+            pt.z,
+          ),
           Matrix.Identity(),
           vm,
           vp,

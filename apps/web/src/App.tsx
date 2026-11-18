@@ -13,6 +13,7 @@ import {
   type HomePlacement,
   type LaborState,
   laborScene,
+  TIMBER_RULES,
   type TimberState,
   timberScene,
 } from "@dynosty/game-core";
@@ -502,15 +503,34 @@ export function App() {
     if (sceneStatus === "준비 완료")
       sceneRef.current?.setGameMinutes(gameMinutes);
   }, [gameMinutes, sceneStatus]);
+  const villageVisible = timberOpen && !laborOpen;
+  const gatePending =
+    villageVisible &&
+    (timberState?.mission === "register-policy" ||
+      (timberState?.scoutVisitors ?? 0) > 0);
+  const post =
+    villageVisible && timberState?.merchantItem !== undefined
+      ? timberState.town.facilities.find((f) => f.kind === "trade")
+      : undefined;
+  const postX = post?.position.x,
+    postZ = post?.position.z;
   useEffect(() => {
     if (sceneStatus !== "준비 완료") return;
     sceneRef.current?.trackPoints(
-      SCOUT_SITES.map((site) => ({
-        id: site.id,
-        x: site.x,
-        y: elevation(site.x, site.z) + 9.5,
-        z: site.z,
-      })),
+      [
+        ...SCOUT_SITES.map((site) => ({
+          id: site.id,
+          x: site.x,
+          y: elevation(site.x, site.z) + 9.5,
+          z: site.z,
+        })),
+        ...(gatePending
+          ? [{ id: "visitor-gate", ...TIMBER_RULES.cartStart, y: 3 }]
+          : []),
+        ...(postX !== undefined && postZ !== undefined
+          ? [{ id: "visitor-trade", x: postX, z: postZ, y: 5 }]
+          : []),
+      ],
       (pos: Record<string, ScreenPoint>) => {
         // 3D 화면 칸 (위 막대·아래 콘솔 사이)
         const W = window.innerWidth,
@@ -521,6 +541,12 @@ export function App() {
         for (const [id, pt] of Object.entries(pos)) {
           const el = pinRefs.current[id];
           if (!el) continue;
+          if (id.startsWith("visitor-")) {
+            el.hidden = !pt.visible;
+            el.style.left = pt.x + "px";
+            el.style.top = pt.y + "px";
+            continue;
+          }
           if (id.startsWith("party:")) {
             // 화면 밖이면 멀리 치움 (React가 다시 그려도 위치는 이 값 그대로)
             el.style.left = `${pt.visible ? pt.x : -9999}px`;
@@ -562,7 +588,7 @@ export function App() {
         }
       },
     );
-  }, [sceneStatus]);
+  }, [sceneStatus, gatePending, postX, postZ]);
   const timberReady = sceneStatus === "준비 완료";
   // 뜨는 창은 한 번에 하나: 새 창을 열면 나머지는 닫힘
   function closePopups() {
@@ -853,6 +879,35 @@ export function App() {
               aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
               tabIndex={0}
             />
+            {(
+              [
+                ["visitor-gate", gatePending, "입촌 요청", "다음 임무"],
+                [
+                  "visitor-trade",
+                  Boolean(post),
+                  "교역소 상인 방문",
+                  "교역소 방문",
+                ],
+              ] as const
+            ).map(
+              ([id, show, label, section]) =>
+                show && (
+                  <button
+                    type="button"
+                    key={id}
+                    hidden
+                    className="village-visitor-marker"
+                    aria-label={label}
+                    title={label}
+                    ref={(el) => {
+                      pinRefs.current[id] = el;
+                    }}
+                    onClick={() => openVillageSection(section)}
+                  >
+                    !
+                  </button>
+                ),
+            )}
             {timberOpen && laborOpen ? (
               <div className="site-markers" ref={markersRef} aria-hidden="true">
                 {SCENE_SIGNS.map(({ id, label }) => (

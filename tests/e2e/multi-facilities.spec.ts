@@ -179,9 +179,14 @@ test("방문 상인의 초상과 재협상 · 계약 입고", async ({ page }) =
   await load(page, {
     ...s,
     paused: true,
+    scoutVisitors: 1,
     merchantItem: 3,
     riskyMerchants: [3],
   });
+  await b(page, "복홀 전체 보기").click();
+  await b(page, "입촌 요청").click();
+  await expect(b(page, "받아준다")).toBeFocused();
+  await b(page, "교역소 상인 방문").click();
   const visit = page.getByLabel("교역소 방문");
   await expect(visit).toContainText("거친손");
   const portrait = visit.getByRole("img", { name: "목재 상인 거친손의 초상" });

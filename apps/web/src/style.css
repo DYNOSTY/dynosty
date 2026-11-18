@@ -3649,3 +3649,18 @@ body,
     width: 3rem;
   }
 }
+
+.village-visitor-marker {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  z-index: 3;
+  border: 2px solid #f5d491;
+  border-radius: 50%;
+  background: #943c24;
+  color: white;
+  font-size: 20px;
+  font-weight: bold;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+}

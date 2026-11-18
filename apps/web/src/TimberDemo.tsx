@@ -184,11 +184,15 @@ export function TimberDemo({
   useEffect(() => {
     if (!active || !ready || !focusSection) return;
     setLaborMode(false);
-    document
-      .querySelector<HTMLElement>(
-        `.timber-demo section[aria-label="${focusSection.label}"]`,
-      )
-      ?.scrollIntoView({ block: "start" });
+    const section = document.querySelector<HTMLElement>(
+      `.timber-demo [aria-label="${focusSection.label}"]`,
+    );
+    section?.scrollIntoView({ block: "start" });
+    if (
+      focusSection.label === "교역소 방문" ||
+      focusSection.label === "다음 임무"
+    )
+      section?.querySelector("button")?.focus({ preventScroll: true });
   }, [active, ready, focusSection]);
   const selectedFacility = state?.town.facilities.find(
     (f) => f.sourceId === selectedSiteId,
