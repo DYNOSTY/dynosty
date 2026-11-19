@@ -716,8 +716,7 @@ export function App() {
   }
   function toggleAuxiliary(panel: "save" | "tools") {
     if (panel === "save" && !timberOpen) {
-      setTimberOpen(true);
-      setSaveOpen(true);
+      openOnly(() => setSaveOpen(!saveOpen));
       return;
     }
     if (!timberOpen) {

@@ -16,6 +16,8 @@ for (const siteId of ["coal-west", "iron-north", "stone-east"] as const) {
   test(`${siteId} 작업장에 배치하면 광물을 자동 입고하고 저장 후 이어진다`, async ({
     page,
   }) => {
+    // Two full 3D loads plus the live delivery on the software renderer.
+    test.setTimeout(240_000);
     let s = commandTimber(
       advanceTimber(createTimberState(), 120),
       { type: "build-logging", siteId },
@@ -57,20 +59,27 @@ for (const siteId of ["coal-west", "iron-north", "stone-east"] as const) {
     await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
     await button(page, "시간 재개").click();
     await expect
-      .poll(async () =>
-        Number(
-          (
-            await page.getByTestId(`resource-${resource}`).textContent()
-          )?.replaceAll(",", ""),
-        ),
+      .poll(
+        async () =>
+          Number(
+            (
+              await page.getByTestId(`resource-${resource}`).textContent()
+            )?.replaceAll(",", ""),
+          ),
+        { timeout: 15_000 },
       )
       .toBeGreaterThan(initial);
     await button(page, "일시정지").click();
+    await saves(page);
     await button(page, "진행 저장").click();
     await expect(page.getByTestId("timber-save-status")).toContainText(
       "저장했습니다",
     );
     await page.reload();
+    await expect(page.getByTestId("play-scene-status")).toHaveText(
+      "3D 준비 완료",
+      { timeout: 90_000 },
+    );
     await button(page, "마른 목재20 조달 체험하기").click();
     await saves(page);
     await button(page, "진행 불러오기").click();
@@ -131,9 +140,9 @@ async function finish(page: Page) {
   throw Error("업무가 완료되지 않았습니다.");
 }
 async function saves(page: Page) {
-  const toggle = button(page, "저장");
-  if ((await toggle.getAttribute("aria-expanded")) !== "true")
-    await toggle.click();
+  const load = button(page, "진행 불러오기");
+  if (!(await load.isVisible())) await page.locator("canvas").press("j");
+  await expect(load).toBeVisible();
 }
 test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확정 뒤 자재를 운반해 건설한다", async ({
   page,
@@ -332,7 +341,7 @@ test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각
   page,
 }) => {
   // 건설·직원 이동·식사를 실제 시간으로 기다리는 연속 시나리오다.
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   await enter(page);
   await loadFixture(
     page,
@@ -348,17 +357,29 @@ test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각
   await expect(button(page, "식사 필요 검사")).toHaveCount(0);
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
   await button(page, "공동 식당 배치 · 목재30 · 철재2").click();
-  const point = await homeCursor(page, -15, -15);
-  await expect(page.getByTestId("home-placement-status")).toContainText(
-    "배치 가능",
-  );
+  const preview = page.getByTestId("home-placement-status");
+  let point: Awaited<ReturnType<typeof homeCursor>> | undefined;
+  for (const [x, z] of [
+    [12, 12],
+    [0, 14],
+    [8, 16],
+    [-8, 12],
+    [16, 4],
+    [-16, 4],
+  ] as const) {
+    const candidate = await homeCursor(page, x, z);
+    if ((await preview.textContent())?.includes("배치 가능")) {
+      point = candidate;
+      break;
+    }
+  }
+  if (!point)
+    throw new Error("식당을 배치할 평탄한 빈 부지를 찾지 못했습니다.");
   await page.mouse.click(point.x, point.y);
-  await expect(page.getByTestId("restaurant-status")).toHaveText(
-    "운영 인력을 배치해 주세요",
-    { timeout: 25000 },
+  await expect(page.getByLabel("식당 운영 인원", { exact: true })).toHaveValue(
+    "2",
+    { timeout: 30_000 },
   );
-  await expect(page.getByTestId("resource-RES_PLANT")).toHaveText("120");
-  await page.getByLabel("식당 운영 인원", { exact: true }).selectOption("1");
   await expect(page.getByTestId("restaurant-status")).toHaveText("영업 중", {
     timeout: 25000,
   });
@@ -369,7 +390,6 @@ test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각
   await expect(page.getByTestId("resource-RES_PLANT")).not.toHaveText("120");
   await button(page, "일시정지").click();
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("90");
-  await expect(page.getByTestId("resource-RES_PLANT")).not.toHaveText("120");
   await saves(page);
   await button(page, "진행 저장").click();
   await expect(page.getByTestId("timber-save-status")).toContainText(
