@@ -99,6 +99,12 @@ export interface GlbVisual {
   dispose(): void;
 }
 
+export type VillageTargetInfo = {
+  name: string;
+  detail: string;
+  portrait?: string;
+};
+
 type Shadow = (
   at: TransformNode,
   radius: number,
@@ -170,7 +176,7 @@ export function createVillage(
 ) {
   const targets = new Map<
     string,
-    { name: string; detail: string; meshes: AbstractMesh[] }
+    VillageTargetInfo & { meshes: AbstractMesh[] }
   >();
   let marked: string | null = null;
   function mark(id: string | null) {
@@ -261,6 +267,8 @@ export function createVillage(
     targets.set(id, {
       name: villageNames[model] ?? model,
       detail,
+      // Only the fixed village buildings have a matching concept portrait.
+      ...(!role && { portrait: `/ui/buildings/${model}.jpg` }),
       meshes: v.meshes,
     });
     for (const m of v.meshes) {

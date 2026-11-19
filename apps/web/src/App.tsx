@@ -1657,6 +1657,19 @@ export function App() {
               aria-label="선택 정보"
               aria-live="polite"
             >
+              {villageInfo.portrait && (
+                <img
+                  key={villageInfo.portrait}
+                  className="village-selection-portrait"
+                  src={villageInfo.portrait}
+                  alt=""
+                  width={64}
+                  height={44}
+                  onError={(event) => {
+                    event.currentTarget.hidden = true;
+                  }}
+                />
+              )}
               <h2>{villageInfo.name}</h2>
               <p>{villageInfo.detail}</p>
             </section>
