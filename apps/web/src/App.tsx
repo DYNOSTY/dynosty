@@ -14,6 +14,8 @@ import {
   type LaborState,
   laborScene,
   RESEARCH_CATALOG,
+  scoutRun,
+  scoutTripMinutes,
   TIMBER_RULES,
   type TimberState,
   timberScene,
@@ -513,30 +515,33 @@ export function App() {
   const gameMinutes = displayedWorld
     ? (displayedWorld.day - 1) * 1440 + displayedWorld.minute
     : 0;
-  const departures = timberState?.scoutDepartures;
   const scouts = useMemo(() => {
-    const scouts: Record<string, { status: "found" | "going"; start: number }> =
-      {};
+    const scouts: Record<
+      string,
+      NonNullable<ReturnType<typeof scoutRun>> & { status: "found" | "going" }
+    > = {};
+    if (!timberState) return scouts;
     for (const site of SCOUT_SITES) {
-      const start = departures?.[site.id];
-      if (start !== undefined)
+      const run = scoutRun(timberState, site);
+      if (run)
         scouts[site.id] = {
-          start,
-          status: gameMinutes - start >= site.hours * 60 ? "found" : "going",
+          ...run,
+          status: gameMinutes >= run.due ? "found" : "going",
         };
     }
     return scouts;
-  }, [departures, gameMinutes]);
+  }, [timberState, gameMinutes]);
   const scoutSite = SCOUT_SITES.find((site) => site.id === scoutOpen) ?? null;
+  const scoutMinutes = scoutSite
+    ? (scouts[scoutSite.id]?.minutes ??
+      scoutTripMinutes(scoutSite, timberState ?? undefined))
+    : 0;
   const foundCount = SCOUT_SITES.filter(
     (site) => scouts[site.id]?.status === "found",
   ).length;
   const leftHours = (id: string) => {
-    const site = SCOUT_SITES.find((x) => x.id === id),
-      run = scouts[id];
-    return site && run
-      ? Math.max(0, Math.ceil(site.hours - (gameMinutes - run.start) / 60))
-      : 0;
+    const run = scouts[id];
+    return run ? Math.max(0, Math.ceil((run.due - gameMinutes) / 60)) : 0;
   };
 
   // 게임 시작 → 주민이 걷고 연기가 남, 시각에 맞춰 낮밤
@@ -567,15 +572,12 @@ export function App() {
   useEffect(() => {
     if (sceneStatus !== "준비 완료") return;
     sceneRef.current?.setScoutMissions(
-      SCOUT_SITES.filter((site) => scouts[site.id]?.status === "going").map(
-        (site) => ({
-          id: site.id,
-          x: site.x,
-          z: site.z,
-          start: scouts[site.id]?.start ?? 0,
-          hours: site.hours,
-        }),
-      ),
+      SCOUT_SITES.flatMap(({ id, x, z }) => {
+        const run = scouts[id];
+        return run?.status === "going"
+          ? [{ id, x, z, start: run.start, hours: run.minutes / 60 }]
+          : [];
+      }),
     );
   }, [scouts, sceneStatus]);
   useEffect(() => {
@@ -691,7 +693,7 @@ export function App() {
               0,
               (
                 timberState?.campaign?.patrolOrder ??
-                Object.keys(departures ?? {})
+                Object.keys(timberState?.scoutDepartures ?? {})
               ).indexOf(site.id),
             ) % 4
           }
@@ -1247,7 +1249,8 @@ export function App() {
                   <dd>시안 · 식량 재고에 미반영</dd>
                   <dt>왕복 시간</dt>
                   <dd>
-                    {scoutSite.hours}시간
+                    {Math.floor(scoutMinutes / 60)}시간
+                    {scoutMinutes % 60 ? ` ${scoutMinutes % 60}분` : ""}
                     {scoutSite.fromPlan ? "" : " (시안 값)"}
                   </dd>
                   <dt>상태</dt>

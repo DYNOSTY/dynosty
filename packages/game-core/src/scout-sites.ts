@@ -1,3 +1,6 @@
+import { scoutSpeedRate } from "./development.js";
+import type { TimberState } from "./timber.js";
+
 // 정찰 거점 (기획서: BOKHOL Dev Lite 03_시스템/정찰과조달.md, 시나리오 1단계 '정찰 5회')
 // 정찰대는 일손 2명과 왕복 식량을 싣고 출발한다.
 export type ScoutSite = {
@@ -62,3 +65,15 @@ export const SCOUT_SITES: ScoutSite[] = [
 
 export const SCOUT_CREW = 2;
 export const SCOUT_GOAL = 5;
+
+export function scoutTripMinutes(site: ScoutSite, s?: TimberState) {
+  return Math.ceil((site.hours * 60) / (s ? scoutSpeedRate(s) : 1));
+}
+
+export function scoutRun(s: TimberState, site: ScoutSite) {
+  const start = s.scoutDepartures?.[site.id];
+  if (start === undefined) return undefined;
+  // 이전 저장의 정찰대는 기존 왕복 일정을 유지한다.
+  const minutes = s.scoutTripDurations?.[site.id] ?? scoutTripMinutes(site);
+  return { start, minutes, due: start + minutes };
+}
