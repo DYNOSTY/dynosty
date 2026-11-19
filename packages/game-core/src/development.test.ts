@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import {
+  advanceDevelopment,
   productionRate,
   RESEARCH_CATALOG,
   scoutSpeedRate,
@@ -194,6 +195,42 @@ it("연구는 공방·선행·배치·현장 도착을 요구하고 완료 효�
   expect(() =>
     cmd(s, { type: "start-research", tech: "TECH_MECHA" }),
   ).toThrow();
+});
+it("연구가 완료되는 마지막 야근 분도 정산하고 다음 분은 쉬게 한다", () => {
+  let s = staffed(build(start(), "workshop"), "build-1");
+  s = cmd(s, { type: "start-research", tech: "TECH_TRAIL" });
+  s = { ...s, world: { ...s.world, minute: 1139 } };
+  s = cmd(s, { type: "set-overtime", target: "build-1", enabled: true });
+  const d = s.town.development;
+  const r = RESEARCH_CATALOG.find((r) => r.id === "TECH_TRAIL");
+  if (!r) throw Error("연구 자료 없음");
+  const door = facilityDoor(first(s));
+  s = {
+    ...s,
+    residents: s.residents.map((q) =>
+      q.workplaceId === "facility:build-1"
+        ? { ...q, position: door, routine: "working" }
+        : q,
+    ),
+    town: {
+      ...s.town,
+      development: {
+        ...d,
+        research: [
+          { tech: r.id, facility: "build-1", work: r.workdays * 1620 - 1 },
+        ],
+        overtime: d.overtime.map((p) => ({ ...p, minutes: 59 })),
+      },
+    },
+  };
+  const finished = advanceDevelopment(s, 1);
+  expect(finished.town.development.completed).toContain(r.id);
+  expect(finished.town.development.overtime[0]?.minutes).toBe(60);
+  expect(finished.world.pessimism).toBe(s.world.pessimism + 1);
+  expect(finished.town.development.seed).not.toBe(d.seed);
+  const idle = advanceDevelopment(finished, 1);
+  expect(idle.town.development.overtime[0]?.minutes).toBe(60);
+  expect(idle.town.development.seed).toBe(finished.town.development.seed);
 });
 it("야근 부상은 공통 건강 사건으로 반영하며 저장·재개시 같은 난수 결과를 얻는다", () => {
   let s = staffed(build(start(), "farm"), "build-1");
