@@ -2,6 +2,7 @@
 import "@babylonjs/loaders/glTF";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
@@ -746,6 +747,28 @@ export function createVillage(
       light.glow.addIncludedOnlyMesh(lamp);
       lamp.setEnabled(false);
     }
+    // 겨울 연출만: 대표 둥지의 입구 주변 표면에만 따뜻한 빛을 반사한다.
+    // 기존 입주·시각에 따른 문 불빛(setLit)은 계절에 관계없이 그대로 둔다.
+    const ondolMeshes =
+      season === "winter" &&
+      kind === "building" &&
+      parent.id === "example-building-1"
+        ? v.meshes.filter((mesh) => mesh.getTotalVertices() > 0)
+        : [];
+    let ondolGlow: PointLight | undefined;
+    if (ondolMeshes.length > 0) {
+      ondolGlow = new PointLight(
+        "representative-ondol-glow",
+        new Vector3(0, 1, 3.25),
+        scene,
+      );
+      ondolGlow.includedOnlyMeshes = ondolMeshes;
+      ondolGlow.parent = node;
+      ondolGlow.diffuse = new Color3(1, 0.53, 0.22);
+      ondolGlow.specular = Color3.Black();
+      ondolGlow.intensity = 0.18;
+      ondolGlow.range = 2;
+    }
     v.play("Idle", 0);
     return {
       setLit(value) {
@@ -763,6 +786,7 @@ export function createVillage(
       },
       animate() {},
       dispose() {
+        ondolGlow?.dispose();
         v.dispose();
         node.dispose();
       },
