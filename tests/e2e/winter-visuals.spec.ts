@@ -19,6 +19,34 @@ for (const season of ["winter", "summer"] as const) {
     expect(loaded).toContain(`/models/buildings/BLD_OFFICE${suffix}.glb`);
     expect(loaded).toContain(`/models/residents/R02_Triceratops${suffix}.glb`);
     expect(loaded).toContain("/models/buildings/BLD_NEST.glb");
+    const ondol = await page.evaluate(() => {
+      const { __scene: scene } = window as unknown as {
+        __scene: {
+          getTransformNodeByName(name: string): object | null;
+          getLightByName(name: string): {
+            parent: object;
+            isEnabled(): boolean;
+            includedOnlyMeshes: { isDescendantOf(node: object): boolean }[];
+          } | null;
+        };
+      };
+      const nest = scene.getTransformNodeByName("example-building-1:glb");
+      const light = scene.getLightByName("representative-ondol-glow");
+      return {
+        enabled: light?.isEnabled() ?? false,
+        scoped: !!(
+          light &&
+          nest &&
+          light.parent === nest &&
+          light.includedOnlyMeshes.length &&
+          light.includedOnlyMeshes.every((mesh) => mesh.isDescendantOf(nest))
+        ),
+      };
+    });
+    expect(ondol).toEqual({
+      enabled: season === "winter",
+      scoped: season === "winter",
+    });
     const frost = await page.locator(".scene-viewport").evaluate((viewport) => {
       const style = getComputedStyle(viewport, "::after");
       return {
