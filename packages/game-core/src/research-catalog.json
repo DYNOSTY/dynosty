@@ -1197,6 +1197,22 @@
     "connected": true
   },
   {
+    "id": "R19",
+    "name": "탈출 기관",
+    "tier": 3,
+    "requires": ["TECH_MECHA2"],
+    "cost": { "RES_METAL": 24, "RES_COAL": 16 },
+    "workdays": 2,
+    "effect": "방주의 시동 시험을 마치고 탈출 항로를 연다",
+    "mission": "",
+    "scope": "campaign",
+    "category": "story",
+    "target": "",
+    "level": 3,
+    "route": "mechanical",
+    "connected": true
+  },
+  {
     "id": "TECH_ELECTRICAL",
     "name": "전기자극기",
     "tier": 3,

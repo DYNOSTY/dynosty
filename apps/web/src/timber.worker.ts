@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import {
+  campaignOf,
   commandTimber,
   createTimberSave,
   createVillageGame,
@@ -8,7 +9,16 @@ import {
 } from "@dynosty/game-core";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 
-let state = createVillageGame(),
+function resumeVillage(data: unknown) {
+  const saved = parseTimberSave(data).state;
+  // Earlier developer saves can already have a mutually exclusive research ending.
+  const campaign =
+    saved.campaign || !saved.town.development.story.rebellion
+      ? { campaign: campaignOf(saved) }
+      : {};
+  return { ...saved, ...campaign, paused: true, remainder: 0 };
+}
+let state = createVillageGame(true),
   last = performance.now();
 let initialized = false;
 const send = (m: TimberResponse) => self.postMessage(m);
@@ -18,9 +28,7 @@ self.onmessage = (event: MessageEvent<TimberRequest>) => {
   try {
     if (m.type === "init") {
       if (!initialized)
-        state = m.resume
-          ? { ...parseTimberSave(m.resume).state, paused: true }
-          : createVillageGame();
+        state = m.resume ? resumeVillage(m.resume) : createVillageGame(true);
       initialized = true;
     } else if (m.type === "exit") {
       state = { ...state, paused: true, remainder: 0 };
@@ -30,7 +38,7 @@ self.onmessage = (event: MessageEvent<TimberRequest>) => {
     } else if (m.type === "command")
       state =
         m.command.type === "restart"
-          ? createVillageGame()
+          ? createVillageGame(true)
           : commandTimber(state, m.command, m.id);
     else if (m.type === "save") {
       send({
@@ -40,8 +48,7 @@ self.onmessage = (event: MessageEvent<TimberRequest>) => {
       });
       return;
     } else {
-      const loaded = parseTimberSave(m.data);
-      state = { ...loaded.state, paused: true, remainder: 0 };
+      state = resumeVillage(m.data);
       initialized = true;
       send({ type: "loaded", requestId: m.requestId });
     }

@@ -136,11 +136,18 @@ test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에�
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
   ).toContainText("갈대나루 발견");
+  const report = page.getByRole("dialog", { name: "갈대나루 · 정찰 결과" });
+  await expect(report).toBeVisible();
+  await report.getByRole("button", { name: "장면 접기" }).click();
+  await expect(report).toBeHidden();
   await button(page, "새 게임").click();
   await button(page, "새 게임 시작").click();
   await expect(
+    page.getByRole("dialog", { name: "별이 진 뒤, 복홀" }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
-  ).toContainText("0 / 5");
+  ).not.toContainText("갈대나루 발견");
   await expect(face).toHaveCount(0);
   expect(errors).toEqual([]);
 });

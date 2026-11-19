@@ -38,7 +38,7 @@ export function storageCapacity(s: TimberState): number {
   const rank = storageResearchLevel(s);
   const legacy = productionSites(s).filter((l) => l.storageBuilt).length;
   return Math.max(
-    500,
+    s.campaign ? 1000 + STORAGE_SPACE[0] : STORAGE_SPACE[0],
     legacy * (STORAGE_SPACE[rank - 1] ?? 500) +
       s.town.facilities
         .filter((f) => f.kind === "storage")

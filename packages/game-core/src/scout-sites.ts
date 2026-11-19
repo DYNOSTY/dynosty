@@ -56,7 +56,7 @@ export const SCOUT_SITES: ScoutSite[] = [
     z: -46,
     hours: 30,
     fromPlan: false,
-    find: "단서를 찾을 수 있는 옛 기록 (1단계)",
+    find: "고려의 창고 인장이 찍힌 목간",
   },
 ];
 

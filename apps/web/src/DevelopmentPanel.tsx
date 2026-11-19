@@ -52,6 +52,7 @@ export function DevelopmentPanel({
   const visibleResearch = RESEARCH_CATALOG.filter(
     (entry) =>
       entry.category !== "story" ||
+      (entry.id === "R17" && (state.chapter ?? 1) >= 4) ||
       showDevTools ||
       d.story.rebellion ||
       d.completed.includes(entry.id),
@@ -302,15 +303,12 @@ export function DevelopmentPanel({
           </p>
         </div>
       ) : null}
-      <p>
-        비관 {state.world.pessimism}/100 · 야근 부상 기록 {d.injuries.length}건
-      </p>
+      <p>야근 부상 기록 {d.injuries.length}건</p>
       <p className="hint">
-        야근은 지정 업무만 당일18~21시입니다. 수당·추가 식량은 없습니다. 개발용:
-        실제 야근1시간에 비관+1, 부상 위험1%/인시. 일반 주민의 식사·귀가 규칙은
-        유지합니다.
+        저녁 여섯 시부터 아홉 시까지 지정된 일터에서만 야근합니다. 수당·추가
+        식량은 없습니다. 늦게까지 남은 일꾼은 다칠 수 있습니다.
       </p>
-      {showDevTools ? (
+      {showDevTools && !state.campaign ? (
         <details>
           <summary>후반 사건 전달 검사</summary>
           <p>

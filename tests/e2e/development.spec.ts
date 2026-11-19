@@ -96,7 +96,7 @@ test("시설 개량 버튼으로2단계 생산 배율과 저장 복원을 확인
     fullPage: true,
   });
 });
-test("야근 선택은 추가 식량을 차감하지 않고18~21시 운영과 비관 증가를 표시한다", async ({
+test("야근 선택은 추가 식량을 차감하지 않고 부상 기록을 남긴다", async ({
   page,
 }) => {
   let s = built("farm");
@@ -122,9 +122,16 @@ test("야근 선택은 추가 식량을 차감하지 않고18~21시 운영과 �
     await button(page, "5분 진행").click();
     await expect(page.getByTestId("timber-clock")).not.toHaveText(before ?? "");
   }
-  await expect(page.getByText(/비관 1\/100/)).toBeVisible();
+  const ledger = page.getByText(/야근 부상 기록 \d+건/);
+  await expect(ledger).toBeVisible();
+  const saved = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem("dynosty.village.resume")!).state.world
+        .pessimism,
+  );
+  expect(saved).toBe(1);
   await expect(page.getByText(/수당·추가 식량은 없습니다/)).toBeVisible();
-  await page.getByText(/비관 1\/100/).scrollIntoViewIfNeeded();
+  await ledger.scrollIntoViewIfNeeded();
   await page.screenshot({
     path: test.info().outputPath("야근_18_21_비관.png"),
     fullPage: true,

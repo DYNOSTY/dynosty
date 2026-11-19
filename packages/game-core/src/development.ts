@@ -243,6 +243,12 @@ export function upgradeFacility(s: TimberState, id: string): TimberState {
     },
   };
 }
+function storyResearchOpen(s: TimberState, id: string) {
+  return (
+    s.town.development.story.rebellion ||
+    (id === "R17" && (s.chapter ?? 1) >= 4)
+  );
+}
 export function researchIssue(s: TimberState, id: string): string | null {
   const r = catalog.find((r) => r.id === id);
   if (!r) return "연구 목록에 없는 기술입니다.";
@@ -265,7 +271,7 @@ export function researchIssue(s: TimberState, id: string): string | null {
     return "선행 연구를 먼저 완료해 주세요.";
   if (r.category === "story") {
     const story = s.town.development.story;
-    if (!story.rebellion)
+    if (!storyResearchOpen(s, id))
       return "양녕의 반란 사건 이후 열리는 후반 연구입니다.";
     if (r.route && story.route !== r.route)
       return "선택한 이야기 분기에서는 연구할 수 없습니다.";
@@ -485,7 +491,7 @@ export function developmentValid(s: TimberState): boolean {
       !r ||
       r.requires.some((p) => !d.completed.includes(p)) ||
       (r.category === "story" &&
-        (!d.story.rebellion || (r.route && r.route !== d.story.route)))
+        (!storyResearchOpen(s, r.id) || (r.route && r.route !== d.story.route)))
     )
       return false;
   }
@@ -503,7 +509,8 @@ export function developmentValid(s: TimberState): boolean {
       !r ||
       !RESEARCH_CONNECTED.includes(r.id) ||
       (r.category === "story" &&
-        (!d.story.rebellion || (r.route && r.route !== d.story.route))) ||
+        (!storyResearchOpen(s, r.id) ||
+          (r.route && r.route !== d.story.route))) ||
       d.completed.includes(r.id) ||
       r.requires.some((p) => !d.completed.includes(p)) ||
       !s.town.facilities.some(
