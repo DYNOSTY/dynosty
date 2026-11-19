@@ -75,6 +75,20 @@ export function SettingsMenu({
             onClick={() => dialogRef.current?.close()}
           />
         </div>
+        <details>
+          <summary>세계관 · 밤에 벌어지는 일</summary>
+          <p>
+            운석이 떨어진 뒤, 밤 정찰 기록에 눈이 벌겋게 빛나는 공룡이 등장했다.
+            전날까지 한 둥지를 쓰던 이도 알아보지 못했고, 성문의 빗장을 들이받아
+            꺾을 만큼 힘이 셌다. 성 밖에서 이들을 만난 정찰대가 처음 쓴 이름이
+            ‘변종’이었다.
+          </p>
+          <p>
+            쥬신의 마지막 밤, 변종 떼가 도성 성문을 무너뜨렸다. 문을 지키다 다친
+            수비병 중에서도 변종이 나타났다. 성안의 구원로마저 끊기면서 왕도는
+            함락되고 쥬신은 멸망했다.
+          </p>
+        </details>
         <label className="volume-label">
           전체 음량 <output>{settings.masterVolume}%</output>
           <input

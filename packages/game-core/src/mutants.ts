@@ -69,24 +69,34 @@ export function repairMutantDamage(s: TimberState, id: string) {
     );
   return note(repaired, mutantStructure(s, id)!.name + " 수리를 마쳤습니다.");
 }
-export function mutantWound(s: TimberState, id: string, random: () => number) {
-  if (s.mutants?.some((m) => m.id === id) || random() >= 0.2) return s;
-  return note(
-    { ...s, mutants: [...(s.mutants ?? []), { id, due: s.elapsed + 30 }] },
-    "달이: 상처를 싸매 주는데 눈이 새빨개졌어. 내 목소리도 못 알아들어. 관아에 포졸 좀 불러 줘!",
-  );
-}
-export function containMutant(s: TimberState, id: string) {
-  if (!s.mutants?.some((m) => m.id === id))
-    throw Error("이미 끝난 출동입니다.");
-  if (
-    !s.residents.some(
+function policeAvailable(s: TimberState) {
+  return (
+    s.campaign?.beat === "capital" ||
+    s.residents.some(
       (r) =>
         r.workplaceId === "office" &&
         r.health === "healthy" &&
         !s.mutants?.some((m) => m.id === r.id),
     )
-  )
+  );
+}
+export function mutantWound(s: TimberState, id: string, random: () => number) {
+  if (s.mutants?.some((m) => m.id === id) || random() >= 0.2) return s;
+  return note(
+    {
+      ...s,
+      mutants: [
+        ...(s.mutants ?? []),
+        { id, due: s.elapsed + (policeAvailable(s) ? 1 : 30) },
+      ],
+    },
+    "달이: 상처를 싸매 주는데 눈이 새빨개졌어. 내 목소리도 못 알아들어. 옆집 새끼들부터 골목 밖으로 데려갈게!",
+  );
+}
+export function containMutant(s: TimberState, id: string) {
+  if (!s.mutants?.some((m) => m.id === id))
+    throw Error("이미 끝난 출동입니다.");
+  if (!policeAvailable(s))
     throw Error("관아에 순라 포졸을 먼저 배치해 주세요.");
   return note(
     { ...s, mutants: s.mutants.filter((m) => m.id !== id) },
@@ -102,15 +112,9 @@ export function advanceMutants(
       s = { ...s, mutants: s.mutants!.filter((q) => q.id !== m.id) };
       continue;
     }
-    if (m.due > s.elapsed) continue;
-    if (
-      s.residents.some(
-        (r) =>
-          r.workplaceId === "office" &&
-          r.health === "healthy" &&
-          !s.mutants?.some((q) => q.id === r.id),
-      )
-    ) {
+    const responding = policeAvailable(s);
+    if (!responding && m.due > s.elapsed) continue;
+    if (responding && random() >= 0.25) {
       s = containMutant(s, m.id);
       continue;
     }
@@ -159,6 +163,10 @@ export function advanceMutants(
           ...s,
           residents: assignHomes(s.residents, s.world.citizens, usableHomes(s)),
         };
+    }
+    if (responding) {
+      s = containMutant(s, m.id);
+      continue;
     }
     s = {
       ...s,

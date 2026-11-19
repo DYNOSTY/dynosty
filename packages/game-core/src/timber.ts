@@ -222,6 +222,7 @@ export interface TimberState {
   readonly mutantDamage?: Readonly<Record<string, number>>;
   readonly heating?: number;
   readonly firedHeat?: number;
+  readonly warmerHomes?: readonly string[];
   readonly raid?: {
     minute: number;
     picture: number;
@@ -2166,6 +2167,12 @@ export function parseTimberState(value: unknown): TimberState {
     fail("변종 목격 기록 오류");
   num(s.heating ?? 0, 3);
   num(s.firedHeat ?? 0, 3);
+  if (
+    s.warmerHomes !== undefined &&
+    (!Array.isArray(s.warmerHomes) ||
+      !s.warmerHomes.every((id) => typeof id === "string"))
+  )
+    throw Error("온돌 기록을 확인해 주세요.");
   if (s.raid !== undefined) {
     if (!isRecord(s.raid)) fail();
     num(s.raid.minute, s.elapsed);
@@ -2551,22 +2558,45 @@ export function villageDefenseActive(s: TimberState) {
   return (
     !!s.campaign &&
     !["opening", "departure"].includes(s.campaign.beat) &&
-    s.rebuilding !== false
+    (s.rebuilding !== false || s.campaign.beat === "capital")
   );
 }
 export function villageTemperature(s: TimberState) {
   const hour = s.world.minute / 60;
   return Math.round(
-    (s.town.cold ? -15 : 3) +
+    (s.town.cold ? -15 : 3) -
+      (s.campaign?.beat === "capital"
+        ? Math.min(30, Math.floor((s.elapsed - s.campaign.since) / 60) * 2)
+        : 0) +
       6 * Math.cos(((hour - 14) * Math.PI) / 12) +
       [0, 2, -3, 1, -2][(s.world.day - 1) % 5]!,
   );
 }
+export function capitalRoad(s: TimberState) {
+  if (s.campaign?.beat !== "capital") return "open";
+  const t = villageTemperature(s);
+  return t <= -12 ? "closed" : t < 0 ? "slow" : "open";
+}
 function fireOndol(s: TimberState): TimberState {
   const wood =
     Math.floor(s.world.resources.RES_WOOD / AMOUNT_SCALE) - s.reservedWood;
-  const level = Math.min(s.heating ?? 0, Math.max(0, wood));
-  return { ...(level ? payTown(s, { RES_WOOD: level }) : s), firedHeat: level };
+  const homes = usableHomes(s).filter((h) =>
+    s.residents.some((r) => r.homeId === h.id && r.health !== "dead"),
+  );
+  const demand = Math.max(
+    s.heating ?? 0,
+    Math.min(3, Math.ceil(-villageTemperature(s) / 8)),
+  );
+  const fuel = Math.min(Math.max(0, wood), demand * homes.length);
+  const base = homes.length ? Math.floor(fuel / homes.length) : 0;
+  const warmerHomes = homes
+    .slice(0, fuel - base * homes.length)
+    .map((h) => h.id);
+  return {
+    ...(fuel ? payTown(s, { RES_WOOD: fuel }) : s),
+    firedHeat: base + Number(warmerHomes.length > 0),
+    warmerHomes,
+  };
 }
 function onExpedition(s: TimberState, r: VillageResident) {
   return (
@@ -2582,7 +2612,7 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
     !villageDefenseActive(s) ||
     (s.world.minute >= 360 && s.world.minute < 1080) ||
     s.campaign.ending ||
-    random() >= 0.15
+    (s.campaign.beat !== "capital" && random() >= 0.15)
   )
     return s;
   const defenders = s.residents.filter(
@@ -2706,7 +2736,11 @@ export function villageFatalIncident(
     } else if (
       temperature +
         (r.homeId && s.mutantDamage?.[r.homeId] !== 100
-          ? (s.firedHeat ?? 0) * 8
+          ? ((s.firedHeat ?? 0) -
+              Number(
+                !!s.warmerHomes?.length && !s.warmerHomes.includes(r.homeId),
+              )) *
+            8
           : 0) <
         0 &&
       !r.task &&
@@ -2781,6 +2815,11 @@ export function advanceTimber(
     if (++count > 1500) fail("작업 정산 경계가 너무 많습니다.");
     if (s.phase === "waiting-labor") s = startDrying(s);
     if (s.phase === "crew-wait") s = replaceCrew(s);
+    if (s.phase === "transport" && s.due !== null && s.startedAt !== null) {
+      const road = capitalRoad(s);
+      if (road === "closed" || (road === "slow" && s.elapsed % 2 === 0))
+        s = { ...s, due: s.due + 1, startedAt: s.startedAt + 1 };
+    }
     const nextTime = Math.min(target, s.due ?? target, s.elapsed + 1),
       elapsed = nextTime - s.elapsed;
     s = {
@@ -2826,7 +2865,10 @@ export function advanceTimber(
       const roll = Math.random();
       s = {
         ...s,
-        merchantItem: roll < 0.5 ? Math.floor(roll * 18) : undefined,
+        merchantItem:
+          capitalRoad(s) !== "closed" && roll < 0.5
+            ? Math.floor(roll * 18)
+            : undefined,
       };
     }
     const repair = s.merchantRepair;
@@ -2906,6 +2948,37 @@ export function advanceTimber(
       s.elapsed % 60 === 0
     ) {
       s = villageFatalIncident(fireOndol(s));
+      if (
+        s.campaign?.beat === "capital" &&
+        s.elapsed % 240 === 0 &&
+        villageTemperature(s) < 0
+      ) {
+        const patient = s.residents.find(
+          (r) =>
+            r.health === "healthy" &&
+            !onExpedition(s, r) &&
+            !isMechanical(s, r.id),
+        );
+        if (patient) {
+          const id = "capital-cold-" + s.elapsed;
+          s = note(
+            commandTimber(
+              s,
+              {
+                type: "citizen-event",
+                event: {
+                  id,
+                  type: "illness",
+                  severity: "minor",
+                  citizenIds: [patient.id],
+                },
+              },
+              id,
+            ),
+            "의원: 오한이 가시지 않는 이가 또 왔습니다. 마른 이불을 이리 주십시오.",
+          );
+        }
+      }
     }
     if (villageDefenseActive(s) && !s.campaign?.ending) {
       if (s.world.minute === 1260) s = gateRaid(s);
@@ -3441,6 +3514,8 @@ export function commandTimber(
       n = { ...s, offer: command.offer };
       break;
     case "contract": {
+      if (capitalRoad(s) === "closed")
+        fail("고갯길이 막혀 새 물자를 조달할 수 없습니다.");
       if (s.phase !== "select" || !s.offer)
         fail("공급 제안을 먼저 선택하세요.");
       const offer = TIMBER_RULES.offers[s.offer];
@@ -3520,6 +3595,7 @@ export function commandTimber(
       break;
     case "visit-decision": {
       if (
+        capitalRoad(s) === "closed" ||
         command.item !== s.merchantItem ||
         command.day !== s.world.day ||
         s.merchantItem === undefined ||
@@ -3644,8 +3720,10 @@ export function commandTimber(
   const villageOrders: Record<string, [string, string]> = {
     share: ["병상에 배식", "누워 있는 우리 누이 몫도 가져다준대."],
     reserve: ["비축분 봉인", "솥이 비었는데 곳간 문엔 빗장을 건다고?"],
-    ward: ["병동에 석탄 지급", "저 방 굴뚝에서도 드디어 연기가 나는구나."],
-    kitchen: ["부엌에 식량 지급", "솥에 한 줌 더 넣겠네. 그릇들 가져오세."],
+    report: [
+      "도성 피해 장부 접수",
+      "의원께서 다친 이들의 이름을 하나씩 짚어 보셨네.",
+    ],
     listen: ["창고 앞 청원 허용", "여기서 기다리면 우리 말도 들어 주신다네."],
     cordon: [
       "창고 출입 통제",

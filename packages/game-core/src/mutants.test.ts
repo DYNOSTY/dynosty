@@ -43,6 +43,26 @@ describe("변종 야습", () => {
     expect(fatal.raid?.dead).toBe(2);
     expect(fatal.mutants).toBeUndefined();
   });
+  it("도성에서는 포졸 배치를 기다리지 않고 변종을 진압한다", () => {
+    const s = bitten(0);
+    const city = {
+      ...s,
+      campaign: { ...s.campaign!, beat: "capital" as const },
+    };
+    expect(advanceMutants(city, () => 0.99).mutants).toHaveLength(0);
+    const hit = advanceMutants(
+      city,
+      vi
+        .fn()
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(0)
+        .mockReturnValue(0.99),
+    );
+    expect(hit.mutants).toHaveLength(0);
+    expect(
+      hit.world.citizenEvents?.some((id) => id.startsWith("mutant-")),
+    ).toBe(true);
+  });
   it("출동, 미대응 시 주민 피해, 건물별 누적 손상과 자원 결제를 구별한다", () => {
     const s = bitten(0);
     const waiting = parseTimberSave(

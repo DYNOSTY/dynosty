@@ -190,20 +190,29 @@ export function CampaignPanel({
     music: "10",
     goal: "오늘 저녁 배식",
     auto: false,
-    lines: [
-      [
-        "덕순이",
-        "고리님, 부상자 넷이 식당 줄에 설 수가 없어요. 오늘 잡은 물고기 넷만 따로 빼 주시면 살을 발라다 먹일 수 있어요.",
-      ],
-      [
-        "길룡",
-        "제 고깃국도 한 그릇 맡아 주세요. 일어나서 못 받는다고 제 몫이 사라지는 건 아니지요?",
-      ],
-      [
-        "나르미",
-        "생선 넷을 풀면 오늘 저녁은 제가 가져다드릴게요. 비축을 지키신다면 그 사정도 제가 가서 전할게요.",
-      ],
-    ],
+    lines:
+      c.beat === "capital"
+        ? [
+            [
+              "의원",
+              "전하, 남문 병상에 누운 넷이 배식을 받으러 나올 수 없습니다. 생선 넷을 따로 내주시면 제가 살을 발라 먹이겠습니다.",
+            ],
+            ["왕", "병상 넷이라 했느냐. 곳간에 남은 몫도 함께 적어 올리라."],
+          ]
+        : [
+            [
+              "덕순이",
+              "고리님, 부상자 넷이 식당 줄에 설 수가 없어요. 오늘 잡은 물고기 넷만 따로 빼 주시면 살을 발라다 먹일 수 있어요.",
+            ],
+            [
+              "길룡",
+              "제 고깃국도 한 그릇 맡아 주세요. 일어나서 못 받는다고 제 몫이 사라지는 건 아니지요?",
+            ],
+            [
+              "나르미",
+              "생선 넷을 풀면 오늘 저녁은 제가 가져다드릴게요. 비축을 지키신다면 그 사정도 제가 가서 전할게요.",
+            ],
+          ],
     choices: [
       {
         action: "share",
@@ -333,7 +342,8 @@ export function CampaignPanel({
               ))}
               <strong>온돌 · 현재 화력 {s.firedHeat ?? 0}단계</strong>
               <p>
-                단계마다 한 시간에 목재 1을 때서 거처를 8 °C 덥힙니다. 땔감이
+                추워지면 집집마다 불을 더 땝니다. 거주 중인 집 한 채가 화력 한
+                단계마다 한 시간에 목재 1을 써서 8 °C를 덥힙니다. 땔감이
                 모자라면 남은 만큼만 땝니다.
               </p>
               {[0, 1, 2, 3].map((level) => (
@@ -343,7 +353,7 @@ export function CampaignPanel({
                   aria-pressed={(s.heating ?? 0) === level}
                   onClick={() => command({ type: "set-heating", level })}
                 >
-                  {level ? level + "단계" : "불 끄기"}
+                  {level ? "최소 " + level + "단계" : "자동"}
                 </button>
               ))}
             </section>
@@ -384,22 +394,26 @@ export function CampaignPanel({
                 <strong>마을 안 변종 · {mutantNames[species]}</strong>
                 <p>
                   달이: 붕대를 갈아 주던 손을 뿌리쳤어. 저 힘으로 기둥을 밀면
-                  지붕이 내려앉아. 포졸을 불러 줘!
+                  지붕이 내려앉아. 새끼들은 이쪽으로 데려올게!
                 </p>
-                <button
-                  type="button"
-                  disabled={
-                    !s.residents.some(
-                      (r) =>
-                        r.workplaceId === "office" && r.health === "healthy",
-                    )
-                  }
-                  onClick={() =>
-                    command({ type: "contain-mutant", resident: m.id })
-                  }
-                >
-                  치안대 출동
-                </button>
+                {s.campaign?.beat === "capital" ? (
+                  <p>도성 치안대가 출동했습니다.</p>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={
+                      !s.residents.some(
+                        (r) =>
+                          r.workplaceId === "office" && r.health === "healthy",
+                      )
+                    }
+                    onClick={() =>
+                      command({ type: "contain-mutant", resident: m.id })
+                    }
+                  >
+                    치안대 출동
+                  </button>
+                )}
               </section>
             );
           })}
@@ -515,7 +529,7 @@ export function CampaignPanel({
           className="scout-all"
           onClick={() => command({ type: "advance", minutes: 1440 })}
         >
-          마을 하루 진행
+          {c.beat === "capital" ? "도성 하루 경영" : "마을 하루 진행"}
         </button>
       )}
       {open ? (

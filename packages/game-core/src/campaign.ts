@@ -21,7 +21,7 @@ import { deposit, facilityResource, payTown } from "./town.js";
 export const CHAPTERS = [
   "복홀의 첫 명령",
   "끊어진 길을 잇다",
-  "붕괴하는 왕도 한양",
+  "붕괴하는 도성",
   "함께 견디는 보름 혹한",
   "누굴 위한 복홀인가",
 ] as const;
@@ -93,7 +93,7 @@ export interface Campaign {
   memorial: "recover" | "remember" | null;
   treaties: number[];
   caravan: { village: number; due: number } | null;
-  relief: "ward" | "kitchen" | null;
+  relief: "ward" | "kitchen" | "report" | null;
   escort: "invite" | "provisions" | null;
   side: "coexist" | "control" | null;
   uprising: boolean;
@@ -163,7 +163,7 @@ export function campaignValid(c: unknown, elapsed: number) {
         !c.treaties.includes(c.caravan.village) &&
         integer(c.caravan.due, Number.MAX_SAFE_INTEGER))) &&
     [null, "recover", "remember"].includes(c.memorial as null) &&
-    [null, "ward", "kitchen"].includes(c.relief as null) &&
+    [null, "ward", "kitchen", "report"].includes(c.relief as null) &&
     [null, "invite", "provisions"].includes(c.escort as null) &&
     [null, "coexist", "control"].includes(c.side as null) &&
     typeof c.uprising === "boolean" &&
@@ -477,12 +477,8 @@ export function actCampaign(
       break;
     }
     case "capital":
-      if (!c.relief && (action === "ward" || action === "kitchen"))
-        return change(
-          "capital",
-          { relief: action },
-          action === "ward" ? pay("RES_COAL", 12) : pay("RES_FISH", 12),
-        );
+      if (!c.relief && action === "report")
+        return change("capital", { relief: "report" });
       if (action === "next" && c.relief && s.elapsed - c.since >= 1440)
         return change("seal");
       break;

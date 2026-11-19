@@ -44,7 +44,7 @@ import {
 import { workplaceOpen } from "./resident-routine.js";
 import { isRecord } from "./save.js";
 import { storageRoom, warehouseDoor } from "./storage.js";
-import type { TimberState } from "./timber.js";
+import { capitalRoad, type TimberState } from "./timber.js";
 import { assignHomes, speciesRule, VILLAGE_RULES } from "./village-services.js";
 
 export const waterAt = (p: GroundPoint, margin = 0) =>
@@ -1043,6 +1043,8 @@ export function dispatchFood(
     !["RES_PLANT", "RES_MEAT", "RES_FISH"].includes(food)
   )
     throw Error("파견할 거점과 식량을 확인해 주세요.");
+  if (f.kind === "trade" && capitalRoad(s) === "closed")
+    throw Error("눈에 길이 막혀 교역 수레를 보낼 수 없습니다.");
   if (!workplaceOpen(s.world.minute))
     throw Error("파견은 일과시간에 지시해 주세요.");
   if (s.town.trips.some((t) => t.facilityId === f.id))
@@ -1104,6 +1106,8 @@ function advanceTrips(input: TimberState, minutes: number): TimberState {
   let s = input;
   for (const old of s.town.trips) {
     const t = { ...old };
+    const road = t.kind === "trade" ? capitalRoad(s) : "open";
+    if (road === "closed") continue;
     const f =
       s.town.facilities.find((f) => f.id === t.facilityId) ?? invalidTown();
     if (
@@ -1122,7 +1126,7 @@ function advanceTrips(input: TimberState, minutes: number): TimberState {
               position: moveOnGround(
                 r.position,
                 goal,
-                minutes,
+                road === "slow" ? minutes / 2 : minutes,
                 t.kind === "hunt"
                   ? 2 *
                       (hasResearch(s, "TECH_FLIGHT")

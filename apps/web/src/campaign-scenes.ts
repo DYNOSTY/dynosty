@@ -3,6 +3,7 @@ import {
   CHAPTERS,
   campaignOf,
   canPay,
+  capitalRoad,
   emergencyRation,
   foodWarnings,
   GAME_RULES,
@@ -39,6 +40,15 @@ export function moraleAdvice(s: TimberState): Line | undefined {
   const limits = GAME_RULES.endings;
   if (s.campaign?.ending || pessimism < limits.concernPessimism) return;
   const day = minute >= 360 && minute < 1080;
+  if (s.campaign?.beat === "capital") {
+    const words =
+      pessimism > limits.urgentPessimism
+        ? "전하, 군량을 나르던 수레까지 멈췄습니다. 지금 배급령을 고쳐 주십시오."
+        : pessimism > limits.warningPessimism
+          ? "전하, 남문 교대에 응한 이가 없습니다. 성안의 청을 들어 주십시오."
+          : "전하, 구호소 앞에 빈 그릇을 놓고 그냥 돌아가는 이들이 늘었습니다.";
+    return [day ? "나르미" : "달이", words];
+  }
   if (pessimism > limits.urgentPessimism)
     return day
       ? [
@@ -76,6 +86,10 @@ export function villageAdvice(
   merchant?: string,
 ): string {
   const c = campaignOf(s);
+  if (c.beat === "capital")
+    return daylight
+      ? "전하, 의원이 밤새 돌본 이들의 명부를 올렸습니다. 남문으로 올 짐수레도 장부와 대조하고 있습니다."
+      : "전하, 성벽 아래서 울음소리가 납니다. 성안에서 붉은 눈을 봤다는 골목에는 벌써 포졸이 갔습니다.";
   if (merchant)
     return daylight
       ? `고리님, 교역소에 상인이 왔어요. ${merchant}의 짐을 같이 보실래요?`
@@ -458,7 +472,7 @@ export function campaignPage(s: TimberState): ScenePage {
           "두 표를 포개서 보내시오. 잘못 받은 곳도, 못 받은 곳도 같이 보게.",
         );
       } else if (c.treaties.length === 5) {
-        complete("3단계로 넘어갈까요? · 한양으로");
+        complete("3단계로 넘어갈까요? · 도성으로");
         line(
           "달이",
           "다섯 곳에서 인장 찍은 종이가 돌아왔어. 마지막 장엔 도장 옆에 손바닥을 찍었더라. 그 집은 인장이 불에 탔대.",
@@ -489,52 +503,67 @@ export function campaignPage(s: TimberState): ScenePage {
       page.auto = !c.caravan;
       break;
     }
-    case "capital":
-      page.title = "한양 남문, 닫힌 약방";
+    case "capital": {
+      page.title = "쥬신 왕의 어전 · 도성 남문";
       page.music = "10";
-      page.goal = `구호처 지원 · 한양 관측 ${Math.min(24, Math.floor(age / 60))}/24시간`;
+      const road = capitalRoad(s);
+      page.goal = `도성 운영 ${Math.min(24, Math.floor(age / 60))}/24시간 · 교역로 ${road === "closed" ? "두절" : road === "slow" ? "지연" : "통행 가능"} · 앓거나 다친 주민 ${s.residents.filter((r) => r.health !== "healthy" && r.health !== "dead").length}명 · 성안 변종 습격 부상 ${(s.world.citizenEvents ?? []).filter((id) => id.startsWith("mutant-") && Number(id.split("-").at(-1)) >= c.since).length}명`;
       line(
-        "의원",
-        "마마, 열이 나는 아이와 몸이 식은 아이가 한 이불을 덮고 있습니다. 병자를 가르라 하시려면 방 하나에 먼저 불을 넣어 주십시오.",
+        "수문장",
+        "전하, 남문 밖에서 변종이 성벽을 긁고 있습니다. 안에서도 하나가 눈을 붉히자 순라 돌던 포졸들이 그 골목으로 달려갔습니다.",
+      );
+      line(
+        "왕",
+        "포졸에게는 내 답을 기다리지 말라 일러라. 의원은 그사이 누가 다쳤는지 살피고, 남문에서는 마지막으로 들어온 수레가 언제였는지 알아보라.",
       );
       line(
         "충녕",
-        "남문의 군량 수레는 아직 소식이 없나요? 솥은 빌릴 수 있어도 그 안을 채울 것까지 빌려 오진 못해요.",
+        "아바마마, 어제 땔감을 들인 집이 오늘 또 장작을 구합니다. 아랫목까지 식으니 새끼들이 잠을 못 잔다 합니다.",
       );
       if (!c.relief) {
-        choice("ward", "병동에 석탄 12 보내기", !canPay(s, "RES_COAL", 12));
-        choice(
-          "kitchen",
-          "남문 솥에 어류 12 보내기",
-          !canPay(s, "RES_FISH", 12),
-        );
+        choice("report", "남문의 장부를 받아 도성을 살핀다");
       } else {
         page.auto = false;
         line(
-          "달이",
-          c.relief === "ward"
-            ? "밤새 약방 굴뚝에 연기가 났어. 의원이 이제야 장갑을 벗고 맥을 짚더라."
-            : "남문을 지키던 군졸이 국을 날랐어. 아이들이 빈 그릇을 돌려줄 때까지 거기 서 있더라.",
+          "의원",
+          "성문에서 다친 이들을 돌보고 돌아오니 동상 입은 식구들이 처마 밑까지 줄을 섰습니다.",
+        );
+        line(
+          "수문장",
+          road === "closed"
+            ? "전하, 고갯길이 막혔습니다. 마지막 수레도 돌아섰습니다."
+            : road === "slow"
+              ? "눈이 수레바퀴를 덮습니다. 해 뜰 때 보인 짐이 아직 고개를 못 넘었습니다."
+              : "남문 길은 아직 열려 있습니다. 들어오는 짐부터 세겠습니다.",
         );
         if (age >= 1440) {
           page.key = "capital-ready";
           page.auto = true;
-          choice("next", "왕의 봉서 펼치기");
+          line(
+            "수문장",
+            "전하, 동문이 뚫렸습니다. 붉은 눈의 변종들이 문루를 무너뜨리자 서문으로 가는 길까지 끊겼습니다. 파수 종을 쳐도 대답하는 초소가 없습니다.",
+          );
+          line(
+            "왕",
+            "남문으로 나가는 길은 아직 있느냐? 내 가마를 비우고 걷지 못하는 이들을 태워라. 충녕에게는 이 봉서를 전하라.",
+          );
+          choice("next", "충녕이 받은 왕의 봉서 펼치기");
         }
       }
       break;
+    }
     case "seal":
       page.clip = "three";
       page.music = "12";
       page.title = "두 번 접힌 봉서";
       line(
         "충녕",
-        "접힌 곳까지 읽으세요. ‘고려의 후손을 한양으로 데려오라. 거역하면 처단하라.’ 공자를 뒤쫓게 한 것도 접니다.",
+        "접힌 곳까지 읽으세요. ‘고려의 후손을 도성으로 데려오라. 거역하면 처단하라.’ 공자를 뒤쫓게 한 것도 접니다.",
       );
       line("고리", "그 말을 어찌 믿겠소? 어제까지 내 뒤에 붙었던 발자국인데.");
       line(
         "충녕",
-        "그래서 봉서를 드리는 거예요. 거기에 제 이름으로 왕명을 거둔다고 썼습니다. 한양에 남은 이들을 데려갈 때까지 이 종이는 공자께 맡기겠습니다.",
+        "그래서 봉서를 드리는 거예요. 거기에 제 이름으로 왕명을 거둔다고 썼습니다. 도성에 남은 이들을 데려갈 때까지 이 종이는 공자께 맡기겠습니다.",
       );
       complete("남하 호송에 동행할까요?");
       break;
