@@ -18,6 +18,7 @@ import type {
   TimberState,
 } from "@dynosty/game-core";
 import { createFog } from "./fog.js";
+import { createFuelYard } from "./fuelyard.js";
 import { createLaborVisual } from "./labor-scene.js";
 import { createLandmarks } from "./landmarks.js";
 import { createLogging } from "./logging.js";
@@ -62,6 +63,10 @@ export interface SceneController {
   setRunning(running: boolean): void;
   /** 게임 시각(하루 안의 분) → 낮밤 */
   setClock(minute: number): void;
+  /** 절기·혹한(winter.ts) → 눈발·시야, 화력·축열 → 굴뚝 연기·온돌 열기 */
+  setWinter(info: { weather: string; heat: number; storage: number }): void;
+  /** 온돌 옆 연료 더미 (석탄·목재 개수) */
+  setFuel(coal: number, wood: number): void;
   /** 정찰을 마친 거점: 먹 안개가 걷히고 모형이 솟음 */
   revealSite(id: string): void;
   resetScouting(): void;
@@ -137,16 +142,27 @@ export function mountScene(
     new URLSearchParams(location.search).get("season") === "summer"
       ? "summer"
       : "winter";
-  const { shadow, setTime, glow, warmMat, followSnow, makePine, makeStump } =
-    buildWorld(
-      scene,
-      LAYOUT.map(([, x, z]) => [x, z] as [number, number]),
-      season,
-    );
+  const {
+    shadow,
+    setTime,
+    setWeather,
+    visibility,
+    glow,
+    warmMat,
+    followSnow,
+    makePine,
+    makeStump,
+  } = buildWorld(
+    scene,
+    LAYOUT.map(([, x, z]) => [x, z] as [number, number]),
+    season,
+  );
   const worldRoot = new TransformNode("island-world", scene);
   for (const mesh of scene.meshes) if (!mesh.parent) mesh.parent = worldRoot;
   const village = createVillage(scene, shadow, { glow, warmMat }, worldRoot);
   // 나무가 곧 자원: 숲 가장자리 벌목터에서 찍고 쓰러뜨리는 연출
+  // 온돌 옆 장작·석탄 더미 (재고만큼)
+  const fuelYard = createFuelYard(scene, worldRoot);
   const logging = createLogging({
     scene,
     shadow,
@@ -361,8 +377,8 @@ export function mountScene(
     scene.fogMode = Scene.FOGMODE_LINEAR;
     scene.fogStart = Math.max(30, camera.radius * 0.8);
     scene.fogEnd = Math.max(
-      95,
-      camera.radius * (season === "winter" ? 2.4 : 4),
+      95 * visibility(),
+      camera.radius * (season === "winter" ? 2.4 : 4) * visibility(),
     );
     // WASD: 화면 기준 앞뒤·좌우로 이동 (멀리 볼수록 빠르게)
     const fwd = camera.target.subtract(camera.position);
@@ -691,6 +707,15 @@ export function mountScene(
       onTrack = cb;
       cameraKey = "";
     },
+    setFuel(coal, wood) {
+      fuelYard.setStock(coal, wood);
+    },
+    setWinter({ weather, heat, storage }) {
+      // 연료가 떨어져 구들이 식으면 연기·열기도 줄어듦
+      const glowing = heat * (0.25 + 0.75 * Math.min(1, storage / 60));
+      setWeather(weather, glowing);
+      village.setHeat(glowing);
+    },
     setRunning(running: boolean) {
       runningNow = running;
       village.setRunning(running);
@@ -724,6 +749,7 @@ export function mountScene(
       entities.dispose();
       village.dispose();
       logging.dispose();
+      fuelYard.dispose();
       fog.dispose();
       scene.dispose();
       engine.dispose();

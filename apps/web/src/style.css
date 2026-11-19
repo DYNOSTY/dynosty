@@ -4503,3 +4503,194 @@ body,
 .e2e-all .site-column {
   overflow: auto !important;
 }
+
+/* ── 절기 시계 (위쪽 왼편 메달) · 기온·날씨 — 2026-11-19 절기·혹한 ── */
+.g-season {
+  position: fixed;
+  z-index: 5;
+  top: 62px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.g-season__dial {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  flex: none;
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / 45%));
+}
+.g-season__paint {
+  position: absolute;
+  inset: 22%;
+  width: 56%;
+  height: 56%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.g-season__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* 지금 절기 칸을 가리키는 바늘 (가운데 → 테두리 칸) */
+.g-season__hand {
+  position: absolute;
+  left: 50%;
+  top: 4%;
+  width: 4px;
+  height: 46%;
+  margin-left: -2px;
+  transform-origin: 50% 100%;
+  border-radius: 2px;
+  background: linear-gradient(var(--nakgwan, #b3322a) 0 34%, transparent 34%);
+  transition: transform 0.6s;
+}
+.g-season__hand::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid var(--nakgwan, #b3322a);
+  box-sizing: border-box;
+  background: rgb(179 50 42 / 18%);
+}
+.g-season__text {
+  display: grid;
+  gap: 2px;
+  padding: 8px 14px 8px 12px;
+  border-radius: 6px;
+  background: rgb(239 230 210 / 92%);
+  box-shadow:
+    0 0 0 1px var(--hanji-line),
+    0 3px 8px rgb(0 0 0 / 30%);
+  color: var(--meok);
+  min-width: 190px;
+}
+.g-season__text p {
+  margin: 0;
+  white-space: nowrap;
+}
+.g-season__term {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.g-season__term b {
+  font: 700 22px / 1.1 var(--font-title);
+}
+.g-season__term span {
+  font-size: 15px;
+  color: var(--meok-sub);
+}
+.g-season__term small {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--meok-sub);
+}
+.g-season__now {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+}
+.g-season__now strong {
+  margin-left: auto;
+  font: 700 22px / 1 var(--font-title);
+  font-variant-numeric: tabular-nums;
+}
+.g-season__next {
+  font-size: 13px;
+  color: var(--meok-sub);
+}
+/* 저장·설정·fps는 절기 시계 아래로 */
+@media (min-width: 761px) {
+  .g-topcmd {
+    top: 202px;
+  }
+  .fps-badge,
+  .g-fps {
+    top: 254px;
+  }
+}
+/* 보온 칸 */
+.warmth-card .warmth-extra {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* 온돌 상태 줄 */
+.g-sel .g-sel__ondol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--meok);
+}
+.g-sel__ondol b {
+  font-variant-numeric: tabular-nums;
+}
+/* 켜진 화력 */
+.g-cmd[aria-pressed="true"] {
+  outline: 3px solid var(--nakgwan, #b3322a);
+  outline-offset: -3px;
+}
+/* 좁은 화면: 절기 시계만 작게 (글 상자는 접음) */
+@media (max-width: 760px) {
+  .g-season {
+    top: 56px;
+    left: 8px;
+  }
+  .g-season__dial {
+    width: 64px;
+    height: 64px;
+  }
+  .g-season__text {
+    display: none;
+  }
+}
+
+/* 2026-11-19 사용자: 건물을 누르면 지도+이름·설명은 왼쪽에 붙고, 명령 9칸 상자는 화면 오른쪽 아래에 따로 */
+.g-console__frame img.end {
+  display: none;
+}
+@media (min-width: 761px) {
+  /* 글 길이만큼만 (최소 420 · 최대 640) — 빈 한지가 넓게 남지 않게 */
+  .g-console.is-selected {
+    width: max-content;
+    min-width: 420px;
+    max-width: min(640px, calc(100vw - 220px));
+    grid-template-columns: 132px minmax(240px, 420px);
+  }
+  .g-console.is-selected .g-console__frame img:nth-child(n + 3) {
+    display: none;
+  }
+  .g-console.is-selected .g-console__frame img.end {
+    display: block;
+    flex: none;
+    height: 100%;
+    width: auto;
+  }
+  /* 명령판: 오른쪽 끝 조각(기둥+상자)을 그대로 쓴 독립 상자, 화면 오른쪽 아래 */
+  .g-console.is-selected .play-menu.g-console__cmd {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    width: 171px;
+    height: 190px;
+    padding: 36px 19px 20px 20px;
+    box-sizing: border-box;
+    background: url(/ui/kit/console_4.png) right bottom / auto 100% no-repeat;
+    filter: drop-shadow(0 -4px 8px rgb(0 0 0 / 25%));
+  }
+}

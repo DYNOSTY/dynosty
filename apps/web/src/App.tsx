@@ -7,11 +7,15 @@ import type {
   SceneSnapshot,
 } from "@dynosty/game-core";
 import {
+  AMOUNT_SCALE,
+  type HeatLevel,
   type LaborState,
   laborScene,
   laborStock,
   type TimberState,
   timberScene,
+  winterReport,
+  ZONES,
 } from "@dynosty/game-core";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { BUILDINGS, type BuildingAction, commandGrid } from "./buildings.js";
@@ -31,11 +35,13 @@ import {
   saveLocalExample,
 } from "./local-save.js";
 import { MediaPanel } from "./MediaPanel.js";
+import { OndolStatus } from "./OndolStatus.js";
 import { PlayPanel } from "./PlayPanel.js";
 import { PlaySavePanel } from "./PlaySavePanel.js";
 import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { QualityFlow } from "./QualityFlow.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
+import { SeasonDial } from "./SeasonDial.js";
 import { SelectionMeta } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import { SiteGuide } from "./SiteGuide.js";
@@ -449,6 +455,43 @@ export function App() {
 
   // 게임 시작 → 주민이 걷고 연기가 남, 시각에 맞춰 낮밤
   const running = playState ? !playState.paused && !timberOpen : false;
+  // 절기·혹한 → 3D(눈발·시야·연기)와 서리 테두리 두께
+  const winterNow = playState
+    ? winterReport(
+        playState.winter,
+        playState.day,
+        playState.minute,
+        playState.citizens,
+      )
+    : null;
+  const nestZone = winterNow?.zones.find((z) => z.id === "nest");
+  const heatScale = nestZone
+    ? { 절약: 0.6, 보통: 1, 긴급: 1.4 }[nestZone.heat]
+    : 1;
+  const coalNow = playState
+    ? Math.floor(playState.resources.RES_COAL / AMOUNT_SCALE)
+    : null;
+  const woodNow = playState
+    ? Math.floor(playState.resources.RES_WOOD / AMOUNT_SCALE)
+    : null;
+  useEffect(() => {
+    if (coalNow !== null && woodNow !== null)
+      sceneRef.current?.setFuel(coalNow, woodNow);
+  }, [coalNow, woodNow]);
+  const weatherNow = winterNow?.weather;
+  const storageNow = nestZone?.storage;
+  useEffect(() => {
+    if (weatherNow === undefined || storageNow === undefined) return;
+    sceneRef.current?.setWinter({
+      weather: weatherNow,
+      heat: heatScale,
+      storage: storageNow,
+    });
+  }, [weatherNow, heatScale, storageNow]);
+  // 영하 10°부터 서리가 짙어져 영하 35°에 가장 두껍게
+  const frost = winterNow
+    ? Math.min(1, Math.max(0, (-winterNow.temp - 10) / 25))
+    : 0.5;
   useEffect(() => {
     if (sceneStatus === "준비 완료") sceneRef.current?.setRunning(running);
   }, [running, sceneStatus]);
@@ -611,7 +654,11 @@ export function App() {
     if (action === "procure") openTimber();
     else if (action === "focus") sceneRef.current?.focusSelected();
     else if (action === "clear") clearSelection();
-    else if (action === "scout") {
+    else if (action.startsWith("heat-")) {
+      // 온돌 화력: 마을 모든 구역(둥지·재배소·쉼터·연구동·치료소)에 한 번에
+      const heat = action.slice(5) as HeatLevel;
+      for (const zone of ZONES) commandPlay({ type: "set-heat", zone, heat });
+    } else if (action === "scout") {
       // 아직 안 가 본 첫 거점의 정찰 창
       const next = SCOUT_SITES.find((site) => !scouts[site.id]);
       if (next) openOnly(() => setScoutOpen(next.id));
@@ -1162,9 +1209,14 @@ export function App() {
         <div className="g-backdrop" aria-hidden="true" onClick={closePopups} />
       ) : null}
       {/* 혹한 톤: 화면 가장자리 서리 · 위 막대 고드름 */}
-      <div className="g-frost" aria-hidden="true" />
+      <div
+        className="g-frost"
+        aria-hidden="true"
+        style={{ opacity: 0.25 + frost * 0.6 }}
+      />
       <div className="g-frost-edge g-frost-edge--top" aria-hidden="true" />
       <FpsBadge />
+      <SeasonDial state={playState} />
       {/* 늘 쓰는 저장·설정은 위쪽 왼편 (하단은 건물을 고를 때만) */}
       <nav className="g-topcmd" aria-label="게임 메뉴">
         <CmdButton
@@ -1243,6 +1295,9 @@ export function App() {
                   ? BUILDINGS[selection.building]?.role
                   : "마을 주민. 일터와 둥지를 오가며 일합니다."}
               </p>
+              {selection.building === "BLD_ONDOL" && playState ? (
+                <OndolStatus state={playState} />
+              ) : null}
               <SelectionMeta entity={selectedEntity} />
             </section>
             <nav className="play-menu g-console__cmd" aria-label="건물 명령">
@@ -1258,6 +1313,12 @@ export function App() {
                       (cmd.action === "procure" && (!timberReady || timberOpen))
                     }
                     onClick={() => cmd.action && runAction(cmd.action)}
+                    toggled={
+                      cmd.action?.startsWith("heat-")
+                        ? playState?.winter.zones.nest.heat ===
+                          cmd.action.slice(5)
+                        : undefined
+                    }
                   />
                 ) : (
                   <span

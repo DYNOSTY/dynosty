@@ -1,6 +1,12 @@
 import raw from "./game-data.json" with { type: "json" };
 import { isRecord } from "./save.js";
 import type { SceneEntity, SceneSnapshot } from "./scene.js";
+import {
+  createWinterState,
+  parseWinterState,
+  stepWinter,
+  type WinterState,
+} from "./winter.js";
 
 export type RuleSet = typeof raw;
 export type ResourceId = keyof RuleSet["resources"];
@@ -218,6 +224,8 @@ export interface PlayState {
   readonly unmet: Readonly<Record<FoodId, number>>;
   readonly optimism: number;
   readonly pessimism: number;
+  /** 절기·온돌·체온 (winter.ts) — 옛 저장에는 없어서 불러올 때 기본값으로 채움 */
+  readonly winter: WinterState;
 }
 export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
   const r = parseRules(rules);
@@ -258,6 +266,7 @@ export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
     unmet: { RES_PLANT: 0, RES_MEAT: 0, RES_FISH: 0 },
     optimism: r.initial.optimism,
     pessimism: r.initial.pessimism,
+    winter: createWinterState(citizens.map((c) => c.id)),
   };
 }
 export function parsePlayState(
@@ -349,6 +358,16 @@ export function parsePlayState(
     unmet,
     optimism: value.optimism,
     pessimism: value.pessimism,
+    winter: (() => {
+      try {
+        return parseWinterState(
+          value.winter,
+          citizens.map((c) => c.id),
+        );
+      } catch {
+        fail();
+      }
+    })(),
   };
 }
 export function dailyFoodDemand(
@@ -383,6 +402,46 @@ export function advancePlayMinutes(
     unmet[id] += needed - used;
     if (!Number.isSafeInteger(unmet[id])) fail();
   }
+  // 절기·온돌·체온: 정시 경계에서 끊어 1시간 이하씩 (불때기 시간표가 시각마다 맞게)
+  let winter = state.winter;
+  let citizens = state.citizens;
+  let optimism = state.optimism;
+  let pessimism = state.pessimism;
+  let wDay = state.day;
+  let wMinute = state.minute;
+  let left = minutes;
+  while (left > 0) {
+    const chunk = Math.min(left, 60 - (wMinute % 60));
+    const r = stepWinter({
+      winter,
+      day: wDay,
+      minute: wMinute,
+      minutes: chunk,
+      coal: resources.RES_COAL,
+      wood: resources.RES_WOOD,
+      // ponytail: 공사·연구 예약 목재 연결 전이라 0 — 예약 장부가 생기면 여기로 넘김
+      reservedWood: 0,
+      scale: AMOUNT_SCALE,
+      citizens,
+    });
+    winter = r.winter;
+    resources.RES_COAL -= r.coalUsed;
+    resources.RES_WOOD -= r.woodUsed;
+    if (r.deaths.length) {
+      const dead = new Set(r.deaths);
+      citizens = citizens.map((c) =>
+        dead.has(c.id) ? { ...c, alive: false } : c,
+      );
+    }
+    pessimism = Math.min(100, Math.max(0, pessimism + r.pessimismDelta));
+    optimism = Math.min(100, Math.max(0, optimism + r.optimismDelta));
+    wMinute += chunk;
+    if (wMinute >= rules.time.minutesPerDay) {
+      wMinute -= rules.time.minutesPerDay;
+      wDay += 1;
+    }
+    left -= chunk;
+  }
   const elapsed = state.minute + minutes;
   const day = state.day + Math.floor(elapsed / rules.time.minutesPerDay);
   number(day, 1, 100_000, true);
@@ -393,6 +452,10 @@ export function advancePlayMinutes(
     resources,
     foodCarry: carry,
     unmet,
+    citizens,
+    optimism,
+    pessimism,
+    winter,
   };
 }
 export function tickPlay(

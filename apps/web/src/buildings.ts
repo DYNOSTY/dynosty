@@ -1,7 +1,14 @@
 // 건물별 하단 콘솔 내용: 이름·역할·초상(컨셉 시트)·명령 9칸
 // 명령 중 실제로 되는 것은 action이 있고, 아직 게임 규칙이 없는 것은 잠김(준비 중)
 
-export type BuildingAction = "procure" | "scout" | "focus" | "clear";
+export type BuildingAction =
+  | "procure"
+  | "scout"
+  | "focus"
+  | "clear"
+  | "heat-절약"
+  | "heat-보통"
+  | "heat-긴급";
 export type BuildingCommand = {
   icon: string;
   label: string;
@@ -30,9 +37,26 @@ export const BUILDINGS: Record<string, BuildingInfo> = {
       ["종류", "난방"],
       ["연결", "둥지 8채"],
     ],
+    // 화력: 기획 v0.4 U35 — 절약0.6 · 보통1 · 긴급1.4배 (석탄 요구와 가열량)
     commands: [
-      locked("ondol", "땔감 넣기"),
-      locked("policy", "난방 세기"),
+      {
+        icon: "heat_save",
+        label: "화력 절약",
+        hotkey: "1",
+        action: "heat-절약",
+      },
+      {
+        icon: "heat_normal",
+        label: "화력 보통",
+        hotkey: "2",
+        action: "heat-보통",
+      },
+      {
+        icon: "heat_urgent",
+        label: "화력 긴급",
+        hotkey: "3",
+        action: "heat-긴급",
+      },
       locked("research", "고래 보수"),
     ],
   },

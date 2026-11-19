@@ -483,6 +483,9 @@ export function createVillage(
   };
   // 석탄 연기처럼 짙고 무겁게 (프로스트펑크 톤)
   const smokes: ParticleSystem[] = [];
+  const smokeBase = new Map<ParticleSystem, number>();
+  /** 화력(절약0.6·보통1·긴급1.4) × 연료 유무 → 굴뚝 연기 양 */
+  let smokeScale = 1;
   function addSmoke(at: Vector3, scale = 1) {
     const ps = new ParticleSystem(`smoke-${smokes.length}`, 110, scene);
     ps.particleTexture = puff;
@@ -505,6 +508,8 @@ export function createVillage(
     ps.emitRate = 10;
     ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     smokes.push(ps);
+    smokeBase.set(ps, ps.emitRate);
+    ps.emitRate = ps.emitRate * smokeScale;
     if (running) ps.start();
   }
 
@@ -662,6 +667,11 @@ export function createVillage(
     }
   }
 
+  function setHeat(scale: number) {
+    if (Math.abs(scale - smokeScale) < 0.01) return;
+    smokeScale = scale;
+    for (const ps of smokes) ps.emitRate = (smokeBase.get(ps) ?? 10) * scale;
+  }
   let running = false;
   function setRunning(value: boolean) {
     if (value === running) return;
@@ -802,6 +812,7 @@ export function createVillage(
 
   return {
     ready,
+    setHeat,
     entityVisual,
     /** 누른 조각이 마을 건물이면 LAYOUT 번호 */
     buildingForMesh(mesh: Node | null): number | null {

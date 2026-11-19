@@ -246,6 +246,8 @@ export function buildWorld(
   season: Season = "winter",
 ) {
   const P = PALETTE[season];
+  /** 온돌 둘레 열기 원판 재질 — 화력에 따라 밝기 (setWeather) */
+  let heatMat = null as StandardMaterial | null;
   scene.clearColor = new Color4(0, 0, 0, 0);
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogDensity = P.fogDensity;
@@ -443,6 +445,7 @@ export function buildWorld(
     hm.alphaMode = 1; // 더하기
     heat.material = hm;
     heat.isPickable = false;
+    heatMat = hm;
   }
   const ground = new Mesh("ground", scene);
   const vd = new VertexData();
@@ -831,6 +834,8 @@ export function buildWorld(
 
   // ── 눈보라 (겨울): 바람에 비스듬히 ──
   let snow: ParticleSystem | null = null;
+  /** 날씨에 따른 시야 (scene.ts 안개 끝 거리에 곱함) */
+  let visibility = 1;
   if (season === "winter") {
     const flake = new DynamicTexture("flake-tex", 32, scene, false);
     const fc = flake.getContext() as CanvasRenderingContext2D;
@@ -904,9 +909,40 @@ export function buildWorld(
   const followSnow = (x: number, z: number) => {
     if (snow) (snow.emitter as Vector3).set(x + 8, 26, z - 4);
   };
+  // 날씨(winter.ts) → 눈발 세기·바람·크기, 시야 / 화력·축열 → 온돌 둘레 열기
+  const WEATHER_LOOK: Record<
+    string,
+    { rate: number; wind: number; life: number; size: number; see: number }
+  > = {
+    맑음: { rate: 90, wind: 0.6, life: 8, size: 0.7, see: 1 },
+    흐림: { rate: 240, wind: 0.8, life: 8, size: 0.85, see: 0.92 },
+    눈: { rate: 620, wind: 1, life: 7.5, size: 1, see: 0.82 },
+    눈보라: { rate: 1050, wind: 2.2, life: 3.4, size: 1.15, see: 0.55 },
+    한파: { rate: 160, wind: 1.3, life: 6, size: 0.55, see: 0.88 },
+  };
+  let lastWeather = "";
+  const setWeather = (weather: string, heat: number) => {
+    if (heatMat) heatMat.emissiveColor = new Color3(heat, heat, heat);
+    if (!snow || weather === lastWeather) return;
+    lastWeather = weather;
+    const look = WEATHER_LOOK[weather] ?? WEATHER_LOOK.눈;
+    if (!look) return;
+    snow.emitRate = look.rate;
+    snow.minLifeTime = look.life * 0.75;
+    snow.maxLifeTime = look.life;
+    snow.direction1 = new Vector3(-3.6 * look.wind, -1, 0.7 * look.wind);
+    snow.direction2 = new Vector3(-2.4 * look.wind, -1, 1.3 * look.wind);
+    snow.minEmitPower = 3 * Math.sqrt(look.wind);
+    snow.maxEmitPower = 5 * Math.sqrt(look.wind);
+    snow.minSize = 0.12 * look.size;
+    snow.maxSize = 0.32 * look.size;
+    visibility = look.see;
+  };
   return {
     shadow,
     setTime,
+    setWeather,
+    visibility: () => visibility,
     glow,
     warmMat,
     followSnow,
