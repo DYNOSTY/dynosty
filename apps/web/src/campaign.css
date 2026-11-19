@@ -197,3 +197,9 @@
     animation: none;
   }
 }
+
+.play-shell .campaign-quest:has(.office-panel) {
+  max-height: min(56dvh, 36rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

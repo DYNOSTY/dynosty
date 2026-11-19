@@ -19,6 +19,7 @@ import {
   TIMBER_RULES,
   type TimberState,
   timberScene,
+  villageDefenseActive,
 } from "@dynosty/game-core";
 import {
   useCallback,
@@ -84,6 +85,7 @@ import { WorkspacePanel } from "./WorkspacePanel.js";
 import { elevation, MAP_SPAN } from "./world.js";
 
 export function App() {
+  const [defenseOpen, setDefenseOpen] = useState(false);
   const [laborOpen, setLaborOpen] = useState(false);
   const [laborState, setLaborState] = useState<LaborState | null>(null);
   const [siteNotices, setSiteNotices] = useState<SiteNotice[]>([]);
@@ -851,6 +853,9 @@ export function App() {
           <CampaignPanel
             state={timberState}
             command={(cmd) => villageCommand.current?.(cmd)}
+            defenseOpen={defenseOpen}
+            setDefenseOpen={setDefenseOpen}
+            gateSelected={!!selectedId?.startsWith("village:BLD_GATE:")}
             officeSelected={!!selectedId?.startsWith("village:BLD_OFFICE:")}
             trade={showTrade}
             work={
@@ -1754,7 +1759,14 @@ export function App() {
             disabled={!timberReady}
             onClick={() => openVillageSection("교역소 방문")}
           />
-          <CmdButton icon="ondol" label="온돌" hotkey="H" disabled />
+          <CmdButton
+            icon="ondol"
+            label="온돌"
+            hotkey="H"
+            disabled={!timberState || !villageDefenseActive(timberState)}
+            pressed={defenseOpen}
+            onClick={() => setDefenseOpen(!defenseOpen)}
+          />
           <CmdButton
             buttonRef={saveMenuRef}
             icon="records"

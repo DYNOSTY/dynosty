@@ -5,6 +5,8 @@ import {
   foodWarnings,
   type TimberCommand,
   type TimberState,
+  villageDefenseActive,
+  villageTemperature,
 } from "@dynosty/game-core";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
@@ -138,12 +140,18 @@ export function CampaignPanel({
   command,
   trade,
   officeSelected,
+  gateSelected,
+  defenseOpen,
+  setDefenseOpen,
   work,
 }: {
   state: TimberState;
   command: (cmd: TimberCommand) => void;
   trade: boolean;
   officeSelected?: boolean;
+  gateSelected?: boolean;
+  defenseOpen?: boolean;
+  setDefenseOpen?: (open: boolean) => void;
   work: boolean;
 }) {
   const c = campaignOf(s);
@@ -161,6 +169,9 @@ export function CampaignPanel({
   useEffect(() => {
     if (officeSelected) setOffice(true);
   }, [officeSelected]);
+  useEffect(() => {
+    if (gateSelected) setDefenseOpen?.(true);
+  }, [gateSelected, setDefenseOpen]);
   const [sound, setSound] = useState(false);
   const { audioRef } = useAudio();
   const canPetition =
@@ -276,6 +287,86 @@ export function CampaignPanel({
         >
           관아 · 순라 배치
         </button>
+      )}
+      {villageDefenseActive(s) && (
+        <>
+          <button
+            type="button"
+            className="scout-all"
+            aria-expanded={!!defenseOpen}
+            onClick={() => setDefenseOpen?.(!defenseOpen)}
+          >
+            기온 {villageTemperature(s)} °C · 성문과 온돌
+            <meter
+              aria-label="마을 기온"
+              min={-25}
+              max={15}
+              low={0}
+              high={5}
+              optimum={10}
+              value={villageTemperature(s)}
+            />
+          </button>
+          {defenseOpen && (
+            <section className="office-panel" aria-label="성문과 온돌">
+              <strong>
+                성문 수비병{" "}
+                {
+                  s.residents.filter(
+                    (r) => r.workplaceId === "gate" && r.health === "healthy",
+                  ).length
+                }
+                명
+              </strong>
+              <p>수비병이 많으면 습격 때 다치거나 숨지는 주민이 줄어듭니다.</p>
+              {([0, 4, 8, 16] as const).map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => command({ type: "set-gate", count })}
+                >
+                  {count}명 배치
+                </button>
+              ))}
+              <strong>온돌 · 현재 화력 {s.firedHeat ?? 0}단계</strong>
+              <p>
+                단계마다 한 시간에 목재 1을 때서 거처를 8 °C 덥힙니다. 땔감이
+                모자라면 남은 만큼만 땝니다.
+              </p>
+              {[0, 1, 2, 3].map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  aria-pressed={(s.heating ?? 0) === level}
+                  onClick={() => command({ type: "set-heating", level })}
+                >
+                  {level ? level + "단계" : "불 끄기"}
+                </button>
+              ))}
+            </section>
+          )}
+          {s.raid && (
+            <section className="office-panel" aria-label="성문 전투 보고">
+              <img
+                src={"/art/raid-" + (s.raid.picture + 1) + ".webp"}
+                alt="복홀 성문의 수비 기록"
+              />
+              <strong>성문 전투 보고</strong>
+              <p>
+                습격대가 물러났습니다.{" "}
+                {s.raid.dead || s.raid.injured
+                  ? `사망 ${s.raid.dead}명 · 부상 ${s.raid.injured}명`
+                  : "모두 무사합니다."}
+              </p>
+              <button
+                type="button"
+                onClick={() => command({ type: "dismiss-raid" })}
+              >
+                보고 확인
+              </button>
+            </section>
+          )}
+        </>
       )}
       {office && (
         <section className="office-panel" aria-label="관아">

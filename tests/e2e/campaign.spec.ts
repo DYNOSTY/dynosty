@@ -210,3 +210,39 @@ test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 
     .poll(() => tracks.some((url) => url.endsWith("/13.ogg")))
     .toBe(true);
 });
+
+test("성문 수비와 온돌을 배치하고 삽화가 있는 전투 보고를 닫는다", async ({
+  page,
+}) => {
+  const s = createVillageGame(false, true);
+  await page.addInitScript(
+    (save) => {
+      if (!localStorage.getItem("dynosty.village.resume"))
+        localStorage.setItem("dynosty.village.resume", JSON.stringify(save));
+    },
+    createTimberSave({
+      ...s,
+      raid: { minute: 0, picture: 5, dead: 0, injured: 1 },
+    }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: /기온.*성문과 온돌/ }).click();
+  const panel = page.getByRole("region", { name: "성문과 온돌", exact: true });
+  await panel.getByRole("button", { name: "4명 배치", exact: true }).click();
+  await expect(panel).toContainText("성문 수비병 4명");
+  await panel.getByRole("button", { name: "2단계", exact: true }).click();
+  await expect(
+    panel.getByRole("button", { name: "2단계", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const report = page.getByRole("region", { name: "성문 전투 보고" });
+  await expect(report).toContainText("부상 1명");
+  await expect
+    .poll(() =>
+      report
+        .getByRole("img")
+        .evaluate((el) => (el as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  await report.getByRole("button", { name: "보고 확인" }).click();
+  await expect(report).toHaveCount(0);
+});

@@ -17,8 +17,11 @@ import {
   createTimberSave,
   createTimberState,
   createVillageGame,
+  gateRaid,
   parseTimberSave,
   type TimberState,
+  villageFatalIncident,
+  villageTemperature,
 } from "./timber.js";
 import { payTown } from "./town.js";
 
@@ -420,4 +423,86 @@ it("재건 중 순라 인원과 배식소 부상을 실제 주민에게 기록�
   );
   expect(s.openingFight).toBe(true);
   expect(s.world.citizens.filter((r) => r.health === "sick")).toHaveLength(2);
+});
+
+it("마을 사망 사고는 해당 환경에서 한 명에게만 발생하고 저장 후 중복되지 않는다", () => {
+  const start = createVillageGame(false, true);
+  expect(villageFatalIncident(start, () => 0)).toBe(start);
+  const night = { ...start, world: { ...start.world, minute: 1080 } };
+  expect(villageFatalIncident(night, () => 0.01)).toBe(night);
+  const attack = restore(villageFatalIncident(night, () => 0));
+  expect(attack.history.at(-1)?.text).toContain("피습");
+  expect(attack.world.citizens.filter((r) => !r.alive)).toHaveLength(1);
+  expect(villageFatalIncident(attack, () => 0)).toBe(attack);
+  const cold = {
+    ...night,
+    town: { ...night.town, cold: true },
+  };
+  expect(
+    villageFatalIncident(
+      cold,
+      vi.fn().mockReturnValueOnce(0).mockReturnValue(0.999),
+    ).history.at(-1)?.text,
+  ).toContain("동상");
+});
+
+it("온돌 연료를 매시간 결제하고 성문 전투 결과와 삽화를 저장한다", () => {
+  let s = createVillageGame(false, true);
+  expect(villageTemperature(s)).toBeGreaterThan(0);
+  s = commandTimber(s, { type: "set-gate", count: 4 }, "gate");
+  expect(s.residents.filter((r) => r.workplaceId === "gate")).toHaveLength(4);
+  s = commandTimber(s, { type: "set-heating", level: 3 }, "heat");
+  const wood = s.world.resources.RES_WOOD;
+  s = commandTimber(s, { type: "advance", minutes: 60 }, "hour");
+  expect(s.firedHeat).toBe(3);
+  expect(s.world.resources.RES_WOOD).toBe(wood - 3 * AMOUNT_SCALE);
+  const safe = restore(
+    gateRaid(s, vi.fn().mockReturnValueOnce(0).mockReturnValue(0.99)),
+  );
+  expect(safe.raid).toMatchObject({ picture: 5, dead: 0, injured: 0 });
+  const raid = restore(gateRaid(s, () => 0));
+  expect(raid.raid).toMatchObject({ picture: 0, dead: 2, injured: 0 });
+  expect(raid.world.citizens.filter((r) => !r.alive)).toHaveLength(2);
+  expect(
+    commandTimber(raid, { type: "dismiss-raid" }, "read").raid,
+  ).toBeUndefined();
+});
+
+it("영상, 충분한 난방, 연료 부족과 장기 굶주림을 구별한다", () => {
+  const s = createVillageGame(false, true);
+  const cold = {
+    ...s,
+    town: { ...s.town, cold: true },
+    world: { ...s.world, minute: 840 },
+  };
+  expect(villageTemperature(cold)).toBeLessThan(0);
+  const housed = createVillageGame();
+  const sheltered = {
+    ...housed,
+    rebuilding: true,
+    town: { ...housed.town, cold: true },
+    world: { ...housed.world, minute: 840 },
+    firedHeat: 3,
+  };
+  const safe = villageFatalIncident(sheltered, () => 0);
+  expect(
+    safe.residents.filter((r) => r.homeId && r.health === "dead"),
+  ).toHaveLength(0);
+  const hungry = {
+    ...s,
+    residents: s.residents.map((r, i) =>
+      i === 0 ? { ...r, hunger: 2880 } : r,
+    ),
+  };
+  expect(villageFatalIncident(hungry, () => 0).history.at(-1)?.text).toContain(
+    "굶주림",
+  );
+  const poor = payTown(cold, { RES_WOOD: 999 });
+  const heated = commandTimber(
+    { ...poor, heating: 3 },
+    { type: "advance", minutes: 60 },
+    "low-fuel",
+  );
+  expect(heated.firedHeat).toBe(1);
+  expect(heated.world.resources.RES_WOOD).toBe(0);
 });
