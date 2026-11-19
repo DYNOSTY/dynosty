@@ -4117,6 +4117,13 @@ body,
 .guide-toggle b {
   font-size: 24px;
 }
+@media (max-width: 760px) {
+  /* 모바일 조달에서 접힌 명령 버튼이 개발 도구(왼쪽 8px + 너비 72px)를 덮지 않게 한다. */
+  .is-procurement > .guide-toggle {
+    left: 88px;
+    max-width: min(430px, calc(100vw - 100px));
+  }
+}
 .trade-deck {
   display: flex;
   flex-wrap: wrap;

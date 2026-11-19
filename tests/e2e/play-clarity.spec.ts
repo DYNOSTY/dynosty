@@ -159,6 +159,34 @@ for (const viewport of [
     ).toBe(true);
   });
 }
+test.describe("모바일 터치", () => {
+  test.use({
+    viewport: { width: 375, height: 812 },
+    isMobile: true,
+    hasTouch: true,
+  });
+
+  test("명령이 접힌 상태에서 개발 도구를 탭해 일손 체험에 들어간다", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await b(page, "마른 목재20 조달 체험하기").tap();
+    const commands = b(page, "명령 열기");
+    const tools = b(page, "개발 도구");
+    await expect(commands).toHaveAttribute("aria-expanded", "false");
+    await expect(tools).toHaveAttribute("aria-expanded", "false");
+    await tools.tap();
+    await expect(tools).toHaveAttribute("aria-expanded", "true");
+    await b(page, "일손 배치·배급 체험하기").tap();
+    await b(page, "개발 도구 닫기").tap();
+    await expect(tools).toHaveAttribute("aria-expanded", "false");
+    await b(page, "배급 준비 장소 보기").tap();
+    await expect
+      .poll(() => horizontalOffset(page, "site-ration"))
+      .toBeLessThan(5);
+  });
+});
+
 test("375px 키보드 장소 이동·기본 복귀·기호 표지는 가로 넘침이나 클릭 가림이 없다", async ({
   page: p,
 }) => {
