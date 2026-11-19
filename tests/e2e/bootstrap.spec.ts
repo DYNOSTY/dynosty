@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { openWorkspace } from "./workspace.js";
 
-test("웹 프록시를 통해 실제 PostgreSQL 연결을 확인한다", async ({
-  request,
-}) => {
+test("웹 프록시를 통해 실제 PostgreSQL 연결을 확인한다", {
+  tag: "@smoke",
+}, async ({ request }) => {
   const response = await request.get("/api/ready");
   expect(response.status()).toBe(200);
   expect(await response.json()).toEqual({

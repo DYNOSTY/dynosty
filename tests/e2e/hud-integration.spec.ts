@@ -92,9 +92,9 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   expect(errors).toEqual([]);
 });
 
-test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에서는 초기화한다", async ({
-  page,
-}) => {
+test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에서는 초기화한다", {
+  tag: "@smoke",
+}, async ({ page }) => {
   // Three full 3D loads share this test's budget on software-rendered CI.
   test.setTimeout(240_000);
   const errors: string[] = [];
