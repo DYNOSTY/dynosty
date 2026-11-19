@@ -226,7 +226,11 @@ export interface PlayState {
   readonly pessimism: number;
   /** 절기·온돌·체온 (winter.ts) — 옛 저장에는 없어서 불러올 때 기본값으로 채움 */
   readonly winter: WinterState;
+  /** 생산 분자 이월 (벌목 목재, food와 같은 고정 소수점) */
+  readonly work: { readonly woodCarry: number };
 }
+// 벌목장 B02 (온돌 UI v0.4 표): 정원6 · 목재18/일 → 1단계 초기 배치 4명 = 하루 12, 낮 9~18시에만
+export const LOGGING = { woodPerDay: 12, from: 9, to: 18 } as const;
 export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
   const r = parseRules(rules);
   const citizens: Citizen[] = [];
@@ -267,6 +271,7 @@ export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
     optimism: r.initial.optimism,
     pessimism: r.initial.pessimism,
     winter: createWinterState(citizens.map((c) => c.id)),
+    work: { woodCarry: 0 },
   };
 }
 export function parsePlayState(
@@ -368,6 +373,11 @@ export function parsePlayState(
         fail();
       }
     })(),
+    work: (() => {
+      const w = isRecord(value.work) ? value.work : { woodCarry: 0 };
+      number(w.woodCarry, 0, Number.MAX_SAFE_INTEGER, true);
+      return { woodCarry: w.woodCarry };
+    })(),
   };
 }
 export function dailyFoodDemand(
@@ -409,6 +419,8 @@ export function advancePlayMinutes(
   let pessimism = state.pessimism;
   let wDay = state.day;
   let wMinute = state.minute;
+  let woodCarry = state.work.woodCarry;
+  const workMinutes = (LOGGING.to - LOGGING.from) * 60;
   let left = minutes;
   while (left > 0) {
     const chunk = Math.min(left, 60 - (wMinute % 60));
@@ -433,6 +445,14 @@ export function advancePlayMinutes(
         dead.has(c.id) ? { ...c, alive: false } : c,
       );
     }
+    // 벌목: 일하는 시각에만 목재가 쌓임 (정시 경계로 잘린 chunk라 시각이 한 시간 안에서 같음)
+    const hour = Math.floor(wMinute / 60);
+    if (hour >= LOGGING.from && hour < LOGGING.to) {
+      // ponytail: 벌목꾼 4명이 늘 일한다고 봄 — 일손 배치·부상과 연결되면 인원 비례로
+      const n = LOGGING.woodPerDay * AMOUNT_SCALE * chunk + woodCarry;
+      resources.RES_WOOD += Math.floor(n / workMinutes);
+      woodCarry = n % workMinutes;
+    }
     pessimism = Math.min(100, Math.max(0, pessimism + r.pessimismDelta));
     optimism = Math.min(100, Math.max(0, optimism + r.optimismDelta));
     wMinute += chunk;
@@ -456,6 +476,7 @@ export function advancePlayMinutes(
     optimism,
     pessimism,
     winter,
+    work: { woodCarry },
   };
 }
 export function tickPlay(

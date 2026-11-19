@@ -4694,3 +4694,274 @@ body,
     filter: drop-shadow(0 -4px 8px rgb(0 0 0 / 25%));
   }
 }
+
+/* ═══ 건물 선택 창 시안 (2026-11-19, ?panel=a|b|c) ═══ */
+.sc {
+  position: fixed;
+  z-index: 6;
+  color: var(--meok);
+  word-break: keep-all;
+}
+.sc h2 {
+  margin: 0;
+  font: 700 22px / 1.2 var(--font-title);
+}
+.sc .sc-btn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 4px;
+  border: 6px solid var(--jjok-deep);
+  border-image: url(/ui/kit/btn.png) 56 fill / 10px / 2px stretch;
+  background: var(--jjok);
+  color: var(--hanji);
+  box-sizing: border-box;
+}
+.sc .sc-btn img {
+  width: 30px;
+  height: 30px;
+}
+.sc .sc-btn > span:not(.sc-btn__text):not(.g-hotkey) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.sc .sc-btn .g-hotkey {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 11px;
+}
+.sc .sc-btn:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+}
+.sc .sc-btn[aria-pressed="true"] {
+  outline: 3px solid var(--nakgwan, #b3322a);
+  outline-offset: -2px;
+}
+.sc-gauges {
+  display: grid;
+  gap: 6px;
+}
+.sc-gauge {
+  display: grid;
+  grid-template-columns: 64px 1fr 52px;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.sc-gauge b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sc-gauge__bar {
+  height: 10px;
+  border-radius: 5px;
+  background: rgb(43 38 32 / 15%);
+  box-shadow: inset 0 0 0 1px var(--hanji-line);
+  overflow: hidden;
+}
+.sc-gauge__bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #b5532a, #e8a04a);
+}
+.sc-gauge__bar.is-coal i {
+  background: linear-gradient(90deg, #2c2a2e, #5a5660);
+}
+.sc-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--meok-sub);
+}
+
+/* a 오른쪽 세로 카드 — 프로스트펑크·어게인스트 더 스톰 */
+.sc--card {
+  right: 16px;
+  top: 220px;
+  width: 360px;
+  padding: 0 22px 22px;
+  border: 28px solid transparent;
+  border-image: url(/ui/kit/panel_frame.png) 180 fill / 28px / 0 stretch;
+  box-sizing: border-box;
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 40%));
+}
+.sc-card__head {
+  position: relative;
+  margin: -6px -10px 12px;
+}
+.sc-card__head img {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--hanji-line);
+}
+.sc-card__head h2 {
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  color: var(--hanji);
+  text-shadow: 0 2px 6px rgb(0 0 0 / 80%);
+  font-size: 26px;
+}
+.sc-card__corner {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 6px;
+}
+.sc-card__corner .sc-btn {
+  width: 40px;
+  height: 40px;
+}
+.sc-card__corner .sc-btn img {
+  width: 22px;
+  height: 22px;
+}
+.sc-card__role {
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--meok-sub);
+  text-wrap: pretty;
+}
+.sc-sub {
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--hanji-line);
+  font: 600 14px / 1 var(--font-body);
+  color: var(--meok-sub);
+}
+.sc-card__actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.sc-card__actions .sc-btn.has-label {
+  width: 100%;
+  height: 76px;
+  grid-template-rows: 1fr auto;
+  gap: 2px;
+  padding: 6px 2px 4px;
+}
+.sc-btn__text {
+  font: 600 13px / 1.1 var(--font-body);
+  white-space: nowrap;
+}
+
+/* b 오른쪽 아래 초상 메달 — 문명 6 */
+.sc--medal {
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+.sc-medal__actions {
+  display: flex;
+  gap: 6px;
+  padding-right: 150px;
+}
+.sc-medal__body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 132px;
+  padding: 12px 150px 12px 20px;
+  border-radius: 66px 8px 8px 66px;
+  background: rgb(239 230 210 / 95%);
+  box-shadow:
+    0 0 0 2px var(--jjok-deep),
+    0 0 0 5px #c79a3a,
+    0 6px 14px rgb(0 0 0 / 40%);
+  min-width: 300px;
+  max-width: 460px;
+}
+.sc-medal__portrait {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 140px;
+  height: 140px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow:
+    0 0 0 4px #c79a3a,
+    0 0 0 8px var(--jjok-deep),
+    0 0 0 10px #b3322a,
+    0 6px 14px rgb(0 0 0 / 45%);
+}
+.sc-medal__text {
+  display: grid;
+  gap: 6px;
+}
+.sc-medal__text p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--meok-sub);
+}
+.sc-medal__close {
+  position: absolute;
+  top: -18px;
+  right: -6px;
+}
+.sc-medal__close .sc-btn {
+  width: 38px;
+  height: 38px;
+}
+
+/* c 건물 옆 카드 — 실록 */
+.sc--float {
+  left: -9999px;
+  top: -9999px;
+  width: 280px;
+  padding: 12px 14px 14px;
+  transform: translate(-50%, calc(-100% - 22px));
+  border-radius: 8px;
+  background: rgb(239 230 210 / 96%);
+  box-shadow:
+    0 0 0 1px var(--hanji-line),
+    0 0 0 3px rgb(43 38 32 / 55%),
+    0 8px 18px rgb(0 0 0 / 45%);
+}
+.sc--float::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  margin-left: -12px;
+  border: 12px solid transparent;
+  border-bottom: 0;
+  border-top-color: rgb(239 230 210 / 96%);
+}
+.sc-float__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sc-float__head .sc-btn {
+  width: 34px;
+  height: 34px;
+}
+.sc-float__role {
+  margin: 4px 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--meok-sub);
+}
+.sc-float__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}

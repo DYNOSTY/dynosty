@@ -115,8 +115,28 @@ describe("온돌 연료 (기획 v0.4 수치)", () => {
   });
 });
 
+describe("벌목 생산 (기획 B02)", () => {
+  it("낮 9~18시에 하루 목재 12가 쌓이고 나눠 진행해도 같다", () => {
+    const s = createPlayState();
+    const day = advancePlayMinutes(s, 1440);
+    // 석탄이 넉넉해 목재를 태우지 않는 첫날: 120 → 132
+    expect(day.resources.RES_WOOD - s.resources.RES_WOOD).toBe(
+      12 * AMOUNT_SCALE,
+    );
+    let split = s;
+    for (let i = 0; i < 144; i++) split = advancePlayMinutes(split, 10);
+    expect(split.resources.RES_WOOD).toBe(day.resources.RES_WOOD);
+  });
+  it("밤에는 목재가 늘지 않는다", () => {
+    const s = createPlayState(); // 00:00
+    expect(advancePlayMinutes(s, 8 * 60).resources.RES_WOOD).toBe(
+      s.resources.RES_WOOD,
+    );
+  });
+});
+
 describe("체온", () => {
-  it("연료가 다 떨어지면 구들이 식고 주민 노출이 쌓여 피난·부상이 생긴다", () => {
+  it("석탄이 없고 목재가 벌목분(하루 12)뿐이면 구들이 반쯤 식고 노출·피난·부상이 생긴다", () => {
     let state = createPlayState();
     state = {
       ...state,
@@ -130,10 +150,11 @@ describe("체온", () => {
       state.minute,
       state.citizens,
     );
-    expect(state.winter.zones.nest.storage).toBe(0);
+    // 하루 목재 12 = 석탄 4 — 필요량(8.9375)의 절반도 안 됨
+    expect(state.winter.zones.nest.storage).toBeLessThan(60);
     expect(
       r.people.exposed + r.people.injured + r.people.critical,
-    ).toBeGreaterThan(20);
+    ).toBeGreaterThan(10);
     expect(r.people.sheltering).toBeGreaterThan(0);
   });
   it("연료가 있으면 둥지에 머문 주민은 따뜻하고, 바깥 일꾼이 더 많이 언다", () => {

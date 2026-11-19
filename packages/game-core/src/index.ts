@@ -109,6 +109,7 @@ export {
   type FoodId,
   foodWarnings,
   GAME_RULES,
+  LOGGING,
   type OutcomeFacts,
   PlayDataError,
   type PlaySave,

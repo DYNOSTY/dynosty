@@ -42,6 +42,7 @@ import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { QualityFlow } from "./QualityFlow.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SeasonDial } from "./SeasonDial.js";
+import { type PanelVariant, SelectionCard } from "./SelectionCard.js";
 import { SelectionMeta } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import { SiteGuide } from "./SiteGuide.js";
@@ -66,6 +67,12 @@ import { elevation, MAP_SPAN } from "./world.js";
 // 사람이 보는 화면에는 영향 없음 (탭 화면은 캡처로 따로 확인)
 const E2E_ALL =
   typeof navigator !== "undefined" && navigator.webdriver === true;
+// 건물 선택 창 시안 (?panel=a|b|c) — 없으면 지금의 지도+설명 / 오른쪽 아래 명령판
+const PANEL = ((v) => (v === "a" || v === "b" || v === "c" ? v : null))(
+  typeof location !== "undefined"
+    ? new URLSearchParams(location.search).get("panel")
+    : null,
+) as PanelVariant | null;
 
 export function App() {
   const [laborOpen, setLaborOpen] = useState(false);
@@ -536,15 +543,32 @@ export function App() {
     if (sceneStatus === "준비 완료")
       sceneRef.current?.setGameMinutes(gameMinutes);
   }, [gameMinutes, sceneStatus]);
+  // 시안 c: 고른 건물의 화면 위치를 따라가는 카드
+  const selAnchor = useRef<HTMLDivElement>(null);
+  const selPoint = (() => {
+    if (PANEL !== "c" || !selectedId) return null;
+    if (selectedId.startsWith("bld:")) {
+      const l = LAYOUT[Number(selectedId.slice(4))];
+      return l ? { x: l[1], z: l[2] } : null;
+    }
+    return { x: 0, z: -1 }; // 가운데 온돌
+  })();
+  const selKey = selPoint ? `${selPoint.x},${selPoint.z}` : "";
   useEffect(() => {
     if (sceneStatus !== "준비 완료") return;
+    const [sx, sz] = selKey ? selKey.split(",").map(Number) : [];
     sceneRef.current?.trackPoints(
-      SCOUT_SITES.map((site) => ({
-        id: site.id,
-        x: site.x,
-        y: elevation(site.x, site.z) + 9.5,
-        z: site.z,
-      })),
+      [
+        ...SCOUT_SITES.map((site) => ({
+          id: site.id,
+          x: site.x,
+          y: elevation(site.x, site.z) + 9.5,
+          z: site.z,
+        })),
+        ...(sx !== undefined && sz !== undefined
+          ? [{ id: "sel", x: sx, y: elevation(sx, sz) + 2.5, z: sz }]
+          : []),
+      ],
       (pos: Record<string, ScreenPoint>) => {
         // 3D 화면 칸 (위 막대·아래 콘솔 사이)
         const W = window.innerWidth,
@@ -553,6 +577,14 @@ export function App() {
           .querySelector(".g-quests")
           ?.getBoundingClientRect();
         for (const [id, pt] of Object.entries(pos)) {
+          if (id === "sel") {
+            const card = selAnchor.current;
+            if (card) {
+              card.style.left = `${pt.visible ? pt.x : -9999}px`;
+              card.style.top = `${pt.visible ? pt.y : -9999}px`;
+            }
+            continue;
+          }
           const el = pinRefs.current[id];
           if (!el) continue;
           if (id.startsWith("party:")) {
@@ -596,7 +628,7 @@ export function App() {
         }
       },
     );
-  }, [sceneStatus]);
+  }, [sceneStatus, selKey]);
   const timberReady = sceneStatus === "준비 완료";
   // 뜨는 창은 한 번에 하나: 새 창을 열면 나머지는 닫힘
   function closePopups() {
@@ -1233,7 +1265,7 @@ export function App() {
         </SettingsMenu>
       </nav>
       <section
-        className={`g-console${selection ? " is-selected" : " is-idle"}`}
+        className={`g-console${selection && !PANEL ? " is-selected" : " is-idle"}`}
         aria-label="명령 콘솔"
       >
         <ConsoleFrame />
@@ -1282,7 +1314,7 @@ export function App() {
           </button>
         </div>
         {/* 고른 것이 있을 때만: 왼쪽 초상·이름·역할 · 오른쪽 건물별 명령 9칸 */}
-        {selection ? (
+        {selection && !PANEL ? (
           <>
             <section className="g-console__info g-sel" aria-label="선택 정보">
               <h2>
@@ -1332,6 +1364,35 @@ export function App() {
           </>
         ) : null}
       </section>
+      {selection && PANEL ? (
+        <SelectionCard
+          variant={PANEL}
+          id={selection.building ?? "BLD_ONDOL"}
+          name={
+            selection.building
+              ? (BUILDINGS[selection.building]?.name ?? "건물")
+              : "트리케라톱스"
+          }
+          role={
+            selection.building
+              ? (BUILDINGS[selection.building]?.role ?? "")
+              : "마을 주민. 일터와 둥지를 오가며 일합니다."
+          }
+          commands={selection.grid}
+          state={playState}
+          onAction={runAction}
+          toggled={(action) =>
+            action?.startsWith("heat-")
+              ? playState?.winter.zones.nest.heat === action.slice(5)
+              : undefined
+          }
+          disabled={(cmd) =>
+            !cmd.action ||
+            (cmd.action === "procure" && (!timberReady || timberOpen))
+          }
+          anchorRef={selAnchor}
+        />
+      ) : null}
     </main>
   );
 }

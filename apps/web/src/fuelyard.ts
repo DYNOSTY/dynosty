@@ -10,7 +10,7 @@ import { loadSceneAsset } from "./scene-assets.js";
 import { elevation, rng } from "./world.js";
 
 /** 장작 더미 · 석탄 더미 자리 (온돌 앞 큰길 양옆) */
-const WOOD_AT = { x: 3.9, z: -4.6 };
+export const WOOD_AT = { x: 3.9, z: -4.6 };
 const COAL_AT = { x: -3.9, z: -4.6 };
 const LOG_ROWS = 6;
 const LOGS_PER_ROW = 6;

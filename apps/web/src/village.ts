@@ -20,6 +20,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
+import { type JigeLoad, wearJige } from "./jige.js";
 import {
   createMaterialLibrary,
   isGlowMaterial,
@@ -366,38 +367,11 @@ export function createVillage(
   );
 
   // 등에 지는 짐 (모델 단위: 주민 0.5배 안에서 등 높이)
-  // 지게(블렌더 tools/blender/jige.py): 빈 지게는 늘 등에, 짐(LOAD)은 창고로 갈 때만
-  const makeProp = (kind: "plant" | "wood" | "fish") => {
-    const rig = new TransformNode(`jige-${kind}`, scene);
-    rig.position.set(0, 1.25, -0.34);
-    rig.scaling.setAll(1.1);
-    let loadNode: TransformNode | null = null;
-    let on = false;
-    const prop = {
-      setEnabled(value: boolean) {
-        on = value;
-        loadNode?.setEnabled(value);
-      },
-    };
-    void load(scene, `/models/props/JIGE_${kind}.glb`).then((asset) => {
-      if (disposed) return;
-      const inst = asset.instantiateModelsToScene(
-        (n) => `${rig.name}:${n}`,
-        false,
-      );
-      for (const root of inst.rootNodes) root.parent = rig;
-      for (const m of rig.getChildMeshes(false)) {
-        m.isPickable = false;
-        lib.dress(m.material);
-      }
-      loadNode =
-        (rig.getDescendants(false).find((n) => n.name.endsWith("LOAD")) as
-          | TransformNode
-          | undefined) ?? null;
-      loadNode?.setEnabled(on);
-      disposers.push(() => inst.dispose());
-    });
-    return { rig, prop };
+  // 지게: 빈 지게는 늘 등에, 짐은 창고로 갈 때만 (jige.ts)
+  const makeProp = (kind: JigeLoad) => {
+    const j = wearJige(scene, kind, lib);
+    disposers.push(j.dispose);
+    return { rig: j.rig, prop: j };
   };
   // 일터 앞 자리(건물에서 마당 쪽으로 3.4m)
   const spot = (i: number) => {
