@@ -120,6 +120,45 @@ test("보완 역할 표지·먼저 배분 링크·장소 이동·빈 바닥·저
   await expect(p.getByTestId("flow-allocated")).toContainText("16개");
   expect(errors).toEqual([]);
 });
+for (const viewport of [
+  { width: 1280, height: 720 },
+  { width: 375, height: 812 },
+]) {
+  test(`${viewport.width}px 일손 현장으로 이동한 뒤 개발 도구 없이 대상을 선택하고 시점을 복귀한다`, async ({
+    page: p,
+  }) => {
+    await p.setViewportSize(viewport);
+    await p.goto("/");
+    await b(p, "마른 목재20 조달 체험하기").click();
+    const tools = b(p, "개발 도구");
+    await tools.press("Enter");
+    await b(p, "일손 배치·배급 체험하기").click();
+    await tools.press("Enter");
+    await expect(tools).toHaveAttribute("aria-expanded", "false");
+    await b(p, "배급 준비 장소 보기").click();
+    await expect(p.locator("canvas")).toBeFocused();
+    await expect.poll(() => horizontalOffset(p, "site-ration")).toBeLessThan(5);
+
+    const controls = p.getByRole("group", { name: "현장 대상 선택" });
+    const inspection = controls.getByRole("button", { name: "검수대 선택" });
+    const reset = b(p, "기본 시점");
+    await expect(reset).toBeInViewport({ ratio: 1, timeout: 3000 });
+    await expect(inspection).toBeInViewport({ ratio: 1, timeout: 3000 });
+    await inspection.click();
+    await expect(inspection).toHaveAttribute("aria-pressed", "true");
+    await expect(p.getByTestId("site-name")).toHaveText("검수대");
+    await reset.click();
+    await expect
+      .poll(() => horizontalOffset(p, "site-ration"))
+      .toBeGreaterThan(30);
+    await expect(inspection).toHaveAttribute("aria-pressed", "true");
+    expect(
+      await p.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+}
 test("375px 키보드 장소 이동·기본 복귀·기호 표지는 가로 넘침이나 클릭 가림이 없다", async ({
   page: p,
 }) => {
