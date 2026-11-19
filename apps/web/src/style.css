@@ -3834,13 +3834,14 @@ body,
 .g-console__info > .g-mood .g-mood__v b {
   font-size: 11px;
 }
+/* 일손 현장은 위의 스크롤 가능한 2단 레이아웃을 유지한다. */
 @media (min-width: 761px) {
-  .is-procurement .play-workspace.has-tools {
+  .is-procurement:not(.is-labor) .play-workspace.has-tools {
     inset: 55px 0 175px;
     display: block;
   }
-  .is-procurement .play-scene,
-  .is-procurement .scene-viewport {
+  .is-procurement:not(.is-labor) .play-scene,
+  .is-procurement:not(.is-labor) .scene-viewport {
     position: absolute;
     inset: 0;
     height: 100%;
@@ -3848,11 +3849,11 @@ body,
     border-radius: 0;
     overflow: hidden;
   }
-  .is-procurement .scene-heading,
-  .is-procurement .scene-footer {
+  .is-procurement:not(.is-labor) .scene-heading,
+  .is-procurement:not(.is-labor) .scene-footer {
     display: none;
   }
-  .play-shell.is-procurement .workspace-tools.timber-tools {
+  .play-shell.is-procurement:not(.is-labor) .workspace-tools.timber-tools {
     position: absolute;
     inset: 8px 12px 8px auto;
     width: clamp(300px, 29vw, 410px);

@@ -836,7 +836,7 @@ export function App() {
   return (
     <main
       data-section={saveOpen || toolsOpen ? undefined : villageSection?.label}
-      className={`play-shell${timberOpen ? " is-procurement" : ""}`}
+      className={`play-shell${timberOpen ? ` is-procurement${laborOpen ? " is-labor" : ""}` : ""}`}
     >
       <header className="play-header">
         <TopFrame />
@@ -1124,6 +1124,29 @@ export function App() {
               ) : null}
             </div>
           ) : null}
+          {timberOpen && laborOpen ? (
+            <fieldset className="selection-actions" aria-label="현장 대상 선택">
+              <button
+                type="button"
+                className="quiet-button"
+                onClick={() => sceneRef.current?.resetCamera()}
+              >
+                기본 시점
+              </button>
+              {SITE_IDS.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="quiet-button"
+                  aria-pressed={selectedSite === id}
+                  disabled={!siteAvailable(laborState, id)}
+                  onClick={() => sceneRef.current?.select(id)}
+                >
+                  {SITE_NAMES[id]} 선택
+                </button>
+              ))}
+            </fieldset>
+          ) : null}
           <div className="scene-footer">
             <p>클릭으로 선택 · 마우스로 회전 · 휠로 확대</p>
             <span>
@@ -1149,13 +1172,15 @@ export function App() {
             className="selection-actions"
             aria-label="예제 대상 선택"
           >
-            <button
-              type="button"
-              className="quiet-button"
-              onClick={() => sceneRef.current?.resetCamera()}
-            >
-              기본 시점
-            </button>
+            {!laborOpen ? (
+              <button
+                type="button"
+                className="quiet-button"
+                onClick={() => sceneRef.current?.resetCamera()}
+              >
+                기본 시점
+              </button>
+            ) : null}
             {appliedSnapshot?.entities
               .filter(
                 (entity) =>
@@ -1177,22 +1202,6 @@ export function App() {
                 </button>
               ))}
           </fieldset>
-          {timberOpen && laborOpen ? (
-            <fieldset className="selection-actions" aria-label="현장 대상 선택">
-              {SITE_IDS.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  className="quiet-button"
-                  aria-pressed={selectedSite === id}
-                  disabled={!siteAvailable(laborState, id)}
-                  onClick={() => sceneRef.current?.select(id)}
-                >
-                  {SITE_NAMES[id]} 선택
-                </button>
-              ))}
-            </fieldset>
-          ) : null}
         </section>
 
         <aside
