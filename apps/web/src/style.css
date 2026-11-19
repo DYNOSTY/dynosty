@@ -779,6 +779,17 @@ h1 {
 .scene-viewport {
   position: relative;
 }
+
+/* Decorative only: leave procurement and canvas hit testing unchanged. */
+.play-shell:not(.is-procurement)
+  .scene-viewport:has(> canvas[data-season="winter"])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url(/ui/kit/frost_vignette.webp) center / 100% 100% no-repeat;
+  opacity: 0.42;
+}
 .site-markers {
   position: absolute;
   inset: 0;
