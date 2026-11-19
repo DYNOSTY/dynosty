@@ -45,7 +45,7 @@ import { createSiteSelection } from "./site-selection.js";
 import { isSiteId, type SiteId } from "./site-targets.js";
 import { SCENE_SIGNS } from "./site-zones.js";
 import { createTimberVisual } from "./timber-scene.js";
-import { createVillage, LAYOUT } from "./village.js";
+import { createVillage, LAYOUT, type VillageTargetInfo } from "./village.js";
 import { buildWorld, ISLAND_RADIUS } from "./world.js";
 import { createZoneVisual } from "./zone-scene.js";
 
@@ -58,7 +58,7 @@ const CAMERA_TARGET = new Vector3(0, 0, -7);
 import { createTownVisual } from "./town-scene.js";
 
 export interface SceneController {
-  villageInfo(id: string): { name: string; detail: string } | undefined;
+  villageInfo(id: string): VillageTargetInfo | undefined;
   update(snapshot: SceneSnapshot, showBoard?: boolean): void;
   select(id: string | null): void;
   focusSite(id: SiteId): boolean;

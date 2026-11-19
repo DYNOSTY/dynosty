@@ -346,6 +346,11 @@ h1 {
 .selection-info {
   border-color: var(--accent);
 }
+.village-selection-portrait {
+  float: inline-start;
+  margin-inline-end: 0.5rem;
+  object-fit: cover;
+}
 .selection-name {
   font-size: 1.25rem;
   font-weight: 700;
