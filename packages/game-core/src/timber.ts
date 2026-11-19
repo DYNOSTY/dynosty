@@ -8,6 +8,14 @@ import {
   sawmillHasForest,
 } from "./bokhol.js";
 import {
+  actCampaign,
+  type Campaign,
+  type CampaignCommand,
+  campaignValid,
+  newCampaign,
+  updateCampaign,
+} from "./campaign.js";
+import {
   createDevelopment,
   isMechanical,
   residentShiftOpen,
@@ -200,7 +208,8 @@ export interface TimberState {
   readonly world: PlayState;
   readonly initialWood: number;
   readonly initialIron: number;
-  readonly chapter?: 2;
+  readonly chapter?: 2 | 3 | 4 | 5;
+  readonly campaign?: Campaign;
   readonly scoutDepartures?: Record<string, number>;
   readonly yardDryAt?: number | undefined;
   readonly woodSpent: number;
@@ -274,6 +283,7 @@ export interface TimberState {
   readonly history: readonly { id: number; minute: number; text: string }[];
 }
 export type TimberCommand =
+  | CampaignCommand
   | { type: "story-event"; event: StoryEvent }
   | { type: "mechanize"; source: string }
   | { type: "electrical-work"; id: string; enabled: boolean }
@@ -422,14 +432,29 @@ function createVillageResident(
     routine: "idle",
   };
 }
-export function createVillageGame(): TimberState {
+export function createVillageGame(beforeDeparture = false): TimberState {
   const world = createPlayState();
   const resources = { ...world.resources };
   for (const id of Object.keys(resources) as (keyof typeof resources)[])
-    resources[id] *= 5;
-  const village = createTimberState({ ...world, resources, minute: 9 * 60 });
+    resources[id] = (beforeDeparture ? 10000 : 1000) * AMOUNT_SCALE;
+  const citizens = beforeDeparture
+    ? [
+        ...world.citizens,
+        ...Array.from({ length: 240 }, (_, i) => ({
+          ...world.citizens[i % world.citizens.length]!,
+          id: `departing-${i}`,
+        })),
+      ]
+    : world.citizens;
+  const village = createTimberState({
+    ...world,
+    citizens,
+    resources,
+    minute: 9 * 60,
+  });
   return {
     ...village,
+    campaign: newCampaign(beforeDeparture ? "opening" : "patrol"),
     residents: village.residents.map((r) => ({
       ...r,
       hunger: Math.floor(r.hunger / 2),
@@ -1888,7 +1913,16 @@ export function parseTimberState(value: unknown): TimberState {
     num(value[key], 10_000_000_000);
   num(value.remainder, 999);
   num(value.buildingHealth, 100);
-  if (value.chapter !== undefined && value.chapter !== 2) fail("단계 오류");
+  if (
+    value.chapter !== undefined &&
+    ![2, 3, 4, 5].includes(value.chapter as number)
+  )
+    fail("단계 오류");
+  if (
+    value.campaign !== undefined &&
+    !campaignValid(value.campaign, value.elapsed as number)
+  )
+    fail("캠페인 기록 오류");
   if (value.scoutDepartures !== undefined) {
     if (!isRecord(value.scoutDepartures)) fail("정찰 기록 오류");
     for (const [id, start] of Object.entries(value.scoutDepartures)) {
@@ -2021,6 +2055,18 @@ export function parseTimberState(value: unknown): TimberState {
     ids.add(r.id);
   }
   const s = JSON.parse(JSON.stringify(value)) as TimberState;
+  if (
+    s.campaign &&
+    ["opening", "departure"].includes(s.campaign.beat) &&
+    (s.elapsed !== 0 ||
+      !s.paused ||
+      s.chapter ||
+      s.residents.length !== 300 ||
+      !Object.values(s.world.resources).every(
+        (n) => n === 10000 * AMOUNT_SCALE,
+      ))
+  )
+    fail("출문 전 장부가 일치하지 않습니다.");
   if (!townValid(s)) fail("건설·생산·파견 기록이 올바르지 않습니다.");
   if (
     s.world.buildings.length !== s.homes.length ||
@@ -2461,6 +2507,9 @@ export function advanceTimber(
     }
     s = resumeResidents(s, elapsed);
     if (s.due === s.elapsed) s = completeStep(s);
+    const previousEnding = s.campaign?.ending;
+    s = updateCampaign(s);
+    if (!previousEnding && s.campaign?.ending) break;
   }
   return parseTimberState(s);
 }
@@ -2474,8 +2523,18 @@ export function commandTimber(
   if (s.processed.includes(id)) return s;
   if (s.processed.length >= 1999 && command.type !== "restart")
     fail("처리 기록이 가득 찼습니다.");
+  if (
+    (s.campaign?.beat === "opening" || s.campaign?.beat === "departure") &&
+    !["campaign", "restart"].includes(command.type)
+  ) {
+    if (command.type === "pause" && command.paused) return s;
+    fail("귀족의 출문을 먼저 확인해 주세요.");
+  }
   let n = s;
   switch (command.type) {
+    case "campaign":
+      n = actCampaign(s, command);
+      break;
     case "plan-building":
       n = planBuilding(s, command.kind, {
         position: command.position,
@@ -2498,6 +2557,15 @@ export function commandTimber(
       n = setOvertime(s, command.target, command.enabled);
       break;
     case "begin-chapter-two": {
+      if (s.campaign) {
+        n = actCampaign(s, {
+          type: "campaign",
+          beat: "patrol",
+          action: "next",
+        });
+        break;
+      }
+      if (s.chapter) return s;
       const now = (s.world.day - 1) * 1440 + s.world.minute;
       if (
         !SCOUT_SITES.every(
@@ -2527,11 +2595,26 @@ export function commandTimber(
       n = {
         ...s,
         scoutDepartures: departures,
+        ...(s.campaign
+          ? {
+              campaign: {
+                ...s.campaign,
+                patrolOrder: [
+                  ...new Set([
+                    ...s.campaign.patrolOrder,
+                    ...Object.keys(departures),
+                  ]),
+                ],
+              },
+            }
+          : {}),
         paused: command.recall ? s.paused : false,
       };
       break;
     }
     case "cold-weather":
+      if (s.campaign?.beat === "winter" && !command.cold)
+        fail("보름 혹한이 아직 끝나지 않았습니다.");
       if (typeof command.cold !== "boolean") fail();
       n = { ...s, town: { ...s.town, cold: command.cold } };
       if (
@@ -2774,6 +2857,7 @@ export function commandTimber(
       break;
     }
     case "story-event":
+      if (s.campaign) fail("본편 사건은 캠페인에서 진행합니다.");
       n = recordResearchStory(s, command.event);
       break;
     case "electrical-work":
@@ -3052,7 +3136,7 @@ export function commandTimber(
         },
         command.accept
           ? "달이: 주민 3명이 합류했습니다. 한 명은 치료가 필요합니다."
-          : "입촌을 거절해 절망이 올랐습니다.",
+          : "문이 닫혔습니다. 배식을 기다리던 주민들이 말없이 길을 비켜 주었습니다.",
       );
       break;
     }
@@ -3096,7 +3180,9 @@ export function commandTimber(
         ? command.event.citizenIds
         : [],
     );
-  return parseTimberState({ ...n, processed: [...n.processed, id] });
+  return parseTimberState(
+    updateCampaign({ ...n, processed: [...n.processed, id] }),
+  );
 }
 export function tickTimber(input: TimberState, elapsedMs: number): TimberState {
   const s = parseTimberState(input);

@@ -26,6 +26,12 @@ import {
   useRef,
   useState,
 } from "react";
+import { CampaignPanel, PatrolPortrait } from "./CampaignPanel.js";
+import {
+  PATROL_NAMES,
+  PATROL_REQUESTS,
+  villageAdvice,
+} from "./campaign-scenes.js";
 import {
   CmdButton,
   CmdFace,
@@ -679,7 +685,17 @@ export function App() {
     const detail = `${site.name} 정찰 중 · ${leftHours(site.id)}시간 남음`;
     return (
       <>
-        <img src="/ui/cmd/residents.png" alt={detail} />
+        <PatrolPortrait
+          index={
+            Math.max(
+              0,
+              (
+                timberState?.campaign?.patrolOrder ??
+                Object.keys(departures ?? {})
+              ).indexOf(site.id),
+            ) % 4
+          }
+        />
         <span aria-hidden="true" className="g-scout-detail">
           {detail}
         </span>
@@ -773,37 +789,46 @@ export function App() {
   const selectedSite =
     timberOpen && laborOpen && isSiteId(selectedId) ? selectedId : null;
 
-  const portrait = (
+  const residentIndex =
+    selectedEntity?.kind === "resident" && timberState
+      ? timberState.residents.findIndex((r) => r.id === selectedEntity.id)
+      : -1;
+  const residentVoice =
+    residentIndex >= 0
+      ? PATROL_NAMES.indexOf(
+          residentName(residentIndex) as (typeof PATROL_NAMES)[number],
+        )
+      : -1;
+  const speakingMerchant = showTrade ? visitor : null;
+  const residentSpeaking = residentVoice >= 0 && !visitor;
+  const portrait = residentSpeaking ? (
+    <PatrolPortrait index={residentVoice} />
+  ) : (
     <img
       alt=""
       src={
-        visitor
-          ? "/art/merchants/" + visitor[0] + ".png"
+        speakingMerchant
+          ? "/art/merchants/" + speakingMerchant[0] + ".png"
           : `/art/advisers/${daylight ? "nareumi" : "dali"}/neutral.png`
       }
     />
   );
   const dialogue = (
     <span className="guide-lines">
-      {visitor?.[2] ?? (daylight ? "나르미" : "달이")}
+      {speakingMerchant?.[2] ??
+        (residentSpeaking
+          ? PATROL_NAMES[residentVoice]
+          : daylight
+            ? "나르미"
+            : "달이")}
       <small>
-        {visitor
-          ? showTrade
-            ? visitor[4]
-            : visitor[3]
-          : !daylight
-            ? foundCount === 5
-              ? "고리님, 정찰대가 모두 돌아왔어요. 오늘 밤은 둥지에 빈자리가 있는지 살펴봐요."
-              : Object.keys(scouts).length > foundCount
-                ? "아직 마을 밖에 있는 이들이 있어요. 정찰대 얼굴에 손을 올리면 남은 길을 알 수 있어요."
-                : "등불이 하나둘 켜지네요. 주민 명단을 펼쳐 보세요. 오늘 잘 곳을 찾은 이들을 짚어 드릴게요."
-            : foundCount === 5
-              ? timberState?.chapter === 2
-                ? "고리님, 다섯 길이 열렸어요. 이웃이 내놓은 물목을 우리 곳간과 견주어 볼까요?"
-                : "생존자들이 돌아왔어요. 의뢰에서 2단계를 시작하세요."
-              : Object.keys(scouts).length
-                ? "정찰대 얼굴에 커서를 대면 귀환 시간을 볼 수 있어요."
-                : "지도에서 미탐색 거점을 눌러 보세요."}
+        {speakingMerchant
+          ? speakingMerchant[3] + " " + speakingMerchant[4]
+          : residentSpeaking
+            ? PATROL_REQUESTS[residentVoice]
+            : timberState
+              ? villageAdvice(timberState, daylight, visitor?.[2])
+              : ""}
       </small>
     </span>
   );
@@ -821,88 +846,89 @@ export function App() {
       </header>
       <section className="g-quests" aria-label="의뢰">
         <h2>의뢰</h2>
-        {/* 1단계 목표: 정찰 5곳 — 다섯 칸 */}
-        <div className="g-quest">
-          <img src="/ui/cmd/map.png" alt="" />
-          <div className="g-quest__body">
-            <span>
-              {timberState?.chapter === 2
-                ? "2단계 · 끊어진 길을 잇다"
-                : "1단계 목표 · 정찰"}
-            </span>
-            <span className="g-pips" aria-hidden="true">
-              {SCOUT_SITES.map((site) => (
-                <i
-                  key={site.id}
-                  className={
-                    scouts[site.id]?.status === "found"
-                      ? "on"
-                      : scouts[site.id]
-                        ? "half"
-                        : ""
+        {timberState?.campaign && (
+          <CampaignPanel
+            state={timberState}
+            command={(cmd) => villageCommand.current?.(cmd)}
+            trade={showTrade}
+            work={
+              villageSection?.label === "건설과 식량 수급" ||
+              villageSection?.label === "연구와 교역망"
+            }
+          />
+        )}
+        {!timberState?.chapter &&
+          (!timberState?.campaign ||
+            timberState.campaign.beat === "patrol") && (
+            <>
+              {/* 정찰 목표 */}
+              <div className="g-quest">
+                <img src="/ui/cmd/map.png" alt="" />
+                <div className="g-quest__body">
+                  <span>1단계 목표 · 정찰</span>
+                  <span className="g-pips" aria-hidden="true">
+                    {SCOUT_SITES.map((site) => (
+                      <i
+                        key={site.id}
+                        className={
+                          scouts[site.id]?.status === "found"
+                            ? "on"
+                            : scouts[site.id]
+                              ? "half"
+                              : ""
+                        }
+                      />
+                    ))}
+                  </span>
+                </div>
+                <b>
+                  {foundCount} / {SCOUT_GOAL}
+                </b>
+              </div>
+
+              {foundCount < 5 && (
+                <small>다섯 곳의 정찰을 마치고 지도층 생존자 귀환</small>
+              )}
+              {Object.keys(scouts).length < 5 && (
+                <button
+                  type="button"
+                  className="scout-all"
+                  onClick={() =>
+                    villageCommand.current?.({
+                      type: "scout-sites",
+                      ids: SCOUT_SITES.map((s) => s.id),
+                    })
                   }
-                />
+                >
+                  남은 거점 모두 정찰
+                </button>
+              )}
+              {/* 발견한 거점: 교역 가능 */}
+              {SCOUT_SITES.filter(
+                (site) => scouts[site.id]?.status === "found",
+              ).map((site) => (
+                <button
+                  key={site.id}
+                  type="button"
+                  className="g-quest g-quest--btn is-found"
+                  onClick={() => openOnly(() => setScoutOpen(site.id))}
+                >
+                  <img src="/ui/cmd/economy.png" alt="" />
+                  <span className="g-quest__body">
+                    <span>{site.name} 발견</span>
+                    <small>
+                      <IconText
+                        text={
+                          site.find.split(" · ")[0]?.replace("교역: ", "") ?? ""
+                        }
+                      />
+                    </small>
+                  </span>
+                  <b>✓</b>
+                </button>
               ))}
-            </span>
-          </div>
-          <b>
-            {timberState?.chapter === 2
-              ? "다섯 마을과 교류 회복"
-              : `${foundCount} / ${SCOUT_GOAL}`}
-          </b>
-        </div>
-        {foundCount === 5 && timberState?.chapter !== 2 && (
-          <button
-            type="button"
-            className="scout-all"
-            onClick={() =>
-              villageCommand.current?.({ type: "begin-chapter-two" })
-            }
-          >
-            생존자 귀환 · 2단계 시작 · 끊어진 길을 잇다
-          </button>
-        )}
-        {foundCount < 5 && (
-          <small>다섯 곳의 정찰을 마치고 지도층 생존자 귀환</small>
-        )}
-        {Object.keys(scouts).length < 5 && (
-          <button
-            type="button"
-            className="scout-all"
-            onClick={() =>
-              villageCommand.current?.({
-                type: "scout-sites",
-                ids: SCOUT_SITES.map((s) => s.id),
-              })
-            }
-          >
-            남은 거점 모두 정찰
-          </button>
-        )}
-        {/* 발견한 거점: 교역 가능 */}
-        {SCOUT_SITES.filter((site) => scouts[site.id]?.status === "found").map(
-          (site) => (
-            <button
-              key={site.id}
-              type="button"
-              className="g-quest g-quest--btn is-found"
-              onClick={() => openOnly(() => setScoutOpen(site.id))}
-            >
-              <img src="/ui/cmd/economy.png" alt="" />
-              <span className="g-quest__body">
-                <span>{site.name} 발견</span>
-                <small>
-                  <IconText
-                    text={
-                      site.find.split(" · ")[0]?.replace("교역: ", "") ?? ""
-                    }
-                  />
-                </small>
-              </span>
-              <b>✓</b>
-            </button>
-          ),
-        )}
+            </>
+          )}
         <div className="play-status">
           {!timberOpen ? (
             <button
@@ -1480,6 +1506,7 @@ export function App() {
               key={site.id}
               type="button"
               className="g-scout-face"
+              aria-label={`${site.name} 정찰 중 · ${leftHours(site.id)}시간 남음`}
               onClick={() => openOnly(() => setScoutOpen(site.id))}
             >
               {scoutFace(site)}
@@ -1619,6 +1646,9 @@ export function App() {
               {placementHint && <output>{placementHint}</output>}
             </section>
           ) : null}
+          {residentSpeaking && consoleOpen && (
+            <p className="guide-lines">{PATROL_REQUESTS[residentVoice]}</p>
+          )}
           {villageInfo ? (
             <section
               className="g-idle selection-info"
@@ -1672,7 +1702,7 @@ export function App() {
               }
             />
           ) : (
-            dialogue
+            !showTrade && dialogue
           )}
           <MoodScale
             hope={displayedWorld?.optimism ?? null}

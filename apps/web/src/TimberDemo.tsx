@@ -1106,7 +1106,7 @@ export function TimberDemo({
                   command({ type: "gate-decision", accept: false })
                 }
               >
-                돌려보낸다 · 절망 상승
+                성문을 닫고 돌려보낸다
               </button>
             </section>
           ) : null}

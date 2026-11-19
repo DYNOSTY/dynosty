@@ -282,7 +282,7 @@ it("식당 대기 중인 유휴 인력은 명령 즉시 좌석을 놓고 건설�
 it("새 마을의 첫 식당은 공사 인부가 배식을 맡고 주민이 식사를 마친다", () => {
   const initial = createVillageGame();
   expect(initial.world.minute).toBe(540);
-  expect(initial.world.resources.RES_WOOD).toBe(6000000);
+  expect(initial.world.resources.RES_WOOD).toBe(10000000);
   const order = plan(initial, "restaurant");
   const crew = order.town.orders[0]?.crew ?? [];
   expect(crew).toHaveLength(4);

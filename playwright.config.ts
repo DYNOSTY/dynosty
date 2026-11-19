@@ -1,4 +1,10 @@
 import { defineConfig } from "@playwright/test";
+import {
+  createTimberSave,
+  createVillageGame,
+} from "./packages/game-core/dist/index.js";
+
+const baseURL = "http://127.0.0.1:5173";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -7,7 +13,22 @@ export default defineConfig({
   expect: { timeout: 30_000 },
   use: {
     actionTimeout: 30_000,
-    baseURL: "http://127.0.0.1:5173",
+    baseURL,
+    // Village tool tests start after the prologue. Campaign tests open a fresh game.
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: baseURL,
+          localStorage: [
+            {
+              name: "dynosty.village.resume",
+              value: JSON.stringify(createTimberSave(createVillageGame())),
+            },
+          ],
+        },
+      ],
+    },
     headless: true,
     launchOptions: {
       args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],

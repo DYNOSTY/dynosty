@@ -222,6 +222,7 @@ it("메카2는 충녕 시해 분기에서 부활시키고 사망자의 뼈를 �
   s = finishResearch(s, "R18");
   s = finishResearch(s, "TECH_MECHA2");
   expect(s.town.development.story.chungnyeong).toBe("mechanical");
+  s = finishResearch(s, "R19");
   expect(() => cmd(s, { type: "mechanize", source })).toThrow();
   s = cmd(s, {
     type: "citizen-event",

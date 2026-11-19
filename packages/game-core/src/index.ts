@@ -90,6 +90,7 @@ export function advanceDay(state: GameState): GameState {
 }
 
 export * from "./bokhol.js";
+export * from "./campaign.js";
 export * from "./development.js";
 export * from "./exchange.js";
 export * from "./home-construction.js";

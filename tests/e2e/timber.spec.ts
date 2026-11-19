@@ -421,7 +421,7 @@ test("B도 직접 수령이나 배분 없이 공동 재고에 입고한다", asy
   await expect(page.getByTestId("timber-result")).toContainText(
     "공동 재고 정산 완료",
   );
-  await button(page, "돌려보낸다 · 절망 상승").click();
+  await button(page, "성문을 닫고 돌려보낸다").click();
   await expect(page.getByTestId("next-mission")).toContainText(
     "현재 인구 60명",
   );
