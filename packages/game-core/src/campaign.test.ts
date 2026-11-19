@@ -4,9 +4,11 @@ import {
   campaignOutcome,
   lostPatrol,
   newCampaign,
+  returnedScouts,
   SETTLEMENTS,
   updateCampaign,
 } from "./campaign.js";
+import { RESEARCH_CATALOG } from "./development.js";
 import { AMOUNT_SCALE } from "./play.js";
 import { SCOUT_SITES } from "./scout-sites.js";
 import {
@@ -37,6 +39,113 @@ const later = (s: TimberState, minutes: number) =>
       minute: (s.world.minute + minutes) % 1440,
     },
   });
+
+const withResearch = (s: TimberState, completed: string[]): TimberState => {
+  const flight = completed.includes("TECH_FLIGHT");
+  for (const tech of completed) {
+    if (s.town.development.completed.includes(tech)) continue;
+    const research = RESEARCH_CATALOG.find((r) => r.id === tech);
+    if (!research) throw Error(`Unknown research: ${tech}`);
+    s = payTown(s, research.cost);
+  }
+  const development = s.town.development;
+  return {
+    ...s,
+    town: {
+      ...s.town,
+      development: {
+        ...development,
+        completed,
+        story: flight
+          ? { ...development.story, rebellion: true, route: "flight" }
+          : development.story,
+      },
+    },
+  };
+};
+const send = (s: TimberState, ...ids: string[]) =>
+  commandTimber(s, { type: "scout-sites", ids }, `send-${s.processed.length}`);
+const recall = (s: TimberState, id: string) =>
+  commandTimber(
+    s,
+    { type: "scout-sites", ids: [id], recall: true },
+    `recall-${id}`,
+  );
+
+it.each([
+  { completed: [], minutes: 2160 },
+  { completed: ["TECH_TRAIL"], minutes: 1440 },
+  { completed: ["TECH_TRAIL", "TECH_SCOUT_SPEED_2"], minutes: 1080 },
+  {
+    completed: ["TECH_TRAIL", "TECH_SCOUT_SPEED_2", "R17", "TECH_FLIGHT"],
+    minutes: 216,
+  },
+])(
+  "applies $minutes minutes to map reports and recall after save/load",
+  ({ completed, minutes }) => {
+    const patrol = { ...createVillageGame(), campaign: newCampaign("patrol") };
+    const sent = restore(send(withResearch(patrol, completed), "reed"));
+    const before = later(sent, minutes - 1);
+    expect(returnedScouts(before)).toEqual([]);
+    expect(() => act(before, "report:reed")).toThrow();
+    expect(recall(before, "reed").scoutDepartures?.reed).toBeUndefined();
+    const due = later(before, 1);
+    expect(returnedScouts(due).map(([id]) => id)).toEqual(["reed"]);
+    expect(act(due, "report:reed").campaign?.reports).toEqual(["reed"]);
+    expect(recall(due, "reed").scoutDepartures?.reed).toBe(
+      sent.scoutDepartures?.reed,
+    );
+  },
+);
+it("preserves legacy and active timings until recall and redeparture", () => {
+  const initial = { ...createVillageGame(), scoutDepartures: { reed: 540 } };
+  const sent = send(withResearch(initial, ["TECH_TRAIL"]), "pine");
+  const upgraded = restore(
+    withResearch(later(sent, 60), ["TECH_TRAIL", "TECH_SCOUT_SPEED_2"]),
+  );
+  const duplicate = send(upgraded, "reed", "pine");
+  expect(duplicate.scoutDepartures).toEqual(sent.scoutDepartures);
+  expect(returnedScouts(later(duplicate, 1920 - 61))).toEqual([]);
+  expect(returnedScouts(later(duplicate, 1920 - 60)).map(([id]) => id)).toEqual(
+    ["pine"],
+  );
+  expect(returnedScouts(later(duplicate, 2160 - 60)).map(([id]) => id)).toEqual(
+    ["reed", "pine"],
+  );
+
+  const resent = restore(send(recall(duplicate, "pine"), "pine"));
+  expect(returnedScouts(later(resent, 1439))).toEqual([]);
+  expect(returnedScouts(later(resent, 1440)).map(([id]) => id)).toEqual([
+    "pine",
+  ]);
+});
+
+it("uses the saved return schedule for chapter two in non-campaign saves", () => {
+  const initial = withResearch(createTimberState(), ["TECH_TRAIL"]);
+  const sent = send(initial, ...SCOUT_SITES.map(({ id }) => id));
+  const begin = (s: TimberState) =>
+    commandTimber(s, { type: "begin-chapter-two" }, "begin");
+  expect(() => begin(later(sent, 2399))).toThrow(/정찰 결과/);
+  expect(begin(later(sent, 2400)).chapter).toBe(2);
+});
+
+it.each([
+  { reed: 0 },
+  { reed: -1 },
+  { reed: 1.5 },
+  { reed: 2161 },
+  { pine: 1920 },
+  { invalid: 50 },
+])("rejects invalid saved scout durations %j", (scoutTripDurations) => {
+  const initial = { ...createVillageGame(), scoutDepartures: { reed: 540 } };
+  expect(() =>
+    parseTimberSave({
+      ...createTimberSave(initial),
+      state: { ...initial, scoutTripDurations },
+    }),
+  ).toThrow();
+});
+
 it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹한과 열흘 평가를 이어 저장한다", () => {
   let s = restore(createVillageGame(true));
   expect(s.residents).toHaveLength(300);

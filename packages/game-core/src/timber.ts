@@ -78,7 +78,7 @@ import {
 } from "./resident-routine.js";
 import { isRecord } from "./save.js";
 import type { SceneSnapshot } from "./scene.js";
-import { SCOUT_SITES } from "./scout-sites.js";
+import { SCOUT_SITES, scoutRun, scoutTripMinutes } from "./scout-sites.js";
 import { storageRoom, warehouseDoor } from "./storage.js";
 import {
   createResearchStory,
@@ -211,6 +211,7 @@ export interface TimberState {
   readonly chapter?: 2 | 3 | 4 | 5;
   readonly campaign?: Campaign;
   readonly scoutDepartures?: Record<string, number>;
+  readonly scoutTripDurations?: Record<string, number>;
   readonly yardDryAt?: number | undefined;
   readonly woodSpent: number;
   readonly logging: LoggingState;
@@ -1930,6 +1931,20 @@ export function parseTimberState(value: unknown): TimberState {
       num(start);
     }
   }
+  if (value.scoutTripDurations !== undefined) {
+    if (!isRecord(value.scoutTripDurations)) fail("정찰 시간 기록 오류");
+    for (const [id, minutes] of Object.entries(value.scoutTripDurations)) {
+      const site = SCOUT_SITES.find((site) => site.id === id);
+      if (
+        !site ||
+        !isRecord(value.scoutDepartures) ||
+        !Object.hasOwn(value.scoutDepartures, id)
+      )
+        fail("정찰 시간 기록 오류");
+      num(minutes, scoutTripMinutes(site));
+      if (minutes === 0) fail("정찰 시간 기록 오류");
+    }
+  }
   if (value.yardDryAt !== undefined) num(value.yardDryAt);
   num(value.reservedWood, 20);
   for (const key of ["startedAt", "due", "settledAt", "repairCompletedAt"])
@@ -2569,8 +2584,7 @@ export function commandTimber(
       const now = (s.world.day - 1) * 1440 + s.world.minute;
       if (
         !SCOUT_SITES.every(
-          (site) =>
-            now - (s.scoutDepartures?.[site.id] ?? Infinity) >= site.hours * 60,
+          (site) => now >= (scoutRun(s, site)?.due ?? Infinity),
         )
       )
         fail("정찰 결과를 기다려 주세요.");
@@ -2582,19 +2596,29 @@ export function commandTimber(
     }
     case "scout-sites": {
       const departures = { ...s.scoutDepartures };
+      const durations = { ...s.scoutTripDurations };
       const now = (s.world.day - 1) * 1440 + s.world.minute;
       for (const id of command.ids) {
         const site = SCOUT_SITES.find((q) => q.id === id);
         if (!site) fail("알 수 없는 정찰 거점");
         const start = departures[id];
         if (command.recall) {
-          if (start !== undefined && now - start < site.hours * 60)
+          if (
+            start !== undefined &&
+            now < (scoutRun(s, site)?.due ?? Infinity)
+          ) {
             delete departures[id];
-        } else if (start === undefined) departures[id] = now;
+            delete durations[id];
+          }
+        } else if (start === undefined) {
+          departures[id] = now;
+          durations[id] = scoutTripMinutes(site, s);
+        }
       }
       n = {
         ...s,
         scoutDepartures: departures,
+        scoutTripDurations: durations,
         ...(s.campaign
           ? {
               campaign: {

@@ -1,6 +1,6 @@
 import { AMOUNT_SCALE, GAME_RULES, type ResourceId } from "./play.js";
 import { isRecord } from "./save.js";
-import { SCOUT_SITES } from "./scout-sites.js";
+import { SCOUT_SITES, scoutRun } from "./scout-sites.js";
 import { recordResearchStory } from "./story-research.js";
 import {
   commandTimber,
@@ -155,11 +155,11 @@ export function campaignValid(c: unknown, elapsed: number) {
 }
 export function returnedScouts(s: TimberState) {
   const now = (s.world.day - 1) * 1440 + s.world.minute;
-  return Object.entries(s.scoutDepartures ?? {}).filter(
-    ([id, start]) =>
-      now - start >=
-      (SCOUT_SITES.find((x) => x.id === id)?.hours ?? Infinity) * 60,
-  );
+  return Object.entries(s.scoutDepartures ?? {}).filter(([id]) => {
+    const site = SCOUT_SITES.find((x) => x.id === id);
+    const run = site && scoutRun(s, site);
+    return run !== undefined && now >= run.due;
+  });
 }
 export function lostPatrol(s: TimberState) {
   return (s.campaign?.patrolOrder ?? Object.keys(s.scoutDepartures ?? {}))[2];

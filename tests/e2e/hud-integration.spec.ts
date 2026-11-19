@@ -1,4 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
+import {
+  createTimberSave,
+  createVillageGame,
+  payTown,
+} from "../../packages/game-core/dist/index.js";
 import { clickExample } from "./scene-picking.js";
 
 type SceneMesh = {
@@ -90,6 +95,37 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   ).toBe(true);
   await expect(page.locator(".site-markers")).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test("지도에 연구가 적용된 정찰 왕복 시간과 귀환을 표시한다", async ({
+  page,
+}) => {
+  const village = payTown(createVillageGame(), { RES_WOOD: 8, RES_METAL: 2 });
+  const save = createTimberSave({
+    ...village,
+    town: {
+      ...village.town,
+      development: { ...village.town.development, completed: ["TECH_TRAIL"] },
+    },
+  });
+  await page.addInitScript((value) => {
+    localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
+  }, save);
+  await ready(page);
+  await button(page, "정찰 거점 갈대나루").click();
+  const panel = page.getByRole("region", { name: "정찰 · 미탐색 거점 패널" });
+  await expect(panel).toContainText("24시간", { timeout: 5000 });
+  await button(page, "정찰대 보내기").click();
+  await expect(
+    page.getByRole("button", { name: "갈대나루 정찰 중 · 24시간 남음" }),
+  ).toBeVisible();
+  await button(page, "1일 진행").click();
+  await expect(
+    page.getByRole("region", { name: "의뢰", exact: true }),
+  ).toContainText("갈대나루 발견");
+  await expect(
+    page.getByRole("dialog", { name: "갈대나루 · 정찰 결과" }),
+  ).toBeVisible();
 });
 
 test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에서는 초기화한다", {
