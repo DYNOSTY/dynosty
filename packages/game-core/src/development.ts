@@ -374,7 +374,8 @@ export function advanceDevelopment(
       o = s.town.orders.find((o) => o.id === p.target);
     if (
       f?.kind === "workshop" &&
-      !s.town.development.research.some((j) => j.facility === f.id)
+      // Research may have completed during the interval being accounted for.
+      !input.town.development.research.some((j) => j.facility === f.id)
     )
       return p;
     const actors = s.residents.filter(
