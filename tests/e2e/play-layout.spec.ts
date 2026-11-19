@@ -140,6 +140,7 @@ test("좁은 화면도 가로 넘침 없이 표시하고 키보드로 메뉴를 
     "3D 준비 완료",
   );
   await expect(page.locator("canvas")).toBeInViewport({ ratio: 1 });
+  await page.getByRole("button", { name: "명령 열기", exact: true }).click();
   await page.getByRole("button", { name: "저장", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(
@@ -158,5 +159,6 @@ test("좁은 화면도 가로 넘침 없이 표시하고 키보드로 메뉴를 
   await page
     .getByRole("button", { name: "개발 도구 닫기", exact: true })
     .click();
+  await page.locator("canvas").scrollIntoViewIfNeeded();
   await expect(page.locator("canvas")).toBeInViewport({ ratio: 1 });
 });

@@ -459,8 +459,8 @@ h1 {
 }
 
 @media (max-width: 540px) {
-  canvas {
-    height: clamp(240px, 40dvh, 360px);
+  .play-scene canvas {
+    height: clamp(180px, 23dvh, 260px);
   }
 }
 
