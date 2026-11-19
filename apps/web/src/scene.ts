@@ -168,6 +168,7 @@ export function mountScene(
     new URLSearchParams(location.search).get("season") === "summer"
       ? "summer"
       : "winter";
+  canvas.dataset.season = season;
   const { shadow, setTime, glow, warmMat, followSnow } = buildWorld(
     scene,
     LAYOUT.map(([, x, z]) => [x, z] as [number, number]),
@@ -182,6 +183,7 @@ export function mountScene(
     shadow,
     { glow, warmMat },
     previewVillage,
+    season,
   );
   const fog = createFog(scene, SCOUT_SITES);
   const landmarks = createLandmarks(scene, SCOUT_SITES, glow, warmMat);

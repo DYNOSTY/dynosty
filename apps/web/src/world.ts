@@ -91,24 +91,24 @@ const PALETTE = {
   },
   // 혹한: 잿빛 눈, 진창 길, 바깥은 더 어둡게. 채도를 낮추고 눈보라 안개로 먼 곳을 지움
   winter: {
-    snowA: [0.8, 0.8, 0.85],
-    snowB: [0.9, 0.9, 0.93],
-    dirt: [0.52, 0.48, 0.47],
-    lip: [0.86, 0.86, 0.9],
-    waste: [0.68, 0.68, 0.73],
-    fog: [0.7, 0.7, 0.76],
-    fogDensity: 0.0105,
-    sun: [0.86, 0.89, 1],
-    skyDay: [0.86, 0.87, 0.95],
-    skyNight: [0.6, 0.62, 0.74],
-    skyGround: [0.42, 0.41, 0.5],
+    snowA: [0.74, 0.79, 0.88],
+    snowB: [0.86, 0.9, 0.97],
+    dirt: [0.34, 0.31, 0.31],
+    lip: [0.84, 0.88, 0.95],
+    waste: [0.6, 0.65, 0.74],
+    fog: [0.6, 0.66, 0.77],
+    fogDensity: 0.0125,
+    sun: [0.78, 0.86, 1],
+    skyDay: [0.76, 0.83, 0.98],
+    skyNight: [0.42, 0.5, 0.7],
+    skyGround: [0.28, 0.31, 0.42],
     sunMax: 0.6,
-    pine: [0.17, 0.24, 0.22],
-    pineB: [0.21, 0.29, 0.26],
+    pine: [0.13, 0.24, 0.2],
+    pineB: [0.16, 0.28, 0.23],
     cap: [0.86, 0.87, 0.91],
     rock: [0.42, 0.41, 0.43],
     ice: [0.72, 0.78, 0.84],
-    saturation: -32,
+    saturation: -18,
   },
 } as const;
 export type Season = keyof typeof PALETTE;
@@ -162,6 +162,63 @@ export function frustum(
   vd.colors = colors;
   return vd;
 }
+// 소나무 한 층: 가지 끝이 별처럼 튀어나오고 끝이 아래로 처진 치마 (off로 눈 층과 가지 끝을 맞춤)
+function pineTier(
+  r: () => number,
+  off: number,
+  y0: number,
+  h: number,
+  rb: number,
+  rt: number,
+  segs: number,
+  col: readonly number[],
+  droop: number,
+  notch: number,
+  dark: number,
+  cap = true,
+) {
+  const pos: number[] = [],
+    ind: number[] = [],
+    colors: number[] = [];
+  for (let i = 0; i < segs; i++) {
+    const a = off + (i / segs) * Math.PI * 2,
+      tip = i % 2 === 0,
+      k = (tip ? 1 : notch) * (1 + (r() - 0.5) * 0.16);
+    pos.push(
+      Math.cos(a) * rb * k,
+      y0 - (tip ? droop * (0.8 + r() * 0.4) : 0),
+      Math.sin(a) * rb * k,
+    );
+  }
+  for (let i = 0; i < segs; i++) {
+    const a = off + (i / segs) * Math.PI * 2;
+    pos.push(Math.cos(a) * rt, y0 + h, Math.sin(a) * rt);
+  }
+  pos.push(0, y0 + h, 0);
+  const top = segs * 2;
+  for (let i = 0; i < segs; i++) {
+    const j = (i + 1) % segs;
+    // 바깥을 보게(시계 반대 → 시계): 예전엔 면이 안쪽을 봐서 나무·바위가 빛을 못 받고 검게 보였음
+    ind.push(i, j, segs + j, i, segs + j, segs + i);
+    if (cap) ind.push(segs + i, segs + j, top);
+  }
+  // 아래 테두리(가지 끝·밑면 쪽)는 어둡게, 위로 갈수록 밝게
+  for (let i = 0; i < pos.length / 3; i++) {
+    const shade = (i < segs ? dark : 1) * (0.92 + r() * 0.16);
+    colors.push(
+      (col[0] ?? 0) * shade,
+      (col[1] ?? 0) * shade,
+      (col[2] ?? 0) * shade,
+      1,
+    );
+  }
+  const vd = new VertexData();
+  vd.positions = pos;
+  vd.indices = ind;
+  vd.colors = colors;
+  return vd;
+}
+
 export function mergedMesh(
   name: string,
   parts: VertexData[],
@@ -201,6 +258,14 @@ export function buildWorld(
     ip.colorCurvesEnabled = true;
     const curves = new ColorCurves();
     curves.globalSaturation = P.saturation;
+    if (season === "winter") {
+      curves.shadowsHue = 215;
+      curves.shadowsDensity = 45;
+      curves.midtonesHue = 210;
+      curves.midtonesDensity = 18;
+      curves.highlightsHue = 35;
+      curves.highlightsDensity = 10;
+    }
     ip.colorCurves = curves;
   }
 
@@ -428,7 +493,59 @@ export function buildWorld(
 
   // ── 나무·그루터기·죽은 나무·바위 ──
   const treeMat = vertexMat("pine-material");
+  const makePine = (v: number) => {
+    const tr = rng(100 + v),
+      parts: VertexData[] = [];
+    parts.push(frustum(tr, 0, 1.1, 0.17, 0.1, 6, [0.27, 0.2, 0.17], 0));
+    const tiers = 6 + v,
+      height = 3.3 + v * 0.55;
+    for (let k = 0; k < tiers; k++) {
+      const t = k / tiers,
+        y = 0.75 + t * height,
+        rb = 1.45 * (1 - t * 0.8) + 0.12,
+        h = 0.95 - t * 0.3,
+        off = tr() * Math.PI,
+        segs = 10;
+      parts.push(
+        pineTier(
+          tr,
+          off,
+          y,
+          h,
+          rb,
+          rb * 0.18,
+          segs,
+          k % 2 ? P.pineB : P.pine,
+          0.22 * h,
+          0.66,
+          0.62,
+          !P.cap, // 눈이 덮으면 윗면은 안 보이니 안 그림
+        ),
+      );
+      if (P.cap)
+        parts.push(
+          pineTier(
+            tr,
+            off,
+            y + h * 0.26,
+            h * 0.82,
+            rb * 0.88,
+            rb * 0.2,
+            segs,
+            P.cap,
+            0.12 * h,
+            0.72,
+            0.86,
+          ),
+        );
+    }
+    // 꼭대기 눈 뾰족
+    if (P.cap)
+      parts.push(frustum(tr, 0.75 + height, 0.45, 0.18, 0.01, 6, P.cap, 0.1));
+    return mergedMesh(`pine-${v}`, parts, scene, treeMat);
+  };
   const pines = [0, 1, 2].map((v) => {
+    if (season === "winter") return makePine(v);
     const tr = rng(100 + v),
       parts: VertexData[] = [];
     parts.push(frustum(tr, 0, 1.2, 0.17, 0.11, 6, [0.3, 0.22, 0.18], 0));
