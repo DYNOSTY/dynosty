@@ -92,20 +92,22 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   expect(errors).toEqual([]);
 });
 
-test("정찰 시안은 발견 표시를 갱신하고 게임 불러오기·새 게임에서 일관되게 초기화한다", async ({
+test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에서는 초기화한다", async ({
   page,
 }) => {
+  // Three full 3D loads share this test's budget on software-rendered CI.
+  test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await ready(page);
   await button(page, "정찰 거점 갈대나루").click();
   await expect(
     page.getByRole("region", { name: "정찰 · 미탐색 거점 패널" }),
-  ).toContainText("저장되지 않으며 인원·식량 재고에 반영하지 않습니다");
+  ).toContainText("파견 기록은 마을과 함께 자동 저장됩니다");
   const food = await page.getByTestId("resource-RES_PLANT").textContent();
   await button(page, "정찰대 보내기").click();
   const face = page
-    .getByRole("group", { name: "파견 중인 정찰대" })
+    .getByRole("region", { name: "파견 중인 정찰대" })
     .getByRole("button", { name: /갈대나루 정찰 중/ });
   await expect(
     page.getByRole("button", { name: /갈대나루 정찰 중/ }),
@@ -123,31 +125,23 @@ test("정찰 시안은 발견 표시를 갱신하고 게임 불러오기·새 �
   await expect(detail).toHaveText(/갈대나루 정찰 중 · \d+시간 남음/);
   await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
   await expect(page.getByTestId("resource-RES_PLANT")).toHaveText(food ?? "");
+  await ready(page);
+  await expect(face).toBeVisible();
   await button(page, "1일 진행").click();
   await button(page, "1일 진행").click();
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
   ).toContainText("갈대나루 발견");
-  await button(page, "저장").click();
-  await button(page, "게임 저장").click();
-  await expect(page.getByTestId("play-save-status")).toContainText(
-    "저장했습니다",
-  );
-  await button(page, "게임 불러오기").click();
-  await expect(page.getByTestId("play-save-status")).toContainText(
-    "불러왔습니다",
-  );
-  await button(page, "저장 닫기").click();
+  await ready(page);
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
-  ).toContainText("0 / 5");
-  await button(page, "정찰 거점 갈대나루").click();
-  await button(page, "정찰대 보내기").click();
+  ).toContainText("갈대나루 발견");
   await button(page, "새 게임").click();
   await button(page, "새 게임 시작").click();
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
-  ).not.toContainText("정찰 중");
+  ).toContainText("0 / 5");
+  await expect(face).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
