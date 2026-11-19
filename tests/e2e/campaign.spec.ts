@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
   commandTimber,
+  createCapital,
   createTimberSave,
   createVillageGame,
   SCOUT_SITES,
@@ -298,11 +299,9 @@ test("쥬신 왕으로 도성 구호를 명하고 설정에서 변종 야습 기
   page,
 }) => {
   const s = createVillageGame();
-  const save = createTimberSave({
-    ...s,
-    chapter: 3,
-    campaign: { ...s.campaign!, beat: "capital" },
-  });
+  const save = createTimberSave(
+    createCapital({ ...s, campaign: { ...s.campaign!, beat: "roads" } }),
+  );
   await page.addInitScript((value) => {
     if (!localStorage.getItem("dynosty.village.resume"))
       localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
@@ -311,10 +310,12 @@ test("쥬신 왕으로 도성 구호를 명하고 설정에서 변종 야습 기
   await expect(page.getByRole("dialog")).toHaveAccessibleName(
     "쥬신 왕의 어전 · 도성 남문",
   );
+  await expect(page.getByRole("heading", { name: "도성 현황" })).toBeVisible();
+  await expect(page.getByTestId("play-population")).toContainText(/1,?000/);
   await readScene(page, "남문의 장부를 받아 도성을 살핀다");
   await expect(page.getByTestId("resource-RES_COAL")).toHaveText("1,000");
   await expect(
-    page.getByRole("button", { name: "도성 하루 경영" }),
+    page.getByRole("button", { name: "도성 반나절 경영" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "명령 열기", exact: true }).click();
   await page.getByRole("button", { name: "설정", exact: true }).click();

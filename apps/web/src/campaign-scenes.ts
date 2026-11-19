@@ -507,6 +507,16 @@ export function campaignPage(s: TimberState): ScenePage {
       page.title = "쥬신 왕의 어전 · 도성 남문";
       page.music = "10";
       const road = capitalRoad(s);
+      if (s.bokhol && !c.relief) {
+        line(
+          "호조 관리",
+          "전하, 호적에 오른 백성이 꼭 천입니다. 남문에선 벌써 아침상을 물렸고, 동쪽 재배소에선 지난가을 갈무리한 종자가 싹을 틔웠습니다.",
+        );
+        line(
+          "왕",
+          "평소의 배급은 그대로 시행하라. 각 관아는 지금 손에 있는 것으로 어느 일까지 맡을 수 있는지 아뢰라.",
+        );
+      }
       page.goal = `도성 운영 ${Math.min(24, Math.floor(age / 60))}/24시간 · 교역로 ${road === "closed" ? "두절" : road === "slow" ? "지연" : "통행 가능"} · 앓거나 다친 주민 ${s.residents.filter((r) => r.health !== "healthy" && r.health !== "dead").length}명 · 성안 변종 습격 부상 ${(s.world.citizenEvents ?? []).filter((id) => id.startsWith("mutant-") && Number(id.split("-").at(-1)) >= c.since).length}명`;
       line(
         "수문장",

@@ -154,7 +154,7 @@ export function hospitalValid(s: TimberState): boolean {
   const patients = s.town.patients;
   if (
     !Array.isArray(patients) ||
-    patients.length > 600 ||
+    patients.length > 1000 ||
     patients.some((p) => !p || typeof p !== "object") ||
     new Set(patients.map((p) => p.resident)).size !== patients.length
   )

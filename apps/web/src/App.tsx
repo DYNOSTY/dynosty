@@ -982,6 +982,9 @@ export function App() {
       {workerError ? <p role="alert">{workerError}</p> : null}
       <div>
         <PlayPanel
+          settlement={
+            timberState?.campaign?.beat === "capital" ? "도성" : "복홀"
+          }
           compact={timberOpen}
           day={timberState?.world.day ?? shownDay}
           minute={playMinute}

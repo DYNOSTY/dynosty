@@ -283,7 +283,7 @@ export function parsePlayState(
     value.buildings.length > 100 ||
     !Array.isArray(value.citizens) ||
     value.citizens.length === 0 ||
-    value.citizens.length > 600
+    value.citizens.length > 1000
   )
     fail();
   const resourceSource: Record<string, unknown> = {

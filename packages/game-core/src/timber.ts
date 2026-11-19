@@ -11,17 +11,21 @@ import {
   actCampaign,
   type Campaign,
   type CampaignCommand,
+  campaignOf,
   campaignValid,
   newCampaign,
+  policyWait,
   updateCampaign,
 } from "./campaign.js";
 import {
   createDevelopment,
   isMechanical,
+  RESEARCH_CATALOG,
   residentShiftOpen,
   setElectricalWork,
   setOvertime,
   startResearch,
+  upgradeCost,
   upgradeFacility,
 } from "./development.js";
 import {
@@ -101,10 +105,12 @@ import {
 } from "./story-research.js";
 import {
   advanceTown,
+  BUILDING_RULES,
   type BuildingKind,
   createTown,
   deposit,
   dispatchFood,
+  type Facility,
   facilityDoor,
   facilityResource,
   facilityStaffLimit,
@@ -221,6 +227,7 @@ export interface TimberState {
   readonly mutants?: readonly { id: string; due: number }[];
   readonly mutantDamage?: Readonly<Record<string, number>>;
   readonly heating?: number;
+  readonly bokhol?: TimberState;
   readonly firedHeat?: number;
   readonly warmerHomes?: readonly string[];
   readonly raid?: {
@@ -424,7 +431,7 @@ const homeSlots: GroundPoint[] = [
   { x: 3, z: -5 },
   { x: -4, z: 3 },
 ];
-for (let radius = 1; homeSlots.length < 600; radius++) {
+for (let radius = 1; homeSlots.length < 1000; radius++) {
   for (let x = -radius; x <= radius; x++)
     for (let z = -radius; z <= radius; z++) {
       if (Math.abs(x) !== radius && Math.abs(z) !== radius) continue;
@@ -512,6 +519,98 @@ export function createVillageGame(
       hunger: Math.floor(r.hunger / 2),
     })),
   };
+}
+export function createCapital(s: TimberState): TimberState {
+  const seed = createVillageGame();
+  const { lastPolicyAt: _lastPolicyAt, ...history } = campaignOf(s);
+  const citizens = Array.from({ length: 1000 }, (_, i) => ({
+    ...seed.world.citizens[i % seed.world.citizens.length]!,
+    id: `capital-${i + 1}`,
+  }));
+  const buildings = Array.from({ length: 100 }, (_, i) => ({
+    id: i === 0 ? "example-building-1" : `dwelling-${i + 1}`,
+    type: "ondol-nest" as const,
+    headingRadians: Math.PI,
+    position: {
+      x: ((i % 10) - 4.5) * 16,
+      y: 0,
+      z: (Math.floor(i / 10) - 4.5) * 16,
+    },
+  }));
+  let city = createTimberState({ ...seed.world, citizens, buildings });
+  const kinds: Facility["kind"][] = [
+    "restaurant",
+    "hospital",
+    "workshop",
+    "storage",
+    "trade",
+    "scout",
+    "farm",
+    "ranch",
+    "restaurant",
+    "hospital",
+    "restaurant",
+    "restaurant",
+  ];
+  const facilities = kinds.map(
+    (kind, i): Facility => ({
+      id: `build-${i + 1}`,
+      kind,
+      position: { x: ((i % 6) - 3) * 16, z: i < 6 ? -16 : 16 },
+      headingRadians: 0,
+      level: 1,
+      sourceId: null,
+      target: BUILDING_RULES[kind].staff,
+      progress: 0,
+      yieldRemainder: 0,
+      buffer: 0,
+      delivered: 0,
+      haul: null,
+    }),
+  );
+  const hospital = facilities.find((f) => f.kind === "hospital")!;
+  city = payTown(city, upgradeCost(hospital));
+  hospital.level = 2;
+  const completed = ["TECH_SEED", "TECH_TRAIL", "UPGRADE_HOSPITAL_2"];
+  for (const f of facilities) city = payTown(city, BUILDING_RULES[f.kind].cost);
+  for (const tech of completed)
+    city = payTown(city, RESEARCH_CATALOG.find((r) => r.id === tech)!.cost);
+  const posts = facilities.flatMap((facility, index) =>
+    Array.from({ length: facility.target }, () => ({
+      workplaceId: index === 0 ? "restaurant" : "facility:" + facility.id,
+      position: facilityDoor(facility),
+    })),
+  );
+  city = {
+    ...city,
+    chapter: 3,
+    elapsed: s.elapsed,
+    rebuilding: true,
+    restaurantBuilt: true,
+    restaurantWorkerTarget: 2,
+    rationPolicy: "cap",
+    bokhol: s,
+    processed: s.processed,
+    campaign: {
+      ...history,
+      beat: "capital",
+      since: s.elapsed,
+      petitionDay: 0,
+    },
+    town: {
+      ...city.town,
+      facilities,
+      nextId: facilities.length + 1,
+      development: { ...city.town.development, completed },
+    },
+    residents: city.residents.map((r, i) => ({
+      ...r,
+      position: r.home ?? r.position,
+      insideHome: !!r.home && !posts[i],
+      ...posts[i],
+    })),
+  };
+  return city;
 }
 export function createTimberState(
   inputWorld: PlayState = createPlayState(),
@@ -1988,6 +2087,18 @@ export function parseTimberState(value: unknown): TimberState {
     !campaignValid(value.campaign, value.elapsed as number)
   )
     fail("캠페인 기록 오류");
+  if (
+    value.bokhol !== undefined &&
+    (!isRecord(value.bokhol) ||
+      value.bokhol.bokhol !== undefined ||
+      !isRecord(value.campaign) ||
+      !["capital", "ending", "finished"].includes(
+        String(value.campaign.beat),
+      ) ||
+      !isRecord(value.bokhol.campaign) ||
+      value.bokhol.campaign.beat !== "roads")
+  )
+    fail("복홀 인계 기록 오류");
   if (value.scoutDepartures !== undefined) {
     if (!isRecord(value.scoutDepartures)) fail("정찰 기록 오류");
     for (const [id, start] of Object.entries(value.scoutDepartures)) {
@@ -2041,7 +2152,7 @@ export function parseTimberState(value: unknown): TimberState {
     if (!r.quantity) fail();
   }
   if (value.merchantItem !== undefined) num(value.merchantItem, 8);
-  if (value.residents.length > 600) fail();
+  if (value.residents.length > 1000) fail();
   const ids = new Set<string>();
   for (const r of value.residents) {
     if (
@@ -3250,10 +3361,19 @@ export function commandTimber(
       n = staffRestaurant({ ...s, restaurantWorkerTarget: command.count });
       break;
     case "set-ration-policy":
+      if (s.campaign && command.policy !== s.rationPolicy && policyWait(s))
+        fail("다음 정책은 발효 후 열두 시간이 지나야 내릴 수 있습니다.");
       if (!["needs", "cap"].includes(command.policy))
         fail("배급 정책이 올바르지 않습니다.");
       n = note(
-        { ...s, rationPolicy: command.policy },
+        {
+          ...s,
+          rationPolicy: command.policy,
+          ...(s.campaign &&
+            command.policy !== s.rationPolicy && {
+              campaign: { ...s.campaign, lastPolicyAt: s.elapsed },
+            }),
+        },
         "배급 정책 변경. 오늘 이미 받은 배급량은 유지합니다.",
       );
       break;
@@ -3689,13 +3809,22 @@ export function commandTimber(
       break;
     }
     case "set-policy":
+      if (s.campaign && policyWait(s))
+        fail("다음 정책은 발효 후 열두 시간이 지나야 내릴 수 있습니다.");
       if (
         s.mission !== "register-policy" ||
         !["relief", "registry"].includes(command.policy)
       )
         fail();
       n = note(
-        { ...s, policy: command.policy, mission: "village-orders" },
+        {
+          ...s,
+          policy: command.policy,
+          mission: "village-orders",
+          ...(s.campaign && {
+            campaign: { ...s.campaign, lastPolicyAt: s.elapsed },
+          }),
+        },
         "P01 장부 정책 선택을 기록했습니다.",
       );
       break;
@@ -3825,11 +3954,9 @@ export interface TimberSave {
 export function parseTimberSave(v: unknown): TimberSave {
   if (!isRecord(v) || v.format !== "dynosty-timber" || v.saveVersion !== 1)
     fail("지원하지 않는 저장 형식입니다.");
-  return {
-    format: "dynosty-timber",
-    saveVersion: 1,
-    state: parseTimberState(v.state),
-  };
+  const state = parseTimberState(v.state);
+  if (state.bokhol) parseTimberState(state.bokhol);
+  return { format: "dynosty-timber", saveVersion: 1, state };
 }
 export function createTimberSave(state: TimberState): TimberSave {
   return parseTimberSave({ format: "dynosty-timber", saveVersion: 1, state });

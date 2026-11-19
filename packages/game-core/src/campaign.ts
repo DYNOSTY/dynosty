@@ -12,8 +12,10 @@ import { storageRoom } from "./storage.js";
 import { recordResearchStory } from "./story-research.js";
 import {
   commandTimber,
+  createCapital,
   createVillageGame,
   note,
+  parseTimberState,
   type TimberState,
 } from "./timber.js";
 import { deposit, facilityResource, payTown } from "./town.js";
@@ -88,6 +90,7 @@ export interface Campaign {
   reports: string[];
   patrolOrder: string[];
   petitionDay: number;
+  lastPolicyAt?: number;
   emergencyDay?: number;
   recoveryDue?: number | null;
   memorial: "recover" | "remember" | null;
@@ -146,6 +149,7 @@ export function campaignValid(c: unknown, elapsed: number) {
     (c.pessimismExtremeSince == null ||
       integer(c.pessimismExtremeSince, elapsed)) &&
     (c.optimismZeroSince == null || integer(c.optimismZeroSince, elapsed)) &&
+    (c.lastPolicyAt === undefined || integer(c.lastPolicyAt, elapsed)) &&
     integer(c.petitionDay, 100000) &&
     (c.emergencyDay === undefined || integer(c.emergencyDay, 100000)) &&
     Array.isArray(c.patrolOrder) &&
@@ -322,6 +326,24 @@ export function updateCampaign(s: TimberState): TimberState {
   return s;
 }
 export type CampaignCommand = { type: "campaign"; beat: Beat; action: string };
+export function policyWait(s: TimberState) {
+  const c = campaignOf(s);
+  return c.lastPolicyAt === undefined
+    ? 0
+    : Math.max(0, c.lastPolicyAt + 720 - s.elapsed);
+}
+export function capitalMealsReady(s: TimberState) {
+  return (
+    s.town.development.completed.includes("UPGRADE_HOSPITAL_2") &&
+    s.town.facilities.some(
+      (f) =>
+        f.kind === "hospital" && f.level >= 2 && s.mutantDamage?.[f.id] !== 100,
+    ) &&
+    s.town.facilities.some(
+      (f) => f.kind === "restaurant" && s.mutantDamage?.[f.id] !== 100,
+    )
+  );
+}
 export function actCampaign(
   s: TimberState,
   command: CampaignCommand,
@@ -348,14 +370,16 @@ export function actCampaign(
     ["patrol", "roads", "capital", "arrival", "winter", "vigil"].includes(
       c.beat,
     ) &&
-    c.petitionDay !== s.world.day &&
+    policyWait(s) === 0 &&
     (action === "share" || action === "reserve")
   ) {
+    if (action === "share" && c.beat === "capital" && !capitalMealsReady(s))
+      throw Error("병원 개량 연구와 2단계 병원, 식당이 필요합니다.");
     const base = action === "share" ? pay("RES_FISH", 4) : s;
     const adjustment = action === "share" ? -4 : 6;
     return change(
       c.beat,
-      { petitionDay: s.world.day },
+      { petitionDay: s.world.day, lastPolicyAt: s.elapsed },
       {
         ...base,
         world: {
@@ -472,15 +496,26 @@ export function actCampaign(
           { caravan: { village: i, due: s.elapsed + v.hours * 60 } },
           pay(v.resource, v.amount),
         );
-      if (action === "next" && c.treaties.length === 5)
-        return { ...change("capital"), chapter: 3 };
+      if (action === "next" && c.treaties.length === 5) return createCapital(s);
       break;
     }
     case "capital":
       if (!c.relief && action === "report")
         return change("capital", { relief: "report" });
       if (action === "next" && c.relief && s.elapsed - c.since >= 1440)
-        return change("seal");
+        return s.bokhol
+          ? {
+              ...parseTimberState(s.bokhol),
+              processed: s.processed,
+              chapter: 3,
+              campaign: {
+                ...campaignOf(s.bokhol),
+                beat: "seal",
+                since: s.bokhol.elapsed,
+                relief: c.relief,
+              },
+            }
+          : change("seal");
       break;
     case "seal":
       if (action === "next") return change("escort");

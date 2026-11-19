@@ -2,10 +2,12 @@ import {
   CHAPTERS,
   campaignOf,
   canPay,
+  capitalMealsReady,
   foodWarnings,
   mutantNames,
   mutantRepairCost,
   mutantStructure,
+  policyWait,
   type TimberCommand,
   type TimberState,
   villageDefenseActive,
@@ -180,7 +182,7 @@ export function CampaignPanel({
   const canPetition =
     ["patrol", "roads", "capital", "arrival", "winter", "vigil"].includes(
       c.beat,
-    ) && c.petitionDay !== s.world.day;
+    ) && policyWait(s) === 0;
   const petitionOpen = petition && canPetition;
   const open =
     petitionOpen || opened === p.key || (p.auto && dismissed !== p.key);
@@ -216,8 +218,13 @@ export function CampaignPanel({
     choices: [
       {
         action: "share",
-        label: "어류 4를 내어 병상까지 배달",
-        disabled: !canPay(s, "RES_FISH", 4),
+        label:
+          c.beat === "capital"
+            ? "병상 배식 · 어류 4 (개량 연구·2단계 병원·식당 필요)"
+            : "어류 4를 내어 병상까지 배달",
+        disabled:
+          !canPay(s, "RES_FISH", 4) ||
+          (c.beat === "capital" && !capitalMealsReady(s)),
       },
       { action: "reserve", label: "오늘은 창고의 비축 유지" },
     ],
@@ -512,6 +519,12 @@ export function CampaignPanel({
           <small>“{s.decree.reaction}”</small>
         </aside>
       )}
+      {policyWait(s) > 0 && (
+        <small>
+          다음 정책 발효까지 {Math.floor(policyWait(s) / 60)}시간{" "}
+          {policyWait(s) % 60}분
+        </small>
+      )}
       {canPetition && (
         <button
           type="button"
@@ -527,9 +540,14 @@ export function CampaignPanel({
         <button
           type="button"
           className="scout-all"
-          onClick={() => command({ type: "advance", minutes: 1440 })}
+          onClick={() =>
+            command({
+              type: "advance",
+              minutes: c.beat === "capital" ? 720 : 1440,
+            })
+          }
         >
-          {c.beat === "capital" ? "도성 하루 경영" : "마을 하루 진행"}
+          {c.beat === "capital" ? "도성 반나절 경영" : "마을 하루 진행"}
         </button>
       )}
       {open ? (

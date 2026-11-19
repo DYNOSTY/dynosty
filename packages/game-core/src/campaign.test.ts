@@ -241,6 +241,22 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
     s = restore(later(s, v.hours * 60));
   }
   s = act(s, "next");
+  expect(s.residents).toHaveLength(1000);
+  expect(s.residents.every((r) => r.homeId)).toBe(true);
+  expect(s.town.facilities.length).toBeGreaterThan(10);
+  expect(s.town.development.completed).toContain("UPGRADE_HOSPITAL_2");
+  const city = restore(s);
+  const hospital = city.town.facilities.find(
+    (f) => f.kind === "hospital" && f.level === 2,
+  )!;
+  expect(() =>
+    act({ ...city, mutantDamage: { [hospital.id]: 100 } }, "share"),
+  ).toThrow("병원");
+  const decree = act(city, "share");
+  expect(() => act(later(decree, 719), "reserve")).toThrow();
+  expect(act(later(decree, 720), "reserve").campaign?.lastPolicyAt).toBe(
+    decree.elapsed + 720,
+  );
   s = act(s, "report");
   expect(() => act(s, "next")).toThrow();
   s = act(later(s, 1440), "next");

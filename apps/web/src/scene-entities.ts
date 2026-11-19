@@ -230,6 +230,13 @@ export function createSceneEntities(
       for (const id of objects.keys()) if (!ids.has(id)) remove(id);
       for (const entity of snapshot.entities) {
         let object = objects.get(entity.id);
+        if (
+          !object &&
+          entity.kind === "resident" &&
+          entity.indoors &&
+          !entity.visible
+        )
+          continue;
         if (object && object.kind !== entity.kind) {
           remove(entity.id);
           object = undefined;

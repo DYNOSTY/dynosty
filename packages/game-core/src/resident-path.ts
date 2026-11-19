@@ -12,6 +12,7 @@ export function residentPath(
   start: GroundPoint,
   goal: GroundPoint,
   buildings: readonly GroundObstacle[],
+  narrow = true,
 ): GroundPoint[] {
   const boxes = buildings.map((p) => ({
     point: p,
@@ -38,28 +39,56 @@ export function residentPath(
       );
     });
   if (inside(start) || inside(goal)) return [];
-  const blocked = (a: GroundPoint, b: GroundPoint) =>
-    boxes.some((box) => {
-      const from = local(a, box),
-        to = local(b, box);
-      let enter = 0,
-        leave = 1;
-      for (const [origin, delta, clearance] of [
-        [from.x, to.x - from.x, box.point.halfWidth ?? CLEARANCE],
-        [from.z, to.z - from.z, box.point.halfDepth ?? CLEARANCE],
-      ] as const) {
-        if (Math.abs(delta) < 1e-9) {
-          if (origin < -clearance || origin > clearance) return false;
-        } else {
-          const t1 = (-clearance - origin) / delta,
-            t2 = (clearance - origin) / delta;
-          enter = Math.max(enter, Math.min(t1, t2));
-          leave = Math.min(leave, Math.max(t1, t2));
-          if (enter > leave) return false;
-        }
+  const intersects = (
+    a: GroundPoint,
+    b: GroundPoint,
+    box: (typeof boxes)[number],
+  ) => {
+    const from = local(a, box),
+      to = local(b, box);
+    let enter = 0,
+      leave = 1;
+    for (const [origin, delta, clearance] of [
+      [from.x, to.x - from.x, box.point.halfWidth ?? CLEARANCE],
+      [from.z, to.z - from.z, box.point.halfDepth ?? CLEARANCE],
+    ] as const) {
+      if (Math.abs(delta) < 1e-9) {
+        if (origin < -clearance || origin > clearance) return false;
+      } else {
+        const t1 = (-clearance - origin) / delta,
+          t2 = (clearance - origin) / delta;
+        enter = Math.max(enter, Math.min(t1, t2));
+        leave = Math.min(leave, Math.max(t1, t2));
+        if (enter > leave) return false;
       }
-      return true;
-    });
+    }
+    return true;
+  };
+  const blocked = (a: GroundPoint, b: GroundPoint) =>
+    boxes.some((box) => intersects(a, b, box));
+  // A shortest route around a subset remains shortest if every segment also clears the other buildings.
+  if (narrow && boxes.length > 24) {
+    const included = new Set<GroundObstacle>();
+    let route = [goal];
+    while (route.length) {
+      const previous = included.size;
+      let from = start;
+      for (const to of route) {
+        for (const box of boxes)
+          if (!included.has(box.point) && intersects(from, to, box))
+            included.add(box.point);
+        from = to;
+      }
+      if (included.size === previous) return route;
+      route = residentPath(
+        start,
+        goal,
+        buildings.filter((b) => included.has(b)),
+        false,
+      );
+    }
+    return [];
+  }
   if (!blocked(start, goal)) return [{ ...goal }];
   const nodes = [
     start,
