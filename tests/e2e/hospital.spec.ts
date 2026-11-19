@@ -10,6 +10,7 @@ import {
 test("병원 클릭으로 주민별 회복을 보고 저장 후 야간 자동 퇴원한다", async ({
   page,
 }) => {
+  test.setTimeout(180_000);
   let s = createTimberState({ ...createPlayState(), minute: 540 });
   s = commandTimber(
     s,
@@ -75,14 +76,18 @@ test("병원 클릭으로 주민별 회복을 보고 저장 후 야간 자동 �
   );
   const button = (name: string) =>
     page.getByRole("button", { name, exact: true });
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+    { timeout: 90_000 },
+  );
   await button("마른 목재20 조달 체험하기").click();
   await expect(page.getByTestId("timber-clock")).toBeVisible();
-  await button("저장").click();
+  await page.locator("canvas").press("j");
   await button("진행 불러오기").click();
   await expect(page.getByTestId("timber-save-status")).toContainText(
     "불러왔습니다",
   );
-  await button("저장").click();
+  await page.locator("canvas").press("j");
   await page.getByText("완공 시설 1곳", { exact: true }).click();
   await button("현장 보기").click();
   const canvas = page.getByLabel(
@@ -99,24 +104,17 @@ test("병원 클릭으로 주민별 회복을 보고 저장 후 야간 자동 �
   await expect(ward.getByRole("listitem")).toHaveCount(3);
   await expect(ward).toContainText("회복 719/720");
   await expect(ward).toContainText("중상");
-  await page
-    .getByRole("heading", { name: "병원 · 자동 치료", exact: true })
-    .scrollIntoViewIfNeeded();
-  await page
-    .getByRole("heading", { name: "병원 · 자동 치료", exact: true })
-    .hover();
-  await page.screenshot({
-    path: test.info().outputPath("병원_주민별_자동회복.png"),
-    fullPage: true,
-  });
-  await button("저장").click();
+  await canvas.press("j");
   await button("진행 저장").click();
   await expect(page.getByTestId("timber-save-status")).toContainText(
     "저장했습니다",
   );
   await button("진행 불러오기").click();
+  await expect(page.getByTestId("timber-save-status")).toContainText(
+    "불러왔습니다",
+  );
   await expect(ward).toContainText("회복 719/720");
-  await button("저장").click();
+  await canvas.press("j");
   await button("개발 도구").click();
   const before = await page.getByTestId("timber-clock").textContent();
   await button("5분 진행").click();
