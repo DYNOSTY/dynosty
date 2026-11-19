@@ -1,0 +1,852 @@
+/* DYNOSTY UI 부품 (M1) — theme.css의 값만 사용 */
+.k-btn,
+.k-panel,
+.k-window,
+.k-tip,
+.k-bubble,
+.c-console,
+.c-console *,
+.h-top,
+.b-band {
+  box-sizing: border-box;
+}
+
+/* 버튼: 쪽빛 천. 상태가 바뀌어도 크기·테두리 굵기는 그대로 */
+.k-btn {
+  min-height: 48px;
+  padding: 0 24px;
+  border: 10px solid var(--jjok-deep);
+  border-image: url(/ui/kit/btn.png) 56 fill / 16px / 4px stretch;
+  background: var(--jjok);
+  color: var(--hanji);
+  font: 600 var(--fs-body) / 1 var(--font-body);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    filter 0.12s,
+    box-shadow 0.12s;
+}
+.k-btn:hover,
+.k-btn.is-hover {
+  filter: brightness(1.12);
+}
+.k-btn:active,
+.k-btn.is-active {
+  border-image-source: url(/ui/kit/btn_pressed.png);
+  box-shadow: none;
+}
+.k-btn:focus-visible {
+  outline: 2px solid var(--nakgwan);
+  outline-offset: 3px;
+}
+.k-btn:disabled {
+  filter: grayscale(0.8) opacity(0.5);
+  cursor: default;
+}
+.k-btn--quiet {
+  border-image: none;
+  border-width: 1px;
+  padding: 0 33px;
+  background: var(--hanji);
+  border-color: var(--hanji-line);
+  color: var(--meok);
+  box-shadow: inset 0 -2px 0 rgb(0 0 0 / 8%);
+}
+.k-btn--danger {
+  border-image: none;
+  border-width: 1px;
+  padding: 0 33px;
+  background: var(--nakgwan);
+  border-color: #7d2420;
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 22%);
+}
+
+/* 창: 한지 + 먹 이중선 + 모서리 구름 (panel_frame.png 9조각) */
+.k-panel,
+.k-window,
+.k-tip,
+.k-bubble {
+  position: relative;
+  background: var(--hanji);
+  border: 20px solid transparent;
+  border-image: url(/ui/kit/panel_frame.png) 210 fill / 46px / 16px stretch;
+  margin: 16px;
+  color: var(--meok);
+}
+.k-panel h4,
+.k-window h4,
+.k-bubble b {
+  margin: 0 0 4px;
+  font: 700 var(--fs-title) / 1.3 var(--font-title);
+}
+.k-panel p,
+.k-bubble p {
+  margin: 0;
+}
+.k-panel small {
+  color: var(--meok-sub);
+  font-size: var(--fs-sub);
+}
+
+.k-window {
+  padding: 0;
+}
+.k-window__band {
+  margin: -8px -8px 0;
+  padding: 12px 24px;
+  background: url(/ui/kit/band.png) center / 104% 100% no-repeat;
+  color: var(--hanji);
+}
+.k-window__band h3 {
+  margin: 0;
+  font: 700 var(--fs-display) / 1.2 var(--font-title);
+  font-size: 28px;
+}
+.k-window__body {
+  padding: 16px 8px 8px;
+}
+.k-window__body h4 {
+  margin-top: 20px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--hanji-line);
+}
+.k-window__lead {
+  margin: 0;
+  color: var(--meok-sub);
+}
+.k-window__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 24px;
+}
+.k-seal {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.k-need {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0;
+}
+.k-need b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 자원 아이콘 */
+.k-icon {
+  margin: 0;
+  width: 96px;
+  text-align: center;
+}
+.k-icon img {
+  display: block;
+  margin: 0 auto 4px;
+  object-fit: contain;
+}
+.k-icon figcaption {
+  font-size: var(--fs-sub);
+}
+
+/* 자원 상세 */
+.k-tip {
+  width: 280px;
+}
+.k-tip__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 var(--fs-title) / 1.3 var(--font-title);
+}
+.k-tip__grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 16px;
+  margin: 12px 0 0;
+}
+.k-tip__grid dt {
+  color: var(--meok-sub);
+}
+.k-tip__grid dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.k-tip__note {
+  margin: 12px 0 0;
+  color: var(--meok-sub);
+  font-size: var(--fs-sub);
+}
+
+/* 게이지: 옻칠 틀 + 한지 홈 + 숫자 */
+.k-gauge {
+  display: grid;
+  grid-template-columns: 48px 1fr 40px;
+  gap: 12px;
+  align-items: center;
+  margin: 8px 0;
+}
+.k-gauge__name {
+  font-size: var(--fs-sub);
+}
+.k-gauge__track {
+  position: relative;
+  height: 14px;
+  border: 2px solid var(--ottchil);
+  border-radius: 7px;
+  background: var(--hanji-deep);
+  overflow: hidden;
+  /* 10칸 눈금: 색을 못 봐도 양이 읽힘 */
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(10% - 1px),
+    rgb(43 38 32 / 25%) calc(10% - 1px) 10%
+  );
+}
+.k-gauge__track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+.k-gauge b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 말풍선 */
+.k-bubble {
+  max-width: 360px;
+}
+.k-bubble b {
+  display: block;
+  color: var(--hanbok);
+  font-size: 20px;
+}
+
+/* ───── HUD 공통 (1920×1080 무대) ───── */
+.h-top {
+  position: absolute;
+  inset: 0 0 auto;
+  display: grid;
+  grid-template-columns: 300px 1fr 300px;
+  align-items: center;
+  height: 96px;
+  padding: 0 32px;
+  background: linear-gradient(var(--ottchil), var(--ottchil-hi));
+  border-bottom: 3px solid #1f1611;
+  box-shadow: inset 0 -6px 0 rgb(239 230 210 / 8%);
+  color: var(--hanji);
+}
+.h-top__title b {
+  display: block;
+  font: 700 30px / 1.1 var(--font-title);
+}
+.h-top__title span {
+  font-size: var(--fs-sub);
+  opacity: 0.8;
+}
+.h-top__time {
+  text-align: right;
+}
+.h-top__time b {
+  display: block;
+  font: 700 24px / 1.2 var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+.h-speed {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.h-speed i {
+  font-style: normal;
+  font-size: 14px;
+  padding: 0 8px;
+  border: 1px solid rgb(239 230 210 / 30%);
+  border-radius: 4px;
+}
+.h-speed i.on {
+  background: var(--hanji);
+  color: var(--meok);
+}
+.h-res {
+  justify-self: center;
+}
+.h-res__main {
+  display: flex;
+  gap: 0;
+  background: var(--hanji);
+  color: var(--meok);
+  border-radius: 8px;
+  padding: 6px 8px;
+  box-shadow: inset 0 0 0 1px var(--hanji-line);
+}
+.h-res__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+}
+.h-res__item + .h-res__item {
+  border-left: 1px solid var(--hanji-line);
+}
+.h-res__item img {
+  object-fit: contain;
+}
+.h-res__item small {
+  display: block;
+  font-size: 14px;
+  color: var(--meok-sub);
+  line-height: 1.1;
+}
+.h-res__item b {
+  font-size: 20px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.h-res__sub {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--hanji);
+}
+.h-res__sub span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.h-goal {
+  position: absolute;
+  top: 120px;
+  left: 24px;
+  width: 380px;
+}
+.h-weather {
+  position: absolute;
+  top: 120px;
+  right: 24px;
+  width: 380px;
+}
+
+/* 가. 스타식 콘솔 */
+.c-console {
+  position: absolute;
+  inset: auto 0 0;
+  height: 320px;
+  display: grid;
+  grid-template-columns: 223px 1fr 222px;
+  gap: 42px;
+  padding: 61px 32px 33px 31px;
+}
+.c-console__frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+}
+.c-console__frame img {
+  height: 100%;
+  width: auto;
+  flex: none;
+}
+.c-console__frame img.grow {
+  flex: 1;
+  width: 0;
+  object-fit: fill;
+}
+.c-console > :not(.c-console__frame) {
+  position: relative;
+}
+/* 가운데 칸: [2.5D 모습 176] [이름·수치] [희망·절망 360] — 8px 격자 */
+.c-console__info {
+  display: grid;
+  grid-template-columns: 176px 1fr 360px;
+  align-items: center;
+  padding: 16px 24px;
+}
+.c-portrait {
+  width: 176px;
+  height: 176px;
+  display: grid;
+  place-items: center;
+}
+.c-portrait img {
+  width: 232px;
+  height: 232px;
+  object-fit: contain;
+  margin: -12px;
+  filter: drop-shadow(0 6px 6px rgb(43 38 32 / 25%));
+}
+.c-sel {
+  padding: 0 32px;
+  align-self: start;
+  padding-top: 8px;
+}
+.c-sel h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font: 700 var(--fs-title) / 1.3 var(--font-title);
+}
+.c-badge {
+  font: 600 14px / 1 var(--font-body);
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--ottchil);
+  color: var(--hanji);
+}
+.c-stats {
+  display: grid;
+  grid-template-columns: 88px 112px 88px 112px;
+  row-gap: 4px;
+  margin: 0;
+}
+.c-slots-label {
+  margin: 12px 0 4px;
+  font-size: var(--fs-sub);
+  color: var(--meok-sub);
+}
+.c-slots {
+  display: flex;
+  gap: 8px;
+}
+.c-slots span {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--hanji-deep);
+  box-shadow:
+    inset 0 0 0 1px var(--hanji-line),
+    inset 0 2px 4px rgb(0 0 0 / 15%);
+}
+.c-slots img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.c-stats dt {
+  color: var(--meok-sub);
+  font-size: var(--fs-sub);
+  line-height: 24px;
+}
+.c-stats dd {
+  margin: 0;
+  font: 600 20px / 24px var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+.c-mood {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  border-left: 1px solid var(--hanji-line);
+  padding-left: 24px;
+}
+.c-map {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  background: url(/ui/kit/bg_village.jpg) 30% 60% / 600% auto;
+  filter: grayscale(1) contrast(0.9) sepia(0.3);
+  opacity: 0.8;
+}
+
+.c-sel h4 {
+  margin: 0;
+  font: 700 var(--fs-title) / 1.3 var(--font-title);
+}
+.c-sel p {
+  margin: 4px 0 8px;
+}
+.c-console__cmd {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 6px;
+}
+.c-cmd {
+  display: grid;
+  place-items: center;
+  gap: 0;
+  border: 8px solid var(--jjok-deep);
+  border-image: url(/ui/kit/btn.png) 56 fill / 12px / 2px stretch;
+  background: var(--jjok);
+  color: var(--hanji);
+  font: 600 var(--fs-sub) / 1.1 var(--font-body);
+  cursor: pointer;
+}
+.c-cmd kbd {
+  font: 12px / 1 var(--font-body);
+  opacity: 0.75;
+}
+.h-advisor-a {
+  position: absolute;
+  left: 24px;
+  bottom: 330px;
+}
+
+/* 나. 떠 있는 띠 */
+.h-advisor-b {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+}
+.h-sel-b {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  width: 360px;
+}
+.b-band {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: linear-gradient(var(--ottchil-hi), var(--ottchil));
+  box-shadow: 0 0 0 2px #1f1611;
+}
+.b-band__cmd {
+  display: flex;
+  gap: 8px;
+}
+.b-band .c-cmd {
+  width: 68px;
+  height: 60px;
+}
+.b-band__mood {
+  width: 260px;
+  color: var(--hanji);
+}
+
+/* 한국어 줄바꿈: 꼬리 줄 방지 */
+.k-panel p,
+.k-window p,
+.k-tip p,
+.k-bubble p {
+  text-wrap: pretty;
+}
+
+/* 명령 칸: 3D 물건 아이콘 + 이름 16 + 단축키 */
+.c-cmd {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+}
+.c-cmd img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 35%));
+}
+.c-cmd span {
+  font: 600 var(--fs-sub) / 1 var(--font-body);
+}
+.c-cmd kbd {
+  position: absolute;
+  top: -2px;
+  right: 0;
+  font: 600 13px / 1 var(--font-body);
+  opacity: 0.7;
+}
+.b-band .c-cmd {
+  width: 76px;
+  height: 72px;
+}
+
+/* 희망·절망 가: 2.5D 등롱·먹 항아리 */
+.m-jars {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 32px;
+  height: 100%;
+}
+.m-obj {
+  position: relative;
+  height: 150px;
+  margin: 0;
+}
+.m-obj img {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.m-slot {
+  position: absolute;
+  left: var(--l);
+  right: var(--r);
+  top: var(--t);
+  bottom: var(--b);
+  overflow: hidden;
+}
+.m-obj--hope .m-slot {
+  background: #4a3a30;
+}
+.m-obj--despair .m-slot {
+  background: var(--hanji-deep);
+}
+.m-slot i {
+  position: absolute;
+  inset: auto 0 0;
+  height: calc(var(--v) * 1%);
+}
+.m-obj--hope .m-slot i {
+  background: linear-gradient(#ffe2a0, #f0a24a);
+  box-shadow: 0 0 12px #ffcf7a;
+}
+.m-obj--despair .m-slot i {
+  background: #1b1714;
+}
+.m-obj--hope img {
+  filter: drop-shadow(0 0 calc(var(--v) * 0.25px) rgb(255 196 110 / 85%));
+}
+.m-obj figcaption {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  transform: translate(-50%, 100%);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+.m-obj figcaption small {
+  font-size: var(--fs-sub);
+  color: var(--meok-sub);
+}
+.m-obj figcaption b {
+  font: 700 24px / 1 var(--font-title);
+  font-variant-numeric: tabular-nums;
+}
+.c-mood .m-scale {
+  height: 100%;
+}
+.c-mood .m-scale {
+  --rs: 0.2;
+}
+.c-mood {
+  grid-template-columns: 1fr;
+  align-items: center;
+}
+.c-mood .m-jars {
+  padding-bottom: 32px;
+}
+.c-mood .m-obj {
+  height: 132px;
+}
+
+/* 희망·절망 나: 저울 */
+.m-scale {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.m-scale > img {
+  height: 150px;
+}
+.m-scale__v {
+  display: grid;
+  text-align: center;
+}
+.m-scale__v small {
+  font-size: var(--fs-sub);
+  color: var(--meok-sub);
+}
+.m-scale__v b {
+  font: 700 28px / 1.1 var(--font-title);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 시트 비교 칸 */
+.mood-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  flex: 1;
+  min-width: 640px;
+}
+.mood-box {
+  display: inline-block;
+  vertical-align: top;
+  width: 300px;
+  height: 230px;
+  margin: 0 12px 12px 0;
+  padding: 16px 0 32px;
+  border-radius: 8px;
+  background: var(--hanji);
+  box-shadow: inset 0 0 0 1px var(--hanji-line);
+  box-sizing: border-box;
+}
+
+/* ── M1c: 2.5D 재질 ── */
+/* 저울 조립 (원본 1120×930 단위를 축소) */
+.rig-box {
+  width: calc(1120px * var(--rs, 0.19));
+  height: calc(930px * var(--rs, 0.19));
+  position: relative;
+}
+.rig {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1120px;
+  height: 930px;
+  transform: scale(var(--rs, 0.19));
+  transform-origin: 0 0;
+}
+.rig img {
+  position: absolute;
+  display: block;
+  transition:
+    left 0.6s,
+    top 0.6s,
+    transform 0.6s;
+}
+.m-scale {
+  gap: 8px;
+}
+
+/* 위 막대: 옻칠 들보 그림 (원본 270px 높이 × 0.444) */
+.h-top {
+  height: 120px;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  grid-template-columns: 36px 300px 53px 1fr 49px 300px 34px;
+  grid-template-rows: 31px 56px 1fr;
+  color: var(--meok);
+}
+.h-top__frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgb(0 0 0 / 35%));
+}
+.h-top__frame img {
+  height: 100%;
+  width: auto;
+  flex: none;
+  object-fit: fill;
+}
+.h-top__frame img.grow {
+  flex: 1;
+  width: 0;
+}
+.h-top > :not(.h-top__frame) {
+  position: relative;
+  grid-row: 2;
+}
+.h-top__title {
+  grid-column: 2;
+  padding: 0 16px;
+  align-self: center;
+}
+.h-top__title b {
+  font-size: 26px;
+}
+.h-top__title span {
+  opacity: 1;
+  color: var(--meok-sub);
+}
+.h-res {
+  grid-column: 4;
+  justify-self: center;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.h-res__main {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+}
+.h-res__item {
+  padding: 0 12px;
+}
+.h-res__item small {
+  font-size: var(--fs-sub);
+}
+.h-res__sub {
+  margin: 0;
+  padding-left: 16px;
+  border-left: 1px solid var(--hanji-line);
+  color: var(--meok-sub);
+  font-size: var(--fs-sub);
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0 16px;
+}
+.h-top__time {
+  grid-column: 6;
+  padding: 0 16px;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.h-top__time b {
+  font-size: 22px;
+}
+.h-speed {
+  margin: 0;
+}
+.h-speed i {
+  border-color: var(--hanji-line);
+}
+.h-speed i.on {
+  background: var(--jjok);
+  color: var(--hanji);
+  border-color: var(--jjok-deep);
+}
+.h-goal,
+.h-weather {
+  top: 136px;
+}
+
+/* 창: 한지 판 + 옻칠 액자 + 놋쇠 모서리 (두께와 그림자 있음) */
+.k-panel,
+.k-window,
+.k-tip,
+.k-bubble {
+  border-image: url(/ui/kit/board_frame.png) 175 fill / 40px / 10px stretch;
+}
+.k-panel,
+.k-window,
+.k-tip,
+.k-bubble {
+  border-width: 36px;
+  border-image-width: 44px;
+  border-image-outset: 8px;
+}
+.k-panel,
+.k-window,
+.k-tip,
+.k-bubble {
+  background: none;
+}

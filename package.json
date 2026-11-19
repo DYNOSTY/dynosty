@@ -26,8 +26,10 @@
     "@biomejs/biome": "2.6.7",
     "@playwright/test": "1.65.0",
     "@types/node": "26.6.6",
+    "@types/pngjs": "6.0.5",
     "concurrently": "10.0.7",
     "pg": "8.23.1",
+    "pngjs": "7.0.0",
     "typescript": "7.0.2",
     "vitest": "5.1.0"
   }

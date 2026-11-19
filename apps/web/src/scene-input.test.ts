@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { observeSceneClicks } from "./scene-input.js";
 
 function fixture() {
+  const focusCalls: FocusOptions[] = [];
   class Surface extends EventTarget {
+    focus(options?: FocusOptions) {
+      focusCalls.push(options ?? {});
+    }
     getBoundingClientRect() {
       return { left: 10, top: 20, width: 200, height: 100 };
     }
@@ -27,10 +31,18 @@ function fixture() {
       : release
     ).dispatchEvent(event);
   };
-  return { clicks, send, stop };
+  return { clicks, send, stop, focusCalls };
 }
 
 describe("장면 클릭 입력", () => {
+  it("누를 때 스크롤 없이 초점을 주고 종료 뒤에는 초점도 바꾸지 않는다", () => {
+    const f = fixture();
+    f.send("pointerdown");
+    expect(f.focusCalls).toEqual([{ preventScroll: true }]);
+    f.stop();
+    f.send("pointerdown");
+    expect(f.focusCalls).toHaveLength(1);
+  });
   it("빠른 연속 클릭을 모두 전달하고 캔버스 기준 좌표로 변환한다", () => {
     const f = fixture();
     try {

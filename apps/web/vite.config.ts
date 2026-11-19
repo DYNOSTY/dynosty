@@ -12,6 +12,10 @@ export default defineConfig(({ mode }) => {
       include: [
         "@babylonjs/core/Culling/ray",
         "@babylonjs/core/Rendering/outlineRenderer",
+        "@babylonjs/core/Meshes/Builders/sphereBuilder",
+        "@babylonjs/core/Meshes/Builders/cylinderBuilder",
+        "@babylonjs/core/Buffers/buffer",
+        "@babylonjs/core/Meshes/mesh.vertexData",
       ],
     },
     server: { port: 5173, strictPort: true, proxy },

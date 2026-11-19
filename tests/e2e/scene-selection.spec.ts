@@ -1,11 +1,33 @@
 import { expect, test } from "@playwright/test";
-import { clickExample, clickFloor, examplePoint } from "./scene-picking.js";
+import {
+  clickExample,
+  clickFloor,
+  examplePoint,
+  outlinePixels,
+  worldPoint,
+} from "./scene-picking.js";
 
 async function ready(page: import("@playwright/test").Page) {
   await page.goto("/");
   await expect(
     page.getByRole("button", { name: "건물 예제 선택", exact: true }),
   ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = (
+          window as unknown as {
+            __scene: {
+              getMeshById(name: string): { getChildMeshes(): unknown[] } | null;
+            };
+          }
+        ).__scene;
+        return (
+          scene.getMeshById("example-building-1")?.getChildMeshes().length ?? 0
+        );
+      }),
+    )
+    .toBeGreaterThan(0);
 }
 
 test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈 바닥에서 해제한다", async ({
@@ -23,18 +45,26 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   );
   // 패널 전환에 따른 장면 폭 변경 없이 실제 테두리 픽셀의 변화를 비교한다.
   await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   const canvas = page.locator("canvas");
-  const before = await canvas.screenshot();
+  expect(outlinePixels(await canvas.screenshot())).toBe(0);
   await clickExample(page, "building");
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
-  await expect(info.getByText("건물 예제", { exact: false })).toBeVisible();
-  await expect(info.getByText("기본 외형", { exact: true })).toBeVisible();
+  await expect(
+    info.getByText("복홀 방 게시판", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    info.getByText("정책 시행 · 필요량에 따른 배급", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "건물 예제 선택", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect
-    .poll(async () => (await canvas.screenshot()).equals(before))
-    .toBe(false);
+    .poll(async () => outlinePixels(await canvas.screenshot()))
+    .toBeGreaterThan(20);
+  await page.screenshot({
+    path: test.info().outputPath("bokhol-notice-board.png"),
+  });
   await clickExample(page, "resident");
   await expect(info.getByText("주민 예제", { exact: false })).toBeVisible();
   await expect(info.getByText("대기 표시", { exact: true })).toBeVisible();
@@ -44,8 +74,8 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   await clickFloor(page);
   await expect(info).toBeHidden();
   await expect
-    .poll(async () => (await canvas.screenshot()).equals(before))
-    .toBe(true);
+    .poll(async () => outlinePixels(await canvas.screenshot()))
+    .toBe(0);
   await expect(page.getByText("1일차", { exact: true })).toBeVisible();
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.example.saves")),
@@ -60,17 +90,17 @@ test("카메라 드래그·우클릭은 대상 선택이나 선택 해제로 처
   await ready(page);
   await clickExample(page, "building");
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
-  await expect(info).toContainText("건물 예제");
+  await expect(info).toContainText("복홀 방 게시판");
   const p = await examplePoint(page, "building");
   await page.mouse.move(p.x, p.y);
   await page.mouse.down();
   await page.mouse.move(p.x + 90, p.y + 30, { steps: 12 });
   await page.mouse.up();
-  await expect(info).toContainText("건물 예제");
+  await expect(info).toContainText("복홀 방 게시판");
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("캔버스 없음");
   await page.mouse.click(box.x + 10, box.y + 10, { button: "right" });
-  await expect(info).toContainText("건물 예제");
+  await expect(info).toContainText("복홀 방 게시판");
 });
 
 test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최신 예제 정보를 표시한다", async ({
@@ -86,7 +116,6 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
     .click();
   await expect(info).toContainText("걷기 표시");
   await expect(info).toContainText("2, 0, 1");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
   await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
@@ -102,7 +131,6 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
   await page
     .getByRole("button", { name: "개발 도구 닫기", exact: true })
     .click();
-  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   await expect(info).toBeVisible();
   await page.reload();
   await expect(info).toBeHidden();
@@ -117,7 +145,7 @@ test.describe("좁은 터치 화면", () => {
     const point = await examplePoint(page, "building");
     await page.touchscreen.tap(point.x, point.y);
     const info = page.getByRole("region", { name: "선택 정보", exact: true });
-    await expect(info).toContainText("건물 예제");
+    await expect(info).toContainText("복홀 방 게시판");
     await page
       .getByRole("button", { name: "주민 예제 선택", exact: true })
       .focus();
@@ -132,4 +160,54 @@ test.describe("좁은 터치 화면", () => {
       ),
     ).toBe(true);
   });
+});
+
+test("마당의 시설과 주민, 게시판을 눌러도 하단 콘솔이 움직이지 않는다", async ({
+  page,
+}) => {
+  await ready(page);
+  const panel = page.getByRole("region", { name: "선택 정보", exact: true });
+  const consoleBox = () => page.locator(".g-console").boundingBox();
+  const before = await consoleBox();
+  for (const [model, label] of [
+    ["BLD_OFFICE", "관아"],
+    ["R05_Gallimimus", "갈리미무스"],
+  ] as const) {
+    const position = await page.evaluate((model) => {
+      const scene = (
+        window as unknown as {
+          __scene: {
+            meshes: Array<{
+              metadata?: { villageTarget?: string };
+              getBoundingInfo(): {
+                boundingBox: {
+                  extendSizeWorld: { length(): number };
+                  centerWorld: { x: number; y: number; z: number };
+                };
+              };
+            }>;
+          };
+        }
+      ).__scene;
+      const meshes = scene.meshes.filter((m) =>
+        m.metadata?.villageTarget?.startsWith("village:" + model + ":"),
+      );
+      const bounds = meshes
+        .map((m) => m.getBoundingInfo().boundingBox)
+        .sort(
+          (a, b) => b.extendSizeWorld.length() - a.extendSizeWorld.length(),
+        );
+      const { x, y, z } = bounds[0]!.centerWorld;
+      return [x, y, z] as const;
+    }, model);
+    const point = await worldPoint(page, position, false);
+    await page.mouse.click(point.x, point.y);
+    await expect(panel).toContainText(label);
+    expect(await consoleBox()).toEqual(before);
+  }
+  await clickExample(page, "building");
+  await expect(panel).toContainText("복홀 방 게시판");
+  expect(await consoleBox()).toEqual(before);
+  await clickFloor(page);
+  await expect(page.getByRole("heading", { name: "복홀 본진" })).toBeVisible();
 });

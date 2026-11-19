@@ -1,0 +1,38 @@
+/* DYNOSTY 그림체 기준 (M1) — 유물 화면·시나리오 삽화·건물 도감에서 뽑음
+   재질: 한지 · 옻칠 나무 · 쪽빛 천 · 먹 · 낙관 빨강 */
+@import url("https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+
+:root {
+  /* 바탕 */
+  --hanji: #efe6d2; /* 한지 */
+  --hanji-deep: #e2d5bc; /* 한지 짙음 · 칸 구분 */
+  --hanji-line: #c7b79a; /* 한지 위 가는 선 */
+  /* 글자 */
+  --meok: #2b2620; /* 먹 · 본문 */
+  --meok-sub: #5d5347; /* 먹 연함 · 보조 (대비 4.5 이상) */
+  /* 재질 */
+  --ottchil: #3a2a22; /* 옻칠 나무 · 콘솔 틀 */
+  --ottchil-hi: #5a4334;
+  --jjok: #34436a; /* 쪽빛 · 주요 버튼 */
+  --jjok-deep: #26324f; /* 눌림 */
+  /* 강조 (한 화면에 하나만) */
+  --nakgwan: #a8322d; /* 낙관 빨강 · 경고·위험 */
+  --cheongja: #7f9e8e; /* 청자 · 희망·정상 */
+  --hanbok: #7b6a9b; /* 한복 보라 · 인물·선택 */
+
+  /* 글꼴 */
+  --font-title: "Gowun Batang", "Nanum Myeongjo", serif;
+  --font-body: Pretendard, "Malgun Gothic", system-ui, sans-serif;
+  /* 글자 크기 (1920×1080 기준, 본문 18 이상) */
+  --fs-display: 36px; /* 창 제목 */
+  --fs-title: 24px; /* 칸 제목 */
+  --fs-body: 18px; /* 본문 · 숫자 */
+  --fs-sub: 16px; /* 보조 · 꼬리표 */
+
+  /* 간격 8px 단위 */
+  --sp-1: 8px;
+  --sp-2: 16px;
+  --sp-3: 24px;
+  --sp-4: 32px;
+}

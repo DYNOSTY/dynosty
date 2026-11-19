@@ -1,0 +1,28 @@
+import { expect, type Page } from "@playwright/test";
+export const progressButton = (p: Page, name: string) =>
+  p.getByRole("button", { name, exact: true });
+export const progressCard = (p: Page, id: string) =>
+  p.getByTestId(`progress-site-${id}`);
+export async function enterProgress(p: Page) {
+  await p.goto("/");
+  await progressButton(p, "마른 목재20 조달 체험하기").click();
+  await progressButton(p, "일손 배치·배급 체험하기").click();
+  await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
+}
+export async function receiveProgress(p: Page) {
+  await enterProgress(p);
+  for (const n of [
+    "확장 제안 A 선택",
+    "확장 약정하기",
+    "확장 수레 출발",
+    "다음 일손 사건까지",
+    "확장 전량 검사 시작",
+    "다음 일손 사건까지",
+    "확장 정상분 16 받기",
+  ])
+    await progressButton(p, n).click();
+}
+export async function siteAction(p: Page, site: string, action: string) {
+  await progressButton(p, `${site} 작업 보기`).click();
+  await progressButton(p, action).click();
+}

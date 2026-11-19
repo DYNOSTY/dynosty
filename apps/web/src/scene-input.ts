@@ -1,4 +1,5 @@
 interface ClickSurface extends EventTarget {
+  focus?(options?: FocusOptions): void;
   getBoundingClientRect(): {
     left: number;
     top: number;
@@ -16,6 +17,8 @@ export function observeSceneClicks(
 ) {
   const pointers = new Map<number, { x: number; y: number; valid: boolean }>();
   const down = (event: Event) => {
+    // Babylon의 기본 focus가 캔버스를 스크롤해 누른 위치를 바꾸지 않게 먼저 초점을 둔다.
+    canvas.focus?.({ preventScroll: true });
     const p = event as PointerEvent;
     pointers.set(p.pointerId, {
       x: p.clientX,
@@ -49,14 +52,14 @@ export function observeSceneClicks(
     const y = p.clientY - rect.top;
     if (x >= 0 && y >= 0 && x < rect.width && y < rect.height) onClick(x, y);
   };
-  canvas.addEventListener("pointerdown", down);
+  canvas.addEventListener("pointerdown", down, true);
   releaseTarget.addEventListener("pointermove", move);
   releaseTarget.addEventListener("pointerup", up);
   releaseTarget.addEventListener("pointercancel", cancel);
   canvas.addEventListener("lostpointercapture", cancel);
   return () => {
     pointers.clear();
-    canvas.removeEventListener("pointerdown", down);
+    canvas.removeEventListener("pointerdown", down, true);
     releaseTarget.removeEventListener("pointermove", move);
     releaseTarget.removeEventListener("pointerup", up);
     releaseTarget.removeEventListener("pointercancel", cancel);

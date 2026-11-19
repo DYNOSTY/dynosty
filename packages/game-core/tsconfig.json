@@ -3,7 +3,8 @@
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2023"]
+    "lib": ["ES2023"],
+    "resolveJsonModule": true
   },
   "include": ["src"]
 }

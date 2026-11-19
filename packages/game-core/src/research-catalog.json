@@ -1,0 +1,1218 @@
+[
+  {
+    "id": "TECH_SEED",
+    "name": "살아남은 종자",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 0
+    },
+    "workdays": 0.5,
+    "effect": "온상 재배소 해금",
+    "mission": "1",
+    "scope": "campaign",
+    "category": "building",
+    "target": "farm",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "TECH_INSPECTION",
+    "name": "규격과 검수",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 6,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "품질 문제의 재검수 시간 4h→2h. 공급자 품질 이력 표시",
+    "mission": "1",
+    "scope": "campaign",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_TRAIL",
+    "name": "길 표식",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "정찰 속도 기본 대비 +50%(1.5배); 2단계와 중복 곱연산하지 않음",
+    "mission": "1",
+    "scope": "campaign",
+    "category": "movement",
+    "target": "",
+    "level": 1,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "TECH_INSULATION",
+    "name": "겹짚 보온",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 12,
+      "RES_METAL": 2
+    },
+    "workdays": 1,
+    "effect": "둥지 기본 보온 +1; 점유 둥지의 난방 목재 소모 ×0.75",
+    "mission": "1",
+    "scope": "campaign",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_PUMP",
+    "name": "증기 수문",
+    "tier": 2,
+    "requires": ["TECH_SEED"],
+    "cost": {
+      "RES_WOOD": 12,
+      "RES_METAL": 8
+    },
+    "workdays": 1,
+    "effect": "정수 물레방 60→80/일. 강물 양식장 날씨계수 하한0.75.",
+    "mission": "2",
+    "scope": "campaign",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_CULTURE",
+    "name": "계단식 온상",
+    "tier": 2,
+    "requires": ["TECH_SEED"],
+    "cost": {
+      "RES_WOOD": 18,
+      "RES_METAL": 6
+    },
+    "workdays": 1,
+    "effect": "온상 생산량 ×1.2; 물·목재 기본 투입은 동일",
+    "mission": "2",
+    "scope": "campaign",
+    "category": "building",
+    "target": "farm",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "TECH_SMOKE",
+    "name": "건조와 훈연",
+    "tier": 2,
+    "requires": ["TECH_INSPECTION"],
+    "cost": {
+      "RES_WOOD": 12,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "고기·어류 부패율 ×0.4. 풀 부패율은 유지.",
+    "mission": "2",
+    "scope": "campaign",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_WATCH",
+    "name": "경보와 순찰",
+    "tier": 2,
+    "requires": ["TECH_TRAIL"],
+    "cost": {
+      "RES_WOOD": 10,
+      "RES_METAL": 6
+    },
+    "workdays": 1,
+    "effect": "망루 해금; 일반 약탈대 경보 +6시간",
+    "mission": "2",
+    "scope": "campaign",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_ROUTES",
+    "name": "복수 조달로",
+    "tier": 3,
+    "requires": ["TECH_TRAIL", "TECH_INSPECTION"],
+    "cost": {
+      "RES_WOOD": 18,
+      "RES_METAL": 8
+    },
+    "workdays": 1.5,
+    "effect": "계약 동시수송 1→2. 출항 전 경로 변경 및 대체길 재예약 허용. 기본 우회길은 연구 없이 이용.",
+    "mission": "3",
+    "scope": "campaign",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_SHELTER",
+    "name": "축열 둥지",
+    "tier": 3,
+    "requires": ["TECH_INSULATION", "TECH_PUMP"],
+    "cost": {
+      "RES_WOOD": 20,
+      "RES_METAL": 8
+    },
+    "workdays": 1,
+    "effect": "점유 둥지 기본 보온 +1; 강추위 공급 손실 방지",
+    "mission": "3",
+    "scope": "campaign",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_REPAIR",
+    "name": "교체식 부품",
+    "tier": 3,
+    "requires": ["TECH_PUMP"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 10
+    },
+    "workdays": 1,
+    "effect": "건물 수리 비용 ×0.75, 공사 재개 지연 제거",
+    "mission": "3",
+    "scope": "campaign",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_BEHAVIOR",
+    "name": "이상행동 관측",
+    "tier": 3,
+    "requires": ["TECH_WATCH"],
+    "cost": {
+      "RES_WOOD": 12,
+      "RES_METAL": 8
+    },
+    "workdays": 1,
+    "effect": "변이 개체 신호 교란 대응 해금; 먹이 유인 손실 감소",
+    "mission": "3",
+    "scope": "campaign",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_MECHA",
+    "name": "장영실의 운반 기관",
+    "tier": 4,
+    "requires": ["TECH_REPAIR", "TECH_ROUTES"],
+    "cost": {
+      "RES_WOOD": 40,
+      "RES_METAL": 30
+    },
+    "workdays": 2,
+    "effect": "확장: 수송 자동화; 본편 잠금",
+    "mission": "",
+    "scope": "extension",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_AQUACULTURE",
+    "name": "순환 양식 수조",
+    "tier": 4,
+    "requires": ["TECH_PUMP", "TECH_CULTURE"],
+    "cost": {
+      "RES_WOOD": 36,
+      "RES_METAL": 24
+    },
+    "workdays": 2,
+    "effect": "확장: 어류 공급의 계절 변동 완화",
+    "mission": "",
+    "scope": "extension",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_FEDERATION",
+    "name": "연합 규격망",
+    "tier": 4,
+    "requires": ["TECH_ROUTES"],
+    "cost": {
+      "RES_WOOD": 32,
+      "RES_METAL": 18
+    },
+    "workdays": 2,
+    "effect": "확장: 군락 간 공동 비축·상호 검수",
+    "mission": "",
+    "scope": "extension",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_FORT",
+    "name": "증기 방호문",
+    "tier": 4,
+    "requires": ["TECH_BEHAVIOR", "TECH_REPAIR"],
+    "cost": {
+      "RES_WOOD": 30,
+      "RES_METAL": 30
+    },
+    "workdays": 2,
+    "effect": "확장: 대형 군락 방어",
+    "mission": "",
+    "scope": "extension",
+    "category": "legacy",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": false
+  },
+  {
+    "id": "TECH_SCOUT_SPEED_2",
+    "name": "정찰 이동 개선2",
+    "tier": 2,
+    "requires": ["TECH_TRAIL"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "정찰 속도 기본 대비 +100%(2배); 1단계 1.5배를 대체",
+    "mission": "2",
+    "scope": "campaign",
+    "category": "movement",
+    "target": "",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_HOME_2",
+    "name": "온돌 둥지 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "온돌 둥지 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "home",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_HOME_3",
+    "name": "온돌 둥지 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_HOME_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "온돌 둥지 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "home",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_RESTAURANT_2",
+    "name": "공동 식당 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "공동 식당 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "restaurant",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_RESTAURANT_3",
+    "name": "공동 식당 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_RESTAURANT_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "공동 식당 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "restaurant",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_LOGGING_2",
+    "name": "제재소 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "제재소 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "logging",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_LOGGING_3",
+    "name": "제재소 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_LOGGING_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "제재소 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "logging",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_STORAGE_2",
+    "name": "공동 저장소 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "공동 저장소 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "storage",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_STORAGE_3",
+    "name": "공동 저장소 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_STORAGE_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "공동 저장소 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "storage",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_COAL_2",
+    "name": "석탄광 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "석탄광 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "coal",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_COAL_3",
+    "name": "석탄광 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_COAL_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "석탄광 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "coal",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_IRON_2",
+    "name": "철광산 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "철광산 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "iron",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_IRON_3",
+    "name": "철광산 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_IRON_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "철광산 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "iron",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_QUARRY_2",
+    "name": "채석장 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "채석장 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "quarry",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_QUARRY_3",
+    "name": "채석장 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_QUARRY_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "채석장 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "quarry",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_FISHERY_2",
+    "name": "어획막 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "어획막 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "fishery",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_FISHERY_3",
+    "name": "어획막 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_FISHERY_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "어획막 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "fishery",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_RANCH_2",
+    "name": "목축장 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "목축장 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "ranch",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_RANCH_3",
+    "name": "목축장 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_RANCH_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "목축장 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "ranch",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_SCOUT_2",
+    "name": "정찰 거점 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "정찰 거점 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "scout",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_SCOUT_3",
+    "name": "정찰 거점 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_SCOUT_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "정찰 거점 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "scout",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_TRADE_2",
+    "name": "교역소 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "교역소 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "trade",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_TRADE_3",
+    "name": "교역소 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_TRADE_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "교역소 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "trade",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_WORKSHOP_2",
+    "name": "연구소 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "기술 공방 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "workshop",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_WORKSHOP_3",
+    "name": "연구소 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_WORKSHOP_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "기술 공방 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "workshop",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_HOSPITAL_2",
+    "name": "병원 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "병원 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "hospital",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_HOSPITAL_3",
+    "name": "병원 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_HOSPITAL_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "병원 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "hospital",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_WOOD_1",
+    "name": "목재 채집 개선1",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "목재 기본 처리량 1.5배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_WOOD",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_WOOD_2",
+    "name": "목재 채집 개선2",
+    "tier": 2,
+    "requires": ["GATHER_RES_WOOD_1"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "목재 기본 처리량 2배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_WOOD",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_COAL_1",
+    "name": "석탄 채집 개선1",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "석탄 기본 처리량 1.5배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_COAL",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_COAL_2",
+    "name": "석탄 채집 개선2",
+    "tier": 2,
+    "requires": ["GATHER_RES_COAL_1"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "석탄 기본 처리량 2배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_COAL",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_IRON_ORE_1",
+    "name": "철광석 채집 개선1",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "철광석 기본 처리량 1.5배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_IRON_ORE",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_IRON_ORE_2",
+    "name": "철광석 채집 개선2",
+    "tier": 2,
+    "requires": ["GATHER_RES_IRON_ORE_1"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "철광석 기본 처리량 2배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_IRON_ORE",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_STONE_1",
+    "name": "석재 채집 개선1",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "석재 기본 처리량 1.5배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_STONE",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_STONE_2",
+    "name": "석재 채집 개선2",
+    "tier": 2,
+    "requires": ["GATHER_RES_STONE_1"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "석재 기본 처리량 2배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_STONE",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_PLANT_1",
+    "name": "풀 채집 개선1",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "풀 기본 처리량 1.5배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_PLANT",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_PLANT_2",
+    "name": "풀 채집 개선2",
+    "tier": 2,
+    "requires": ["GATHER_RES_PLANT_1"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "풀 기본 처리량 2배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_PLANT",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_MEAT_1",
+    "name": "고기 채집 개선1",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "고기 기본 처리량 1.5배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_MEAT",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_MEAT_2",
+    "name": "고기 채집 개선2",
+    "tier": 2,
+    "requires": ["GATHER_RES_MEAT_1"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "고기 기본 처리량 2배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_MEAT",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_FISH_1",
+    "name": "어류 채집 개선1",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "어류 기본 처리량 1.5배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_FISH",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "GATHER_RES_FISH_2",
+    "name": "어류 채집 개선2",
+    "tier": 2,
+    "requires": ["GATHER_RES_FISH_1"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "어류 기본 처리량 2배 · 건물 단계와 겹쳐도 최고2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "collection",
+    "target": "RES_FISH",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "SPACE_2",
+    "name": "저장 공간 개선1",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "저장소 공간 최소1000 · 건물 단계와 높은 용량만 적용",
+    "mission": "",
+    "scope": "campaign",
+    "category": "storage",
+    "target": "",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "SPACE_3",
+    "name": "저장 공간 개선2",
+    "tier": 2,
+    "requires": ["SPACE_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "저장소 공간2000 · 건물 단계와 중복 곱연산 없음",
+    "mission": "",
+    "scope": "campaign",
+    "category": "storage",
+    "target": "",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "R17",
+    "name": "유산 기록 대조",
+    "tier": 3,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 20,
+      "RES_METAL": 10
+    },
+    "workdays": 1.5,
+    "effect": "후반 기록 대조 · 반란 사건 이후 연구",
+    "mission": "",
+    "scope": "campaign",
+    "category": "story",
+    "target": "",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "R18",
+    "name": "의식 이전 장치",
+    "tier": 3,
+    "requires": ["R17"],
+    "cost": {
+      "RES_WOOD": 20,
+      "RES_METAL": 10
+    },
+    "workdays": 1.5,
+    "effect": "충녕의 기계 부활에 필요한 의식 이전 기술",
+    "mission": "",
+    "scope": "campaign",
+    "category": "story",
+    "target": "",
+    "level": 3,
+    "route": "mechanical",
+    "connected": true
+  },
+  {
+    "id": "TECH_FLIGHT",
+    "name": "날틀",
+    "tier": 3,
+    "requires": ["R17", "TECH_SCOUT_SPEED_2"],
+    "cost": {
+      "RES_WOOD": 20,
+      "RES_METAL": 10
+    },
+    "workdays": 1.5,
+    "effect": "정찰 속도 기본10배 · 공통 연구와 나르미 배율을 대체",
+    "mission": "",
+    "scope": "campaign",
+    "category": "story",
+    "target": "",
+    "level": 3,
+    "route": "flight",
+    "connected": true
+  },
+  {
+    "id": "TECH_MECHA2",
+    "name": "메카2",
+    "tier": 3,
+    "requires": ["R18"],
+    "cost": {
+      "RES_WOOD": 20,
+      "RES_METAL": 10
+    },
+    "workdays": 1.5,
+    "effect": "충녕을 기계로 부활 · 사망자의 뼈로 식량·잠·거주지가 필요 없는 노동 개체 제작",
+    "mission": "",
+    "scope": "campaign",
+    "category": "story",
+    "target": "",
+    "level": 3,
+    "route": "mechanical",
+    "connected": true
+  },
+  {
+    "id": "TECH_ELECTRICAL",
+    "name": "전기자극기",
+    "tier": 3,
+    "requires": ["R17"],
+    "cost": {
+      "RES_WOOD": 20,
+      "RES_METAL": 10
+    },
+    "workdays": 1.5,
+    "effect": "지정 생산시설의 작업량 기본200% · 다른 배율과 겹쳐도2배",
+    "mission": "",
+    "scope": "campaign",
+    "category": "story",
+    "target": "",
+    "level": 3,
+    "route": "dictatorship",
+    "connected": true
+  }
+]
