@@ -153,14 +153,17 @@ describe("식성별 고정 정밀도 소비와 시간", () => {
   });
 });
 describe("승인된 실패·엔딩 판정", () => {
-  it("24시간 극단 유지와 회복, 가입 인원 분모의 80% 사망을 구분한다", () => {
+  it("민심 한계 도달 즉시 추방, 지지 소진 하루와 사망률 실패를 구분한다", () => {
     expect(
       evaluateOutcome({
         ...facts(),
         pessimism: 100,
-        pessimismExtremeMinutes: 1439,
+        pessimismExtremeMinutes: 0,
       }),
     ).toBe("continue");
+    expect(
+      evaluateOutcome({ ...facts(), difficulty: "hard", pessimism: 100 }),
+    ).toBe("failure");
     expect(
       evaluateOutcome({
         ...facts(),
@@ -175,6 +178,17 @@ describe("승인된 실패·엔딩 판정", () => {
         pessimismExtremeMinutes: 1440,
       }),
     ).toBe("continue");
+    expect(
+      evaluateOutcome({ ...facts(), optimism: 0, optimismZeroMinutes: 1439 }),
+    ).toBe("continue");
+    expect(
+      evaluateOutcome({
+        ...facts(),
+        difficulty: "hard",
+        optimism: 0,
+        optimismZeroMinutes: 0,
+      }),
+    ).toBe("failure");
     expect(
       evaluateOutcome({ ...facts(), optimism: 0, optimismZeroMinutes: 1440 }),
     ).toBe("failure");

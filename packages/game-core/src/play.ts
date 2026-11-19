@@ -145,7 +145,9 @@ export function parseRules(value: unknown): RuleSet {
     fail();
   const e = value.endings as Record<string, unknown>;
   if (
-    e.warningPessimism !== 90 ||
+    e.concernPessimism !== 60 ||
+    e.warningPessimism !== 75 ||
+    e.urgentPessimism !== 90 ||
     e.evictionPessimism !== 100 ||
     e.evictionOptimism !== 0 ||
     e.evictionMinutes !== 1440 ||
@@ -493,7 +495,15 @@ export function foodWarnings(state: PlayState, rules: RuleSet = GAME_RULES) {
       : [],
   );
 }
+export type Difficulty = "normal" | "hard";
+export function evictionDelay(
+  difficulty: Difficulty = "normal",
+  rules = GAME_RULES,
+) {
+  return difficulty === "hard" ? 0 : rules.endings.evictionMinutes;
+}
 export interface OutcomeFacts {
+  difficulty?: Difficulty;
   admitted: number;
   dead: number;
   pessimism: number;
@@ -522,11 +532,12 @@ export function evaluateOutcome(
     f.lowPessimismMinutes,
   ])
     number(n, 0, Number.MAX_SAFE_INTEGER, true);
+  const delay = evictionDelay(f.difficulty, rules);
   if (
     (f.pessimism >= rules.endings.evictionPessimism &&
-      f.pessimismExtremeMinutes >= rules.endings.evictionMinutes) ||
+      f.pessimismExtremeMinutes >= delay) ||
     (f.optimism <= rules.endings.evictionOptimism &&
-      f.optimismZeroMinutes >= rules.endings.evictionMinutes) ||
+      f.optimismZeroMinutes >= delay) ||
     f.dead / f.admitted >= rules.endings.deathFraction
   )
     return "failure";

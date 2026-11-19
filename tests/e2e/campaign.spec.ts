@@ -23,16 +23,28 @@ test("출문을 눈으로 확인하고 장면을 접었다 돌아와도 재고�
   await page.goto("/");
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveAccessibleName("별이 진 뒤, 복홀");
-  await expect(page.getByTestId("play-population")).toContainText("300");
+  await expect(page.getByTestId("play-population")).toContainText("600");
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("10,000");
-  await readScene(page, "복홀 성문으로");
+  await readScene(page, "어려움 · 복홀 성문으로");
   await expect(dialog).toHaveAccessibleName("목진이 문을 열어 달라고 했다");
   await page.reload();
   await expect(dialog).toHaveAccessibleName("목진이 문을 열어 달라고 했다");
   await readScene(page, "성문을 열고 남은 장부 확인");
   await expect(page.getByTestId("play-population")).toContainText("60");
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,000");
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
+          .campaign.difficulty,
+    ),
+  ).toBe("hard");
   await readScene(page, "남은 예순 명과 시작");
+  await page.getByRole("button", { name: "관아 · 순라 배치" }).click();
+  const office = page.getByRole("region", { name: "관아" });
+  await office.getByRole("button", { name: "1단계 · 4명" }).click();
+  await expect(office).toContainText("순라 포졸 4명");
+  await page.getByRole("button", { name: "관아 · 순라 배치" }).click();
   await page.getByRole("button", { name: "주민의 청 듣기" }).click();
   await expect(dialog.locator(".patrol-portrait")).toBeVisible();
   await readScene(page, "어류 4를 내어 병상까지 배달");
@@ -84,6 +96,79 @@ test("함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단
         .getByRole("button", { name: new RegExp("^" + name + " ·") }),
     ).toBeVisible();
   }
+});
+test("밤에 달이가 배급령 변경을 재촉하고 주민 청을 거절하면 그 자리에서 추방된다", async ({
+  page,
+}) => {
+  const start = createVillageGame();
+  const save = createTimberSave({
+    ...start,
+    world: { ...start.world, minute: 1080, pessimism: 94 },
+    campaign: { ...start.campaign!, difficulty: "hard" },
+  });
+  await page.addInitScript((value) => {
+    if (!localStorage.getItem("dynosty.village.resume"))
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
+  }, save);
+  await page.goto("/");
+  const warning = page.locator(".campaign-advisory");
+  await expect(warning).toContainText("달이");
+  await expect(warning).toContainText("오늘 밤 배급령부터 바꾸자");
+  await page.getByRole("button", { name: "주민의 청 듣기" }).click();
+  await readScene(page, "오늘은 창고의 비축 유지");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "아무도 깨우지 않는 아침",
+  );
+  await expect(warning).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "아무도 깨우지 않는 아침",
+  );
+});
+test("어려움으로 저장된 5단계에서 지지가 사라지면 시간 진행 없이 추방된다", async ({
+  page,
+}) => {
+  const s = createVillageGame();
+  const save = createTimberSave({
+    ...s,
+    chapter: 5,
+    campaign: { ...s.campaign!, beat: "vigil", difficulty: "hard" },
+    world: { ...s.world, optimism: 0, pessimism: 20 },
+  });
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "아무도 깨우지 않는 아침",
+  );
+});
+test("옛 저장은 기본 보통 난이도로 남은 유예 시간을 이어간다", async ({
+  page,
+}) => {
+  const s = createVillageGame();
+  const save = createTimberSave({
+    ...s,
+    chapter: 5,
+    campaign: { ...s.campaign!, beat: "vigil", pessimismExtremeSince: 0 },
+    elapsed: 1439,
+    world: { ...s.world, pessimism: 100 },
+  });
+  delete save.state.campaign!.difficulty;
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  await expect(page.locator(".campaign-advisory")).toContainText("배급령");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "마을 하루 진행" }).click();
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "아무도 깨우지 않는 아침",
+  );
 });
 test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 본다", async ({
   page,

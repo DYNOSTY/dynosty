@@ -147,7 +147,9 @@
     "yangnyeong": "stage5"
   },
   "endings": {
-    "warningPessimism": 90,
+    "concernPessimism": 60,
+    "warningPessimism": 75,
+    "urgentPessimism": 90,
     "evictionPessimism": 100,
     "evictionOptimism": 0,
     "evictionMinutes": 1440,

@@ -1,13 +1,21 @@
-import { AMOUNT_SCALE, GAME_RULES, type ResourceId } from "./play.js";
+import {
+  AMOUNT_SCALE,
+  type Difficulty,
+  evictionDelay,
+  foodWarnings,
+  GAME_RULES,
+  type ResourceId,
+} from "./play.js";
 import { isRecord } from "./save.js";
 import { SCOUT_SITES, scoutRun } from "./scout-sites.js";
+import { storageRoom } from "./storage.js";
 import { recordResearchStory } from "./story-research.js";
 import {
   commandTimber,
   createVillageGame,
   type TimberState,
 } from "./timber.js";
-import { payTown } from "./town.js";
+import { deposit, payTown } from "./town.js";
 
 export const CHAPTERS = [
   "복홀의 첫 명령",
@@ -79,6 +87,7 @@ export interface Campaign {
   reports: string[];
   patrolOrder: string[];
   petitionDay: number;
+  emergencyDay?: number;
   memorial: "recover" | "remember" | null;
   treaties: number[];
   caravan: { village: number; due: number } | null;
@@ -87,6 +96,7 @@ export interface Campaign {
   side: "coexist" | "control" | null;
   uprising: boolean;
   lastHigh: number;
+  difficulty?: Difficulty;
   pessimismExtremeSince?: number | null;
   optimismZeroSince?: number | null;
   ending: "hope" | "escape" | "collapse" | null;
@@ -94,6 +104,7 @@ export interface Campaign {
 export function newCampaign(beat: Beat, since = 0): Campaign {
   return {
     beat,
+    difficulty: "normal",
     since,
     reports: [],
     patrolOrder: [],
@@ -124,12 +135,16 @@ export function campaignValid(c: unknown, elapsed: number) {
   const village = (n: unknown) => integer(n, SETTLEMENTS.length - 1);
   return (
     BEATS.includes(c.beat as Beat) &&
+    (c.difficulty === undefined ||
+      c.difficulty === "normal" ||
+      c.difficulty === "hard") &&
     integer(c.since, elapsed) &&
     integer(c.lastHigh, elapsed) &&
     (c.pessimismExtremeSince == null ||
       integer(c.pessimismExtremeSince, elapsed)) &&
     (c.optimismZeroSince == null || integer(c.optimismZeroSince, elapsed)) &&
     integer(c.petitionDay, 100000) &&
+    (c.emergencyDay === undefined || integer(c.emergencyDay, 100000)) &&
     Array.isArray(c.patrolOrder) &&
     new Set(c.patrolOrder).size === c.patrolOrder.length &&
     c.patrolOrder.every((id) => SCOUT_SITES.some((site) => site.id === id)) &&
@@ -166,15 +181,18 @@ export function lostPatrol(s: TimberState) {
 }
 export function campaignOutcome(s: TimberState): Campaign["ending"] {
   const c = campaignOf(s);
+  const delay = evictionDelay(c.difficulty);
+  if (
+    s.world.pessimism >= GAME_RULES.endings.evictionPessimism &&
+    s.elapsed - (c.pessimismExtremeSince ?? s.elapsed) >= delay
+  )
+    return "collapse";
   if (s.chapter !== 5) return null;
   const people = s.world.citizens.filter((p) => !p.mechanicalFrom);
   const rules = GAME_RULES.endings;
-  const held = (since: number | null | undefined) =>
-    since != null && s.elapsed - since >= rules.evictionMinutes;
   if (
-    (s.world.pessimism >= rules.evictionPessimism &&
-      held(c.pessimismExtremeSince)) ||
-    (s.world.optimism <= rules.evictionOptimism && held(c.optimismZeroSince)) ||
+    (s.world.optimism <= rules.evictionOptimism &&
+      s.elapsed - (c.optimismZeroSince ?? s.elapsed) >= delay) ||
     people.filter((p) => !p.alive).length >=
       people.length * GAME_RULES.endings.deathFraction
   )
@@ -200,7 +218,26 @@ export function campaignOutcome(s: TimberState): Campaign["ending"] {
 }
 export function updateCampaign(s: TimberState): TimberState {
   let c = s.campaign;
-  if (!c) return s;
+  if (!c || c.ending) return s;
+  const rules = GAME_RULES.endings;
+  const pessimismExtremeSince =
+    s.world.pessimism >= rules.evictionPessimism
+      ? (c.pessimismExtremeSince ?? s.elapsed)
+      : null;
+  const optimismZeroSince =
+    s.chapter === 5 && s.world.optimism <= rules.evictionOptimism
+      ? (c.optimismZeroSince ?? s.elapsed)
+      : null;
+  if (
+    pessimismExtremeSince !== (c.pessimismExtremeSince ?? null) ||
+    optimismZeroSince !== (c.optimismZeroSince ?? null)
+  ) {
+    c = { ...c, pessimismExtremeSince, optimismZeroSince };
+    s = { ...s, campaign: c };
+  }
+  const ending = campaignOutcome(s);
+  if (ending)
+    return { ...s, paused: true, campaign: { ...c, beat: "ending", ending } };
   if (c.beat === "arrival" || c.beat === "winter") {
     const onset = c.beat === "arrival";
     const duration =
@@ -227,33 +264,13 @@ export function updateCampaign(s: TimberState): TimberState {
         caravan: null,
       },
     };
-  if (s.chapter === 5 && !c.ending) {
-    const rules = GAME_RULES.endings;
-    const pessimismExtremeSince =
-      s.world.pessimism >= rules.evictionPessimism
-        ? (c.pessimismExtremeSince ?? s.elapsed)
-        : null;
-    const optimismZeroSince =
-      s.world.optimism <= rules.evictionOptimism
-        ? (c.optimismZeroSince ?? s.elapsed)
-        : null;
-    if (
-      pessimismExtremeSince !== (c.pessimismExtremeSince ?? null) ||
-      optimismZeroSince !== (c.optimismZeroSince ?? null)
-    ) {
-      c = { ...c, pessimismExtremeSince, optimismZeroSince };
-      s = { ...s, campaign: c };
-    }
-    const ending = campaignOutcome(s);
-    if (ending)
-      return { ...s, paused: true, campaign: { ...c, beat: "ending", ending } };
-    if (
-      c.beat === "vigil" &&
-      s.world.pessimism > 30 &&
-      c.lastHigh !== s.elapsed
-    )
-      return { ...s, campaign: { ...c, lastHigh: s.elapsed } };
-  }
+  if (
+    s.chapter === 5 &&
+    c.beat === "vigil" &&
+    s.world.pessimism > 30 &&
+    c.lastHigh !== s.elapsed
+  )
+    return { ...s, campaign: { ...c, lastHigh: s.elapsed } };
   return s;
 }
 export type CampaignCommand = { type: "campaign"; beat: Beat; action: string };
@@ -303,12 +320,15 @@ export function actCampaign(
   }
   switch (c.beat) {
     case "opening":
-      if (action === "next") return change("departure");
+      if (action === "next" || action === "hard")
+        return change("departure", {
+          difficulty: action === "hard" ? "hard" : "normal",
+        });
       break;
     case "departure":
       if (action === "leave")
         return {
-          ...createVillageGame(),
+          ...createVillageGame(false, true),
           processed: s.processed,
           campaign: { ...c, beat: "after" },
         };
@@ -457,11 +477,58 @@ export function actCampaign(
         return change("vigil", { since: c.since }, base);
       }
       break;
+    case "vigil": {
+      const ration = emergencyRation(s);
+      if (!ration || action !== `ration:${s.world.day}:${ration}`) break;
+      const trade = c.side === "coexist";
+      const base = trade
+        ? payTown(s, { RES_WOOD: 12 })
+        : commandTimber(
+            s,
+            {
+              type: "citizen-event",
+              event: { type: "death", id: action, citizenIds: [ration] },
+            },
+            action,
+          );
+      const supplied = deposit(base, "RES_MEAT", 8);
+      return {
+        ...supplied,
+        campaign: { ...supplied.campaign!, emergencyDay: s.world.day },
+        world: {
+          ...supplied.world,
+          pessimism: Math.max(
+            0,
+            Math.min(100, supplied.world.pessimism + (trade ? -2 : 12)),
+          ),
+        },
+      };
+    }
     case "ending":
       if (action === "finish") return change("finished");
       break;
   }
   throw Error("아직 이 명령의 조건을 갖추지 못했습니다.");
+}
+export function emergencyRation(s: TimberState) {
+  const c = s.campaign;
+  if (
+    c?.beat !== "vigil" ||
+    !c.side ||
+    c.emergencyDay === s.world.day ||
+    !foodWarnings(s.world).some((w) => w.id === "RES_MEAT") ||
+    storageRoom(s, "RES_MEAT") < 8
+  )
+    return;
+  if (c.side === "coexist")
+    return canPay(s, "RES_WOOD", 12) ? "trade" : undefined;
+  const residents = s.world.citizens.filter(
+    (p) => p.alive && !p.mechanicalFrom,
+  );
+  return (
+    residents.find((p) => p.diet === "RES_MEAT" && p.health === "sick") ??
+    residents.find((p) => p.diet === "RES_PLANT")
+  )?.id;
 }
 export function canPay(s: TimberState, resource: ResourceId, units: number) {
   return (

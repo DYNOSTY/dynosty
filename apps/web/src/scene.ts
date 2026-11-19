@@ -763,6 +763,13 @@ export function mountScene(
       if (state && !villageState) resetWorldCamera();
       updateGround(state);
       entities.setElevation(elevation);
+      if (state?.decree && state.decree.serial !== villageState?.decree?.serial)
+        village.postDecree(state.decree.title, !!villageState);
+      if (!state?.decree && villageState?.decree) village.clearDecree();
+      village.setFireDamage(
+        !!state?.rebuilding,
+        state?.campaign?.beat === "departure",
+      );
       villageState = state;
       animationSpeed = state?.speed ?? 1;
       entities.setObstacles(
