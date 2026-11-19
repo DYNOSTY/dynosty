@@ -104,6 +104,7 @@ export {
   type TimberState as LegacyTimberState,
 } from "./legacy-timber.js";
 export * from "./logging.js";
+export * from "./mutants.js";
 export {
   AMOUNT_SCALE,
   advancePlayClock,

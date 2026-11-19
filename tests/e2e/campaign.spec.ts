@@ -246,3 +246,50 @@ test("성문 수비와 온돌을 배치하고 삽화가 있는 전투 보고를 
   await report.getByRole("button", { name: "보고 확인" }).click();
   await expect(report).toHaveCount(0);
 });
+
+test("붉은 눈의 주민에게 치안대를 보내고 훼손된 둥지만 수리한다", async ({
+  page,
+}) => {
+  const base = createVillageGame(false, true);
+  const guard = commandTimber(base, { type: "set-guards", count: 4 }, "guard");
+  const patient = guard.residents.find((r) => !r.workplaceId)!;
+  const injured = commandTimber(
+    guard,
+    {
+      type: "citizen-event",
+      event: {
+        type: "illness",
+        id: "wounded",
+        citizenIds: [patient.id],
+        severity: "major",
+      },
+    },
+    "wounded",
+  );
+  const save = createTimberSave({
+    ...injured,
+    mutants: [{ id: patient.id, due: 30 }],
+    mutantDamage: { [injured.homes[0]!.id]: 25 },
+  });
+  await page.addInitScript((value) => {
+    if (!localStorage.getItem("dynosty.village.resume"))
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
+  }, save);
+  await page.goto("/");
+  const active = page.getByRole("region", { name: "마을 안 변종" });
+  await expect
+    .poll(() =>
+      active
+        .getByRole("img")
+        .evaluate((el) => (el as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  await active.getByRole("button", { name: "치안대 출동" }).click();
+  await expect(active).toHaveCount(0);
+  const repair = page.getByRole("button", { name: "수리 · 목재 4, 석재 1" });
+  await repair.click();
+  await expect(repair).toHaveCount(0);
+  await page.reload();
+  await expect(active).toHaveCount(0);
+  await expect(repair).toHaveCount(0);
+});

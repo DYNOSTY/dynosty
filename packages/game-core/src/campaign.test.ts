@@ -456,6 +456,8 @@ it("온돌 연료를 매시간 결제하고 성문 전투 결과와 삽화를 �
   s = commandTimber(s, { type: "advance", minutes: 60 }, "hour");
   expect(s.firedHeat).toBe(3);
   expect(s.world.resources.RES_WOOD).toBe(wood - 3 * AMOUNT_SCALE);
+  expect(gateRaid(s, () => 0)).toBe(s);
+  s = { ...s, world: { ...s.world, minute: 1260 } };
   const safe = restore(
     gateRaid(s, vi.fn().mockReturnValueOnce(0).mockReturnValue(0.99)),
   );

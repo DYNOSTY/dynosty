@@ -53,6 +53,14 @@ import {
   staffLogging,
 } from "./logging.js";
 import {
+  advanceMutants,
+  containMutant,
+  mutantStructure,
+  mutantWound,
+  repairMutantDamage,
+  usableHomes,
+} from "./mutants.js";
+import {
   AMOUNT_SCALE,
   advancePlayClock,
   applyCitizenEvent,
@@ -209,6 +217,9 @@ export interface VillageResident extends ResidentRoutine {
   readonly lastMeal: MealPlan["foods"] | null;
 }
 export interface TimberState {
+  readonly sighting?: { species: string; source: "gate" | "scout" };
+  readonly mutants?: readonly { id: string; due: number }[];
+  readonly mutantDamage?: Readonly<Record<string, number>>;
   readonly heating?: number;
   readonly firedHeat?: number;
   readonly raid?: {
@@ -332,6 +343,8 @@ export type TimberCommand =
   | { type: "set-logging-workers"; count: number; siteId?: ProductionSiteId }
   | { type: "set-restaurant-workers"; count: number }
   | { type: "set-heating"; level: number }
+  | { type: "contain-mutant"; resident: string }
+  | { type: "repair-mutant"; building: string }
   | { type: "dismiss-raid" }
   | { type: "set-gate"; count: number }
   | { type: "set-guards"; count: 0 | 4 | 8 | 16 }
@@ -604,8 +617,7 @@ const constructionSite = (
   headingRadians = Math.PI,
 ): GroundPoint =>
   kind === "home" ? homeEntrance({ position: p, headingRadians }) : { ...p };
-const habitableHomes = (homes: readonly VillageHome[], health: number) =>
-  health > 0 ? homes : homes.filter((h) => h.id !== "example-building-1");
+
 export const villageObstacles = (s: TimberState): GroundObstacle[] => [
   ...townObstacles(s),
   ...(s.construction?.kind === "home" ? [homeObstacle(s.construction)] : []),
@@ -650,6 +662,7 @@ export function restaurantStaff(s: TimberState, facilityId?: string) {
   const assigned = s.residents.filter(
     (r) =>
       isDiningEmployee(s, r) &&
+      s.mutantDamage?.[employeeRestaurant(s, r.id)?.id ?? ""] !== 100 &&
       r.health === "healthy" &&
       (!facilityId || employeeRestaurant(s, r.id)?.id === facilityId),
   );
@@ -1095,7 +1108,7 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
                 : r,
             ),
             next.world.citizens,
-            habitableHomes(homes, next.buildingHealth),
+            usableHomes(next, homes),
           ),
         },
         build.kind === "restaurant"
@@ -2120,6 +2133,37 @@ export function parseTimberState(value: unknown): TimberState {
     ids.add(r.id);
   }
   const s = JSON.parse(JSON.stringify(value)) as TimberState;
+  if (
+    s.mutants !== undefined &&
+    (!Array.isArray(s.mutants) ||
+      new Set(s.mutants.map((m) => m?.id)).size !== s.mutants.length ||
+      s.mutants.some(
+        (m) =>
+          !m ||
+          !s.residents.some((r) => r.id === m.id) ||
+          !Number.isSafeInteger(m.due) ||
+          m.due < 0,
+      ))
+  )
+    fail("변종 사건 기록 오류");
+  if (
+    s.mutantDamage !== undefined &&
+    (!isRecord(s.mutantDamage) ||
+      Object.entries(s.mutantDamage).some(
+        ([id, damage]) =>
+          !mutantStructure(s, id) ||
+          !Number.isInteger(damage) ||
+          damage <= 0 ||
+          damage > 100,
+      ))
+  )
+    fail("건물 손상 기록 오류");
+  if (
+    s.sighting &&
+    (!["gate", "scout"].includes(s.sighting.source) ||
+      !["R02", "R03", "SPINO"].includes(s.sighting.species))
+  )
+    fail("변종 목격 기록 오류");
   num(s.heating ?? 0, 3);
   num(s.firedHeat ?? 0, 3);
   if (s.raid !== undefined) {
@@ -2477,7 +2521,7 @@ const merchantGoods = [
 const paymentItems = [5, 3, 4, 4, 8, 3, 2, 3, 1] as const;
 function merchantStaff(s: TimberState) {
   const post = s.town.facilities.find((f) => f.kind === "trade");
-  return post
+  return post && s.mutantDamage?.[post.id] !== 100
     ? s.residents.filter(
         (r) =>
           r.workplaceId === "facility:" + post.id &&
@@ -2536,6 +2580,7 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
   if (
     !s.campaign ||
     !villageDefenseActive(s) ||
+    (s.world.minute >= 360 && s.world.minute < 1080) ||
     s.campaign.ending ||
     random() >= 0.15
   )
@@ -2570,11 +2615,18 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
       id,
     );
     if (killed) dead++;
-    else injured++;
+    else {
+      injured++;
+      s = mutantWound(s, victim!.id, random);
+    }
   }
   return note(
     {
       ...s,
+      sighting: {
+        source: "gate",
+        species: ["R02", "R03", "SPINO"][Math.floor(random() * 3)]!,
+      },
       raid: {
         minute: s.elapsed,
         picture: Math.floor(random() * 6),
@@ -2582,7 +2634,7 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
         injured,
       },
     },
-    `성문에서 습격을 막아냈습니다. 사망 ${dead}명, 부상 ${injured}명.`,
+    `붉은 눈의 변종 공룡이 성문에서 물러났습니다. 사망 ${dead}명, 부상 ${injured}명.`,
   );
 }
 export function villageFatalIncident(
@@ -2597,7 +2649,12 @@ export function villageFatalIncident(
     random() >= 0.01 + Math.max(0, -temperature) * 0.001
   )
     return s;
-  const cases: { id: string; cause: string; injury?: string }[] = [];
+  const cases: {
+    id: string;
+    cause: string;
+    injury?: string;
+    mutant: boolean;
+  }[] = [];
   const guards = s.residents.filter(
     (r) => r.workplaceId === "office" && r.health === "healthy",
   ).length;
@@ -2609,17 +2666,21 @@ export function villageFatalIncident(
     if (r.health === "dead" || isMechanical(s, r.id)) continue;
     let cause: string | undefined;
     let injury: string | undefined;
+    let mutant = false;
     if (
       r.task === "patrol-recovery" ||
       r.task?.startsWith("scout:") ||
       s.town.trips.some((t) => t.kind === "hunt" && t.ids.includes(r.id))
     ) {
       if (!scoutAccident) continue;
-      cause = [
-        "산적의 매복으로 정찰 중 숨졌습니다.",
-        "정찰길 낙석 사고로 숨졌습니다.",
-        "정찰 중 들짐승의 습격으로 숨졌습니다.",
-      ][Math.floor(random() * 3)]!;
+      mutant = night && random() < 0.7;
+      cause = mutant
+        ? "성 밖에서 붉은 눈의 변종 공룡에게 습격당해 숨졌습니다."
+        : [
+            "산적의 매복으로 정찰 중 숨졌습니다.",
+            "정찰길 낙석 사고로 숨졌습니다.",
+            "정찰 중 들짐승의 습격으로 숨졌습니다.",
+          ][Math.floor(random() * 3)]!;
       injury = cause.replace("숨졌습니다.", "다쳤습니다.");
     } else if (atHospital(s, r)) {
       if (
@@ -2643,7 +2704,11 @@ export function villageFatalIncident(
       cause = "작업장에서 일하던 중 사고로 숨졌습니다.";
       injury = "작업장에서 일하던 중 다쳤습니다.";
     } else if (
-      temperature + (r.homeId ? (s.firedHeat ?? 0) * 8 : 0) < 0 &&
+      temperature +
+        (r.homeId && s.mutantDamage?.[r.homeId] !== 100
+          ? (s.firedHeat ?? 0) * 8
+          : 0) <
+        0 &&
       !r.task &&
       r.routine !== "eating"
     ) {
@@ -2661,6 +2726,7 @@ export function villageFatalIncident(
       cases.push({
         id: r.id,
         cause,
+        mutant,
         ...(injury && r.health === "healthy" ? { injury } : {}),
       });
   }
@@ -2669,7 +2735,7 @@ export function villageFatalIncident(
   const id = "village-fatality-" + s.elapsed;
   if (s.world.citizenEvents?.includes(id)) return s;
   const wounded = casualty.injury && random() >= 0.25;
-  return note(
+  const result = note(
     commandTimber(
       s,
       {
@@ -2687,6 +2753,15 @@ export function villageFatalIncident(
     ),
     `주민 ${s.residents.findIndex((r) => r.id === casualty.id) + 1} · ${wounded ? casualty.injury : casualty.cause}`,
   );
+  if (!casualty.mutant) return result;
+  const seen: TimberState = {
+    ...result,
+    sighting: {
+      source: "scout",
+      species: ["R02", "R03", "SPINO"][Math.floor(random() * 3)]!,
+    },
+  };
+  return wounded ? mutantWound(seen, casualty.id, random) : seen;
 }
 export function advanceTimber(
   input: TimberState,
@@ -2831,7 +2906,10 @@ export function advanceTimber(
       s.elapsed % 60 === 0
     ) {
       s = villageFatalIncident(fireOndol(s));
-      if (s.elapsed % 1440 === 0) s = gateRaid(s);
+    }
+    if (villageDefenseActive(s) && !s.campaign?.ending) {
+      if (s.world.minute === 1260) s = gateRaid(s);
+      if (s.mutants?.length) s = advanceMutants(s);
     }
     const previousEnding = s.campaign?.ending;
     s = updateCampaign(s);
@@ -2858,6 +2936,12 @@ export function commandTimber(
   }
   let n = s;
   switch (command.type) {
+    case "repair-mutant":
+      n = repairMutantDamage(s, command.building);
+      break;
+    case "contain-mutant":
+      n = containMutant(s, command.resident);
+      break;
     case "set-heating":
       num(command.level, 3);
       n = { ...s, heating: command.level };
@@ -3294,11 +3378,7 @@ export function commandTimber(
       };
       n = {
         ...n,
-        residents: assignHomes(
-          n.residents,
-          n.world.citizens,
-          habitableHomes(n.homes, n.buildingHealth),
-        ),
+        residents: assignHomes(n.residents, n.world.citizens, usableHomes(n)),
       };
       n = staffLogging(staffRestaurant(replaceCrew(n)), eligible);
       if (
@@ -3430,11 +3510,7 @@ export function commandTimber(
       if (n.buildingHealth === 0)
         n = {
           ...n,
-          residents: assignHomes(
-            n.residents,
-            n.world.citizens,
-            habitableHomes(n.homes, n.buildingHealth),
-          ),
+          residents: assignHomes(n.residents, n.world.citizens, usableHomes(n)),
         };
       if (
         n.buildingHealth === 0 &&

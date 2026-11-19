@@ -3,6 +3,9 @@ import {
   campaignOf,
   canPay,
   foodWarnings,
+  mutantNames,
+  mutantRepairCost,
+  mutantStructure,
   type TimberCommand,
   type TimberState,
   villageDefenseActive,
@@ -345,6 +348,91 @@ export function CampaignPanel({
               ))}
             </section>
           )}
+          {s.sighting && (
+            <section className="office-panel" aria-label="변종 목격 기록">
+              <img
+                src={"/art/mutant-" + s.sighting.species + ".webp"}
+                alt={"붉어진 눈의 " + mutantNames[s.sighting.species]}
+              />
+              <strong>
+                {s.sighting.source === "gate"
+                  ? "성문 야경 보고"
+                  : "정찰대 목격 보고"}{" "}
+                · {mutantNames[s.sighting.species]}
+              </strong>
+              <p>
+                {s.sighting.source === "gate"
+                  ? "문지기: 저놈, 지난겨울엔 내 손에서 여물을 받아먹었습니다. 오늘 밤엔 제 이름을 불러도 문짝만 들이받더군요."
+                  : "정찰대원: 처음엔 횃불인 줄 알았습니다. 불 두 점이 같이 깜박이더니 눈밭을 가로질러 우리한테 달려들었습니다."}
+              </p>
+            </section>
+          )}
+          {s.mutants?.map((m) => {
+            const species = s.world.citizens.find(
+              (r) => r.id === m.id,
+            )!.species;
+            return (
+              <section
+                key={m.id}
+                className="office-panel"
+                aria-label="마을 안 변종"
+              >
+                <img
+                  src={"/art/mutant-" + species + ".webp"}
+                  alt={"눈이 붉어진 " + mutantNames[species]}
+                />
+                <strong>마을 안 변종 · {mutantNames[species]}</strong>
+                <p>
+                  달이: 붕대를 갈아 주던 손을 뿌리쳤어. 저 힘으로 기둥을 밀면
+                  지붕이 내려앉아. 포졸을 불러 줘!
+                </p>
+                <button
+                  type="button"
+                  disabled={
+                    !s.residents.some(
+                      (r) =>
+                        r.workplaceId === "office" && r.health === "healthy",
+                    )
+                  }
+                  onClick={() =>
+                    command({ type: "contain-mutant", resident: m.id })
+                  }
+                >
+                  치안대 출동
+                </button>
+              </section>
+            );
+          })}
+          {Object.entries(s.mutantDamage ?? {}).map(([id, damage]) => {
+            const target =
+              s.homes.find((h) => h.id === id) ??
+              s.town.facilities.find((f) => f.id === id);
+            if (!target) return null;
+            const cost = mutantRepairCost(s, id);
+            return (
+              <section className="office-panel" key={id}>
+                <strong>
+                  {mutantStructure(s, id)?.name} · 내구도 {100 - damage}/100
+                </strong>
+                <small>
+                  위치 {Math.round(target.position.x)},{" "}
+                  {Math.round(target.position.z)}
+                </small>
+                <button
+                  type="button"
+                  disabled={
+                    !canPay(s, "RES_WOOD", cost.RES_WOOD) ||
+                    !canPay(s, "RES_STONE", cost.RES_STONE)
+                  }
+                  onClick={() =>
+                    command({ type: "repair-mutant", building: id })
+                  }
+                >
+                  수리 · 목재 {cost.RES_WOOD}, 석재 {cost.RES_STONE}
+                </button>
+              </section>
+            );
+          })}
           {s.raid && (
             <section className="office-panel" aria-label="성문 전투 보고">
               <img
@@ -353,7 +441,7 @@ export function CampaignPanel({
               />
               <strong>성문 전투 보고</strong>
               <p>
-                습격대가 물러났습니다.{" "}
+                붉은 눈의 변종들이 성문에서 물러났습니다.{" "}
                 {s.raid.dead || s.raid.injured
                   ? `사망 ${s.raid.dead}명 · 부상 ${s.raid.injured}명`
                   : "모두 무사합니다."}

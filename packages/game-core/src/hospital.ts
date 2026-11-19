@@ -66,12 +66,13 @@ export function advanceHospital(
   for (const original of s.town.patients) {
     const p = { ...original };
     let r = s.residents.find((r) => r.id === p.resident);
-    if (!r) continue;
+    if (!r || s.mutants?.some((m) => m.id === r?.id)) continue;
     if (p.hospital === null) {
       const hospitals = s.town.facilities
         .filter(
           (f) =>
             f.kind === "hospital" &&
+            s.mutantDamage?.[f.id] !== 100 &&
             s.town.patients.filter((q) => q.hospital === f.id).length <
               hospitalBeds(f.level),
         )
@@ -101,7 +102,7 @@ export function advanceHospital(
       const staffed = s.residents.some(
         (q) => q.workplaceId === `facility:${f.id}` && q.health === "healthy",
       );
-      if (arrived && staffed)
+      if (arrived && staffed && s.mutantDamage?.[f.id] !== 100)
         p.progress += (minutes * 12) / hospitalHours(f.level);
       r = {
         ...r,

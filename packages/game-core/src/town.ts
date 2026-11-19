@@ -34,6 +34,7 @@ import {
 } from "./home-placement.js";
 import { advanceHospital, hospitalValid, type Patient } from "./hospital.js";
 import { loggingSites, productionSites, setLoggingSite } from "./logging.js";
+import { usableHomes } from "./mutants.js";
 import { AMOUNT_SCALE, type FoodId, type ResourceId } from "./play.js";
 import {
   type GroundPoint,
@@ -669,7 +670,7 @@ export function advanceTown(input: TimberState, minutes: number): TimberState {
                 : h,
             ),
           };
-          residents = assignHomes(residents, s.world.citizens, s.homes);
+          residents = assignHomes(residents, s.world.citizens, usableHomes(s));
         } else if (o.kind === "home") {
           const homes = [
             ...s.homes,
@@ -683,9 +684,7 @@ export function advanceTown(input: TimberState, minutes: number): TimberState {
           residents = assignHomes(
             residents,
             s.world.citizens,
-            s.buildingHealth > 0
-              ? homes
-              : homes.filter((h) => h.id !== "example-building-1"),
+            usableHomes(s, homes),
           );
           s = {
             ...s,
@@ -860,7 +859,7 @@ function advanceTownProduction(
   for (const original of s.town.facilities) {
     const f = { ...original };
     const resource = facilityResource(f);
-    if (!resource) continue;
+    if (!resource || s.mutantDamage?.[f.id] === 100) continue;
     const workers = s.residents.filter(
       (r) =>
         r.workplaceId === `facility:${f.id}` &&
@@ -1039,6 +1038,7 @@ export function dispatchFood(
   const f = s.town.facilities.find((f) => f.id === facilityId);
   if (
     !f ||
+    s.mutantDamage?.[f.id] === 100 ||
     !["scout", "trade"].includes(f.kind) ||
     !["RES_PLANT", "RES_MEAT", "RES_FISH"].includes(food)
   )
