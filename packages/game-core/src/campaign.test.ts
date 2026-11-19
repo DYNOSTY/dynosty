@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import {
   campaignOf,
   campaignOutcome,
@@ -170,7 +170,62 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(() => act(s, "next")).toThrow();
   s = later(s, 60 * 60);
   for (const x of SCOUT_SITES) {
-    s = restore(act(s, x.id === lostPatrol(s) ? "recover" : "report:" + x.id));
+    if (x.id !== lostPatrol(s)) {
+      s = restore(act(s, "report:" + x.id));
+      continue;
+    }
+    const roll = vi.spyOn(Math, "random");
+    try {
+      for (const [draw, increase] of [
+        [0.49, 1],
+        [0.5, 0],
+      ] as const) {
+        roll.mockReturnValue(draw);
+        const stayed = restore(act(s, "remember"));
+        expect(stayed.world.pessimism).toBe(s.world.pessimism + increase);
+        expect(stayed.campaign?.recoveryDue).toBeNull();
+        expect(stayed.residents.some((r) => r.task === "patrol-recovery")).toBe(
+          false,
+        );
+      }
+    } finally {
+      roll.mockRestore();
+    }
+    const before = restore({
+      ...s,
+      logging: { ...s.logging, built: true, target: 2 },
+      residents: s.residents.map((r, i) =>
+        i < 2 ? { ...r, workplaceId: "logging" } : r,
+      ),
+    });
+    s = restore(act(before, "recover"));
+    expect(s.world.optimism).toBe(before.world.optimism + 1);
+    const roster = s.residents.filter((r) => r.task === "patrol-recovery");
+    expect(roster).toHaveLength(2);
+    expect(roster.every((r) => r.workplaceId === "logging")).toBe(true);
+    const workingDay = commandTimber(
+      s,
+      { type: "advance", minutes: 30 },
+      "work",
+    );
+    expect(workingDay.logging.progress).toBe(before.logging.progress);
+    expect(workingDay.logging.buffer).toBe(before.logging.buffer);
+    const lastMinute = later(
+      workingDay,
+      s.campaign!.recoveryDue! - workingDay.elapsed - 1,
+    );
+    expect(
+      lastMinute.residents.filter((r) => r.task === "patrol-recovery"),
+    ).toHaveLength(2);
+    const back = restore(
+      commandTimber(lastMinute, { type: "advance", minutes: 1 }, "return"),
+    );
+    expect(back.campaign?.recoveryDue).toBeNull();
+    expect(
+      back.residents
+        .filter((r) => roster.some((member) => member.id === r.id))
+        .every((r) => r.workplaceId === "logging" && !r.task),
+    ).toBe(true);
   }
   expect(s.world.citizens.filter((c) => !c.alive)).toHaveLength(2);
   expect(s.scoutVisitors).toBe(1);

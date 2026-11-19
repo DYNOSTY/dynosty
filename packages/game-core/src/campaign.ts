@@ -7,15 +7,16 @@ import {
   type ResourceId,
 } from "./play.js";
 import { isRecord } from "./save.js";
-import { SCOUT_SITES, scoutRun } from "./scout-sites.js";
+import { SCOUT_CREW, SCOUT_SITES, scoutRun } from "./scout-sites.js";
 import { storageRoom } from "./storage.js";
 import { recordResearchStory } from "./story-research.js";
 import {
   commandTimber,
   createVillageGame,
+  note,
   type TimberState,
 } from "./timber.js";
-import { deposit, payTown } from "./town.js";
+import { deposit, facilityResource, payTown } from "./town.js";
 
 export const CHAPTERS = [
   "복홀의 첫 명령",
@@ -88,6 +89,7 @@ export interface Campaign {
   patrolOrder: string[];
   petitionDay: number;
   emergencyDay?: number;
+  recoveryDue?: number | null;
   memorial: "recover" | "remember" | null;
   treaties: number[];
   caravan: { village: number; due: number } | null;
@@ -138,6 +140,7 @@ export function campaignValid(c: unknown, elapsed: number) {
     (c.difficulty === undefined ||
       c.difficulty === "normal" ||
       c.difficulty === "hard") &&
+    (c.recoveryDue == null || integer(c.recoveryDue, 144000000)) &&
     integer(c.since, elapsed) &&
     integer(c.lastHigh, elapsed) &&
     (c.pessimismExtremeSince == null ||
@@ -175,6 +178,38 @@ export function returnedScouts(s: TimberState) {
     const run = site && scoutRun(s, site);
     return run !== undefined && now >= run.due;
   });
+}
+function patrolCasualties(s: TimberState) {
+  return s.world.citizens
+    .filter((p) => p.alive && !p.mechanicalFrom)
+    .slice(-2)
+    .map((p) => p.id);
+}
+export function recoveryCrew(s: TimberState) {
+  const casualties = patrolCasualties(s);
+  const production = new Set(
+    s.town.facilities
+      .filter((f) => facilityResource(f))
+      .map((f) => "facility:" + f.id),
+  );
+  const producer = (work: string | null) =>
+    !!work && (work.startsWith("logging") || production.has(work));
+  return s.residents
+    .filter(
+      (r) =>
+        r.health === "healthy" &&
+        !r.task &&
+        !r.nextWork &&
+        (producer(r.workplaceId) || !r.workplaceId) &&
+        !s.workerIds.includes(r.id) &&
+        !casualties.includes(r.id),
+    )
+    .sort(
+      (a, b) =>
+        Number(producer(b.workplaceId)) - Number(producer(a.workplaceId)),
+    )
+    .slice(0, SCOUT_CREW)
+    .map((r) => r.id);
 }
 export function lostPatrol(s: TimberState) {
   return (s.campaign?.patrolOrder ?? Object.keys(s.scoutDepartures ?? {}))[2];
@@ -218,6 +253,19 @@ export function campaignOutcome(s: TimberState): Campaign["ending"] {
 }
 export function updateCampaign(s: TimberState): TimberState {
   let c = s.campaign;
+  if (c?.recoveryDue != null && s.elapsed >= c.recoveryDue) {
+    c = { ...c, recoveryDue: null };
+    s = {
+      ...note(
+        s,
+        "수습대가 두 사람을 모시고 돌아왔습니다. 파견된 주민들이 마을 일에 복귀합니다.",
+      ),
+      campaign: c,
+      residents: s.residents.map((r) =>
+        r.task === "patrol-recovery" ? { ...r, task: null } : r,
+      ),
+    };
+  }
   if (!c || c.ending) return s;
   const rules = GAME_RULES.endings;
   const pessimismExtremeSince =
@@ -353,10 +401,11 @@ export function actCampaign(
         report === lostPatrol(s) &&
         ["recover", "remember"].includes(action)
       ) {
-        const dead = s.world.citizens
-          .filter((p) => p.alive && !p.mechanicalFrom)
-          .slice(-2)
-          .map((p) => p.id);
+        const dead = patrolCasualties(s);
+        const send = action === "recover";
+        const crew = send ? recoveryCrew(s) : [];
+        if (send && crew.length < SCOUT_CREW)
+          throw Error("수습대에 나설 주민 두 명이 필요합니다.");
         const base = action === "recover" ? pay("RES_MEAT", 6) : s;
         const loss = dead.length
           ? commandTimber(
@@ -372,9 +421,42 @@ export function actCampaign(
           "patrol",
           {
             reports: [...c.reports, report],
+            recoveryDue: send
+              ? s.elapsed +
+                scoutRun(s, SCOUT_SITES.find((site) => site.id === report)!)!
+                  .minutes
+              : null,
             memorial: action === "recover" ? "recover" : "remember",
           },
-          loss,
+          {
+            ...note(
+              loss,
+              send
+                ? "주민 둘이 일손을 놓고 수습에 나섰습니다. 유족들이 성문에서 돌아올 이들을 기다립니다."
+                : "추가 파견을 멈추고 두 이름을 추모 장부에 올렸습니다.",
+            ),
+            residents: loss.residents.map((r) =>
+              crew.includes(r.id)
+                ? {
+                    ...r,
+                    task: "patrol-recovery",
+                    routine: "idle",
+                    insideHome: false,
+                    eatingUntil: null,
+                    diningSeat: null,
+                    request: null,
+                  }
+                : r,
+            ),
+            world: {
+              ...loss.world,
+              optimism: Math.min(100, loss.world.optimism + (send ? 1 : 0)),
+              pessimism: Math.min(
+                100,
+                loss.world.pessimism + (!send && Math.random() < 0.5 ? 1 : 0),
+              ),
+            },
+          },
         );
       }
       if (action === "next" && c.reports.length === SCOUT_SITES.length)

@@ -7,6 +7,7 @@ import {
   foodWarnings,
   GAME_RULES,
   lostPatrol,
+  recoveryCrew,
   returnedScouts,
   SCOUT_SITES,
   SETTLEMENTS,
@@ -93,6 +94,10 @@ export function villageAdvice(
     return daylight
       ? "마을 입구에 새로 온 이들이 있어요. 성문 표식을 눌러 누구와 함께 왔는지 들어 보세요."
       : "성문 밖에서 사람 목소리가 나. 새로 온 이들인가 봐. 입구에 가서 만나 보자.";
+  if (c.recoveryDue != null && c.recoveryDue > s.elapsed)
+    return daylight
+      ? "두 분이 썰매를 끌고 나갔어요. 돌아올 때까진 남은 일손으로 오늘 몫을 마련해야 해요."
+      : "수습대가 돌아오면 성문에서 불러 줄게. 그동안은 여기 있는 이들끼리 일하자.";
   const { optimism, pessimism } = s.world;
   if (
     pessimism < GAME_RULES.endings.concernPessimism &&
@@ -330,20 +335,20 @@ export function campaignPage(s: TimberState): ScenePage {
         page.music = "12";
         line(
           "길룡",
-          "제가 성 밖 망을 보던 차였습니다. 돌아온 건 빈 수레였어요. 셋째 조 둘은 산등성이 아래서 찾았습니다. 숨이 끊겨 있었습니다.",
+          "밤새 눈이 들이쳤습니다. 둘이 끝내 눈을 뜨지 않더군요. 버드나무 아래 눕히고 돌을 얹어 뒀습니다. 다시 가면 찾을 수 있습니다.",
         );
         line(
           "달이",
-          "지난봄에 길삯을 받던 역졸들이래. 이제는 산적이 되어 제 이웃 수레를 털어. 그 집에 이 말을 누가 전하지?",
+          "썰매를 끌려면 둘은 가야 해. 둘이 돌아올 때까지는 여기 남은 이들끼리 일해야 하고.",
         );
         line(
           "고리",
-          "내가 가겠소. 유품을 찾으러 갈지는 남은 사람들 몫까지 살피고 정합시다.",
+          "길룡아, 손부터 녹여라. 그 집 식구들한테는 나도 함께 가마.",
         );
         choice(
           "recover",
-          "호위대에 고기 6을 내어 유품 회수",
-          !canPay(s, "RES_MEAT", 6),
+          "주민 둘에게 고기 6을 들려 두 사람을 데려오기",
+          !canPay(s, "RES_MEAT", 6) || recoveryCrew(s).length < 2,
         );
         choice("remember", "추가 파견을 멈추고 두 이름을 추모 장부에");
         break;

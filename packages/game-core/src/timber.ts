@@ -561,7 +561,7 @@ export function createTimberState(
     ],
   };
 }
-function note(s: TimberState, text: string): TimberState {
+export function note(s: TimberState, text: string): TimberState {
   return {
     ...s,
     history: [...s.history, { id: s.history.length, minute: s.elapsed, text }],
@@ -863,6 +863,7 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
           ? r.hunger
           : Math.min(2880, r.hunger + minutes),
     };
+    if (r.task === "patrol-recovery") return current;
     if (s.workerIds.includes(r.id)) return { ...current, insideHome: false };
     if (
       s.town.patients.some((p) => p.resident === r.id && p.hospital !== null)
@@ -3510,7 +3511,10 @@ export function timberScene(s: TimberState): SceneSnapshot {
           s.phase === "transport" && r.id === s.transportWorkerId
             ? Math.PI / 2
             : Math.PI,
-        visible: r.health !== "dead" && !residentIndoors(s, r),
+        visible:
+          r.task !== "patrol-recovery" &&
+          r.health !== "dead" &&
+          !residentIndoors(s, r),
         indoors: residentIndoors(s, r) && r.health !== "dead",
         needsHelp: r.request !== null && r.request !== "waiting-seat",
         motion:
