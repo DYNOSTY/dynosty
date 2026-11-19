@@ -1,9 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
-import { press, reveal } from "./labor-tabs.js";
+import { press, reveal, startTimber } from "./labor-tabs.js";
 
 async function enter(page: Page) {
   await page.goto("/");
-  await press(page, "마른 목재20 조달 체험하기");
+  await startTimber(page);
   await expect(page.getByTestId("timber-phase")).toHaveText("공급 제안 비교");
 }
 const button = (page: Page, name: string) =>
@@ -82,7 +82,7 @@ test("보완 중 저장·새로고침 복원과 이전 저장은 품질·예약�
     "체험판을 저장했습니다.",
   );
   await page.reload();
-  await press(page, "마른 목재20 조달 체험하기");
+  await startTimber(page);
   await press(page, "체험 불러오기");
   await expect(page.getByTestId("timber-phase")).toHaveText("건조·재검사");
   await expect(page.getByTestId("timber-clock")).toContainText("9시간 0분");
@@ -162,7 +162,7 @@ test("체험 시간·3배속과 비활성 신호·나가기 정지, 지연 후 �
   await expect(page.getByTestId("timber-clock")).toHaveText(stopped as string);
   await press(page, "생존 예제로 돌아가기");
   await page.waitForTimeout(1100);
-  await press(page, "마른 목재20 조달 체험하기");
+  await startTimber(page);
   await expect(page.getByTestId("timber-clock")).toHaveText(stopped as string);
   await press(page, "처음부터 다른 선택");
   await press(page, "새 체험 확인");

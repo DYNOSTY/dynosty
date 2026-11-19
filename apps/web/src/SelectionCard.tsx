@@ -1,16 +1,13 @@
 import { AMOUNT_SCALE, type PlayState, winterReport } from "@dynosty/game-core";
-import type { Ref } from "react";
+import type { CSSProperties } from "react";
 import type { BuildingAction, BuildingCommand } from "./buildings.js";
 import { CmdFace } from "./GameHud.js";
 
-// 건물을 눌렀을 때 띄우는 창 — 레퍼런스별 시안 (2026-11-19, ?panel=a|b|c)
-//  a 오른쪽 세로 카드: 프로스트펑크(건물 그림 머리·상태·일꾼·효과) + 어게인스트 더 스톰(오른쪽에 붙은 판)
-//  b 오른쪽 아래 초상 메달: 문명 6(고른 대상 요약 메달 + 위쪽 명령 아이콘)
-//  c 건물 옆 카드: 실록(고른 건물 바로 옆에 뜨는 작은 정보 창)
-export type PanelVariant = "a" | "b" | "c";
+// 건물을 눌렀을 때 띄우는 창 (2026-11-19 사용자 선택: 시안 B) — 문명 6처럼 오른쪽 아래 초상 + 요약,
+// 위에 명령 아이콘 줄. 초상은 원이 아니라 모서리만 둥근 사각 (사용자: "사각 같이 꼭다리 둥글게")
+// 노란 테두리는 뺌 (사용자 11/19 "테두리 지워 노란 테두리")
 
 type Props = {
-  variant: PanelVariant;
   id: string;
   name: string;
   role: string;
@@ -19,30 +16,71 @@ type Props = {
   onAction: (a: BuildingAction) => void;
   toggled: (a: BuildingAction | undefined) => boolean | undefined;
   disabled: (cmd: BuildingCommand) => boolean;
-  anchorRef?: Ref<HTMLDivElement>;
+  /** 초상 그림 (없으면 건물 그림) — 주민은 /ui/residents/<종>.jpg */
+  portrait?: string | undefined;
+  /** 주민 종의 장단점 (기획서에 적힌 것만) */
+  traits?: { gain: string; loss: string } | undefined;
 };
 
+// 구들 축열 = 온돌 단면 가로 띠(사용자 11/19 3차 "가로로 연출") — 왼쪽 아궁이 불이 고래를 따라
+// 오른쪽 굴뚝까지 열이 번져 가는 만큼이 축열. 다 차면 굴뚝에서 연기가 남.
+// 석탄 = 덩이 7개(한 덩이 = 하루치), 남은 만큼 채워짐.
+const COAL_SLOTS = 7;
 function OndolGauge({ state }: { state: PlayState }) {
   const r = winterReport(state.winter, state.day, state.minute, state.citizens);
   const nest = r.zones.find((z) => z.id === "nest");
   const coal = state.resources.RES_COAL / AMOUNT_SCALE;
   const days = r.coalPerDay > 0 ? coal / r.coalPerDay : 0;
   const storage = nest?.storage ?? 0;
+  const vars = {
+    "--heat": storage / 100,
+    "--fire": nest?.firing ? 1 : 0,
+  } as CSSProperties;
   return (
     <div className="sc-gauges">
-      <div className="sc-gauge">
-        <span className="sc-gauge__label">구들 축열</span>
-        <span className="sc-gauge__bar" aria-hidden="true">
-          <i style={{ width: `${storage}%` }} />
-        </span>
-        <b>{storage}%</b>
+      <div className="sc-head">
+        <img src="/ui/season/heat_urgent.png" alt="" />
+        <span>구들 축열</span>
+        <b className={storage >= 70 ? "is-hot" : ""}>{storage}%</b>
       </div>
-      <div className="sc-gauge">
-        <span className="sc-gauge__label">석탄</span>
-        <span className="sc-gauge__bar is-coal" aria-hidden="true">
-          <i style={{ width: `${Math.min(100, (days / 7) * 100)}%` }} />
-        </span>
-        <b>{coal > 0 ? `${days.toFixed(1)}일` : "없음"}</b>
+      <div
+        className={`ondol-x${storage >= 70 ? " is-hot" : ""}${storage >= 95 ? " is-full" : ""}`}
+        style={vars}
+        aria-hidden="true"
+      >
+        <img className="ondol-x__strip" src="/ui/kit/ondol_strip.webp" alt="" />
+        <span
+          className="ondol-x__heat"
+          style={{ width: `${storage * 0.9}%` }}
+        />
+        <span className="ondol-x__fire" />
+        <span className="ondol-x__smoke" />
+      </div>
+      <div className="sc-head">
+        <img src="/ui/resources/RES_COAL.png" alt="" />
+        <span>석탄</span>
+        <b className={days < 2 ? "is-low" : ""}>
+          {coal > 0 ? `${days.toFixed(1)}일` : "없음"}
+        </b>
+      </div>
+      <div
+        className={`coal-x${days < 2 ? " is-low" : ""}`}
+        title="한 덩이 = 하루치"
+        aria-hidden="true"
+      >
+        {Array.from({ length: COAL_SLOTS }, (_, i) => {
+          const f = Math.max(0, Math.min(1, days - i));
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: 고정 7칸
+            <i key={i}>
+              <img
+                src="/ui/resources/RES_COAL.png"
+                alt=""
+                style={{ clipPath: `inset(0 ${100 - f * 100}% 0 0)` }}
+              />
+            </i>
+          );
+        })}
       </div>
       <p className="sc-note">
         {nest?.firing ? "불 때는 중" : "쉬는 중"} · 하루 석탄{" "}
@@ -81,72 +119,39 @@ export function SelectionCard(p: Props) {
     </button>
   );
 
-  if (p.variant === "b")
-    return (
-      <section className="sc sc--medal" aria-label="선택 정보">
-        <div className="sc-medal__actions">
-          {own.map((a) => button(a, false))}
-          {focus ? button(focus, false) : null}
-        </div>
-        <div className="sc-medal__body">
-          <img
-            className="sc-medal__portrait"
-            src={`/ui/buildings/${p.id}.jpg`}
-            alt=""
-          />
-          <div className="sc-medal__text">
-            <h2>{p.name}</h2>
-            <p>{p.role}</p>
-            {isOndol && p.state ? <OndolGauge state={p.state} /> : null}
-          </div>
-          {clear ? (
-            <div className="sc-medal__close">{button(clear, false)}</div>
+  return (
+    <section className="sc sc--medal" aria-label="선택 정보">
+      <div className="sc-medal__actions">
+        {own.map((x) => button(x, false))}
+        {focus ? button(focus, false) : null}
+      </div>
+      <div className="sc-medal__body">
+        <img
+          className="sc-medal__portrait"
+          src={p.portrait ?? `/ui/buildings/${p.id}.jpg`}
+          alt=""
+        />
+        <div className="sc-medal__text">
+          <h2>{p.name}</h2>
+          <p>{p.role}</p>
+          {isOndol && p.state ? <OndolGauge state={p.state} /> : null}
+          {p.traits ? (
+            <span className="story-gl sc-traits">
+              <span className="is-gain">
+                <i>장점</i>
+                {p.traits.gain}
+              </span>
+              <span className="is-loss">
+                <i>단점</i>
+                {p.traits.loss}
+              </span>
+            </span>
           ) : null}
         </div>
-      </section>
-    );
-
-  if (p.variant === "c")
-    return (
-      <section
-        className="sc sc--float"
-        aria-label="선택 정보"
-        ref={p.anchorRef as Ref<HTMLElement>}
-      >
-        <header className="sc-float__head">
-          <h2>{p.name}</h2>
-          {clear ? button(clear, false) : null}
-        </header>
-        <p className="sc-float__role">{p.role}</p>
-        {isOndol && p.state ? <OndolGauge state={p.state} /> : null}
-        <div className="sc-float__actions">
-          {own.map((a) => button(a, false))}
-          {focus ? button(focus, false) : null}
-        </div>
-      </section>
-    );
-
-  return (
-    <section className="sc sc--card" aria-label="선택 정보">
-      <header className="sc-card__head">
-        <img src={`/ui/buildings/${p.id}.jpg`} alt="" />
-        <h2>{p.name}</h2>
-        <div className="sc-card__corner">
-          {focus ? button(focus, false) : null}
-          {clear ? button(clear, false) : null}
-        </div>
-      </header>
-      <p className="sc-card__role">{p.role}</p>
-      {isOndol && p.state ? (
-        <>
-          <h3 className="sc-sub">구들</h3>
-          <OndolGauge state={p.state} />
-          <h3 className="sc-sub">화력</h3>
-        </>
-      ) : (
-        <h3 className="sc-sub">할 일</h3>
-      )}
-      <div className="sc-card__actions">{own.map((a) => button(a, true))}</div>
+        {clear ? (
+          <div className="sc-medal__close">{button(clear, false)}</div>
+        ) : null}
+      </div>
     </section>
   );
 }

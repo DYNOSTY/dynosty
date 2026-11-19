@@ -290,7 +290,6 @@ export function createLogging(opts: {
     return false;
   }
   const FALL_MAX = Math.PI / 2 - 0.05;
-  let running = false;
   function step(site: Site, dt: number) {
     const w = site.worker;
     if (!w) return;
@@ -453,14 +452,11 @@ export function createLogging(opts: {
 
   return {
     animate(dt: number) {
-      if (!running) return;
+      // 벌목 연출도 일시정지와 상관없이 계속 (마을 생활과 같음)
       for (const s of sites) step(s, Math.min(dt, 0.1));
       flush();
     },
-    setRunning(value: boolean) {
-      running = value;
-      if (!value) for (const s of sites) s.worker?.play("Idle");
-    },
+    setRunning(_value: boolean) {},
     dispose() {
       disposed = true;
       for (const d of disposers) d();

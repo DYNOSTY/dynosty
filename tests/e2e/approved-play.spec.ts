@@ -265,6 +265,6 @@ test("대표 모델 요청 실패는 명확히 안내하고 대체 표시로 게
   expect(await page.evaluate(() => scrollY)).toBe(beforeScroll);
   await expect(
     page.getByRole("region", { name: "선택 정보", exact: true }),
-  ).toContainText("주민 예제");
+  ).toContainText("트리케라톱스");
   await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
 });

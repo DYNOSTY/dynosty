@@ -247,6 +247,8 @@ export function mountScene(
     const bld = id?.startsWith("bld:") ? Number(id.slice(4)) : null;
     if (bld !== null) return selectBuilding(bld);
     village.highlight(null);
+    // 마을 건물 선택은 예제·현장 선택기가 모르는 값이라 여기서 직접 해제를 알림 (X·Esc·빈 바닥)
+    if (id === null && selected?.startsWith("bld:")) publishSelection(null);
     if (isSiteId(id)) {
       entities.select(null);
       sites.select(id);

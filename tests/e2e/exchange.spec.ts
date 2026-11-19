@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { choose, press, reveal } from "./labor-tabs.js";
+import { choose, press, reveal, startTimber } from "./labor-tabs.js";
 
 const b = (p: Page, n: string) =>
   p.getByRole("button", { name: n, exact: true });
 async function enter(p: Page) {
   await p.goto("/");
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 }
@@ -53,7 +53,7 @@ async function next(p: Page) {
 }
 async function reload(p: Page) {
   await p.reload();
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-save-status")).toContainText(

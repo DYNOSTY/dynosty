@@ -80,8 +80,11 @@ export async function clickFloor(page: Page) {
   if (!box) throw new Error("장면 캔버스가 없습니다.");
   const x = box.x + box.width / 2;
   let bottom = box.y + box.height;
-  for (const selector of [".g-console", ".g-console__cmd"]) {
-    const bar = await page.locator(selector).boundingBox();
+  // 아래쪽 UI(콘솔·선택 창)를 피해 바닥을 누름 — 없는 요소는 건너뜀 (없을 때 기다리며 멈추지 않게)
+  for (const selector of [".g-console", ".g-console__cmd", ".sc"]) {
+    const loc = page.locator(selector).first();
+    if ((await loc.count()) === 0) continue;
+    const bar = await loc.boundingBox();
     if (bar && x >= bar.x && x <= bar.x + bar.width && bar.y > box.y)
       bottom = Math.min(bottom, bar.y);
   }

@@ -32,36 +32,51 @@ export function PlayPanel({ state, error, busy, onCommand }: Props) {
       <div className="settlement-heading">
         <div>
           <h2 className="settlement-title">복홀 현황</h2>
-          <p>
+          {/* 주민 수만 아이콘 칸으로 (날짜·시각은 시계가 보여 줌 — 2026-11-19) */}
+          <p className="play-pop" title="주민">
+            <img src="/ui/cmd/residents.png" alt="" />
             <span data-testid="play-population">
-              주민 {state.citizens.filter((c) => c.alive).length}명
-            </span>{" "}
-            · <span data-testid="play-clock">생존 {clock}</span>
+              <span className="sr-only">주민 </span>
+              {state.citizens.filter((c) => c.alive).length}
+              <span className="sr-only">명</span>
+            </span>
+            <span data-testid="play-clock" className="sr-only">
+              생존 {clock}
+            </span>
           </p>
         </div>
-        <div className="play-controls">
+        {/* 진행 단추: 글 대신 붓 아이콘 (이름은 그대로 — 화면 읽기·시험이 씀) */}
+        <div className="play-controls is-icons">
           <button
             type="button"
+            className={state.paused ? "is-play" : "is-pause"}
+            aria-label={state.paused ? "게임 시작" : "일시정지"}
+            title={state.paused ? "게임 시작" : "일시정지"}
             disabled={busy}
             onClick={() => onCommand({ type: "pause", paused: !state.paused })}
           >
-            {state.paused ? "게임 시작" : "일시정지"}
+            <img
+              src={`/ui/cmd/${state.paused ? "ico_play" : "ico_pause"}.webp`}
+              alt=""
+            />
           </button>
           <button
             type="button"
-            className="quiet-button"
+            aria-label="1일 진행"
+            title="1일 진행"
             disabled={busy}
             onClick={() => onCommand({ type: "advance-day" })}
           >
-            1일 진행
+            <img src="/ui/cmd/ico_nextday.webp" alt="" />
           </button>
           <button
             type="button"
-            className="quiet-button"
+            aria-label="새 게임"
+            title="새 게임"
             disabled={busy}
             onClick={() => setConfirm(true)}
           >
-            새 게임
+            <img src="/ui/cmd/ico_newgame.webp" alt="" />
           </button>
         </div>
       </div>
@@ -105,9 +120,7 @@ export function PlayPanel({ state, error, busy, onCommand }: Props) {
               {GAME_RULES.resources[id].name}
             </span>
             <strong data-testid={`resource-${id}`}>
-              {Math.floor(state.resources[id] / AMOUNT_SCALE).toLocaleString(
-                "ko-KR",
-              )}
+              {shortAmount(Math.floor(state.resources[id] / AMOUNT_SCALE))}
             </strong>
           </div>
         ))}
@@ -134,6 +147,11 @@ export function PlayPanel({ state, error, busy, onCommand }: Props) {
   );
 }
 
+/** 자원 숫자: 10만 미만은 그대로, 이상은 "1,235만"처럼 — 8자리가 돼도 칸이 한 줄로 유지 (정확한 값은 title) */
+export function shortAmount(n: number) {
+  if (n < 100_000) return n.toLocaleString("ko-KR");
+  return `${Math.round(n / 10_000).toLocaleString("ko-KR")}만`;
+}
 // 기획 화면정의 보조행 「보온」: 따뜻한 주민 수가 기본, 냉기·부상은 아이콘+숫자로 (색만으로 경고하지 않음)
 function WarmthCard({ state }: { state: PlayState }) {
   const r = winterReport(state.winter, state.day, state.minute, state.citizens);

@@ -16,6 +16,7 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { Scene } from "@babylonjs/core/scene";
 import { LOGGING_SITES } from "./layout.js";
+import { loadSceneAsset } from "./scene-assets.js";
 import { SCOUT_SITES } from "./scout-sites.js";
 
 export const ISLAND_RADIUS = 70;
@@ -526,6 +527,105 @@ export function buildWorld(
 
   // ── 나무·그루터기·죽은 나무·바위 ──
   const treeMat = vertexMat("pine-material");
+  // 블렌더로 깎은 나무(tools/blender/tree.py, 2026-11-19)가 오면 같은 메시의 모양만 바꿔 끼움 —
+  // 숲 배치(thin instance)·벌목 쓰러짐은 그대로. 재질 색은 정점 색으로 옮겨 한 번에 그림
+  const treeHosts: Array<{ mesh: Mesh; kind: string }> = [];
+  let treeGeo: Map<string, VertexData> | null = null;
+  // 면이 바깥을 보는 방향(감김) 점수: 면 법선 · (면 중심 − 모양 중심)의 합. 부호가 감김 방향을 알려 줌
+  const windingScore = (pos: ArrayLike<number>, ix: ArrayLike<number>) => {
+    let cx = 0,
+      cy = 0,
+      cz = 0;
+    const n = pos.length / 3;
+    for (let i = 0; i < pos.length; i += 3) {
+      cx += pos[i] ?? 0;
+      cy += pos[i + 1] ?? 0;
+      cz += pos[i + 2] ?? 0;
+    }
+    cx /= n;
+    cy /= n;
+    cz /= n;
+    let score = 0;
+    for (let t = 0; t < ix.length; t += 3) {
+      const a = (ix[t] ?? 0) * 3,
+        b = (ix[t + 1] ?? 0) * 3,
+        c = (ix[t + 2] ?? 0) * 3;
+      const ux = (pos[b] ?? 0) - (pos[a] ?? 0),
+        uy = (pos[b + 1] ?? 0) - (pos[a + 1] ?? 0),
+        uz = (pos[b + 2] ?? 0) - (pos[a + 2] ?? 0);
+      const vx = (pos[c] ?? 0) - (pos[a] ?? 0),
+        vy = (pos[c + 1] ?? 0) - (pos[a + 1] ?? 0),
+        vz = (pos[c + 2] ?? 0) - (pos[a + 2] ?? 0);
+      const nx = uy * vz - uz * vy,
+        ny = uz * vx - ux * vz,
+        nz = ux * vy - uy * vx;
+      const fx = ((pos[a] ?? 0) + (pos[b] ?? 0) + (pos[c] ?? 0)) / 3 - cx,
+        fy =
+          ((pos[a + 1] ?? 0) + (pos[b + 1] ?? 0) + (pos[c + 1] ?? 0)) / 3 - cy,
+        fz =
+          ((pos[a + 2] ?? 0) + (pos[b + 2] ?? 0) + (pos[c + 2] ?? 0)) / 3 - cz;
+      score += nx * fx + ny * fy + nz * fz;
+    }
+    return score;
+  };
+  const fitTree = (mesh: Mesh, kind: string) => {
+    const src = treeGeo?.get(kind);
+    if (!src) return;
+    // 코드로 만든 옛 나무와 같은 감김(바깥 방향)이 되게 맞추고, 법선도 옛 나무처럼 감김에서 다시 계산
+    const oldPos = mesh.getVerticesData("position"),
+      oldIx = mesh.getIndices();
+    const vd = new VertexData();
+    vd.positions = Array.from(src.positions ?? []);
+    vd.colors = Array.from(src.colors ?? []);
+    const ix = Array.from(src.indices ?? []);
+    if (
+      oldPos &&
+      oldIx &&
+      Math.sign(windingScore(oldPos, oldIx)) !==
+        Math.sign(windingScore(vd.positions, ix))
+    )
+      for (let i = 0; i < ix.length; i += 3) {
+        const t = ix[i + 1] ?? 0;
+        ix[i + 1] = ix[i + 2] ?? 0;
+        ix[i + 2] = t;
+      }
+    vd.indices = ix;
+    const normals: number[] = [];
+    VertexData.ComputeNormals(vd.positions, ix, normals);
+    vd.normals = normals;
+    // 이미 thin instance가 붙은 메시의 모양을 제자리에서 바꾸면 그려지지 않음(Babylon) →
+    // 새 메시를 만들어 옛 메시의 행렬을 받아 쓰고, 옛 메시는 감춤 (옛 메시는 행렬 보관용으로 남김)
+    const fresh = new Mesh(`${mesh.name}-glb`, scene);
+    vd.applyToMesh(fresh);
+    fresh.material = mesh.material;
+    fresh.parent = mesh.parent;
+    fresh.isPickable = false;
+    fresh.alwaysSelectAsActiveMesh = true;
+    let buf: Float32Array | null = null;
+    const copy = () => {
+      const mats = mesh.thinInstanceGetWorldMatrices();
+      const fresh16 = !buf || buf.length !== Math.max(1, mats.length) * 16;
+      if (fresh16) buf = new Float32Array(Math.max(1, mats.length) * 16);
+      const b = buf as Float32Array;
+      mats.forEach((m, i) => {
+        m.copyToArray(b, i * 16);
+      });
+      if (fresh16) fresh.thinInstanceSetBuffer("matrix", b, 16, false);
+      else fresh.thinInstanceBufferUpdated("matrix");
+      fresh.thinInstanceCount = mats.length;
+      fresh.isVisible = mesh.thinInstanceCount > 0;
+    };
+    copy();
+    mesh.isVisible = false;
+    // 벌목장 나무·그루터기는 매 장면 행렬이 바뀜(쓰러짐·다시 자람) → 매번 옮겨 담음
+    if (mesh.name.startsWith("logging"))
+      scene.onBeforeRenderObservable.add(copy);
+  };
+  const hostTree = (mesh: Mesh, kind: string) => {
+    treeHosts.push({ mesh, kind });
+    fitTree(mesh, kind);
+    return mesh;
+  };
   // 눈 쌓인 전나무(컨셉 시트): 별 모양 가지 층 + 층마다 위를 덮은 눈 (가지 끝 초록은 남김)
   // far: 마을에서 먼 숲(40m~)용 — 층·가지를 줄인 같은 모양 (점 개수 약 1/3)
   const makePine = (v: number, name = `pine-${v}`, far = false) => {
@@ -577,27 +677,74 @@ export function buildWorld(
     // 꼭대기 눈 뾰족
     if (P.cap)
       parts.push(frustum(tr, 0.75 + height, 0.45, 0.18, 0.01, 6, P.cap, 0.1));
-    return mergedMesh(name, parts, scene, treeMat);
+    // 세 갈래 중 둘째는 적송, 나머지는 전나무
+    return hostTree(
+      mergedMesh(name, parts, scene, treeMat),
+      v === 1 ? "TREE_PINE" : "TREE_FIR",
+    );
   };
   const pines = [0, 1, 2].map((v) => makePine(v));
   const pinesFar = [0, 1, 2].map((v) => makePine(v, `pine-far-${v}`, true));
   const pineAt = (d: number, n: number) =>
     (d > 40 ? pinesFar : pines)[n % 3] as Mesh;
   const cap = P.cap ?? [0.5, 0.45, 0.4];
-  const makeStump = (name = "stump") =>
-    mergedMesh(
-      name,
-      (() => {
-        const sr = rng(55);
-        return [
-          frustum(sr, 0, 0.42, 0.28, 0.24, 7, [0.33, 0.25, 0.2], 0.2),
-          frustum(sr, 0.42, 0.06, 0.25, 0.2, 7, cap, 0.1),
-        ];
-      })(),
-      scene,
-      treeMat,
+  const makeStump = (name = "stump") => hostStump(name);
+  const hostStump = (name: string) =>
+    hostTree(
+      mergedMesh(
+        name,
+        (() => {
+          const sr = rng(55);
+          return [
+            frustum(sr, 0, 0.42, 0.28, 0.24, 7, [0.33, 0.25, 0.2], 0.2),
+            frustum(sr, 0.42, 0.06, 0.25, 0.2, 7, cap, 0.1),
+          ];
+        })(),
+        scene,
+        treeMat,
+      ),
+      "TREE_STUMP",
     );
   const stump = makeStump();
+  void (async () => {
+    const geo = new Map<string, VertexData>();
+    for (const kind of ["TREE_FIR", "TREE_PINE", "TREE_STUMP"]) {
+      try {
+        const asset = await loadSceneAsset(scene, `/models/trees/${kind}.glb`);
+        const inst = asset.instantiateModelsToScene(
+          (n) => `${kind}-src:${n}`,
+          false,
+        );
+        const parts: Mesh[] = [];
+        for (const root of inst.rootNodes) {
+          root.computeWorldMatrix(true);
+          for (const m of root.getChildMeshes(false))
+            if (m instanceof Mesh && m.getTotalVertices() > 0) parts.push(m);
+        }
+        for (const m of parts) {
+          m.computeWorldMatrix(true);
+          const c =
+            (m.material as { albedoColor?: Color3 } | null)?.albedoColor ??
+            Color3.White();
+          const n = m.getTotalVertices();
+          const cols = new Float32Array(n * 4);
+          for (let i = 0; i < n; i++) cols.set([c.r, c.g, c.b, 1], i * 4);
+          m.setVerticesData("color", cols);
+        }
+        const merged = Mesh.MergeMeshes(parts, true, true);
+        if (merged) {
+          geo.set(kind, VertexData.ExtractFromMesh(merged));
+          merged.dispose();
+        }
+        inst.dispose();
+      } catch {
+        // 못 받으면 코드로 만든 나무 그대로
+      }
+    }
+    if (scene.isDisposed) return;
+    treeGeo = geo;
+    for (const h of treeHosts) fitTree(h.mesh, h.kind);
+  })();
   const deadTrees = [0, 1].map((v) => {
     const dr = rng(70 + v),
       bark = [0.24, 0.21, 0.21],
@@ -849,11 +996,12 @@ export function buildWorld(
     // 눈은 카메라 주변(±32m)에만 내림 → 개수를 줄여도 보이는 밀도는 같음
     snow = new ParticleSystem("snow", 3800, scene);
     snow.particleTexture = flake;
-    snow.emitter = new Vector3(8, 30, -4);
+    snow.emitter = new Vector3(1, 30, 0);
     snow.minEmitBox = new Vector3(-26, 0, -32);
     snow.maxEmitBox = new Vector3(38, 0, 32);
-    snow.direction1 = new Vector3(-3.6, -1, 0.7);
-    snow.direction2 = new Vector3(-2.4, -1, 1.3);
+    // 거의 곧게 내리는 눈 (사용자 11/19: 사선 → 직선). 바람은 아주 조금만
+    snow.direction1 = new Vector3(-0.3, -1, 0.05);
+    snow.direction2 = new Vector3(-0.1, -1, 0.15);
     snow.minEmitPower = 3;
     snow.maxEmitPower = 5;
     snow.minLifeTime = 6;
@@ -907,18 +1055,19 @@ export function buildWorld(
 
   /** 눈이 카메라를 따라오게 */
   const followSnow = (x: number, z: number) => {
-    if (snow) (snow.emitter as Vector3).set(x + 8, 26, z - 4);
+    if (snow) (snow.emitter as Vector3).set(x + 1, 26, z);
   };
   // 날씨(winter.ts) → 눈발 세기·바람·크기, 시야 / 화력·축열 → 온돌 둘레 열기
+  // 시야(see): 눈보라도 적당히만 뿌옇게 — 사용자 11/19 "심하면 경험을 해친다"
   const WEATHER_LOOK: Record<
     string,
     { rate: number; wind: number; life: number; size: number; see: number }
   > = {
     맑음: { rate: 90, wind: 0.6, life: 8, size: 0.7, see: 1 },
-    흐림: { rate: 240, wind: 0.8, life: 8, size: 0.85, see: 0.92 },
-    눈: { rate: 620, wind: 1, life: 7.5, size: 1, see: 0.82 },
-    눈보라: { rate: 1050, wind: 2.2, life: 3.4, size: 1.15, see: 0.55 },
-    한파: { rate: 160, wind: 1.3, life: 6, size: 0.55, see: 0.88 },
+    흐림: { rate: 240, wind: 0.8, life: 8, size: 0.85, see: 0.96 },
+    눈: { rate: 620, wind: 1, life: 7.5, size: 1, see: 0.92 },
+    눈보라: { rate: 900, wind: 1.6, life: 5, size: 1.1, see: 0.78 },
+    한파: { rate: 160, wind: 1.3, life: 6, size: 0.55, see: 0.94 },
   };
   let lastWeather = "";
   const setWeather = (weather: string, heat: number) => {
@@ -930,8 +1079,8 @@ export function buildWorld(
     snow.emitRate = look.rate;
     snow.minLifeTime = look.life * 0.75;
     snow.maxLifeTime = look.life;
-    snow.direction1 = new Vector3(-3.6 * look.wind, -1, 0.7 * look.wind);
-    snow.direction2 = new Vector3(-2.4 * look.wind, -1, 1.3 * look.wind);
+    snow.direction1 = new Vector3(-0.3 * look.wind, -1, 0.05 * look.wind);
+    snow.direction2 = new Vector3(-0.1 * look.wind, -1, 0.15 * look.wind);
     snow.minEmitPower = 3 * Math.sqrt(look.wind);
     snow.maxEmitPower = 5 * Math.sqrt(look.wind);
     snow.minSize = 0.12 * look.size;

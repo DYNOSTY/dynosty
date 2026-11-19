@@ -35,18 +35,19 @@ import {
   saveLocalExample,
 } from "./local-save.js";
 import { MediaPanel } from "./MediaPanel.js";
-import { OndolStatus } from "./OndolStatus.js";
+import { MoodPanel } from "./MoodPanel.js";
 import { PlayPanel } from "./PlayPanel.js";
 import { PlaySavePanel } from "./PlaySavePanel.js";
 import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { QualityFlow } from "./QualityFlow.js";
+import { type Quest, QuestCard } from "./QuestCard.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SeasonDial } from "./SeasonDial.js";
-import { type PanelVariant, SelectionCard } from "./SelectionCard.js";
-import { SelectionMeta } from "./SelectionPanel.js";
+import { SelectionCard } from "./SelectionCard.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import { SiteGuide } from "./SiteGuide.js";
 import { SiteProgress } from "./SiteProgress.js";
+import { StoryChoice } from "./StoryChoice.js";
 import type { CameraInfo, SceneController, ScreenPoint } from "./scene.js";
 import { SCOUT_CREW, SCOUT_GOAL, SCOUT_SITES } from "./scout-sites.js";
 import { type SiteNotice, siteCompletions } from "./site-progress.js";
@@ -67,12 +68,29 @@ import { elevation, MAP_SPAN } from "./world.js";
 // 사람이 보는 화면에는 영향 없음 (탭 화면은 캡처로 따로 확인)
 const E2E_ALL =
   typeof navigator !== "undefined" && navigator.webdriver === true;
-// 건물 선택 창 시안 (?panel=a|b|c) — 없으면 지금의 지도+설명 / 오른쪽 아래 명령판
-const PANEL = ((v) => (v === "a" || v === "b" || v === "c" ? v : null))(
+/** 개발용 단추·안내를 보일지 (?dev=1 또는 자동 시험) */
+const DEV_UI =
+  E2E_ALL ||
+  (typeof location !== "undefined" &&
+    new URLSearchParams(location.search).has("dev"));
+/** 선택 화면 시안 (?story=trade | ending) */
+// 시안용: ?mood=낙관,비관 으로 민심 칸 값을 덮어 봄 (연출 확인)
+const MOOD_TEST = new URLSearchParams(location.search)
+  .get("mood")
+  ?.split(",")
+  .map(Number);
+const STORY =
   typeof location !== "undefined"
-    ? new URLSearchParams(location.search).get("panel")
-    : null,
-) as PanelVariant | null;
+    ? new URLSearchParams(location.search).get("story")
+    : null;
+
+// 주민 종의 장단점 — 기획서에 적힌 것만 (개발인계서 2.1: 4족 짐 수송대 시속 6km, 2족 정찰병 12km)
+const RESIDENT_TRAITS = {
+  R02: {
+    gain: "무거운 짐을 나른다 · 네 발 수송대",
+    loss: "느리다 · 시속 6km",
+  },
+};
 
 export function App() {
   const [laborOpen, setLaborOpen] = useState(false);
@@ -93,6 +111,7 @@ export function App() {
       setSiteNotices((old) => [...old, ...added].slice(-4));
   }, []);
   const [timberOpen, setTimberOpen] = useState(false);
+  const [questOpen, setQuestOpen] = useState<string | null>(null);
   const [timberState, setTimberState] = useState<TimberState | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
   const [playState, setPlayState] = useState<PlayState | null>(null);
@@ -452,12 +471,68 @@ export function App() {
   const foundCount = SCOUT_SITES.filter(
     (site) => scouts[site.id]?.status === "found",
   ).length;
+
   const leftHours = (id: string) => {
     const site = SCOUT_SITES.find((x) => x.id === id),
       run = scouts[id];
     return site && run
       ? Math.max(0, Math.ceil(site.hours - (gameMinutes - run.start) / 60))
       : 0;
+  };
+  // 공통 의뢰 카드 내용 — 그림만 의뢰마다 다르고 칸은 같다 (QuestCard)
+  const quests: Record<string, Quest> = {
+    scout: {
+      id: "scout",
+      kind: "1단계 목표 · 정찰",
+      art: "/ui/quests/scout.jpg",
+      title: "주변 거점 다섯 곳 찾기",
+      why: "정찰대를 보내 주변 땅을 알아낸다.\n찾은 거점과는 교역할 수 있다.",
+      // 정찰 길: 마을 → 거점(가까운 순). 정찰대 표식이 간 만큼 나아감
+      progress: {
+        icon: "/ui/cmd/map.png",
+        now: foundCount,
+        goal: SCOUT_GOAL,
+        route: SCOUT_SITES.map((x) => {
+          const st = scouts[x.id]?.status ?? "unknown";
+          const left = st === "going" ? leftHours(x.id) : 0;
+          return {
+            key: x.id,
+            name: x.name,
+            hours: x.hours,
+            state: st === "found" || st === "going" ? st : "unknown",
+            done: st === "going" ? 1 - left / x.hours : 0,
+            left,
+          };
+        }),
+      },
+      meta: [],
+    },
+    wood: {
+      id: "wood",
+      kind: "조달 · 의뢰",
+      art: "/ui/quests/wood.jpg",
+      title: "마른 목재 20 조달",
+      why: "석탄이 모자라면 온돌은 목재를 땐다.\n젖은 목재는 받기 전에 가려낸다.",
+      meta: [
+        [
+          "땔감 환산",
+          <span className="qc__conv" key="conv">
+            <img src="/ui/resources/RES_COAL.png" alt="석탄" />1<span>=</span>
+            <img src="/ui/resources/RES_WOOD.png" alt="목재" />3
+          </span>,
+        ],
+        ["순서", "정찰 → 발주 → 검수"],
+        ["실패하면", "시작 지점에서 다시"],
+      ],
+      action: {
+        label: "마른 목재20 조달 체험하기",
+        disabled: sceneStatus !== "준비 완료",
+        onClick: () => {
+          setQuestOpen(null);
+          openTimber();
+        },
+      },
+    },
   };
 
   // 게임 시작 → 주민이 걷고 연기가 남, 시각에 맞춰 낮밤
@@ -543,32 +618,15 @@ export function App() {
     if (sceneStatus === "준비 완료")
       sceneRef.current?.setGameMinutes(gameMinutes);
   }, [gameMinutes, sceneStatus]);
-  // 시안 c: 고른 건물의 화면 위치를 따라가는 카드
-  const selAnchor = useRef<HTMLDivElement>(null);
-  const selPoint = (() => {
-    if (PANEL !== "c" || !selectedId) return null;
-    if (selectedId.startsWith("bld:")) {
-      const l = LAYOUT[Number(selectedId.slice(4))];
-      return l ? { x: l[1], z: l[2] } : null;
-    }
-    return { x: 0, z: -1 }; // 가운데 온돌
-  })();
-  const selKey = selPoint ? `${selPoint.x},${selPoint.z}` : "";
   useEffect(() => {
     if (sceneStatus !== "준비 완료") return;
-    const [sx, sz] = selKey ? selKey.split(",").map(Number) : [];
     sceneRef.current?.trackPoints(
-      [
-        ...SCOUT_SITES.map((site) => ({
-          id: site.id,
-          x: site.x,
-          y: elevation(site.x, site.z) + 9.5,
-          z: site.z,
-        })),
-        ...(sx !== undefined && sz !== undefined
-          ? [{ id: "sel", x: sx, y: elevation(sx, sz) + 2.5, z: sz }]
-          : []),
-      ],
+      SCOUT_SITES.map((site) => ({
+        id: site.id,
+        x: site.x,
+        y: elevation(site.x, site.z) + 9.5,
+        z: site.z,
+      })),
       (pos: Record<string, ScreenPoint>) => {
         // 3D 화면 칸 (위 막대·아래 콘솔 사이)
         const W = window.innerWidth,
@@ -577,14 +635,6 @@ export function App() {
           .querySelector(".g-quests")
           ?.getBoundingClientRect();
         for (const [id, pt] of Object.entries(pos)) {
-          if (id === "sel") {
-            const card = selAnchor.current;
-            if (card) {
-              card.style.left = `${pt.visible ? pt.x : -9999}px`;
-              card.style.top = `${pt.visible ? pt.y : -9999}px`;
-            }
-            continue;
-          }
           const el = pinRefs.current[id];
           if (!el) continue;
           if (id.startsWith("party:")) {
@@ -628,7 +678,7 @@ export function App() {
         }
       },
     );
-  }, [sceneStatus, selKey]);
+  }, [sceneStatus]);
   const timberReady = sceneStatus === "준비 완료";
   // 뜨는 창은 한 번에 하나: 새 창을 열면 나머지는 닫힘
   function closePopups() {
@@ -728,8 +778,13 @@ export function App() {
       </header>
       <section className="g-quests" aria-label="의뢰">
         <h2>의뢰</h2>
-        {/* 1단계 목표: 정찰 5곳 — 다섯 칸 */}
-        <div className="g-quest">
+        {/* 1단계 목표: 정찰 5곳 — 다섯 칸 · 누르면 공통 의뢰 카드 */}
+        <button
+          type="button"
+          className="g-quest g-quest--btn"
+          aria-expanded={questOpen === "scout"}
+          onClick={() => setQuestOpen(questOpen === "scout" ? null : "scout")}
+        >
           <img src="/ui/cmd/map.png" alt="" />
           <div className="g-quest__body">
             <span>1단계 목표 · 정찰</span>
@@ -751,7 +806,7 @@ export function App() {
           <b>
             {foundCount} / {SCOUT_GOAL}
           </b>
-        </div>
+        </button>
         {/* 진행 중 정찰: 남은 시간 막대 */}
         {SCOUT_SITES.filter((site) => scouts[site.id]?.status === "going").map(
           (site) => (
@@ -805,18 +860,23 @@ export function App() {
             <button
               type="button"
               className="timber-entry-link"
-              disabled={sceneStatus !== "준비 완료"}
-              onClick={() => {
-                openTimber();
-              }}
+              aria-label="의뢰 · 마른 목재 20 조달"
+              aria-expanded={questOpen === "wood"}
+              onClick={() => setQuestOpen(questOpen === "wood" ? null : "wood")}
             >
-              마른 목재20 조달 체험하기
+              마른 목재 20 조달
             </button>
           ) : (
             <p>마른 목재20 · 조달 체험판</p>
           )}
           <span data-testid="play-scene-status">3D {sceneStatus}</span>
         </div>
+        {questOpen && quests[questOpen] && !timberOpen ? (
+          <QuestCard
+            q={quests[questOpen] as Quest}
+            onClose={() => setQuestOpen(null)}
+          />
+        ) : null}
       </section>
       {/* 정찰 거점 표식 (3D 위치를 따라감) */}
       <div className="g-pins">
@@ -850,10 +910,12 @@ export function App() {
               onClick={() => openOnly(() => setScoutOpen(site.id))}
               aria-label={`정찰 거점 ${site.name}`}
             >
-              <b className="g-pin__arrow" aria-hidden="true" />
-              <i aria-hidden="true">
-                {st === "found" ? "✓" : st === "going" ? "…" : "?"}
-              </i>
+              {/* 수묵 봉수대 표식: 미탐색 = 꺼진 봉수대, 가는 중 = 깃발, 찾음 = 불 켜짐. 이름은 마우스를 올릴 때 */}
+              <img
+                className="g-pin__mark"
+                src={`/ui/kit/pin_${st === "found" || st === "going" ? st : "unknown"}.webp`}
+                alt=""
+              />
               <span>{st === "unknown" ? "미탐색" : site.name}</span>
             </button>
           );
@@ -919,7 +981,8 @@ export function App() {
               </div>
             ) : null}
           </div>
-          <div className="scene-footer">
+          {/* 개발용 안내·예제 단추: 플레이어 화면에선 숨김 (?dev=1 또는 자동 시험에서만) */}
+          <div className="scene-footer" hidden={!DEV_UI}>
             <p>클릭으로 선택 · 마우스로 회전 · 휠로 확대</p>
             <span>
               {timberOpen && laborOpen
@@ -927,7 +990,11 @@ export function App() {
                 : "대표 주민 1종 · 온돌 둥지"}
             </span>
           </div>
-          <fieldset className="selection-actions" aria-label="예제 대상 선택">
+          <fieldset
+            className="selection-actions"
+            aria-label="예제 대상 선택"
+            hidden={!DEV_UI}
+          >
             <button
               type="button"
               className="quiet-button"
@@ -1244,11 +1311,17 @@ export function App() {
       <div
         className="g-frost"
         aria-hidden="true"
-        style={{ opacity: 0.25 + frost * 0.6 }}
+        style={{ opacity: 0.18 + frost * 0.22 }}
       />
       <div className="g-frost-edge g-frost-edge--top" aria-hidden="true" />
       <FpsBadge />
       <SeasonDial state={playState} />
+      {playState ? (
+        <MoodPanel
+          optimism={MOOD_TEST?.[0] ?? playState.optimism}
+          pessimism={MOOD_TEST?.[1] ?? playState.pessimism}
+        />
+      ) : null}
       {/* 늘 쓰는 저장·설정은 위쪽 왼편 (하단은 건물을 고를 때만) */}
       <nav className="g-topcmd" aria-label="게임 메뉴">
         <CmdButton
@@ -1264,10 +1337,7 @@ export function App() {
           <CmdFace icon="settings" label="설정" hotkey="Esc" />
         </SettingsMenu>
       </nav>
-      <section
-        className={`g-console${selection && !PANEL ? " is-selected" : " is-idle"}`}
-        aria-label="명령 콘솔"
-      >
+      <section className="g-console is-idle" aria-label="명령 콘솔">
         <ConsoleFrame />
         <div className="g-console__map">
           <button
@@ -1306,6 +1376,7 @@ export function App() {
             ref={toolsMenuRef}
             type="button"
             className="g-dev"
+            hidden={!DEV_UI}
             aria-expanded={toolsOpen}
             aria-controls={toolsPanelId}
             onClick={() => openOnly(() => setToolsOpen(!toolsOpen))}
@@ -1314,60 +1385,14 @@ export function App() {
           </button>
         </div>
         {/* 고른 것이 있을 때만: 왼쪽 초상·이름·역할 · 오른쪽 건물별 명령 9칸 */}
-        {selection && !PANEL ? (
-          <>
-            <section className="g-console__info g-sel" aria-label="선택 정보">
-              <h2>
-                {selection.building
-                  ? (BUILDINGS[selection.building]?.name ?? "건물")
-                  : "트리케라톱스"}
-              </h2>
-              <p>
-                {selection.building
-                  ? BUILDINGS[selection.building]?.role
-                  : "마을 주민. 일터와 둥지를 오가며 일합니다."}
-              </p>
-              {selection.building === "BLD_ONDOL" && playState ? (
-                <OndolStatus state={playState} />
-              ) : null}
-              <SelectionMeta entity={selectedEntity} />
-            </section>
-            <nav className="play-menu g-console__cmd" aria-label="건물 명령">
-              {selection.grid.map(({ slot, cmd }) =>
-                cmd ? (
-                  <CmdButton
-                    key={slot}
-                    icon={cmd.icon}
-                    label={cmd.label}
-                    hotkey={cmd.hotkey ?? ""}
-                    disabled={
-                      !cmd.action ||
-                      (cmd.action === "procure" && (!timberReady || timberOpen))
-                    }
-                    onClick={() => cmd.action && runAction(cmd.action)}
-                    toggled={
-                      cmd.action?.startsWith("heat-")
-                        ? playState?.winter.zones.nest.heat ===
-                          cmd.action.slice(5)
-                        : undefined
-                    }
-                  />
-                ) : (
-                  <span
-                    key={slot}
-                    className="g-cmd g-cmd--empty"
-                    aria-hidden="true"
-                  />
-                ),
-              )}
-            </nav>
-          </>
-        ) : null}
       </section>
-      {selection && PANEL ? (
+      {selection ? (
         <SelectionCard
-          variant={PANEL}
-          id={selection.building ?? "BLD_ONDOL"}
+          id={selection.building ?? "RESIDENT"}
+          portrait={
+            selection.building ? undefined : "/ui/residents/R02_Triceratops.jpg"
+          }
+          traits={selection.building ? undefined : RESIDENT_TRAITS.R02}
           name={
             selection.building
               ? (BUILDINGS[selection.building]?.name ?? "건물")
@@ -1376,7 +1401,7 @@ export function App() {
           role={
             selection.building
               ? (BUILDINGS[selection.building]?.role ?? "")
-              : "마을 주민. 일터와 둥지를 오가며 일합니다."
+              : "짐 운반꾼. 일터와 창고 사이로 짐을 나릅니다."
           }
           commands={selection.grid}
           state={playState}
@@ -1390,9 +1415,9 @@ export function App() {
             !cmd.action ||
             (cmd.action === "procure" && (!timberReady || timberOpen))
           }
-          anchorRef={selAnchor}
         />
       ) : null}
+      {STORY ? <StoryChoice id={STORY} /> : null}
     </main>
   );
 }

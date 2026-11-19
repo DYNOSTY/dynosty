@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { SITE_POINTS } from "../../apps/web/src/site-targets.js";
-import { press } from "./labor-tabs.js";
+import { press, startTimber } from "./labor-tabs.js";
 import {
   progressButton as b,
   progressCard as card,
@@ -63,7 +63,7 @@ test("재배치의 부족 이유·진행량을 복원하고 실패 불러오기�
     "저장했습니다",
   );
   await p.reload();
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-save-status")).toContainText(
@@ -131,7 +131,7 @@ test("교환의 대기·예약 인원·재검수·수령 완료를 보여주고 
     "저장했습니다",
   );
   await p.reload();
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-save-status")).toContainText(

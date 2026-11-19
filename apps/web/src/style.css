@@ -13,7 +13,7 @@
   --focus: #b5654a;
   --warn: #b5654a;
   --hud-shadow: 0 1px 0 rgb(58 46 42 / 8%), 0 6px 18px rgb(58 46 42 / 10%);
-  font-family: Pretendard, "Malgun Gothic", system-ui, sans-serif;
+  font-family: var(--font-body);
   word-break: keep-all;
   color: var(--ink);
   background: var(--paper);
@@ -3437,8 +3437,18 @@ body,
   .g-quests {
     display: contents;
   }
-  .g-quests > :not(.play-status) {
+  .g-quests > :not(.play-status):not(.qc) {
     display: none;
+  }
+  /* 휴대폰: 의뢰 카드는 아래에서 올라오는 판 (가로 넘침 없이) */
+  .qc {
+    position: fixed;
+    z-index: 20;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-height: 70vh;
+    overflow: auto;
   }
 }
 @media (max-width: 760px) {
@@ -4508,8 +4518,8 @@ body,
 .g-season {
   position: fixed;
   z-index: 5;
-  top: 62px;
-  left: 12px;
+  top: 40px; /* 쥐·범·용은 테 위, 나머지 여덟은 왼쪽 아래(9~6시) — 위 동물이 자원 줄을 안 덮게 */
+  left: 40px; /* 테 왼쪽으로 나온 동물이 화면 밖으로 잘리지 않게 */
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4612,11 +4622,11 @@ body,
 /* 저장·설정·fps는 절기 시계 아래로 */
 @media (min-width: 761px) {
   .g-topcmd {
-    top: 202px;
+    top: 266px;
   }
   .fps-badge,
   .g-fps {
-    top: 254px;
+    top: 318px;
   }
 }
 /* 보온 칸 */
@@ -4744,117 +4754,192 @@ body,
   outline: 3px solid var(--nakgwan, #b3322a);
   outline-offset: -2px;
 }
+/* 눈금 (2026-11-19 3차): 온돌 단면 가로 띠 + 석탄 덩이 7칸. 머리줄(아이콘·이름·수치)은 칸 폭 고정 */
 .sc-gauges {
   display: grid;
   gap: 6px;
+  margin-top: 8px;
 }
-.sc-gauge {
+.sc-head {
   display: grid;
-  grid-template-columns: 64px 1fr 52px;
+  grid-template-columns: 22px 1fr 64px;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 15px;
 }
-.sc-gauge b {
+.sc-head img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+.sc-head b {
   text-align: right;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  transition: color 0.4s;
 }
-.sc-gauge__bar {
-  height: 10px;
-  border-radius: 5px;
-  background: rgb(43 38 32 / 15%);
-  box-shadow: inset 0 0 0 1px var(--hanji-line);
+.sc-head b.is-hot {
+  color: #c2410c;
+}
+.sc-head b.is-low {
+  color: var(--nakgwan, #b3322a);
+}
+/* 온돌 단면: 차가운 돌 그림 위에 열이 왼쪽(아궁이)→오른쪽(굴뚝)으로 번짐 */
+.ondol-x {
+  --heat: 0;
+  --fire: 0;
+  position: relative;
+  height: 56px;
+  border-radius: 6px;
   overflow: hidden;
+  background: #1e1a17;
+  box-shadow:
+    inset 0 0 0 1px rgb(43 38 32 / 55%),
+    0 2px 6px rgb(0 0 0 / 30%);
 }
-.sc-gauge__bar i {
-  display: block;
+.ondol-x__strip {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #b5532a, #e8a04a);
+  object-fit: cover;
+  filter: brightness(calc(0.75 + 0.25 * var(--heat)));
 }
-.sc-gauge__bar.is-coal i {
-  background: linear-gradient(90deg, #2c2a2e, #5a5660);
+/* 열: 불길 결(fire_band, 오른쪽으로 흐르는 불)을 숯불 바탕에 screen으로 겹쳐 고래를 따라 오른쪽으로 이글거림.
+   앞머리는 깃털처럼 흐려짐 (사용자 11/19 4차 "이글거림이 우측으로") */
+.ondol-x__heat {
+  position: absolute;
+  left: 10%;
+  top: 42%;
+  bottom: 14%;
+  border-radius: 3px;
+  background:
+    url(/ui/kit/fire_band.webp) 0 50% / 280px 140% repeat-x,
+    linear-gradient(90deg, #7a2008, #4a1005 60%, #2a0804);
+  background-blend-mode: screen, normal;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+  box-shadow: 0 0 10px 2px rgb(255 120 30 / calc(0.2 + 0.5 * var(--heat)));
+  animation: ondol-flow 2.2s linear infinite;
+  transition: width 0.9s ease;
+}
+/* 아궁이 불 (왼쪽 끝) */
+.ondol-x__fire {
+  position: absolute;
+  left: 1.5%;
+  bottom: 18%;
+  width: 9%;
+  height: calc(30% + 45% * var(--fire));
+  opacity: calc(0.35 + 0.65 * var(--fire));
+  background:
+    radial-gradient(
+      ellipse 45% 100% at 50% 100%,
+      rgb(255 250 210) 0%,
+      rgb(255 180 60 / 90%) 35%,
+      rgb(230 70 20 / 0%) 75%
+    );
+  filter: blur(0.4px) drop-shadow(0 0 6px rgb(255 140 40 / 90%));
+  transform-origin: 50% 100%;
+  animation: ondol-fire 0.6s ease-in-out infinite alternate;
+}
+/* 굴뚝 연기 (오른쪽 끝) — 열이 끝까지 차면 피어오름 */
+.ondol-x__smoke {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 8%;
+  height: 45%;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 50% 80%, rgb(70 64 60 / 75%) 0 22%, transparent 48%),
+    radial-gradient(circle at 40% 35%, rgb(90 84 78 / 55%) 0 18%, transparent 42%);
+  transition: opacity 0.8s;
+}
+.ondol-x.is-full .ondol-x__smoke {
+  opacity: 1;
+  animation: ondol-smoke 2.4s ease-out infinite;
+}
+.ondol-x.is-hot {
+  box-shadow:
+    inset 0 0 0 1px rgb(43 38 32 / 55%),
+    0 0 12px 2px rgb(255 120 40 / 45%);
+}
+/* 석탄 덩이 7칸: 빈 칸은 흐린 덩이, 남은 만큼 색을 채움 */
+.coal-x {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgb(43 38 32 / 10%);
+}
+.coal-x i {
+  position: relative;
+  height: 28px;
+}
+.coal-x i::before {
+  /* 빈 덩이(흐림) — 위에 남은 만큼 잘라 낸 색 덩이를 겹침 */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url(/ui/resources/RES_COAL.png) center / contain no-repeat;
+  filter: grayscale(1);
+  opacity: 0.25;
+}
+.coal-x img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 40%));
+}
+.coal-x.is-low {
+  box-shadow: inset 0 0 0 2px var(--nakgwan, #b3322a);
+}
+@keyframes ondol-flow {
+  to {
+    background-position:
+      280px 50%,
+      0 0;
+  }
+}
+@keyframes ondol-fire {
+  from {
+    transform: scaleY(0.85) skewX(-4deg);
+  }
+  to {
+    transform: scaleY(1.1) skewX(4deg);
+  }
+}
+@keyframes ondol-smoke {
+  from {
+    transform: translateY(6px) scale(0.8);
+    opacity: 0.9;
+  }
+  to {
+    transform: translateY(-10px) scale(1.3);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ondol-x *,
+  .ondol-x__heat {
+    /* biome-ignore lint/complexity/noImportantStyles: 움직임 줄이기 설정은 모든 애니메이션보다 우선 */
+    animation: none !important;
+  }
 }
 .sc-note {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--meok-sub);
 }
-
-/* a 오른쪽 세로 카드 — 프로스트펑크·어게인스트 더 스톰 */
-.sc--card {
-  right: 16px;
-  top: 220px;
-  width: 360px;
-  padding: 0 22px 22px;
-  border: 28px solid transparent;
-  border-image: url(/ui/kit/panel_frame.png) 180 fill / 28px / 0 stretch;
-  box-sizing: border-box;
-  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 40%));
-}
-.sc-card__head {
-  position: relative;
-  margin: -6px -10px 12px;
-}
-.sc-card__head img {
-  display: block;
-  width: 100%;
-  height: 150px;
-  object-fit: cover;
-  border-radius: 4px;
-  box-shadow: 0 0 0 1px var(--hanji-line);
-}
-.sc-card__head h2 {
-  position: absolute;
-  left: 12px;
-  bottom: 8px;
-  color: var(--hanji);
-  text-shadow: 0 2px 6px rgb(0 0 0 / 80%);
-  font-size: 26px;
-}
-.sc-card__corner {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: flex;
-  gap: 6px;
-}
-.sc-card__corner .sc-btn {
-  width: 40px;
-  height: 40px;
-}
-.sc-card__corner .sc-btn img {
-  width: 22px;
-  height: 22px;
-}
-.sc-card__role {
-  margin: 0 0 10px;
+.sc-traits > span {
   font-size: 15px;
-  line-height: 1.55;
-  color: var(--meok-sub);
-  text-wrap: pretty;
 }
-.sc-sub {
-  margin: 14px 0 6px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--hanji-line);
-  font: 600 14px / 1 var(--font-body);
-  color: var(--meok-sub);
-}
-.sc-card__actions {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.sc-card__actions .sc-btn.has-label {
-  width: 100%;
-  height: 76px;
-  grid-template-rows: 1fr auto;
-  gap: 2px;
-  padding: 6px 2px 4px;
-}
-.sc-btn__text {
-  font: 600 13px / 1.1 var(--font-body);
-  white-space: nowrap;
+.sc-traits i {
+  font-size: 13px;
 }
 
 /* b 오른쪽 아래 초상 메달 — 문명 6 */
@@ -4875,15 +4960,15 @@ body,
   display: flex;
   align-items: center;
   min-height: 132px;
-  padding: 12px 150px 12px 20px;
-  border-radius: 66px 8px 8px 66px;
+  padding: 14px 178px 14px 22px; /* 초상(140)+테두리 자리 — 수치가 초상에 가리지 않게 */
+  border-radius: 16px; /* 사용자: 둥근 원보다 모서리만 둥근 사각 */
   background: rgb(239 230 210 / 95%);
   box-shadow:
     0 0 0 2px var(--jjok-deep),
-    0 0 0 5px #c79a3a,
     0 6px 14px rgb(0 0 0 / 40%);
-  min-width: 300px;
-  max-width: 460px;
+  /* 폭 고정 — 고른 것이 바뀌어도 창 크기가 흔들리지 않게, 눈금 막대가 넉넉하게 */
+  width: min(540px, calc(100vw - 32px));
+  box-sizing: border-box;
 }
 .sc-medal__portrait {
   position: absolute;
@@ -4892,12 +4977,10 @@ body,
   width: 140px;
   height: 140px;
   transform: translateY(-50%);
-  border-radius: 50%;
+  border-radius: 22px;
   object-fit: cover;
   box-shadow:
-    0 0 0 4px #c79a3a,
-    0 0 0 8px var(--jjok-deep),
-    0 0 0 10px #b3322a,
+    0 0 0 3px var(--jjok-deep),
     0 6px 14px rgb(0 0 0 / 45%);
 }
 .sc-medal__text {
@@ -4906,7 +4989,7 @@ body,
 }
 .sc-medal__text p {
   margin: 0;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
   color: var(--meok-sub);
 }
@@ -4920,48 +5003,1019 @@ body,
   height: 38px;
 }
 
-/* c 건물 옆 카드 — 실록 */
-.sc--float {
-  left: -9999px;
-  top: -9999px;
-  width: 280px;
-  padding: 12px 14px 14px;
-  transform: translate(-50%, calc(-100% - 22px));
-  border-radius: 8px;
-  background: rgb(239 230 210 / 96%);
-  box-shadow:
-    0 0 0 1px var(--hanji-line),
-    0 0 0 3px rgb(43 38 32 / 55%),
-    0 8px 18px rgb(0 0 0 / 45%);
+/* ── 십이시 시계 (2026-11-19 2차): 원 = 하늘만, 테 = 그 시의 십이간지 ──
+   상자 168×208 — 하늘 원(지름 124) 중심이 (84,124). 테 그림은 512 캔버스·구멍 반지름 128이라 248px로 놓으면
+   구멍이 하늘 원과 딱 맞음. 테 위 동물(말 등)이 위로 120px까지 올라와도 위 자원 줄을 덮지 않게 상자를 높게 */
+.g-season__dial.g-time {
+  width: 168px;
+  height: 208px;
+  filter: none;
 }
-.sc--float::after {
-  content: "";
+.g-time__sky {
   position: absolute;
-  left: 50%;
-  bottom: -12px;
-  margin-left: -12px;
-  border: 12px solid transparent;
-  border-bottom: 0;
-  border-top-color: rgb(239 230 210 / 96%);
+  left: 22px;
+  top: 62px;
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #2a3550;
 }
-.sc-float__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.g-time__sky img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 100%;
+  transition: opacity 1s linear;
 }
-.sc-float__head .sc-btn {
-  width: 34px;
-  height: 34px;
+/* 구름 띠 (검은 바탕 그림 → screen 합성으로 검정이 사라짐), 2분에 한 바퀴 */
+.g-time__clouds {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12%;
+  height: 46%;
+  background: url(/ui/time/clouds.webp) 0 50% / auto 100% repeat-x;
+  mix-blend-mode: screen;
+  opacity: 0.75;
+  animation: g-clouds 120s linear infinite;
+  pointer-events: none;
 }
-.sc-float__role {
-  margin: 4px 0 8px;
+.g-time__clouds.is-night {
+  opacity: 0.35;
+}
+@keyframes g-clouds {
+  to {
+    background-position: -512px 50%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .g-time__clouds {
+    animation: none;
+  }
+}
+.g-time__ring {
+  position: absolute;
+  left: -40px;
+  top: 0;
+  width: 248px;
+  height: 248px;
+  filter: drop-shadow(0 3px 6px rgb(0 0 0 / 45%));
+}
+.g-time__orb {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border-radius: 50%;
+  z-index: 2; /* 구름 위 — 해를 가리지 않게 */
+  transition:
+    left 1s linear,
+    top 1s linear;
+}
+.g-time__orb.is-sun {
+  /* 일월오봉도의 해 — 붉은 원, 빛은 아주 조금 (사용자 11/19 "해가 아니라 핵분열") */
+  /* 일장기처럼 보이지 않게: 작게, 주황빛 붉은색, 가장자리는 붓으로 번진 듯 */
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  background: radial-gradient(circle at 42% 40%, #f0a050 0 18%, #dc5a2c 55%, #c2402a 72%, rgb(194 64 42 / 0%) 78%);
+  box-shadow: 0 0 8px 2px rgb(240 140 70 / 40%);
+}
+.g-time__orb.is-moon {
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  background: radial-gradient(
+    circle at 40% 40%,
+    #f4f1e6 0 55%,
+    #c9c3b0 70%,
+    rgb(201 195 176 / 0%) 74%
+  );
+  box-shadow: 0 0 8px 2px rgb(230 230 255 / 45%);
+}
+.g-time__term {
   font-size: 14px;
-  line-height: 1.5;
   color: var(--meok-sub);
 }
-.sc-float__actions {
+
+/* ═══ 선택 화면 (프로스트펑크 사건 창 레퍼런스) — 퀘스트 → 반으로 나눈 제안 ═══ */
+.story {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 72px 48px 48px;
+  background: rgb(14 16 22 / 78%) center / cover no-repeat;
+  backdrop-filter: blur(2px);
+}
+.story.is-ending {
+  background-color: rgb(14 16 22 / 70%);
+  background-blend-mode: multiply;
+}
+.story-kicker {
+  margin: 0 0 6px;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: #d9c79f;
+}
+.story h2 {
+  margin: 0;
+  font: 700 36px / 1.2 var(--font-title);
+  color: var(--hanji);
+  text-shadow: 0 2px 10px rgb(0 0 0 / 70%);
+}
+/* 1) 퀘스트: 큰 삽화 + 제목·한 줄 + 다음 */
+.story-quest {
+  position: relative;
+  width: min(1100px, 92vw);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 2px #c79a3a,
+    0 0 0 6px var(--ottchil),
+    0 18px 40px rgb(0 0 0 / 60%);
+}
+.story-quest img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+.story-quest__text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 80px 40px 28px;
+  background: linear-gradient(transparent, rgb(14 16 22 / 92%) 55%);
+}
+.story-quest__text p:not(.story-kicker) {
+  margin: 8px 0 18px;
+  font-size: 20px;
+  color: var(--hanji);
+}
+.story-next {
+  padding: 12px 28px;
+  font: 700 18px / 1 var(--font-title);
+  color: var(--hanji);
+  border: 8px solid var(--jjok-deep);
+  border-image: url(/ui/kit/btn.png) 56 fill / 12px / 2px stretch;
+  background: var(--jjok);
+}
+.story-next::after {
+  content: " →";
+}
+/* 2) 제안: 화면을 반으로, 그림 위주 */
+.story-head {
+  text-align: center;
+  margin-bottom: 18px;
+}
+.story-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  width: min(1280px, 94vw);
+  height: min(620px, 68vh);
+}
+.story-side {
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #111;
+  box-shadow:
+    0 0 0 2px #8a6a3a,
+    0 0 0 5px var(--ottchil),
+    0 14px 30px rgb(0 0 0 / 55%);
+  transition:
+    transform 0.25s,
+    box-shadow 0.25s;
+}
+.story-side img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s;
+}
+.story-side:hover img,
+.story-side:focus-visible img {
+  transform: scale(1.04);
+}
+.story-side:hover,
+.story-side:focus-visible,
+.story-side.is-picked {
+  box-shadow:
+    0 0 0 3px #f2c66b,
+    0 0 0 6px var(--ottchil),
+    0 0 28px 6px rgb(242 198 107 / 45%);
+}
+.story-side__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 45%, rgb(10 12 18 / 92%));
+}
+.story-side__body {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 22px;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  text-align: left;
+  color: var(--hanji);
+}
+.story-side__body b {
+  font: 700 32px / 1.1 var(--font-title);
+  text-shadow: 0 2px 8px rgb(0 0 0 / 80%);
+}
+.story-side__body q {
+  font-size: 19px;
+  line-height: 1.5;
+  quotes: "“" "”";
+  text-wrap: pretty;
+  word-break: keep-all;
+}
+.story-tags {
   display: flex;
+  gap: 8px;
+}
+.story-tags span {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  background: rgb(239 230 210 / 18%);
+  box-shadow: inset 0 0 0 1px rgb(239 230 210 / 45%);
+}
+.story-pick {
+  margin-top: 4px;
+  padding: 10px 22px;
+  font: 700 18px / 1 var(--font-title);
+  border: 8px solid var(--jjok-deep);
+  border-image: url(/ui/kit/btn.png) 56 fill / 12px / 2px stretch;
+  background: var(--jjok);
+}
+/* 인물 초상은 머리가 잘리지 않게 위쪽 기준 */
+.story.is-ending .story-side img {
+  object-position: 50% 8%;
+}
+
+/* 메달 창: 닫기 단추 단축키 표시는 숨김(겹침) */
+.sc-medal__close .g-hotkey {
+  display: none;
+}
+/* 얻음·잃음 (색만이 아니라 글자·기호로도 구분) */
+.story-gl {
+  display: grid;
   gap: 6px;
-  margin-top: 8px;
+}
+.story-gl > span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 18px;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+.story-gl i {
+  flex: none;
+  font-style: normal;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.story-gl .is-gain i {
+  background: #7f9e8e;
+  color: #10201a;
+}
+.story-gl .is-gain i::before {
+  content: "▲ ";
+}
+.story-gl .is-loss i {
+  background: #a8322d;
+  color: #fff3ee;
+}
+.story-gl .is-loss i::before {
+  content: "▼ ";
+}
+.story-confirm {
+  position: absolute;
+  left: 50%;
+  bottom: 48px;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  padding: 20px 32px;
+  border-radius: 10px;
+  background: rgb(14 16 22 / 92%);
+  box-shadow:
+    0 0 0 2px #c79a3a,
+    0 12px 30px rgb(0 0 0 / 60%);
+  color: var(--hanji);
+  font-size: 19px;
+}
+.story-confirm p {
+  margin: 0;
+}
+.story-confirm div {
+  display: flex;
+  gap: 12px;
+}
+.story-back {
+  padding: 12px 22px;
+  font: 600 17px / 1 var(--font-title);
+  color: var(--hanji);
+  background: transparent;
+  border: 1px solid rgb(239 230 210 / 45%);
+  border-radius: 4px;
+}
+
+/* ═══ 위쪽 자원 줄 (2026-11-19 사용자: 더 크게 · 7~8자리도 겹치거나 두 줄 되지 않게) ═══ */
+@media (min-width: 761px) {
+  .resource-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    overflow: hidden;
+  }
+  .resource-card {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 6px;
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+  .resource-icon {
+    width: 36px;
+    height: 36px;
+    flex: none;
+  }
+  .resource-card strong {
+    display: inline-block;
+    min-width: 4.2ch; /* "9,999" — 숫자가 바뀌어도 칸 폭이 흔들리지 않게 */
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .warmth-card strong {
+    min-width: 5ch;
+  }
+}
+
+/* ═══ 공통 의뢰 카드 (QuestCard, 2026-11-19) — 의뢰 목록 바로 아래 펼침. 그림만 의뢰마다 다르고 칸 자리는 같다 ═══ */
+.qc {
+  display: grid;
+  margin-top: 10px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--hanji);
+  color: var(--meok);
+  text-shadow: none;
+  box-shadow:
+    0 0 0 2px var(--jjok-deep),
+    0 8px 18px rgb(0 0 0 / 45%);
+  word-break: keep-all;
+}
+.qc__art {
+  position: relative;
+  height: 132px;
+  background: 50% 22% / cover no-repeat;
+}
+.qc__art span {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgb(43 38 32 / 78%);
+  color: var(--hanji);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.qc__body {
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px 14px;
+}
+.qc h3 {
+  margin: 0;
+  font: 700 20px / 1.3 var(--font-title);
+  text-wrap: balance;
+}
+.qc__why {
+  margin: 0;
+  white-space: pre-line; /* 문장마다 줄 — 구가 갈라지지 않게 */
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--meok-sub);
+  text-wrap: pretty;
+}
+/* 진행: 아이콘 · 막대 · 수치 — 수치 칸은 최소 64px, 큰 수면 막대가 줄고 수는 안 잘림 */
+.qc__row {
+  display: grid;
+  grid-template-columns: 30px minmax(48px, 1fr) minmax(64px, max-content);
+  align-items: center;
+  gap: 10px;
+}
+.qc__row img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+.qc__row b {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+}
+.qc__bar {
+  height: 10px;
+  border-radius: 5px;
+  background: rgb(43 38 32 / 15%);
+  overflow: hidden;
+}
+.qc__bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #8a5a2b, #c48a3e);
+  transition: width 0.6s ease;
+}
+.qc__meta {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  font-size: 15px;
+}
+.qc__meta div {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 8px;
+}
+.qc__meta dt {
+  color: var(--meok-sub);
+  white-space: nowrap;
+}
+.qc__meta dd {
+  margin: 0;
+  min-width: 0;
+}
+.qc__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.qc__btns button {
+  padding: 7px 16px;
+  border-radius: 4px;
+  font: 700 15px / 1.3 var(--font-body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.qc__go {
+  border: 0;
+  background: var(--jjok);
+  color: var(--hanji);
+  box-shadow: inset 0 0 0 2px var(--jjok-deep);
+}
+.qc__go:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.qc__btns .qc__close {
+  border: 0;
+  background: transparent;
+  color: var(--meok);
+  box-shadow: inset 0 0 0 1px var(--hanji-line, #c7b79a);
+  font-weight: 400;
+}
+.qc__btns button:focus-visible {
+  outline: 3px solid var(--nakgwan, #b3322a);
+  outline-offset: 2px;
+}
+@media (max-width: 760px) {
+  /* 휴대폰: 같은 시계를 줄여서 (칸 배치는 그대로) */
+  .g-season__dial.g-time {
+    zoom: 0.42;
+  }
+}
+/* 의뢰 카드: 땔감 환산 아이콘 · 정찰 길 칸(도착까지 간 만큼 채움) */
+.qc__conv {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.qc__conv img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+.qc__conv > span {
+  margin: 0 4px;
+  color: var(--meok-sub);
+}
+/* 정찰 길 (레퍼런스: 배너 사가 행렬 표식 + 프로스트펑크 예상 이동 시간) —
+   마을 → 거점(가까운 순) 먹선 길, 거점 아래 왕복 시간, 정찰대 표식이 간 만큼 나아감 */
+.qc__label {
+  font-size: 15px;
+  color: var(--meok-sub);
+}
+.qc__route {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* 한 줄: 표식 26 · 이름 76 · 길 · 시간 76 (폭 고정 — 상태가 바뀌어도 흔들림 없이) */
+.qc__route li {
+  display: grid;
+  grid-template-columns: 26px 76px 1fr 76px;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  font-size: 14px;
+}
+.qc__route li > img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+.qc__route li.is-unknown > img {
+  opacity: 0.55;
+}
+.qc__name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.qc__route li.is-unknown .qc__name {
+  color: var(--meok-sub);
+}
+.qc__route small {
+  text-align: right;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--meok-sub);
+  font-variant-numeric: tabular-nums;
+}
+.qc__route li.is-going small {
+  color: #a8501a;
+  font-weight: 700;
+}
+.qc__route li.is-found small {
+  color: #2f6b4a;
+  font-weight: 700;
+}
+/* 길: 먹 점선, 간 만큼 진하게 */
+.qc__path {
+  position: relative;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, rgb(43 38 32 / 35%) 0 6px, transparent 6px 10px);
+}
+.qc__path i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: repeating-linear-gradient(90deg, #a8501a 0 6px, transparent 6px 10px);
+  transition: width 0.8s ease;
+}
+.qc__route li.is-found .qc__path i {
+  background: #3f6b55;
+}
+.qc__scout {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  transform: translate(-50%, -60%);
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 50%));
+  animation: qc-walk 0.8s ease-in-out infinite alternate;
+  transition: left 0.8s ease;
+}
+@keyframes qc-walk {
+  to {
+    transform: translate(-50%, -75%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qc__scout img {
+    animation: none;
+  }
+}
+
+/* ═══ 민심 칸 (MoodPanel, 2026-11-19 4차) — 자원 줄 아래 가운데.
+   낙관 = 한지에 스며드는 햇빛 / 비관 = 번지는 먹·핏빛. 칸 폭 고정(아이콘 36 · 이름 40 · 막대 · 수 40) ═══ */
+.mood {
+  --dread: 0;
+  position: fixed;
+  z-index: 5;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 4px;
+  width: 460px;
+  padding: 8px 14px 10px 10px;
+  border-radius: 12px;
+  background:
+    radial-gradient(
+      ellipse 60% 120% at 100% 100%,
+      rgb(60 10 8 / calc(0.55 * var(--dread) * var(--dread))),
+      transparent 70%
+    ),
+    rgb(239 230 210 / 94%);
+  box-shadow:
+    0 0 0 2px var(--jjok-deep),
+    0 6px 14px rgb(0 0 0 / 40%);
+  color: var(--meok);
+  pointer-events: none;
+  transition: box-shadow 0.8s;
+}
+.mood.is-danger,
+.mood.is-critical {
+  /* 테두리까지 먹이 배어듦 */
+  box-shadow:
+    0 0 0 2px #3a0d0a,
+    0 0 16px 3px rgb(120 15 10 / 55%),
+    0 6px 14px rgb(0 0 0 / 40%);
+}
+.mood__row {
+  --v: 0;
+  display: grid;
+  grid-template-columns: 36px 40px 1fr 40px;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  font-size: 16px;
+}
+.mood__row b {
+  text-align: right;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.6s;
+}
+.mood__icon {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 45%));
+  transition: filter 0.8s;
+}
+.mood__bar {
+  position: relative;
+  height: 18px;
+  border-radius: 9px;
+  background: linear-gradient(#2a221d, #3e322a);
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 60%);
+}
+.mood__bar > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  transition: width 0.8s ease;
+}
+
+/* 낙관: 빛 결이 천천히 흐르고, 높을수록 막대 위로 빛이 번져 오름 */
+.is-hope .mood__bar {
+  background: linear-gradient(#1f2433, #2c3247);
+}
+.is-hope .mood__bar > i {
+  background: url(/ui/kit/light_mist.webp) 0 50% / 384px 48px repeat-x;
+  filter: brightness(calc(0.85 + 0.35 * var(--v)));
+  box-shadow: 0 0 calc(2px + 14px * var(--v)) calc(3px * var(--v))
+    rgb(255 220 150 / calc(0.15 + 0.6 * var(--v)));
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 10px), rgb(0 0 0 / 40%));
+  mask-image: linear-gradient(90deg, #000 calc(100% - 10px), rgb(0 0 0 / 40%));
+  animation: mood-drift 30s linear infinite;
+}
+/* 빛 알갱이: 낙관이 높을수록 많이·높이 피어오름 */
+.mood__motes {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 50%;
+  height: 30px;
+  opacity: min(1, calc(var(--v) * var(--v) * 1.4));
+  background:
+    radial-gradient(circle, rgb(255 246 214) 0 1px, transparent 2px) 0 0 / 23px 26px,
+    radial-gradient(circle, rgb(255 230 170 / 80%) 0 1px, transparent 2px) 9px 7px / 31px 26px;
+  animation: mood-rise 4s linear infinite;
+  -webkit-mask-image: linear-gradient(to top, #000, transparent);
+  mask-image: linear-gradient(to top, #000, transparent);
+}
+.is-hope.is-bright .mood__icon {
+  filter: drop-shadow(0 0 7px rgb(255 220 140 / 90%));
+}
+
+/* 비관: 깨끗한 한지에 먹이 번지며 핏빛이 섞임. 값이 오를수록 짙고 막대 밖으로 배어 나옴 */
+.is-despair .mood__bar {
+  background: linear-gradient(#f3ead6, #e2d4b8);
+  box-shadow:
+    inset 0 1px 2px rgb(60 40 20 / 35%),
+    0 0 0 1px rgb(60 40 20 / 25%);
+}
+.is-despair .mood__bar > i {
+  background: url(/ui/kit/ink_bleed.webp) 0 50% / 384px 48px repeat-x;
+  filter: saturate(calc(0.7 + 0.9 * var(--v))) brightness(calc(1.25 - 0.4 * var(--v)));
+  box-shadow: 0 0 calc(4px + 14px * var(--v) * var(--v)) calc(4px * var(--v))
+    rgb(70 8 6 / calc(0.25 + 0.6 * var(--v)));
+  /* 앞머리는 먹이 번지듯 흐려짐 */
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+  animation: mood-drift 40s linear infinite reverse;
+}
+/* 흘러내리는 먹: 위기부터 막대 아래로 방울이 맺혀 떨어짐 */
+.mood__drip {
+  position: absolute;
+  inset: 70% 6% auto 30%;
+  height: 0;
+  pointer-events: none;
+}
+.is-danger .mood__drip,
+.is-critical .mood__drip {
+  height: 14px;
+  background:
+    radial-gradient(ellipse 2px 6px at 20% 0, #2a0806 0 70%, transparent 72%) 0 0 / 40px 100% repeat-x,
+    radial-gradient(ellipse 1.5px 9px at 60% 0, #4a0b08 0 70%, transparent 72%) 13px 0 / 57px 100% repeat-x;
+  animation: mood-drip 2.6s ease-in infinite;
+}
+.mood__bar em {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #1b0e0c;
+  color: #ffb4a6;
+  font: 700 12px / 16px var(--font-body);
+  font-style: normal;
+  white-space: nowrap;
+}
+.mood__row.is-danger,
+.mood__row.is-critical {
+  color: #7d1a14;
+}
+.mood__row.is-danger .mood__icon,
+.mood__row.is-critical .mood__icon {
+  filter: drop-shadow(0 0 7px rgb(140 15 10 / 90%));
+}
+.mood__row.is-critical .mood__bar {
+  animation: mood-throb 1.4s ease-in-out infinite;
+}
+@keyframes mood-drift {
+  to {
+    background-position: 768px 50%;
+  }
+}
+@keyframes mood-rise {
+  to {
+    background-position:
+      0 -26px,
+      9px -19px;
+  }
+}
+@keyframes mood-drip {
+  from {
+    transform: translateY(-6px) scaleY(0.4);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(6px) scaleY(1.2);
+    opacity: 0;
+  }
+}
+@keyframes mood-throb {
+  50% {
+    box-shadow:
+      inset 0 1px 3px rgb(0 0 0 / 60%),
+      0 0 12px 3px rgb(120 10 8 / 60%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mood *,
+  .mood__bar,
+  .mood__bar > i {
+    /* biome-ignore lint/complexity/noImportantStyles: 움직임 줄이기 설정은 모든 애니메이션보다 우선 */
+    animation: none !important;
+  }
+}
+@media (max-width: 760px) {
+  .mood {
+    top: 56px;
+    width: calc(100vw - 24px);
+  }
+}
+
+/* ═══ 화면 정리 (2026-11-19 6번) ═══ */
+/* 개발용 안내·예제 단추는 ?dev=1·자동 시험에서만 */
+.scene-footer[hidden],
+.selection-actions[hidden],
+.g-dev[hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: hidden 속성은 화면마다 다른 display 규칙보다 늘 이겨야 함 */
+  display: none !important;
+}
+/* 위 왼쪽: 주민 수만 아이콘 칸 */
+.settlement-heading p.play-pop,
+.play-pop {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  white-space: nowrap;
+  /* biome-ignore lint/complexity/noImportantStyles: 위 막대의 옛 상태 글 규칙(여러 겹)보다 이겨야 함 */
+  font-size: 22px !important;
+  font-weight: 700;
+  color: var(--meok);
+  font-variant-numeric: tabular-nums;
+}
+.settlement-heading p.play-pop img,
+.play-pop img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+/* 진행 단추: 붓 아이콘 (멈춤/시작 · 하루 넘김 · 새 게임) — 칸 크기 고정, 눌러도 흔들림 없이 */
+.play-controls.is-icons {
+  gap: 6px;
+}
+.play-controls.is-icons button {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(43 38 32 / 12%);
+  box-shadow: inset 0 0 0 1px rgb(43 38 32 / 25%);
+  cursor: pointer;
+}
+.play-controls.is-icons button img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+.play-controls.is-icons button:hover:not(:disabled) {
+  background: rgb(43 38 32 / 20%);
+}
+.play-controls.is-icons button:focus-visible {
+  outline: 3px solid var(--nakgwan, #b3322a);
+  outline-offset: 2px;
+}
+.play-controls.is-icons button.is-pause {
+  /* 진행 중: 멈춤 단추가 눌린 듯 표시 */
+  background: var(--jjok, #34436a);
+  box-shadow: inset 0 0 0 2px var(--jjok-deep, #26324f);
+}
+.play-controls.is-icons button:disabled {
+  opacity: 0.45;
+}
+/* 지도 위 거점 표식: 흰 알약 대신 수묵 봉수대, 이름은 올렸을 때·찾은 곳만 늘 */
+@media (min-width: 761px) {
+  .g-pins .g-pin {
+    display: grid;
+    justify-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    transform: translate(-50%, -90%);
+  }
+  .g-pin__mark {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 3px rgb(0 0 0 / 55%));
+    transition: transform 0.2s;
+  }
+  .g-pins .g-pin > span {
+    margin-top: -6px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgb(27 22 18 / 78%);
+    color: var(--hanji);
+    font: 600 13px / 1.4 var(--font-body);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .g-pins .g-pin.is-found > span,
+  .g-pins .g-pin:hover > span,
+  .g-pins .g-pin:focus-visible > span {
+    opacity: 1;
+  }
+  .g-pins .g-pin:hover .g-pin__mark {
+    transform: translateY(-3px);
+  }
+  .g-pins .g-pin:focus-visible {
+    outline: 3px solid var(--nakgwan, #b3322a);
+    outline-offset: 2px;
+  }
+  .g-pin__arrow,
+  .g-pins .g-pin > i {
+    display: none;
+  }
+  /* 미니맵: 수묵 지도 바탕 + 찍은 지도는 먹빛으로 맞춤, 가장자리는 한지에 번지듯 */
+  .g-minimap {
+    background: url(/ui/kit/minimap_ink.webp) center / cover no-repeat;
+  }
+  .g-minimap img {
+    filter: grayscale(0.55) sepia(0.35) contrast(1.05) brightness(1.02);
+    mix-blend-mode: multiply;
+  }
+  .g-minimap::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 18px 6px rgb(239 230 210 / 85%);
+  }
+}
+
+/* 민심 칸: 작게, 시계 글 상자 바로 아래 (사용자 11/19 "다른 곳에 작게") — 왼쪽 위 상태 기둥(시각·날씨·민심) */
+@media (min-width: 761px) {
+  .mood {
+    top: 214px;
+    left: 218px;
+    transform: none;
+    width: 206px;
+    gap: 2px;
+    padding: 6px 10px 6px 8px;
+    border-radius: 10px;
+  }
+  .mood__row {
+    grid-template-columns: 22px 28px 1fr 26px;
+    gap: 5px;
+    height: 26px;
+    font-size: 12px;
+  }
+  .mood__row b {
+    font-size: 14px;
+  }
+  .mood__icon {
+    width: 22px;
+    height: 22px;
+  }
+  .mood__bar {
+    height: 10px;
+    border-radius: 5px;
+  }
+  .mood__bar em {
+    right: 2px;
+    padding: 0 5px;
+    font-size: 10px;
+    line-height: 12px;
+  }
+  .mood__motes {
+    height: 14px;
+  }
+  .is-danger .mood__drip,
+  .is-critical .mood__drip {
+    height: 8px;
+  }
+}
+
+/* 해·달: 붓으로 그린 그림 (2026-11-19 "진시·사시 해 신경 써") — 가장자리 번짐 띠는 잘라 내고,
+   해는 높이(--alt)에 따라 지평선 가까이선 붉게, 높이 뜨면 금빛 */
+.g-time__orb.is-sun,
+.g-time__orb.is-moon {
+  --alt: 0.5;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border-radius: 0;
+  box-shadow: none;
+  background: url(/ui/time/sun.webp) center / contain no-repeat;
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 60%, transparent 74%);
+  mask-image: radial-gradient(circle closest-side, #000 60%, transparent 74%);
+  filter: saturate(calc(1.35 - 0.35 * var(--alt))) hue-rotate(calc((1 - var(--alt)) * -12deg))
+    brightness(calc(0.95 + 0.15 * var(--alt)));
+}
+.g-time__orb.is-moon {
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  background-image: url(/ui/time/moon.webp);
+  filter: none;
 }

@@ -1,13 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
 import { SITE_POINTS, type SiteId } from "../../apps/web/src/site-targets.js";
-import { press, reveal } from "./labor-tabs.js";
+import { press, reveal, startTimber } from "./labor-tabs.js";
 import { clickFloor, outlinePixels, worldPoint } from "./scene-picking.js";
 
 const b = (p: Page, n: string) =>
   p.getByRole("button", { name: n, exact: true });
 async function enter(p: Page) {
   await p.goto("/");
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 }
@@ -122,7 +122,7 @@ test("현장 재배치는 보완 진행량을 보존하고 저장·새로고침 
   );
   expect(save).not.toContain("site-preview");
   await p.reload();
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-clock")).toContainText("9시간 0분");
