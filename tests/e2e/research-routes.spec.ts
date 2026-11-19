@@ -12,6 +12,7 @@ import {
 
 const button = (p: Page, name: string) =>
   p.getByRole("button", { name, exact: true });
+test.describe.configure({ timeout: 180_000 });
 function fixture(
   route: "flight" | "mechanical" | "dictatorship",
   completed: string[],
@@ -83,14 +84,17 @@ async function load(p: Page, s: TimberState) {
       ),
     createTimberSave(s),
   );
+  await expect(p.getByTestId("play-scene-status")).toHaveText("3D 준비 완료", {
+    timeout: 90_000,
+  });
   await button(p, "마른 목재20 조달 체험하기").click();
   await expect(p.getByTestId("timber-clock")).toBeVisible();
-  await button(p, "저장").click();
+  await p.locator("canvas").press("j");
   await button(p, "진행 불러오기").click();
   await expect(p.getByTestId("timber-save-status")).toContainText(
     "불러왔습니다",
   );
-  await button(p, "저장").click();
+  await p.locator("canvas").press("j");
 }
 test("초기 연구 화면은 후반 사건과 기술을 공개하지 않는다", async ({
   page,
@@ -120,10 +124,13 @@ test("반란 진압 노선의 날틀 연구 완료가10배와 새 삽화를 표�
   await expect(page.getByText(/정찰 연구 배율×10/)).toBeVisible();
   await button(page, "일시정지").click();
   await art.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: test.info().outputPath("날틀_연구완료_삽화.png"),
-    fullPage: true,
-  });
+  await expect
+    .poll(() =>
+      art.evaluate((image) =>
+        image instanceof HTMLImageElement ? image.naturalWidth : 0,
+      ),
+    )
+    .toBeGreaterThan(0);
   await page.getByLabel("연구 기술", { exact: true }).selectOption("R18");
   await expect(button(page, "연구 시작")).toBeDisabled();
   await expect(
@@ -167,10 +174,13 @@ test("독재 노선에서 시설을 지정해야 강제 작업과 새 삽화가 
   await expect(art).toBeVisible();
   await expect(page.getByText(/생산 배율×2.00/)).toBeVisible();
   await art.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: test.info().outputPath("전기자극기_지정시행_삽화.png"),
-    fullPage: true,
-  });
+  await expect
+    .poll(() =>
+      art.evaluate((image) =>
+        image instanceof HTMLImageElement ? image.naturalWidth : 0,
+      ),
+    )
+    .toBeGreaterThan(0);
 });
 test("메카 노선은 사망자의 뼈로 한 개체만 제작하고 저장해도 중복 제작하지 않는다", async ({
   page,
@@ -193,7 +203,7 @@ test("메카 노선은 사망자의 뼈로 한 개체만 제작하고 저장해�
     }),
   ).toBeVisible();
   await expect(button(page, "주민 60의 뼈로 메카 제작")).toHaveCount(0);
-  await button(page, "저장").click();
+  await page.locator("canvas").press("j");
   await button(page, "진행 저장").click();
   await expect(page.getByTestId("timber-save-status")).toContainText(
     "저장했습니다",
