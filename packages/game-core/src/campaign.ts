@@ -87,6 +87,8 @@ export interface Campaign {
   side: "coexist" | "control" | null;
   uprising: boolean;
   lastHigh: number;
+  pessimismExtremeSince?: number | null;
+  optimismZeroSince?: number | null;
   ending: "hope" | "escape" | "collapse" | null;
 }
 export function newCampaign(beat: Beat, since = 0): Campaign {
@@ -124,6 +126,9 @@ export function campaignValid(c: unknown, elapsed: number) {
     BEATS.includes(c.beat as Beat) &&
     integer(c.since, elapsed) &&
     integer(c.lastHigh, elapsed) &&
+    (c.pessimismExtremeSince == null ||
+      integer(c.pessimismExtremeSince, elapsed)) &&
+    (c.optimismZeroSince == null || integer(c.optimismZeroSince, elapsed)) &&
     integer(c.petitionDay, 100000) &&
     Array.isArray(c.patrolOrder) &&
     new Set(c.patrolOrder).size === c.patrolOrder.length &&
@@ -163,8 +168,13 @@ export function campaignOutcome(s: TimberState): Campaign["ending"] {
   const c = campaignOf(s);
   if (s.chapter !== 5) return null;
   const people = s.world.citizens.filter((p) => !p.mechanicalFrom);
+  const rules = GAME_RULES.endings;
+  const held = (since: number | null | undefined) =>
+    since != null && s.elapsed - since >= rules.evictionMinutes;
   if (
-    s.world.pessimism > GAME_RULES.endings.warningPessimism ||
+    (s.world.pessimism >= rules.evictionPessimism &&
+      held(c.pessimismExtremeSince)) ||
+    (s.world.optimism <= rules.evictionOptimism && held(c.optimismZeroSince)) ||
     people.filter((p) => !p.alive).length >=
       people.length * GAME_RULES.endings.deathFraction
   )
@@ -189,7 +199,7 @@ export function campaignOutcome(s: TimberState): Campaign["ending"] {
   return null;
 }
 export function updateCampaign(s: TimberState): TimberState {
-  const c = s.campaign;
+  let c = s.campaign;
   if (!c) return s;
   if (c.beat === "arrival" || c.beat === "winter") {
     const onset = c.beat === "arrival";
@@ -218,6 +228,22 @@ export function updateCampaign(s: TimberState): TimberState {
       },
     };
   if (s.chapter === 5 && !c.ending) {
+    const rules = GAME_RULES.endings;
+    const pessimismExtremeSince =
+      s.world.pessimism >= rules.evictionPessimism
+        ? (c.pessimismExtremeSince ?? s.elapsed)
+        : null;
+    const optimismZeroSince =
+      s.world.optimism <= rules.evictionOptimism
+        ? (c.optimismZeroSince ?? s.elapsed)
+        : null;
+    if (
+      pessimismExtremeSince !== (c.pessimismExtremeSince ?? null) ||
+      optimismZeroSince !== (c.optimismZeroSince ?? null)
+    ) {
+      c = { ...c, pessimismExtremeSince, optimismZeroSince };
+      s = { ...s, campaign: c };
+    }
     const ending = campaignOutcome(s);
     if (ending)
       return { ...s, paused: true, campaign: { ...c, beat: "ending", ending } };

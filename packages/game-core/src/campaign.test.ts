@@ -117,8 +117,30 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
         world: { ...control.world, pessimism: 91 },
       }),
     ).campaign?.ending,
-  ).toBe("collapse");
+  ).toBeNull();
 });
+
+it.each([
+  ["pessimism", 100, 99],
+  ["optimism", 0, 1],
+] as const)(
+  "%s 극단값이 24시간 연속일 때만 추방하고 저장·회복을 처리한다",
+  (metric, extreme, recovered) => {
+    const start = {
+      ...createVillageGame(),
+      chapter: 5 as const,
+      campaign: newCampaign("vigil"),
+    };
+    const set = (s: TimberState, value: number) =>
+      updateCampaign({ ...s, world: { ...s.world, [metric]: value } });
+    const before = later(restore(set(start, extreme)), 1439);
+    expect(before.campaign?.ending).toBeNull();
+    expect(later(restore(before), 1).campaign?.ending).toBe("collapse");
+    const reset = set(set(before, recovered), extreme);
+    expect(later(reset, 1).campaign?.ending).toBeNull();
+    expect(later(reset, 1440).campaign?.ending).toBe("collapse");
+  },
+);
 it("주민 청은 하루 한 번만 비용과 민심을 바꾸고 이전 저장의 출문은 재연하지 않는다", () => {
   const s = createVillageGame();
   const n = act(s, "share");

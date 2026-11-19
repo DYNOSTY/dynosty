@@ -18,6 +18,8 @@ async function readScene(page: Page, label: string) {
 test("출문을 눈으로 확인하고 장면을 접었다 돌아와도 재고가 중복 차감되지 않는다", async ({
   page,
 }) => {
+  // Three 3D loads and the complete prologue share this budget on software-rendered CI.
+  test.setTimeout(240_000);
   await page.goto("/");
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveAccessibleName("별이 진 뒤, 복홀");
