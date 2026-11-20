@@ -127,6 +127,7 @@ export function App() {
   const toolsPanelId = useId();
   const scoutPanelId = useId();
   const [consoleOpen, setConsoleOpen] = useState(false);
+  const inCapital = timberState?.campaign?.beat === "capital";
   const [reports, setReports] = useState<string[]>([]);
   const lastResearch = useRef<string[] | null>(null);
   useEffect(() => {
@@ -1581,8 +1582,10 @@ export function App() {
         >
           <img alt="" src="/ui/cmd/research.png" />
           <span>
-            영실 · 연구 완료
-            <small>공자님, ‘{reports[0]}’ 연구를 마쳤습니다.</small>
+            {inCapital ? "사곡" : "영실"} · 연구 완료
+            <small>
+              {inCapital ? "전하" : "공자님"}, ‘{reports[0]}’ 연구를 마쳤습니다.
+            </small>
           </span>{" "}
           ✓
         </button>
