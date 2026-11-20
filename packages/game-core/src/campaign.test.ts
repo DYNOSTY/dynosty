@@ -154,7 +154,7 @@ it.each([
   ).toThrow();
 });
 
-it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹한과 열흘 평가를 이어 저장한다", () => {
+it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 엔딩을 끝까지 진행한다", () => {
   let s = restore(createVillageGame(true));
   expect(s.residents).toHaveLength(600);
   expect(new Set(Object.values(s.world.resources))).toEqual(
@@ -314,68 +314,74 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(s.world.citizens.filter((p) => p.alive)).toHaveLength(188);
   expect(s.town.received.RES_COAL).toBeGreaterThanOrEqual(1800);
   s = restore(s);
-  let hope = act(
-    act(
-      later(
-        act({ ...s, world: { ...s.world, optimism: 70 } }, "coexist"),
-        5 * 1440,
-      ),
-      "resist",
-    ),
-    "next",
-  );
-  expect(hope.campaign?.uprising).toBe(false);
-  hope = later(hope, 6 * 1440 - 1);
-  expect(campaignOutcome(hope)).toBeNull();
-  hope = later(hope, 1);
-  expect(restore(act(hope, "finish")).campaign?.ending).toBe("hope");
-  let control = act(
-    withResearch({ ...s, world: { ...s.world, pessimism: 55 } }, ["R17"]),
-    "control",
-  );
-  expect(control.campaign?.beat).toBe("forecast");
-  control = later(
-    {
-      ...control,
-      mutants: [
-        { id: control.residents[0]!.id, due: control.elapsed + 5 * 1440 },
-      ],
-    },
-    5 * 1440,
-  );
-  expect(control.campaign?.beat).toBe("rally");
-  expect(() => act(control, "next")).toThrow();
-  control = act(control, "listen");
-  expect(control.town.development.story.route).toBe("mechanical");
-  control = act(control, "next");
-  expect(control.town.development.story.chungnyeong).toBe("dead");
-  control = later(control, 10 * 1440);
-  expect(campaignOutcome(control)).toBeNull();
-  control = payTown(control, { RES_WOOD: 60, RES_METAL: 54, RES_COAL: 16 });
-  const development = control.town.development;
-  const awakened = updateCampaign({
-    ...control,
-    town: {
-      ...control.town,
-      development: {
-        ...development,
-        completed: ["R17", "R18", "TECH_MECHA2", "R19"],
-        story: { ...development.story, chungnyeong: "mechanical" },
-      },
-    },
-  });
-  expect(awakened.campaign?.beat).toBe("ending");
-  const ending = awakened;
-  expect(restore(ending).campaign?.ending).toBe("escape");
-  expect(
-    restore(
-      updateCampaign({
-        ...control,
-        world: { ...control.world, pessimism: 91 },
-      }),
-    ).campaign?.ending,
-  ).toBeNull();
-});
+  const command = (
+    state: TimberState,
+    cmd: Parameters<typeof commandTimber>[1],
+  ) => commandTimber(state, cmd, "run-" + state.processed.length);
+  const day = (state: TimberState) =>
+    command(state, { type: "advance", minutes: 1440 });
+  const roll = vi.spyOn(Math, "random").mockReturnValue(0.99);
+  try {
+    // Hold nightly incidents constant to compare the three choices on the same arriving convoy.
+    s = act(s, "coexist");
+    for (
+      let d = 0;
+      d < 6 && minutesUntilCoup(s) > 1 && s.campaign?.beat === "forecast";
+      d++
+    ) {
+      s = command(s, {
+        type: "advance",
+        minutes: Math.min(1440, minutesUntilCoup(s) - 1),
+      });
+    }
+    expect(minutesUntilCoup(s)).toBe(1);
+    for (const [optimism, action, ending] of [
+      [69, "resist", "escape"],
+      [70, "resist", "hope"],
+      [70, "ally", "order"],
+    ] as const) {
+      const rally = restore(
+        command(
+          { ...s, world: { ...s.world, optimism } },
+          { type: "advance", minutes: 1 },
+        ),
+      );
+      let run = act(act(rally, action), "next");
+      if (ending === "escape") {
+        expect(run.town.development.story.chungnyeong).toBe("dead");
+        run = command(run, {
+          type: "plan-building",
+          kind: "workshop",
+          position: { x: 12, z: 12 },
+          headingRadians: Math.PI,
+        });
+        for (
+          let d = 0;
+          d < 3 && !run.town.facilities.some((f) => f.kind === "workshop");
+          d++
+        )
+          run = day(run);
+        const lab = run.town.facilities.find((f) => f.kind === "workshop")!;
+        run = command(run, { type: "facility-staff", id: lab.id, count: 2 });
+        for (const tech of ["R17", "R18", "TECH_MECHA2"]) {
+          expect(run.campaign?.ending).toBeNull();
+          run = restore(command(run, { type: "start-research", tech }));
+          for (
+            let d = 0;
+            d < 10 && !run.town.development.completed.includes(tech);
+            d++
+          )
+            run = day(run);
+          expect(run.town.development.completed).toContain(tech);
+        }
+      }
+      for (let d = 0; d < 12 && !run.campaign?.ending; d++) run = day(run);
+      expect(restore(run).campaign?.ending).toBe(ending);
+    }
+  } finally {
+    roll.mockRestore();
+  }
+}, 120_000);
 
 it.each([1, 2, 3, 4, 5] as const)(
   "단계 %i에서 99는 버티고 100에 닿으면 난이도에 따라 추방된다",

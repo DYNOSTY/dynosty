@@ -164,7 +164,7 @@ it("목진은 반란 당일 성문 습격 기록이 있을 때만 붉은 눈을 
   }
 });
 
-it("메카 연구가 남으면 영실이 공방 연구를 권한다", () => {
+it("메카 연구가 남으면 영실이 첫 연구의 이름을 알려 준다", () => {
   const s = createVillageGame();
   s.town.development.story.chungnyeong = "dead";
   const p = campaignPage({
@@ -172,5 +172,8 @@ it("메카 연구가 남으면 영실이 공방 연구를 권한다", () => {
     chapter: 5,
     campaign: { ...s.campaign!, beat: "vigil", revivalPrepared: false },
   });
-  expect(p.lines[0]).toEqual(["영실", expect.stringContaining("공방")]);
+  expect(p.lines[0]).toEqual([
+    "영실",
+    expect.stringContaining("유산 기록 대조"),
+  ]);
 });

@@ -393,7 +393,7 @@ export function CampaignPanel({
     setOpened(
       c.beat === "verdict" &&
         action === "next" &&
-        s.town.development.story.chungnyeong === "dead"
+        s.town.development.story.route === "mechanical"
         ? "vigil"
         : null,
     );

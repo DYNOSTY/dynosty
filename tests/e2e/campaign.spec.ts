@@ -628,3 +628,127 @@ for (const [label, raided, rally, verdict] of [
     await expect(dialog).toContainText(verdict);
   });
 }
+for (const [hope, allegiance, film] of [
+  [69, "양녕의 반란에 맞선다", "mechanical-late"],
+  [70, "양녕의 반란에 맞선다", "hope"],
+  [70, "양녕의 반란에 동조한다", "order"],
+] as const) {
+  test("반란 선택부터 결말 재생까지 · " + film, async ({ page }) => {
+    test.setTimeout(240_000);
+    let village = createVillageGame();
+    const send = (cmd: Parameters<typeof commandTimber>[1]) => {
+      village = commandTimber(
+        village,
+        cmd,
+        "setup-" + village.processed.length,
+      );
+    };
+    send({
+      type: "plan-building",
+      kind: "workshop",
+      position: { x: 12, z: 12 },
+      headingRadians: Math.PI,
+    });
+    send({ type: "advance", minutes: 1440 });
+    const workshop = village.town.facilities.find(
+      (f) => f.kind === "workshop",
+    )!;
+    send({ type: "facility-staff", id: workshop.id, count: 2 });
+    const save = createTimberSave({
+      ...village,
+      chapter: 5,
+      paused: true,
+      elapsed: 5 * 1440,
+      world: { ...village.world, day: 6, minute: 1260, optimism: hope },
+      campaign: {
+        ...village.campaign!,
+        beat: "rally",
+        since: 0,
+        side: "coexist",
+        hopeAtCoup: hope,
+        revivalPrepared: false,
+      },
+    });
+    await page.addInitScript((value) => {
+      if (!localStorage.getItem("dynosty.village.resume"))
+        localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
+    }, save);
+    await page.goto("/");
+    const dialog = page.getByRole("dialog");
+    await readScene(page, allegiance);
+    await readScene(
+      page,
+      film === "mechanical-late"
+        ? "판결을 기록하고 의원으로"
+        : "판결을 기록하고 마을로",
+    );
+    const readProgress = () =>
+      page.evaluate(() => {
+        const s = JSON.parse(
+          localStorage.getItem("dynosty.village.resume")!,
+        ).state;
+        return {
+          elapsed: s.elapsed as number,
+          completed: s.town.development.completed as string[],
+          ending: s.campaign.ending as string | null,
+        };
+      });
+    const day = async () => {
+      const before = await readProgress();
+      await page
+        .getByRole("button", { name: "마을 하루 진행", exact: true })
+        .click();
+      await expect
+        .poll(async () => (await readProgress()).elapsed)
+        .toBeGreaterThan(before.elapsed);
+    };
+    if (film === "mechanical-late") {
+      await expect(dialog).toContainText("유산 기록 대조");
+      await dialog.getByRole("button", { name: "장면 접기" }).click();
+      for (const tech of ["R17", "R18", "TECH_MECHA2"]) {
+        const report = page.getByRole("button", { name: /영실 · 연구 완료/ });
+        if (await report.isVisible()) await report.click();
+        await page
+          .getByRole("button", { name: /^(명령 열기|거래 제안 열기)$/ })
+          .click();
+        await page.getByRole("button", { name: "연구", exact: true }).click();
+        await page.getByLabel("연구 기술", { exact: true }).selectOption(tech);
+        await page
+          .getByRole("button", { name: "연구 시작", exact: true })
+          .click();
+        await expect(page.getByTestId("research-status")).toContainText(
+          "연구 중",
+        );
+        await page
+          .getByRole("button", { name: "명령 접기", exact: true })
+          .click();
+        for (
+          let i = 0;
+          i < 12 && !(await readProgress()).completed.includes(tech);
+          i++
+        )
+          await day();
+        expect((await readProgress()).completed).toContain(tech);
+      }
+    }
+    for (let i = 0; i < 12 && !(await readProgress()).ending; i++) await day();
+    const next = dialog.getByRole("button", { name: /^다음 대사/ });
+    await next.click();
+    await next.click();
+    const clip = dialog.locator("video");
+    await expect(clip).toHaveAttribute(
+      "src",
+      "/story/campaign/" + film + ".mp4",
+    );
+    await expect
+      .poll(() => clip.evaluate((v) => v.currentTime))
+      .toBeGreaterThan(0);
+    if (film === "mechanical-late") {
+      await expect(dialog).toContainText("공주마마?");
+      await next.click();
+      await expect(dialog).toContainText(
+        "안.녕.하.세.요. 저.는. 충.녕.입.니.다.",
+      );
+    }
+  });
+}
