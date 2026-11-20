@@ -1,5 +1,6 @@
 import {
   AMOUNT_SCALE,
+  COUP_SURVIVAL_HOPE,
   type Difficulty,
   evictionDelay,
   foodWarnings,
@@ -150,6 +151,7 @@ export interface Campaign {
   side: "coexist" | "control" | null;
   uprising: boolean;
   revivalPrepared?: boolean;
+  hopeAtCoup?: number;
   coupGateRaided?: boolean;
   awakeningSeen?: boolean;
   lastHigh: number;
@@ -240,6 +242,10 @@ export function campaignValid(c: unknown, elapsed: number) {
     [null, "invite", "provisions"].includes(c.escort as null) &&
     [null, "coexist", "control"].includes(c.side as null) &&
     (c.awakeningSeen === undefined || typeof c.awakeningSeen === "boolean") &&
+    (c.hopeAtCoup === undefined ||
+      (typeof c.hopeAtCoup === "number" &&
+        c.hopeAtCoup >= 0 &&
+        c.hopeAtCoup <= 100)) &&
     (c.coupGateRaided === undefined || typeof c.coupGateRaided === "boolean") &&
     (c.revivalPrepared === undefined ||
       typeof c.revivalPrepared === "boolean") &&
@@ -317,23 +323,10 @@ export function campaignOutcome(s: TimberState): Campaign["ending"] {
         1440
   )
     return null;
-  if (
-    s.town.development.story.chungnyeong === "alive" &&
-    s.world.pessimism <= 30 &&
-    s.elapsed - Math.max(c.since, c.lastHigh) >= 10 * 1440
-  )
-    return c.side === "control" ? "order" : "hope";
-  if (
-    c.revivalPrepared === false &&
-    s.town.development.story.chungnyeong === "dead"
-  )
-    return "order";
-  if (
-    c.awakeningSeen &&
-    s.town.development.story.chungnyeong === "mechanical" &&
-    s.town.development.completed.includes("R19")
-  )
-    return "escape";
+  const story = s.town.development.story;
+  if (story.route === "dictatorship") return "order";
+  if (story.chungnyeong === "mechanical") return "escape";
+  if (story.route === "flight" && story.chungnyeong === "alive") return "hope";
   return null;
 }
 // Anchor the five nights to the first 21:00 after the council, including when a save starts late at night.
@@ -378,15 +371,14 @@ export function updateCampaign(s: TimberState): TimberState {
   if (c.beat === "forecast" && minutesUntilCoup(s) <= 0) {
     const uprising = s.world.pessimism > s.world.optimism;
     const prepared = s.town.development.completed.includes("R17");
-    let next = recordResearchStory(s, "rebellion-started");
-    if (uprising && s.mutants?.length)
-      next = recordResearchStory(next, "chungnyeong-assassinated");
+    const next = recordResearchStory(s, "rebellion-started");
     return {
       ...next,
       paused: true,
       campaign: {
         ...c,
-        beat: uprising ? "rally" : "verdict",
+        beat: "rally",
+        hopeAtCoup: s.world.optimism,
         uprising,
         revivalPrepared: prepared,
       },
@@ -742,22 +734,19 @@ export function actCampaign(
       }
       break;
     case "rally":
-      if (action === "listen" || action === "cordon") {
-        const base = action === "listen" ? pay("RES_PLANT", 12) : s;
-        return change(
-          "verdict",
-          { since: c.since },
-          {
-            ...base,
-            world: {
-              ...base.world,
-              pessimism: Math.min(
-                100,
-                Math.max(0, s.world.pessimism + (action === "listen" ? -8 : 8)),
-              ),
-            },
-          },
-        );
+      if (["resist", "ally", "listen", "cordon"].includes(action)) {
+        const prior = recordResearchStory(s, "rebellion-started");
+        const base = prior.town.development.story.route
+          ? prior
+          : recordResearchStory(
+              prior,
+              action === "ally"
+                ? "allied-yangnyeong"
+                : (c.hopeAtCoup ?? s.world.optimism) >= COUP_SURVIVAL_HOPE
+                  ? "rebellion-suppressed"
+                  : "chungnyeong-assassinated",
+            );
+        return change("verdict", { since: c.since }, base);
       }
       break;
     case "verdict":

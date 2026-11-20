@@ -186,7 +186,7 @@ test("좁은 화면의 5단계 컷씬과 성안 변종 없는 반란을 이어 �
   const save = createTimberSave({
     ...start,
     chapter: 5,
-    world: { ...start.world, pessimism: 55 },
+    world: { ...start.world, pessimism: 85, optimism: 75 },
     campaign: { ...start.campaign!, beat: "summit" },
   });
   await page.addInitScript(
@@ -254,7 +254,7 @@ test("좁은 화면의 5단계 컷씬과 성안 변종 없는 반란을 이어 �
       await expect(page.getByText(/관측패를 모두 맞춰/)).toBeVisible();
   }
   await expect(dialog).toHaveAccessibleName("혹한 닷새 전 · 배반자의 외침");
-  await readScene(page, "풀 12를 풀고 대표들과 함께 식사");
+  await readScene(page, "양녕의 반란에 맞선다");
   await expect(dialog).toHaveAccessibleName("성문 빗장이 들리던 밤");
   await dialog.getByRole("button", { name: /^다음 대사/ }).click();
   await expect(dialog).toContainText("푸른 보자기를 맨 주민");
@@ -393,6 +393,14 @@ test("쥬신 왕으로 도성 구호를 명하고 설정에서 변종 야습 기
   await expect(page.getByTestId("play-population")).toContainText(/1,?000/);
   await readScene(page, "남문의 장부를 받아 도성을 살핀다");
   await expect(page.getByTestId("resource-RES_COAL")).toHaveText("1,000");
+  await page
+    .getByRole("button", { name: "남문 · 피난 수레", exact: true })
+    .first()
+    .click();
+  const carts = page.getByRole("region", { name: "남문 피난 수레" });
+  await carts.getByRole("button", { name: "석탄 1000 수레에 싣기" }).click();
+  await expect(page.getByTestId("resource-RES_COAL")).toHaveText("0");
+  await expect(carts).toContainText("석탄 · 1000 / 6000");
   await expect(
     page.getByRole("button", { name: "도성 반나절 경영" }),
   ).toBeVisible();
@@ -409,14 +417,6 @@ function awakenedVillageSave(completed: string[], days: number) {
   for (const id of completed)
     base = payTown(base, RESEARCH_CATALOG.find((r) => r.id === id)!.cost);
   return createTimberSave({
-  await page
-    .getByRole("button", { name: "남문 · 피난 수레", exact: true })
-    .first()
-    .click();
-  const carts = page.getByRole("region", { name: "남문 피난 수레" });
-  await carts.getByRole("button", { name: "석탄 1000 수레에 싣기" }).click();
-  await expect(page.getByTestId("resource-RES_COAL")).toHaveText("0");
-  await expect(carts).toContainText("석탄 · 1000 / 6000");
     ...base,
     chapter: 5,
     elapsed: base.elapsed + days * 1440,
@@ -442,78 +442,48 @@ function awakenedVillageSave(completed: string[], days: number) {
   });
 }
 
-test("충녕의 소생 소식을 전한 뒤 이어 하면 의원 후일담을 듣는다", async ({
-  page,
-}) => {
-  const save = awakenedVillageSave(["R17", "R18", "TECH_MECHA2"], 0);
-  await page.addInitScript((value) => {
-    if (!localStorage.getItem("dynosty.village.resume"))
-      localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
-  }, save);
-  await page.goto("/");
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toHaveAccessibleName("다시 들린 목소리");
-  await dialog.getByRole("button", { name: /^다음 대사/ }).click();
-  await expect(dialog).toContainText("그날 내 옆에 누웠던 아이는요?");
-  await readScene(page, "의원 밖에 소식을 전한다");
-  await expect(dialog).toHaveCount(0);
-  await page.reload();
-  await page.getByRole("button", { name: /^5단계 ·/ }).click();
-  await expect(dialog).toContainText("혼자 문턱을 넘던걸요");
-});
-
-test("복홀 성곽 엔딩은 기록과 경구 뒤에 무성 영상과 두 공룡의 대화를 보여 준다", async ({
-  page,
-}) => {
-  const save = awakenedVillageSave(["R17", "R18", "TECH_MECHA2", "R19"], 11);
-  await page.addInitScript(
-    (value) =>
-      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
-    save,
-  );
-  const music = page.waitForResponse(
-    (response) => response.url().endsWith("/B.ogg") && response.ok(),
-  );
-  await page.goto("/");
-  await expect(page.getByRole("dialog")).toHaveAccessibleName(
-    "다시 들린 목소리",
-  );
-  await readScene(page, "의원 밖에 소식을 전한다");
-  const dialog = page.getByRole("dialog", { name: "복홀에 아침이 오면" });
-  const next = dialog.getByRole("button", { name: /^다음 대사/ });
-  await expect(dialog).toContainText("당신이 우리 곁을 지켜 준 덕입니다");
-  await next.click();
-  await expect(dialog.locator("video")).toHaveCount(0);
-  await next.click();
-  const clip = dialog.locator("video");
-  await expect(clip).toHaveAttribute("src", "/story/campaign/escape.mp4");
-  await expect
-    .poll(() => clip.evaluate((v) => v.muted && v.currentTime > 0))
-    .toBe(true);
-  await music;
-  await expect(dialog).toContainText("공자님, 손 좀 내어 주실래요?");
-  await next.click();
-  await expect(dialog).toContainText("네, 공주 마마.");
-  await next.click();
-  await expect(dialog).toContainText("저도 그 말을 하려던 참이었어요.");
-});
-
-test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 증가분에 맞는다", async ({
-  page,
-}) => {
-  const village = createVillageGame();
-  const save = createTimberSave({
-    ...village,
-    chapter: 4,
-    paused: true,
-    campaign: {
-      ...village.campaign!,
-      beat: "thaw",
-      departures: 3,
-      evacuees: 200,
-      cargo: { ...CONVOY_GOALS },
+for (const prepared of [true, false]) {
+  test(
+    "기계 충녕의 결말 영상과 첫인사 · " +
+      (prepared ? "생전 연구" : "늦은 연구"),
+    async ({ page }) => {
+      const base = awakenedVillageSave(["R17", "R18", "TECH_MECHA2"], 11);
+      const save = createTimberSave({
+        ...base.state,
+        campaign: {
+          ...base.state.campaign!,
+          beat: "ending",
+          ending: "escape",
+          revivalPrepared: prepared,
+        },
+      });
+      await page.addInitScript(
+        (value) =>
+          localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+        save,
+      );
+      await page.goto("/");
+      const dialog = page.getByRole("dialog");
+      const next = dialog.getByRole("button", { name: /^다음 대사/ });
+      await next.click();
+      await next.click();
+      await expect(dialog).toContainText("공주마마?");
+      const clip = dialog.locator("video");
+      await expect(clip).toHaveAttribute(
+        "src",
+        "/story/campaign/" + (prepared ? "escape" : "mechanical-late") + ".mp4",
+      );
+      await expect
+        .poll(() => clip.evaluate((v) => v.currentTime))
+        .toBeGreaterThan(0);
+      await next.click();
+      await expect(dialog).toContainText(
+        "안.녕.하.세.요. 저.는. 충.녕.입.니.다.",
+      );
     },
-  });
+  );
+}
+
 test("남문에서 손자들을 본 왕이 세 번째 행렬을 보내고 성안에 남는다", async ({
   page,
 }) => {
@@ -561,6 +531,22 @@ test("남문에서 손자들을 본 왕이 세 번째 행렬을 보내고 성안
   await expect(ending.locator("video")).toHaveAttribute("src", /ending-3\.mp4/);
 });
 
+test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 증가분에 맞는다", async ({
+  page,
+}) => {
+  const village = createVillageGame();
+  const save = createTimberSave({
+    ...village,
+    chapter: 4,
+    paused: true,
+    campaign: {
+      ...village.campaign!,
+      beat: "thaw",
+      departures: 3,
+      evacuees: 200,
+      cargo: { ...CONVOY_GOALS },
+    },
+  });
   await page.addInitScript(
     (value) =>
       localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
@@ -634,7 +620,7 @@ for (const [label, raided, rally, verdict] of [
     const dialog = page.getByRole("dialog");
     await expect(dialog).toHaveAccessibleName("혹한 닷새 전 · 배반자의 외침");
     await expect(dialog).toContainText(rally);
-    await readScene(page, "풀 12를 풀고 대표들과 함께 식사");
+    await readScene(page, "양녕의 반란에 맞선다");
     await expect(dialog).toHaveAccessibleName("성문 빗장이 들리던 밤");
     await expect(dialog).toContainText(verdict);
     await page.reload();

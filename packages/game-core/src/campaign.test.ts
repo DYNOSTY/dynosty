@@ -293,8 +293,8 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   s = later(s, 15 * 1440);
   expect(s.town.cold).toBe(true);
   s = later(s, 15 * 1440);
-  const arrival = { type: "campaign", beat: "thaw", action: "next" } as const;
   const beforeArrival = s.world.resources;
+  const arrival = { type: "campaign", beat: "thaw", action: "next" } as const;
   s = commandTimber(restore(s), arrival, "arrive-at-bokhol");
   s = restore(s);
   expect(s.chapter).toBe(5);
@@ -302,7 +302,6 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(() => commandTimber(s, arrival, "repeat-arrival")).toThrow(
     "이미 지난 장면",
   );
-  let hope = act(later(act(s, "coexist"), 5 * 1440), "next");
   for (const [item, units] of [
     ["RES_WOOD", 3000],
     ["RES_MEAT", 1500],
@@ -315,6 +314,16 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(s.world.citizens.filter((p) => p.alive)).toHaveLength(188);
   expect(s.town.received.RES_COAL).toBeGreaterThanOrEqual(1800);
   s = restore(s);
+  let hope = act(
+    act(
+      later(
+        act({ ...s, world: { ...s.world, optimism: 70 } }, "coexist"),
+        5 * 1440,
+      ),
+      "resist",
+    ),
+    "next",
+  );
   expect(hope.campaign?.uprising).toBe(false);
   hope = later(hope, 6 * 1440 - 1);
   expect(campaignOutcome(hope)).toBeNull();
@@ -337,7 +346,7 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(control.campaign?.beat).toBe("rally");
   expect(() => act(control, "next")).toThrow();
   control = act(control, "listen");
-  expect(control.world.pessimism).toBe(48);
+  expect(control.town.development.story.route).toBe("mechanical");
   control = act(control, "next");
   expect(control.town.development.story.chungnyeong).toBe("dead");
   control = later(control, 10 * 1440);
@@ -355,8 +364,8 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
       },
     },
   });
-  expect(awakened.campaign?.beat).toBe("vigil");
-  const ending = act(restore(awakened), "awakening");
+  expect(awakened.campaign?.beat).toBe("ending");
+  const ending = awakened;
   expect(restore(ending).campaign?.ending).toBe("escape");
   expect(
     restore(
@@ -611,48 +620,39 @@ it("도성 한파가 길을 막고 집마다 불을 올리며 환자를 낸다",
     "winter-hour",
   );
   expect(end.firedHeat).toBe(3);
-  expect(end.world.resources.RES_WOOD).toBeLessThan(
-    late.world.resources.RES_WOOD,
+  expect(end.world.resources.RES_COAL).toBeLessThan(
+    late.world.resources.RES_COAL,
   );
   expect(end.world.citizenEvents).toContain("capital-cold-1440");
 });
 
-it("닷새째의 민심과 그때까지 끝낸 연구를 저장해 반란의 결과를 정한다", () => {
+it.each([
+  [69, "resist", "dead", null],
+  [70, "resist", "alive", "hope"],
+  [69, "ally", "dead", "order"],
+  [70, "ally", "dead", "order"],
+] as const)("반란 당시 희망 %i, 선택 %s", (optimism, action, life, ending) => {
   const start = createVillageGame();
-  const base: TimberState = {
-    ...start,
-    chapter: 5,
-    campaign: newCampaign("summit"),
-    world: { ...start.world, pessimism: 65, optimism: 30 },
-  };
-  const chosen = act(base, "coexist");
-  const before = later(chosen, minutesUntilCoup(chosen) - 1);
-  expect(before.town.development.story.rebellion).toBe(false);
-  const quiet = restore(later(before, 1));
-  expect(quiet.campaign?.beat).toBe("rally");
-  expect(quiet.town.development.story.chungnyeong).toBe("alive");
-  const event = restore(
-    later(
-      {
-        ...before,
-        mutants: [{ id: before.residents[0]!.id, due: before.elapsed + 1 }],
-      },
-      1,
-    ),
+  const chosen = act(
+    {
+      ...start,
+      chapter: 5,
+      campaign: newCampaign("summit"),
+      world: { ...start.world, optimism },
+    },
+    "control",
   );
-  expect(event.town.development.story.chungnyeong).toBe("dead");
-  expect(event.campaign?.revivalPrepared).toBe(false);
-  const vigil = act(act(event, "listen"), "next");
-  const onset = later(vigil, 10 * 1440 - (vigil.elapsed - chosen.elapsed));
-  expect(onset.town.cold).toBe(true);
-  expect(onset.campaign?.ending).toBeNull();
-  expect(later(onset, 1440).campaign?.ending).toBe("order");
-  const backed = later(
-    act({ ...base, world: { ...base.world, optimism: 80 } }, "control"),
-    5 * 1440,
+  const rally = restore(later(chosen, minutesUntilCoup(chosen)));
+  expect(rally.campaign?.beat).toBe("rally");
+  expect(rally.town.development.story.rebellion).toBe(true);
+  const verdict = act(
+    { ...rally, world: { ...rally.world, optimism: 50 } },
+    action,
   );
-  expect(backed.town.development.story.rebellion).toBe(true);
-  expect(backed.town.development.story.chungnyeong).toBe("alive");
+  expect(verdict.town.development.story.chungnyeong).toBe(life);
+  expect(restore(later(act(verdict, "next"), 11 * 1440)).campaign?.ending).toBe(
+    ending,
+  );
 });
 
 it("단계별 경구 추첨을 저장하고 이어 할 때 같은 경구를 보여준다", () => {
@@ -696,7 +696,7 @@ it("첫밤과 이튿밤에 변종 없이 지나가도 닷새째 반란이 시작
           "scheduled-night",
         ),
       ).toEqual(resumed);
-      expect(after.campaign?.beat).toBe(night === 5 ? "verdict" : "forecast");
+      expect(after.campaign?.beat).toBe(night === 5 ? "rally" : "forecast");
     }
   } finally {
     roll.mockRestore();

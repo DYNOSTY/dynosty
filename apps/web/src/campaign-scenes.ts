@@ -794,7 +794,6 @@ export function campaignPage(s: TimberState): ScenePage {
         "양녕",
         "이 백성들은 나의 것이다. 그 같은 일이 또 벌어진다면 내 아들에게 이들을 맡기겠다. 그날은 나도 아버지처럼 홀로 남겠다.",
       );
-      line(
       if (c.evacuees)
         line(
           "남문에서 온 짐꾼",
@@ -810,6 +809,7 @@ export function campaignPage(s: TimberState): ScenePage {
           `목재 ${Math.floor((c.cargo.RES_WOOD ?? 0) * 0.3).toLocaleString("ko-KR")} · 고기 ${Math.floor((c.cargo.RES_MEAT ?? 0) * 0.3).toLocaleString("ko-KR")} · 어류 ${Math.floor((c.cargo.RES_FISH ?? 0) * 0.3).toLocaleString("ko-KR")} · 석탄 ${Math.floor((c.cargo.RES_COAL ?? 0) * 0.3).toLocaleString("ko-KR")}`,
         );
       }
+      line(
         "양녕",
         "우리 스피노사우루스 집안은 물고기가 끊긴 겨울도 겪었다. 고기 솥이 사흘을 빈다고 치자. 다리가 부러진 자는 내일도 부역을 못 나간다. 그 살로 성벽을 지킬 열을 먹일 수 있다면, 나는 그리 명하겠다.",
       );
@@ -876,12 +876,8 @@ export function campaignPage(s: TimberState): ScenePage {
         "덕순이",
         "그 손 치우시오. 내 몫 달라는 말을 당신 좋으라고 한 줄 아시오? 고리님, 여기 우리랑 한 끼 앉아 주시겠어요?",
       );
-      choice(
-        "listen",
-        "풀 12를 풀고 대표들과 함께 식사",
-        !canPay(s, "RES_PLANT", 12),
-      );
-      choice("cordon", "창고 문을 닫고 경비를 세우기");
+      choice("resist", "양녕의 반란에 맞선다");
+      choice("ally", "양녕의 반란에 동조한다");
       break;
     case "verdict":
       page.illustration = "gate";
@@ -917,12 +913,13 @@ export function campaignPage(s: TimberState): ScenePage {
             image: "chungnyeong-dining",
             alt: "복홀 식당에서 어린 공룡들과 한 상에 앉은 충녕",
           };
-        line(
-          "나르미",
-          s.town.development.story.chungnyeong === "dead"
-            ? "고리님, 의원이 오기도 전에 충녕 마마가 돌아가셨어요. 성안에서 붕대를 감고 있던 이의 눈이 붉어졌어요. 마마가 새끼를 밀어내는 사이에 그이가 덮쳤어요. 길룡 씨가 손을 놓지 못해요."
-            : "고리님, 충녕 마마는 무사하세요. 어린 공룡들을 데리고 식당에 계세요.",
-        );
+        if (s.town.development.story.route !== "dictatorship")
+          line(
+            "나르미",
+            s.town.development.story.chungnyeong === "dead"
+              ? "고리님, 의원이 오기도 전에 충녕 마마가 돌아가셨어요. 성안에서 붕대를 감고 있던 이의 눈이 붉어졌어요. 마마가 새끼를 밀어내는 사이에 그이가 덮쳤어요. 길룡 씨가 손을 놓지 못해요."
+              : "고리님, 충녕 마마는 무사하세요. 어린 공룡들을 데리고 식당에 계세요.",
+          );
         line(
           "목진",
           "마마, 보셨지요? 제가 먼저 빗장을 들었습니다. 마마께서 오시면 다들 이리 올 줄 알았습니다. 저도 그 곁에 있게 해 주십시오.",
@@ -950,29 +947,21 @@ export function campaignPage(s: TimberState): ScenePage {
           "내 깃발만 보면 다들 빗장을 들 거라 여겼느냐. 고리가 어려 보여서 버린 놈이 내가 약해 보이면 어찌할지 뻔하구나. 다들 잘 보아라.",
         );
       }
-      if (!c.uprising && c.side === "control") {
+      if (s.town.development.story.route === "dictatorship") {
+        line("양녕", "성문을 닫아라. 이 백성들은 나의 것이다.");
+        line("포졸", "충녕 마마께서 돌아가셨습니다.");
+      } else if (
+        !c.uprising &&
+        s.town.development.story.chungnyeong === "dead"
+      ) {
         line(
-          "양녕",
-          "창을 거두어라. 성문을 안에서 열어 준 이는 하나도 없구나.",
-        );
-        line(
-          "고리",
-          "그대도 보았소. 이곳에서 함께 겨울을 날 생각이면 백성이 받는 몫부터 같이 받으시오.",
-        );
-      } else if (!c.uprising) {
-        line(
-          "고리",
-          "쥬신의 군량표와 역참 명부를 나란히 거시오. 양녕이 우리를 먹였다는 날에 다리는 끊겨 있었소.",
-        );
-
-        line(
-          "달이",
-          "심리가 끝났어. 반란을 일으킨 양녕에게 사형이 집행됐어. 고리는 판결문을 읽고도 한참 인장을 내려놓지 못했어.",
+          "나르미",
+          "고리님, 충녕 마마가 돌아가셨어요. 성안에서 변한 이가 마마를 덮쳤어요.",
         );
       }
       choice(
         "next",
-        s.town.development.story.chungnyeong === "dead"
+        s.town.development.story.route === "mechanical"
           ? "판결을 기록하고 의원으로"
           : "판결을 기록하고 마을로",
       );
@@ -980,10 +969,7 @@ export function campaignPage(s: TimberState): ScenePage {
     case "vigil":
       page.auto = false;
       page.music = c.side === "control" ? "14" : "04";
-      page.goal =
-        c.side === "coexist"
-          ? `봄 장부를 펴기까지 · 마을이 잠잠했던 날 ${Math.min(10, Math.floor((s.elapsed - Math.max(c.since, c.lastHigh)) / 1440))} / 10일`
-          : `겨울나기 · 새 배급령을 내린 지 ${Math.min(10, days)} / 10일`;
+      page.goal = "다가오는 혹한을 견딘다";
       if (s.town.development.story.chungnyeong === "alive") {
         line(
           "충녕",
@@ -995,60 +981,21 @@ export function campaignPage(s: TimberState): ScenePage {
             ? "오늘도 사람들이 빈 그릇을 들고 곳간 앞에 서 있어. 고리야, 봄 얘기는 조금 이른가 봐. 같이 내려갈래?"
             : "덕순이가 내일은 집에서 파를 좀 가져오겠대. 어제까지만 해도 제 그릇을 두 손에 꼭 쥐고 있던 이가 말이야.",
         );
-      } else if (s.town.development.story.chungnyeong === "mechanical") {
-        if (!c.awakeningSeen) {
-          page.key = "awakening";
-          page.auto = true;
-          page.title = "다시 들린 목소리";
-          line("영실", "고리님, 이리 와 보세요. 방금 제 이름을 불렀습니다.");
-          line(
-            "충녕",
-            "영실, 들리나요? 그날 내 옆에 누웠던 아이는요? 어미 꼬리를 꼭 쥐고 있었는데.",
-          );
-          line(
-            "고리",
-            "집에 갔습니다. 어제는 제 발로 식당까지 걸어왔다더군요.",
-          );
-          line(
-            "충녕",
-            "다행이네요. 그 어미가 밤새 아이 곁에 앉아 있었어요. 만나거든 나도 일어났다고 전해 주세요.",
-          );
-          choice("awakening", "의원 밖에 소식을 전한다");
-          break;
-        }
+      } else if (s.town.development.story.route === "dictatorship") {
+        line("양녕", "성문의 열쇠를 가져와라.");
+      } else if (s.town.development.story.chungnyeong === "dead") {
+        page.title = "의원의 등잔";
+        const completed = s.town.development.completed;
         line(
-          "나르미",
-          "마마가 깨어나셨다는 말을 듣고 그 아이가 또 왔어요. 이번엔 어미 꼬리를 놓고 혼자 문턱을 넘던걸요.",
+          "영실",
+          completed.includes("R18")
+            ? "고리님, 이제 마마를 모실 몸을 지어야 합니다. 공방에서 메카 2단계 연구를 이어가게 해 주십시오."
+            : completed.includes("R17")
+              ? "기록을 맞춰 보았습니다. 이제 의식을 옮길 장치를 만들 차례입니다."
+              : "아직 대조하지 못한 기록이 있습니다. 고리님, 공방에서 마저 살펴보게 해 주십시오.",
         );
       } else {
-        page.title = "의원의 등잔";
-        line(
-          "고리",
-          "영실아. 밖에서 다들 기다린다. 내가 나가서 무어라 전하랴?",
-        );
-        if (c.revivalPrepared === false) {
-          line(
-            "고리",
-            "문은 조금 열어 두어라. 마지막 인사를 올리러 올 테니.",
-          );
-        } else if (
-          c.revivalPrepared ||
-          s.town.development.completed.includes("R17") ||
-          s.town.development.completed.includes("R18")
-        ) {
-          line("영실", "잠깐만요, 고리님.");
-          page.lineIllustration = {
-            at: page.lines.length,
-            image: "infirmary-record",
-            alt: "등잔 아래 영실이 건 기록판 위로 조금 들린 바늘",
-          };
-          line("고리", "공주 마마?");
-        } else {
-          line(
-            "영실",
-            "먼저 공방에 남은 기록부터 살피겠습니다. 마마의 흔적을 찾거든 지휘관께 곧장 기별하겠습니다.",
-          );
-        }
+        line("영실", "고리님, 의원에 함께 가 주시겠습니까?");
       }
       {
         const ration = emergencyRation(s);
@@ -1080,7 +1027,11 @@ export function campaignPage(s: TimberState): ScenePage {
     case "ending":
     case "finished": {
       const end = c.ending ?? "collapse";
-      if (end !== "collapse") page.clip = end;
+      if (end !== "collapse")
+        page.clip =
+          end === "escape" && c.revivalPrepared === false
+            ? "mechanical-late"
+            : end;
       if (end !== "collapse") {
         line(
           "복홀의 기록",
@@ -1100,22 +1051,16 @@ export function campaignPage(s: TimberState): ScenePage {
               ? "다시 열린 성문"
               : "아무도 깨우지 않는 아침";
       if (end === "hope") {
-        line(
-          "돌쇠",
-          "고리 나리, 오늘은 빈 그릇 하나 더 놓겠습니다. 나루 장에 처음 오는 장꾼은 줄 서는 데를 모를 테니까요.",
-        );
-        line(
-          "고리",
-          "그럼 내가 거기 앉았다가 일러 주지. 오늘은 밥이 식기 전에 나도 좀 먹읍시다.",
-        );
-      } else if (end === "escape") {
         line("충녕", "공자님, 손 좀 내어 주실래요?");
         line("고리", "네, 공주 마마. ……내려갈 때도 이렇게 가도 될까요?");
         line("충녕", "저도 그 말을 하려던 참이었어요.");
+      } else if (end === "escape") {
+        line("고리", "공주마마?");
+        line("충녕", "안.녕.하.세.요. 저.는. 충.녕.입.니.다.");
       } else if (end === "order") {
         line(
           "고리",
-          "명부부터 가져오시오. 이 겨울을 건넌 이들의 이름을 하나도 빠뜨리지 않겠소.",
+          "명부를 가져오시오. 오늘부터 양녕의 인장이 찍힌 명만 받으시오.",
         );
       } else {
         line(

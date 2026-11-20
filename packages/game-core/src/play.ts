@@ -503,6 +503,7 @@ export function evictionDelay(
   return difficulty === "hard" ? 0 : rules.endings.evictionMinutes;
 }
 export interface OutcomeFacts {
+  hopeAtCoup?: number;
   difficulty?: Difficulty;
   admitted: number;
   dead: number;
@@ -520,7 +521,7 @@ export interface OutcomeFacts {
 export function evaluateOutcome(
   f: OutcomeFacts,
   rules: RuleSet = GAME_RULES,
-): "failure" | "ending-a" | "ending-b" | "continue" {
+): "failure" | "ending-a" | "ending-b" | "ending-c" | "continue" {
   number(f.admitted, 1, 100_000, true);
   number(f.dead, 0, f.admitted, true);
   number(f.pessimism, 0, 100);
@@ -541,22 +542,15 @@ export function evaluateOutcome(
     f.dead / f.admitted >= rules.endings.deathFraction
   )
     return "failure";
-  if (
-    f.stage5Minutes < rules.campaign.stage5MinimumDays * 1440 ||
-    !rules.campaign.clues.every((c) => f.clues.includes(c)) ||
-    !rules.campaign.researchOrder.every((r) => f.research.includes(r))
-  )
+  if (!f.route || f.stage5Minutes < rules.campaign.stage5MinimumDays * 1440)
     return "continue";
-  if (
-    f.route === "coexist" &&
-    f.pessimism <= rules.endings.endingAPessimism &&
-    f.lowPessimismMinutes >= rules.endings.endingAHoldDays * 1440
-  )
-    return "ending-a";
-  if (f.route === "yangnyeong" && f.research.includes("R19") && f.mech2)
-    return "ending-b";
-  return "continue";
+  if (f.route === "yangnyeong") return "ending-c";
+  const hope = f.hopeAtCoup ?? f.optimism;
+  number(hope, 0, 100);
+  if (hope >= COUP_SURVIVAL_HOPE) return "ending-a";
+  return f.mech2 ? "ending-b" : "continue";
 }
+export const COUP_SURVIVAL_HOPE = 70;
 export interface PlaySave {
   readonly format: "dynosty-play";
   readonly saveVersion: 1;

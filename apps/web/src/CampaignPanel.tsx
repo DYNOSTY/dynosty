@@ -155,6 +155,7 @@ function SceneDialog({
         (!(
           page.clip === "hope" ||
           page.clip === "escape" ||
+          page.clip === "mechanical-late" ||
           page.clip === "order"
         ) ||
           cursor >= 2) && (
@@ -224,21 +225,21 @@ export function CampaignPanel({
   trade,
   officeSelected,
   gateSelected,
+  southVisits,
   defenseOpen,
   setDefenseOpen,
   work,
 }: {
-  southVisits,
   state: TimberState;
   command: (cmd: TimberCommand) => void;
   trade: boolean;
   officeSelected?: boolean;
   gateSelected?: boolean;
+  southVisits?: number;
   defenseOpen?: boolean;
   setDefenseOpen?: (open: boolean) => void;
   work: boolean;
 }) {
-  southVisits?: number;
   const c = campaignOf(s);
   const p = campaignPage(s);
   const advice = moraleAdvice(s);
@@ -415,10 +416,6 @@ export function CampaignPanel({
         {s.chapter ?? 1}단계 · {CHAPTERS[(s.chapter ?? 1) - 1]}
         <small>{p.goal || p.title}</small>
       </button>
-      {!["opening", "departure"].includes(c.beat) && (
-        <button
-          type="button"
-          className="scout-all"
       {c.beat === "capital" && (
         <>
           <button
@@ -508,6 +505,10 @@ export function CampaignPanel({
           )}
         </>
       )}
+      {!["opening", "departure"].includes(c.beat) && (
+        <button
+          type="button"
+          className="scout-all"
           aria-expanded={office}
           onClick={() => setOffice(!office)}
         >

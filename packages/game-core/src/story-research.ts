@@ -59,7 +59,7 @@ export function recordResearchStory(
   const story: ResearchStory = {
     ...previous,
     route,
-    chungnyeong: route === "mechanical" ? "dead" : "alive",
+    chungnyeong: route === "flight" ? "alive" : "dead",
   };
   return {
     ...s,
@@ -88,7 +88,9 @@ export function storyResearchValid(s: TimberState): boolean {
     ![null, "flight", "mechanical", "dictatorship"].includes(story.route) ||
     !["alive", "dead", "mechanical"].includes(story.chungnyeong) ||
     (!story.rebellion && story.route !== null) ||
-    (story.route !== "mechanical" && story.chungnyeong !== "alive") ||
+    ((story.route === null || story.route === "flight") &&
+      story.chungnyeong !== "alive") ||
+    (story.route === "dictatorship" && story.chungnyeong === "mechanical") ||
     (story.route === "mechanical" && story.chungnyeong === "alive") ||
     (story.chungnyeong === "mechanical") !== d.completed.includes("TECH_MECHA2")
   )

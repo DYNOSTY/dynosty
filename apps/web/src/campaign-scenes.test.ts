@@ -1,8 +1,4 @@
-import {
-  actCampaign,
-  createVillageGame,
-  type TimberState,
-} from "@dynosty/game-core";
+import { createVillageGame } from "@dynosty/game-core";
 import { expect, it } from "vitest";
 import {
   campaignPage,
@@ -80,33 +76,25 @@ it("안내는 도착한 상인과 주민, 돌아온 조와 아직 부족한 식�
   expect(villageAdvice(shortage, true)).toContain("어획막");
 });
 
-it("충녕이 깨어난 소식은 확인 전까지 열리고 이후에는 마을 일과로 돌아간다", () => {
-  const base = createVillageGame();
-  const s: TimberState = {
-    ...base,
-    chapter: 5,
-    campaign: { ...base.campaign!, beat: "vigil" },
-    town: {
-      ...base.town,
-      development: {
-        ...base.town.development,
-        story: { ...base.town.development.story, chungnyeong: "mechanical" },
+it("기계 충녕은 결말에서만 처음 인사한다", () => {
+  const s = createVillageGame();
+  for (const prepared of [false, true]) {
+    const page = campaignPage({
+      ...s,
+      chapter: 5,
+      campaign: {
+        ...s.campaign!,
+        beat: "ending",
+        ending: "escape",
+        revivalPrepared: prepared,
       },
-    },
-  };
-  const page = campaignPage(s);
-  expect(page.key).toBe("awakening");
-  expect(page.auto).toBe(true);
-  expect(page.choices.map((c) => c.action)).toEqual(["awakening"]);
-  const command = {
-    type: "campaign",
-    beat: "vigil",
-    action: "awakening",
-  } as const;
-  const seen = actCampaign(s, command);
-  expect(campaignPage(seen).auto).toBe(false);
-  expect(campaignPage(seen).key).toBe("vigil");
-  expect(() => actCampaign(seen, command)).toThrow();
+    });
+    expect(page.clip).toBe(prepared ? "escape" : "mechanical-late");
+    expect(page.lines.slice(-2)).toEqual([
+      ["고리", "공주마마?"],
+      ["충녕", "안.녕.하.세.요. 저.는. 충.녕.입.니.다."],
+    ]);
+  }
 });
 
 it("배급 정책과 민심에 따라 창고 이야기를 달리 전하고 혹한 예보는 모두에게 전한다", () => {
@@ -176,27 +164,13 @@ it("목진은 반란 당일 성문 습격 기록이 있을 때만 붉은 눈을 
   }
 });
 
-it("의원에서는 남겨 둔 기록이 있어야 고리의 부름에 바늘 삽화가 뜬다", () => {
+it("메카 연구가 남으면 영실이 공방 연구를 권한다", () => {
   const s = createVillageGame();
   s.town.development.story.chungnyeong = "dead";
-  for (const revivalPrepared of [true, false]) {
-    const page = campaignPage({
-      ...s,
-      chapter: 5,
-      campaign: { ...s.campaign!, beat: "vigil", revivalPrepared },
-    });
-    expect(page.lines.some(([name]) => name === "충녕")).toBe(false);
-    if (revivalPrepared) {
-      expect(page.lineIllustration?.image).toBe("infirmary-record");
-      expect(page.lines[page.lineIllustration!.at]).toEqual([
-        "고리",
-        "공주 마마?",
-      ]);
-    } else {
-      expect(page.lineIllustration).toBeUndefined();
-      expect(page.lines[1]?.[1]).toBe(
-        "문은 조금 열어 두어라. 마지막 인사를 올리러 올 테니.",
-      );
-    }
-  }
+  const p = campaignPage({
+    ...s,
+    chapter: 5,
+    campaign: { ...s.campaign!, beat: "vigil", revivalPrepared: false },
+  });
+  expect(p.lines[0]).toEqual(["영실", expect.stringContaining("공방")]);
 });
