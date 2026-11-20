@@ -101,10 +101,37 @@ test("함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단
   await expect(
     page.locator(".result-screen .result-quote footer"),
   ).toContainText("『");
-  await page.getByRole("button", { name: "지금 단계에 머물기" }).click();
+  const transition = page.getByRole("button", {
+    name: "2단계로 넘어갈까요? · 다섯 마을로",
+  });
+  const settings = page.getByRole("button", {
+    name: "난이도 설정",
+    exact: true,
+  });
+  const difficulty = page.getByRole("combobox", { name: "난이도" });
+  await transition.click();
+  await settings.click();
+  await difficulty.selectOption("hard");
+  await page.getByRole("button", { name: "돌아가기" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: /1단계 · 복홀의 첫 명령/ }).click();
-  await readScene(page, "2단계로 넘어갈까요? · 다섯 마을로");
+  const nextLine = page.getByRole("button", { name: /^다음 대사/ });
+  while (await nextLine.count()) await nextLine.click();
+  await transition.click();
+  await settings.click();
+  await difficulty.selectOption("hard");
+  await page.getByRole("button", { name: "시작하기" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = JSON.parse(
+          localStorage.getItem("dynosty.village.resume")!,
+        ).state;
+        return [state.chapter, state.campaign.difficulty];
+      }),
+    )
+    .toEqual([2, "hard"]);
+  await page.reload();
   await expect(page.getByRole("dialog")).toHaveAccessibleName(
     "끊어진 길을 잇다",
   );
@@ -119,6 +146,24 @@ test("함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단
         .getByRole("button", { name: new RegExp("^" + name + " ·") }),
     ).toBeVisible();
   }
+  await page.getByRole("button", { name: "장면 접기" }).click();
+  await page.getByRole("button", { name: "나가기", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveAccessibleName("메인 메뉴");
+  await page.getByRole("button", { name: "다시하기" }).click();
+  await page.getByLabel("시작 난이도").selectOption("normal");
+  await page.getByRole("button", { name: "현재 2단계 처음부터 시작" }).click();
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "끊어진 길을 잇다",
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
+            .campaign.difficulty,
+      ),
+    )
+    .toBe("normal");
 });
 test("밤에 달이가 배급령 변경을 재촉하고 주민 청을 거절하면 그 자리에서 추방된다", async ({
   page,
@@ -795,7 +840,7 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
   await readScene(page, "충녕 · 먹는 것과 필요한 양에 맞춰 배급한다");
-  await page.getByRole("button", { name: "메인 메뉴", exact: true }).click();
+  await page.getByRole("button", { name: "나가기", exact: true }).click();
   await dialog.getByRole("button", { name: "돌아보기" }).click();
   await dialog.getByRole("button", { name: "서막" }).click();
   await expect(dialog.locator("video")).toHaveAttribute(
@@ -836,7 +881,7 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   );
   expect(loaded.world).toEqual(manual.world);
   expect(loaded.town).toEqual(manual.town);
-  await page.getByRole("button", { name: "메인 메뉴", exact: true }).click();
+  await page.getByRole("button", { name: "나가기", exact: true }).click();
   await dialog.getByRole("button", { name: "다시하기" }).click();
   await dialog.getByRole("button", { name: /^5단계 ·/ }).click();
   await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");

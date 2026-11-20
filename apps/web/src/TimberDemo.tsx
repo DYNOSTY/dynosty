@@ -37,12 +37,12 @@ import {
   workplaceOpen,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
+import { EndingMenu } from "./EndingMenu.js";
 import { LaborDemo } from "./LaborDemo.js";
 import { MerchantOffers, merchantCards } from "./MerchantOffers.js";
 import { residentName } from "./resident-names.js";
-import { saveStageStart } from "./stage-replay.js";
-import { EndingMenu } from "./EndingMenu.js";
 import type { SiteId } from "./site-targets.js";
+import { saveStageStart } from "./stage-replay.js";
 import { buildingCost, TownPanel } from "./TownPanel.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";

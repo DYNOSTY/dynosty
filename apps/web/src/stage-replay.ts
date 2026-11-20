@@ -91,7 +91,10 @@ function resume(data: unknown) {
   window.location.reload();
 }
 
-export async function replayStage(stage: number) {
+export async function replayStage(
+  stage: number,
+  difficulty: "normal" | "hard",
+) {
   const data = await archive("starts", "readonly", (table) => table.get(stage));
   const save =
     data === undefined
@@ -99,7 +102,15 @@ export async function replayStage(stage: number) {
       : parseTimberSave(data);
   if ((save.state.chapter ?? 1) !== stage)
     throw Error("단계 기록을 확인해 주세요.");
-  resume(save);
+  resume(
+    createTimberSave({
+      ...save.state,
+      campaign: {
+        ...(save.state.campaign ?? newCampaign("opening")),
+        difficulty,
+      },
+    }),
+  );
 }
 
 export function writeSlot(id: number, state: TimberState) {

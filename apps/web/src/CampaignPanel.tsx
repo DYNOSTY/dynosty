@@ -22,7 +22,6 @@ import {
 } from "@dynosty/game-core";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
-import { EndingMenu } from "./EndingMenu.js";
 import {
   campaignPage,
   gatheringRumor,
@@ -30,6 +29,7 @@ import {
   PATROL_NAMES,
   type ScenePage,
 } from "./campaign-scenes.js";
+import { EndingMenu } from "./EndingMenu.js";
 
 import "./campaign.css";
 
@@ -106,8 +106,7 @@ function SceneDialog({
         }}
         onCancel={(e) => {
           e.preventDefault();
-          setPending("");
-          setSelecting(false);
+          close();
         }}
       >
         <h2>
@@ -130,15 +129,13 @@ function SceneDialog({
           </label>
         )}
         <footer>
-          <button onClick={() => setSelecting(!selecting)}>난이도 설정</button>
-          <button onClick={() => act(pending, level)}>시작하기</button>
-          <button
-            onClick={() => {
-              setPending("");
-              setSelecting(false);
-              setLevel(difficulty);
-            }}
-          >
+          <button type="button" onClick={() => setSelecting(!selecting)}>
+            난이도 설정
+          </button>
+          <button type="button" onClick={() => act(pending, level)}>
+            시작하기
+          </button>
+          <button type="button" onClick={close}>
             돌아가기
           </button>
         </footer>
@@ -538,8 +535,14 @@ export function CampaignPanel({
   }
   return (
     <div className="campaign-quest">
-      <button type="button" onClick={() => setMainMenu(true)}>
-        메인 메뉴
+      <button
+        type="button"
+        onClick={() => {
+          close();
+          setMainMenu(true);
+        }}
+      >
+        나가기
       </button>
       <button
         type="button"
