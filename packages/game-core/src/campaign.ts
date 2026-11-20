@@ -379,7 +379,8 @@ export function updateCampaign(s: TimberState): TimberState {
     const uprising = s.world.pessimism > s.world.optimism;
     const prepared = s.town.development.completed.includes("R17");
     let next = recordResearchStory(s, "rebellion-started");
-    if (uprising) next = recordResearchStory(next, "chungnyeong-assassinated");
+    if (uprising && s.mutants?.length)
+      next = recordResearchStory(next, "chungnyeong-assassinated");
     return {
       ...next,
       paused: true,

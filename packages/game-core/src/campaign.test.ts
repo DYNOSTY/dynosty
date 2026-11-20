@@ -325,7 +325,15 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
     "control",
   );
   expect(control.campaign?.beat).toBe("forecast");
-  control = later(control, 5 * 1440);
+  control = later(
+    {
+      ...control,
+      mutants: [
+        { id: control.residents[0]!.id, due: control.elapsed + 5 * 1440 },
+      ],
+    },
+    5 * 1440,
+  );
   expect(control.campaign?.beat).toBe("rally");
   expect(() => act(control, "next")).toThrow();
   control = act(control, "listen");
@@ -620,7 +628,18 @@ it("닷새째의 민심과 그때까지 끝낸 연구를 저장해 반란의 결
   const chosen = act(base, "coexist");
   const before = later(chosen, minutesUntilCoup(chosen) - 1);
   expect(before.town.development.story.rebellion).toBe(false);
-  const event = restore(later(before, 1));
+  const quiet = restore(later(before, 1));
+  expect(quiet.campaign?.beat).toBe("rally");
+  expect(quiet.town.development.story.chungnyeong).toBe("alive");
+  const event = restore(
+    later(
+      {
+        ...before,
+        mutants: [{ id: before.residents[0]!.id, due: before.elapsed + 1 }],
+      },
+      1,
+    ),
+  );
   expect(event.town.development.story.chungnyeong).toBe("dead");
   expect(event.campaign?.revivalPrepared).toBe(false);
   const vigil = act(act(event, "listen"), "next");

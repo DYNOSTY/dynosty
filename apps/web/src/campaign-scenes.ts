@@ -70,6 +70,7 @@ export interface ScenePage {
   frames?: { image: string; words: string }[];
   illustration?: string;
   laterIllustration?: { from: number; image: string; alt: string };
+  lineIllustration?: { at: number; image: string; alt: string };
   lines: Line[];
   choices: Choice[];
   auto: boolean;
@@ -910,9 +911,17 @@ export function campaignPage(s: TimberState): ScenePage {
         );
       }
       if (c.uprising) {
+        if (s.town.development.story.chungnyeong === "alive")
+          page.lineIllustration = {
+            at: page.lines.length,
+            image: "chungnyeong-dining",
+            alt: "복홀 식당에서 어린 공룡들과 한 상에 앉은 충녕",
+          };
         line(
           "나르미",
-          "고리님, 의원이 오기도 전에 충녕 마마가 돌아가셨어요. 성안에서 붕대를 감고 있던 이의 눈이 붉어졌어요. 마마가 새끼를 밀어내는 사이에 그이가 덮쳤어요. 길룡 씨가 손을 놓지 못해요.",
+          s.town.development.story.chungnyeong === "dead"
+            ? "고리님, 의원이 오기도 전에 충녕 마마가 돌아가셨어요. 성안에서 붕대를 감고 있던 이의 눈이 붉어졌어요. 마마가 새끼를 밀어내는 사이에 그이가 덮쳤어요. 길룡 씨가 손을 놓지 못해요."
+            : "고리님, 충녕 마마는 무사하세요. 어린 공룡들을 데리고 식당에 계세요.",
         );
         line(
           "목진",

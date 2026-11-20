@@ -178,7 +178,7 @@ test("옛 저장은 기본 보통 난이도로 남은 유예 시간을 이어간
     "아무도 깨우지 않는 아침",
   );
 });
-test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 본다", async ({
+test("좁은 화면의 5단계 컷씬과 성안 변종 없는 반란을 이어 본다", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -239,6 +239,10 @@ test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 
   expect(rect?.width).toBeLessThanOrEqual(390);
   await readScene(page, "양녕 · 지휘권을 합치고 징발 허용");
   for (let day = 0; day < 5; day++) {
+    if (day === 4)
+      await page.evaluate(() => {
+        Math.random = () => 0.99;
+      });
     await page.getByRole("button", { name: "마을 하루 진행" }).click();
     if (day === 1 || day === 2)
       await expect(
@@ -256,7 +260,14 @@ test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 
   await expect(dialog).toContainText("푸른 보자기를 맨 주민");
   await expect(dialog).toContainText("이쪽 빗장은 내가 들 테니");
   await dialog.getByRole("button", { name: /^다음 대사/ }).click();
-  await expect(dialog).toContainText("충녕 마마가 돌아가셨어요");
+  await expect(dialog).toContainText("어린 공룡들을 데리고 식당에 계세요.");
+  await expect
+    .poll(() =>
+      dialog
+        .getByRole("img", { name: /한 상에 앉은 충녕/ })
+        .evaluate((el) => (el as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
   const nextLine = dialog.getByRole("button", { name: /^다음 대사/ });
   await nextLine.click();
   await expect(dialog.locator("img.campaign-still")).toHaveAttribute(
@@ -273,10 +284,7 @@ test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 
   await expect(dialog).toContainText("고개 들어라, 목진.");
   await nextLine.click();
   await expect(dialog).toContainText("아니다. 들지도 마라. 가치도 없다.");
-  await readScene(page, "판결을 기록하고 의원으로");
-  await expect(dialog).toHaveAccessibleName("의원의 등잔");
-  await nextLine.click();
-  await expect(dialog).toContainText("이제는 그 목소리를 되찾을 수 없습니다");
+  await readScene(page, "판결을 기록하고 마을로");
 
   await expect
     .poll(() => tracks.some((url) => url.endsWith("/13.ogg")))
