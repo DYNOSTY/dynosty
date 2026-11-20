@@ -3095,7 +3095,16 @@ export function advanceTimber(
       }
     }
     if (villageDefenseActive(s) && !s.campaign?.ending) {
-      if (s.world.minute === 1260) s = gateRaid(s);
+      if (s.world.minute === 1260) {
+        s = gateRaid(s);
+        if (
+          beforeUpdate === "forecast" &&
+          s.campaign &&
+          minutesUntilCoup(s) === 0 &&
+          s.raid?.minute === s.elapsed
+        )
+          s = { ...s, campaign: { ...s.campaign, coupGateRaided: true } };
+      }
       if (s.mutants?.length) s = advanceMutants(s);
     }
 

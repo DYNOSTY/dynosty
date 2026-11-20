@@ -155,3 +155,19 @@ it("성문에서 주민이 배급을 기억하고 민심에 따라 빗장을 들
     ]);
   }
 });
+
+it("목진은 반란 당일 성문 습격 기록이 있을 때만 붉은 눈을 언급한다", () => {
+  const base = createVillageGame();
+  for (const beat of ["rally", "verdict"] as const) {
+    for (const coupGateRaided of [undefined, false, true]) {
+      const scene = campaignPage({
+        ...base,
+        chapter: 5,
+        campaign: { ...base.campaign!, beat, coupGateRaided },
+      });
+      expect(scene.lines[0]?.[1].includes("붉은 눈")).toBe(
+        Boolean(coupGateRaided),
+      );
+    }
+  }
+});

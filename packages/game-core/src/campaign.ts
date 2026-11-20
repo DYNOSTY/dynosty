@@ -150,6 +150,7 @@ export interface Campaign {
   side: "coexist" | "control" | null;
   uprising: boolean;
   revivalPrepared?: boolean;
+  coupGateRaided?: boolean;
   awakeningSeen?: boolean;
   lastHigh: number;
   difficulty?: Difficulty;
@@ -239,6 +240,7 @@ export function campaignValid(c: unknown, elapsed: number) {
     [null, "invite", "provisions"].includes(c.escort as null) &&
     [null, "coexist", "control"].includes(c.side as null) &&
     (c.awakeningSeen === undefined || typeof c.awakeningSeen === "boolean") &&
+    (c.coupGateRaided === undefined || typeof c.coupGateRaided === "boolean") &&
     (c.revivalPrepared === undefined ||
       typeof c.revivalPrepared === "boolean") &&
     typeof c.uprising === "boolean" &&

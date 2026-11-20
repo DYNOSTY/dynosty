@@ -683,3 +683,35 @@ it("첫밤과 이튿밤에 변종 없이 지나가도 닷새째 반란이 시작
     roll.mockRestore();
   }
 });
+
+it("닷새째 밤 습격 기록은 저장하거나 성문 보고를 닫아도 판결까지 남는다", () => {
+  const start = createVillageGame(false, true);
+  const chosen = act(
+    {
+      ...start,
+      chapter: 5,
+      world: { ...start.world, pessimism: 55 },
+      campaign: newCampaign("summit"),
+    },
+    "control",
+  );
+  const before = later(chosen, minutesUntilCoup(chosen) - 1);
+  for (const draw of [0, 0.99]) {
+    const roll = vi.spyOn(Math, "random").mockReturnValue(draw);
+    try {
+      let state = commandTimber(
+        restore(before),
+        { type: "advance", minutes: 1 },
+        "coup-night",
+      );
+      expect(Boolean(state.campaign?.coupGateRaided)).toBe(draw === 0);
+      if (state.raid)
+        state = commandTimber(state, { type: "dismiss-raid" }, "read");
+      state = restore(act(restore(state), "listen"));
+      expect(state.campaign?.beat).toBe("verdict");
+      expect(Boolean(state.campaign?.coupGateRaided)).toBe(draw === 0);
+    } finally {
+      roll.mockRestore();
+    }
+  }
+});

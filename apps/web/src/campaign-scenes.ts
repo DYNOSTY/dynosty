@@ -856,7 +856,12 @@ export function campaignPage(s: TimberState): ScenePage {
       page.illustration = "gate";
       page.music = "13";
       page.title = "혹한 닷새 전 · 배반자의 외침";
-      line("목진", "문을 여시오! 양녕 마마께서 드신 깃발이 보이지 않소!");
+      line(
+        "목진",
+        c.coupGateRaided
+          ? "지금이오! 성문에 붉은 눈이 들이닥쳤소. 어서 빗장을 드시오. 양녕 마마의 깃발 아래 서시오!"
+          : "창고에서 나와 약조한 이들, 내 목소리 들리시오? 양녕 마마의 깃발을 보시오. 지금 빗장을 드시오!",
+      );
       line(
         "길룡",
         "오늘은 수레 안 끕니다. 저기 쌓인 패가 보이시지요? 저만 나온 게 아닙니다. 문빗장을 걸기 전에 우리 말도 한 번 들으십시오.",
@@ -884,7 +889,9 @@ export function campaignPage(s: TimberState): ScenePage {
       page.music = c.uprising ? "13" : "14";
       line(
         "목진",
-        "문을 여시오! 쥬신의 군세가 눈앞에 섰는데 언제까지 빈 솥 곁에 앉아 있을 게요!",
+        c.coupGateRaided
+          ? "성문에 붉은 눈이 붙은 걸 다들 보았지 않소! 지금이오, 빗장을 드시오!"
+          : "거기 빗장 끝을 잡은 이, 날 보시오. 문을 열기로 했잖소. 왜들 가만히 서 있는 게요?",
       );
       if (c.uprising) {
         line(
