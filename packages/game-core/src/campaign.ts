@@ -373,7 +373,7 @@ export function updateCampaign(s: TimberState): TimberState {
     c = { ...c, pessimismExtremeSince, optimismZeroSince };
     s = { ...s, campaign: c };
   }
-  if (c.beat === "forecast" && s.elapsed - c.since >= 5 * 1440) {
+  if (c.beat === "forecast" && minutesUntilCoup(s) <= 0) {
     const uprising = s.world.pessimism > s.world.optimism;
     const prepared = s.town.development.completed.includes("R17");
     let next = recordResearchStory(s, "rebellion-started");

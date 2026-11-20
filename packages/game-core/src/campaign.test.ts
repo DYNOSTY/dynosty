@@ -6,6 +6,7 @@ import {
   convoyLoad,
   emergencyRation,
   lostPatrol,
+  minutesUntilCoup,
   newCampaign,
   returnedScouts,
   SETTLEMENTS,
@@ -617,13 +618,13 @@ it("닷새째의 민심과 그때까지 끝낸 연구를 저장해 반란의 결
     world: { ...start.world, pessimism: 65, optimism: 30 },
   };
   const chosen = act(base, "coexist");
-  const before = later(chosen, 5 * 1440 - 1);
+  const before = later(chosen, minutesUntilCoup(chosen) - 1);
   expect(before.town.development.story.rebellion).toBe(false);
   const event = restore(later(before, 1));
   expect(event.town.development.story.chungnyeong).toBe("dead");
   expect(event.campaign?.revivalPrepared).toBe(false);
   const vigil = act(act(event, "listen"), "next");
-  const onset = later(vigil, 5 * 1440);
+  const onset = later(vigil, 10 * 1440 - (vigil.elapsed - chosen.elapsed));
   expect(onset.town.cold).toBe(true);
   expect(onset.campaign?.ending).toBeNull();
   expect(later(onset, 1440).campaign?.ending).toBe("order");
@@ -644,6 +645,40 @@ it("단계별 경구 추첨을 저장하고 이어 할 때 같은 경구를 보�
     expect(restore({ ...state, campaign }).campaign?.victoryQuotes).toEqual(
       campaign.victoryQuotes,
     );
+  } finally {
+    roll.mockRestore();
+  }
+});
+
+it("첫밤과 이튿밤에 변종 없이 지나가도 닷새째 반란이 시작되고 저장 후 야습을 재처리하지 않는다", () => {
+  const start = createVillageGame(false, true);
+  const base = act(
+    { ...start, chapter: 5, campaign: newCampaign("summit") },
+    "coexist",
+  );
+  const first = minutesUntilCoup(base) - 4 * 1440;
+  const roll = vi.spyOn(Math, "random").mockReturnValue(0.99);
+  try {
+    for (const night of [1, 2, 5]) {
+      const before = later(base, first + (night - 1) * 1440 - 1);
+      const after = commandTimber(
+        restore(before),
+        { type: "advance", minutes: 1 },
+        "scheduled-night",
+      );
+      expect(after.world.minute).toBe(1260);
+      expect(after.mutants ?? []).toHaveLength(0);
+      expect(after.raid).toBeUndefined();
+      const resumed = restore(after);
+      expect(
+        commandTimber(
+          resumed,
+          { type: "advance", minutes: 1 },
+          "scheduled-night",
+        ),
+      ).toEqual(resumed);
+      expect(after.campaign?.beat).toBe(night === 5 ? "verdict" : "forecast");
+    }
   } finally {
     roll.mockRestore();
   }

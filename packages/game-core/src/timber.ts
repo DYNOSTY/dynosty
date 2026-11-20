@@ -13,6 +13,7 @@ import {
   type CampaignCommand,
   campaignOf,
   campaignValid,
+  minutesUntilCoup,
   newCampaign,
   policyWait,
   updateCampaign,
@@ -2669,7 +2670,7 @@ export function villageDefenseActive(s: TimberState) {
   return (
     !!s.campaign &&
     !["opening", "departure"].includes(s.campaign.beat) &&
-    (s.rebuilding !== false || s.campaign.beat === "capital")
+    (s.rebuilding !== false || s.campaign.beat === "capital" || s.chapter === 5)
   );
 }
 export function villageTemperature(s: TimberState) {
@@ -2934,6 +2935,8 @@ export function advanceTimber(
     const nextTime = Math.min(target, s.due ?? target, s.elapsed + 1),
       elapsed = nextTime - s.elapsed;
     s = {
+    const beforeUpdate = s.campaign?.beat;
+    const previousEnding = s.campaign?.ending;
       ...s,
       elapsed: nextTime,
       world: advancePlayClock(s.world, elapsed),
@@ -3095,12 +3098,12 @@ export function advanceTimber(
       if (s.world.minute === 1260) s = gateRaid(s);
       if (s.mutants?.length) s = advanceMutants(s);
     }
-    const beforeUpdate = s.campaign?.beat;
-    const previousEnding = s.campaign?.ending;
+
     s = updateCampaign(s);
     if (
       (!previousEnding && s.campaign?.ending) ||
-      (beforeUpdate === "forecast" && s.campaign?.beat !== "forecast")
+      (beforeUpdate === "forecast" &&
+        (s.campaign?.beat !== "forecast" || minutesUntilCoup(s) === 15 * 60))
     )
       break;
   }
