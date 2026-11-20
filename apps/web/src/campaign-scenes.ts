@@ -67,6 +67,8 @@ export interface ScenePage {
   title: string;
   music: string;
   clip?: string;
+  resultQuote?: Line;
+  nextStage?: number | "escort";
   frames?: { image: string; words: string }[];
   illustration?: string;
   laterIllustration?: { from: number; image: string; alt: string };
@@ -278,6 +280,7 @@ export function campaignPage(s: TimberState): ScenePage {
   const choice = (action: string, label: string, disabled = false) =>
     page.choices.push({ action, label, disabled });
   const complete = (next: string, action = "next") => {
+    page.nextStage = chapter + 1;
     page.title = chapter + "단계 완료 · " + CHAPTERS[chapter - 1];
     page.goal = chapter + "단계 완료";
     if (chapter !== 3)
@@ -314,6 +317,7 @@ export function campaignPage(s: TimberState): ScenePage {
   };
   switch (c.beat) {
     case "opening":
+      page.nextStage = 1;
       page.title = "별이 진 뒤, 복홀";
       page.clip = "opening";
       page.music = "00";
@@ -611,9 +615,9 @@ export function campaignPage(s: TimberState): ScenePage {
     case "capital": {
       page.title = "쥬신 왕의 어전 · 도성 남문";
       page.music = "10";
-      const road = capitalRoad(s);
       if (c.relief && convoyReady(s)) {
         page.key = "capital-ready";
+        page.nextStage = "escort";
         page.title = "3단계 완료 · 남문에 남은 왕";
         page.auto = true;
         page.goal = "3단계 완료";
@@ -634,6 +638,7 @@ export function campaignPage(s: TimberState): ScenePage {
         choice("next", "먼저 남하한 충녕의 소식");
         break;
       }
+      const road = capitalRoad(s);
       if (s.bokhol && !c.relief) {
         line(
           "호조 관리",
@@ -692,6 +697,7 @@ export function campaignPage(s: TimberState): ScenePage {
       choice("next", "남하 호송에 동행할까요?");
       break;
     case "escort":
+      page.nextStage = 4;
       page.clip = "escort";
       page.music = "13";
       page.title = "길가에서 기다린 목진";
@@ -703,10 +709,7 @@ export function campaignPage(s: TimberState): ScenePage {
         "충녕",
         "그 청은 받지 않겠습니다. 발에 감은 건 복홀 의원의 붕대지요? 공자님은 그 발로 걷지 못하는 그대를 업고 가셨지요. 나는 그분께 가는 길입니다. 길을 비켜 주세요.",
       );
-      line(
-        "복홀의 기록",
-        "행렬이 지나간 뒤에도 목진은 한참 길가에 서 있었다.",
-      );
+      line("복홀의 기록", "행렬이 지나간 뒤에도 목진은 한참 길가에 서 있었다.");
       line(
         "덕순이",
         "마마, 저희더러 따라오라 하시면 걸을 수는 있어요. 도중에 저 아이가 처져도 이름 한 번만 더 불러 주세요.",
@@ -829,8 +832,8 @@ export function campaignPage(s: TimberState): ScenePage {
         "고리",
         "다들 들었소. 내 이름으로 장부에 쓰겠소. 무슨 일이 생기든, 그 이름부터 찾으시오.",
       );
-      choice("coexist", "충녕 · 식성별 배급과 공동 보호");
-      choice("control", "양녕 · 지휘권을 합치고 징발 허용");
+      choice("coexist", "충녕 · 먹는 것과 필요한 양에 맞춰 배급한다");
+      choice("control", "양녕 · 식단마다 하루 배급의 상한을 정한다");
       break;
     case "forecast":
       page.auto = false;
@@ -865,8 +868,14 @@ export function campaignPage(s: TimberState): ScenePage {
           : "창고에서 나와 약조한 이들, 내 목소리 들리시오? 양녕 마마의 깃발을 보시오. 지금 빗장을 드시오!",
       );
       line(
+        "양녕",
+        "내 깃발을 세워라. 남문에서 나와 함께 온 자들은 이리 와라. 오늘부터 내가 창고 열쇠를 맡겠다.",
+      );
+      line(
         "길룡",
-        "오늘은 수레 안 끕니다. 저기 쌓인 패가 보이시지요? 저만 나온 게 아닙니다. 문빗장을 걸기 전에 우리 말도 한 번 들으십시오.",
+        c.side === "control"
+          ? "고리님, 첫날 정한 몫이 제 몸엔 모자랍니다. 그 말씀 드리러 이 다리로 예까지 왔습니다. 그런데 왜 창고 열쇠 이야기가 나옵니까?"
+          : "고리님, 어느 집에 뭐가 필요한지 적어 오라셨지요. 제 이웃들 몫도 적어 왔습니다. 이걸 왜 양녕 마마 쪽에 내야 합니까?",
       );
       line(
         "목진",
@@ -1027,6 +1036,7 @@ export function campaignPage(s: TimberState): ScenePage {
     case "ending":
     case "finished": {
       const end = c.ending ?? "collapse";
+      if (end === "collapse") page.illustration = "gori-exile";
       if (end !== "collapse")
         page.clip =
           end === "escape" && c.revivalPrepared === false
@@ -1037,7 +1047,7 @@ export function campaignPage(s: TimberState): ScenePage {
           "복홀의 기록",
           "긴 추위를 지나 다시 이웃의 이름을 부를 수 있게 되었습니다. 당신이 우리 곁을 지켜 준 덕입니다.",
         );
-        line(...quote);
+        page.resultQuote = quote;
       }
       page.key = c.beat + end;
       page.music = end === "hope" ? "A" : end === "escape" ? "B" : "C";
@@ -1083,7 +1093,6 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     }
   }
-  const closingFrame = page.frames?.at(-1);
-  if (closingFrame) closingFrame.words += `\n\n“${quote[1]}” — ${quote[0]}`;
+  if (page.frames?.length) page.resultQuote = quote;
   return page;
 }

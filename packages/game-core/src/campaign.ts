@@ -429,7 +429,12 @@ export function updateCampaign(s: TimberState): TimberState {
     return { ...s, campaign: { ...c, lastHigh: s.elapsed } };
   return s;
 }
-export type CampaignCommand = { type: "campaign"; beat: Beat; action: string };
+export type CampaignCommand = {
+  type: "campaign";
+  beat: Beat;
+  action: string;
+  difficulty?: Difficulty;
+};
 export function policyWait(s: TimberState) {
   const c = campaignOf(s);
   return c.lastPolicyAt === undefined

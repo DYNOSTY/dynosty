@@ -1060,6 +1060,13 @@ export function App() {
               <div className="fallen-caption">
                 당신이 알던 대로 공룡 문명은 멸망했습니다.
                 <small>과거의 편린</small>
+                <blockquote className="result-quote">
+                  <p>
+                    장부는 두고 가겠소. 죽은 이들의 이름까지 가져갈 권리는 내게
+                    없소.
+                  </p>
+                  <footer>고리</footer>
+                </blockquote>
               </div>
             )}
             <canvas

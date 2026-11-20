@@ -234,3 +234,127 @@
   display: block;
   width: 100%;
 }
+.prince-greetings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: -0.8rem;
+  position: relative;
+  justify-content: center;
+}
+.prince-greetings p {
+  position: relative;
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+  background: #fff3d6;
+  color: #34251b;
+  border-radius: 0.8rem;
+  animation: prince-hello 8s both;
+}
+.prince-greetings p::before {
+  content: "";
+  position: absolute;
+  left: 1rem;
+  bottom: 100%;
+  border: 0.35rem solid transparent;
+  border-bottom-color: #fff3d6;
+}
+.prince-greetings p + p {
+  animation-delay: 1s;
+}
+@keyframes prince-hello {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  6%,
+  92% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prince-greetings p {
+    animation: none;
+  }
+}
+dialog.result-screen {
+  box-sizing: border-box;
+  inset: 0;
+  margin: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  color: #fff;
+  background: #121819 center / cover;
+  isolation: isolate;
+}
+.result-heading {
+  position: absolute;
+  top: 5%;
+  left: 5%;
+  font-size: 1rem;
+}
+.result-quote {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: 82%;
+  margin: 0;
+  font-family: Georgia, "Batang", serif;
+  color: white;
+  text-shadow: 0 2px 8px #000;
+}
+.result-quote p {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(19px, 3vw, 43px);
+  line-height: 1.6;
+  word-break: keep-all;
+}
+.result-quote footer {
+  display: block;
+  text-align: right;
+  margin-top: 0.8em;
+  font-size: clamp(14px, 1.4vw, 22px);
+}
+.result-screen > footer {
+  position: absolute;
+  right: 5%;
+  bottom: 5%;
+}
+.campaign-dialog .result-film {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  filter: brightness(0.45);
+  z-index: -1;
+}
+.fallen-caption .result-quote {
+  position: static;
+  transform: none;
+  margin: 1em auto;
+}
+.mission-entry h2 {
+  position: absolute;
+  left: 6%;
+  bottom: 20%;
+  color: white;
+  font:
+    clamp(24px, 4vw, 60px) Georgia,
+    serif;
+}
+.mission-entry label {
+  position: absolute;
+  right: 5%;
+  bottom: 18%;
+  background: #14191f;
+  padding: 1em;
+}

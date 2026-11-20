@@ -81,7 +81,8 @@ function policeAvailable(s: TimberState) {
   );
 }
 export function mutantWound(s: TimberState, id: string, random: () => number) {
-  if (s.mutants?.some((m) => m.id === id) || random() >= 0.2) return s;
+  if (random() >= 0.2) return s;
+  if (s.mutants?.some((m) => m.id === id)) return s;
   return note(
     {
       ...s,

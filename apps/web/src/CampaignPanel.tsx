@@ -47,22 +47,31 @@ export function PatrolPortrait({ index }: { index: number }) {
 }
 function SceneDialog({
   page,
+  difficulty,
   close,
   act,
   advisory,
 }: {
   page: ScenePage;
+  difficulty: "normal" | "hard";
   advisory: ReactNode;
   close: () => void;
-  act: (action: string) => void;
+  act: (action: string, difficulty?: "normal" | "hard") => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [cursor, setCursor] = useState(0);
+  const [pending, setPending] = useState("");
+  const [selecting, setSelecting] = useState(false);
+  const [level, setLevel] = useState(difficulty);
+  const stage = page.nextStage;
   const frameIndex = cursor - page.lines.length;
   const frame = page.frames?.[frameIndex];
   const flashback = page.key === "summit" && page.lines[cursor]?.[1] === "";
   const familyScene = page.key === "summit" && cursor > 0 && cursor <= 5;
-  const total = page.lines.length + (page.frames?.length ?? 0);
+  const storyLength = page.lines.length + (page.frames?.length ?? 0);
+  const total = storyLength + Number(!!page.resultQuote);
+  const result = cursor === storyLength ? page.resultQuote : undefined;
+  const backdrop = page.frames?.at(-1)?.image;
   const lineIndex = Math.min(cursor, page.lines.length - 1);
   useEffect(() => {
     if (!frame || cursor >= total - 1) return;
@@ -86,109 +95,191 @@ function SceneDialog({
     element?.showModal();
     return () => element?.close();
   }, []);
+  if (pending && stage)
+    return (
+      <dialog
+        ref={dialog}
+        className="campaign-dialog result-screen mission-entry"
+        aria-label="미션 시작 준비"
+        style={{
+          backgroundImage: `linear-gradient(0deg,#0b111aeb,transparent 78%),url(${media}mission-${stage}.webp)`,
+        }}
+        onCancel={(e) => {
+          e.preventDefault();
+          setPending("");
+          setSelecting(false);
+        }}
+      >
+        <h2>
+          {stage === "escort"
+            ? "사이드 미션 · 충녕의 남하"
+            : stage + "단계 · " + CHAPTERS[stage - 1]}
+        </h2>
+        {selecting && (
+          <label>
+            난이도{" "}
+            <select
+              value={level}
+              onChange={(e) =>
+                setLevel(e.target.value === "hard" ? "hard" : "normal")
+              }
+            >
+              <option value="normal">보통</option>
+              <option value="hard">어려움</option>
+            </select>
+          </label>
+        )}
+        <footer>
+          <button onClick={() => setSelecting(!selecting)}>난이도 설정</button>
+          <button onClick={() => act(pending, level)}>시작하기</button>
+          <button
+            onClick={() => {
+              setPending("");
+              setSelecting(false);
+              setLevel(difficulty);
+            }}
+          >
+            돌아가기
+          </button>
+        </footer>
+      </dialog>
+    );
   return (
     <dialog
       ref={dialog}
-      className="campaign-dialog"
+      className={result ? "campaign-dialog result-screen" : "campaign-dialog"}
+      style={
+        result && backdrop
+          ? {
+              backgroundImage: `linear-gradient(#10141985,#101419ad),url(${media}${backdrop}.webp)`,
+            }
+          : undefined
+      }
       aria-label={page.title}
       onCancel={(e) => {
         e.preventDefault();
         close();
       }}
     >
-      <header>
-        <h2>{page.title}</h2>
-        <button type="button" onClick={close} aria-label="장면 접기">
-          접기
-        </button>
-      </header>
-      {frame && (
-        <video
-          key={frame.image}
-          className="campaign-still"
-          aria-label={page.title + " 엔딩 영상"}
-          src={
-            media +
-            "ending-" +
-            frame.image.charAt(4) +
-            ".mp4#t=" +
-            frameIndex * 7.5 +
-            "," +
-            (frameIndex + 1) * 7.5
-          }
-          poster={media + frame.image + ".webp"}
-          playsInline
-          muted
-          autoPlay
-        />
-      )}
-      {flashback && (
-        <img
-          className="campaign-still"
-          src={media + "end-3b.webp"}
-          alt="도성 광장에 홀로 선 왕의 뒷모습"
-        />
-      )}
-      {!flashback && !frame && (familyScene || later || page.illustration) && (
-        <img
-          className="campaign-still"
-          alt={
-            familyScene
-              ? "복홀 성문 앞의 양녕과 새끼 스피노사우르스 포와 혜"
-              : (later?.alt ?? page.title)
-          }
-          src={`/story/campaign/${familyScene ? "royal-family" : (later?.image ?? page.illustration)}.webp`}
-        />
-      )}
-      {page.key === "summit" && cursor === 1 && (
-        <section className="prince-greetings" aria-label="두 왕자의 인사">
-          <p>
-            <strong>포</strong> 복홀 어른들, 안녕하세요! 쥬신의 왕자 포예요!
-          </p>
-          <p>
-            <strong>혜</strong> 저도 왕자예요! 혜라고 불러 주세요!
-          </p>
-        </section>
-      )}
-      {page.clip &&
-        !familyScene &&
-        !frame &&
-        (!(
-          page.clip === "hope" ||
-          page.clip === "escape" ||
-          page.clip === "mechanical-late" ||
-          page.clip === "order"
-        ) ||
-          cursor >= 2) && (
-          <video
-            key={page.clip}
-            src={media + page.clip + ".mp4"}
-            muted
-            playsInline
-            autoPlay
-            controls
-            preload="metadata"
-            aria-label={page.title + " 무성 컷씬"}
-          />
-        )}
-      {!flashback && page.goal && <p className="campaign-goal">{page.goal}</p>}
-      {!flashback && (!frame || frame.words) && (
-        <div className="campaign-speech" aria-live="polite">
-          {frame ? null : face >= 0 ? (
-            <PatrolPortrait index={face} />
-          ) : name === "나르미" || name === "달이" ? (
-            <img
-              alt=""
-              src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.png`}
+      {result ? (
+        <>
+          <h2 className="result-heading">{page.title}</h2>
+          {!backdrop && page.clip && (
+            <video
+              className="result-film"
+              src={media + page.clip + ".mp4"}
+              autoPlay
+              muted
+              playsInline
+              loop
             />
-          ) : null}
-          <div>
-            <strong>{frame ? "복홀의 기록" : name}</strong>
-            <p>{frame?.words ?? words}</p>
-          </div>
-        </div>
+          )}
+          <blockquote className="result-quote">
+            <p>{result[1]}</p>
+            <footer>{result[0]}</footer>
+          </blockquote>
+        </>
+      ) : (
+        <>
+          <header>
+            <h2>{page.title}</h2>
+            <button type="button" onClick={close} aria-label="장면 접기">
+              접기
+            </button>
+          </header>
+          {frame && (
+            <video
+              key={frame.image}
+              className="campaign-still"
+              aria-label={page.title + " 엔딩 영상"}
+              src={
+                media +
+                "ending-" +
+                frame.image.charAt(4) +
+                ".mp4#t=" +
+                frameIndex * 7.5 +
+                "," +
+                (frameIndex + 1) * 7.5
+              }
+              poster={media + frame.image + ".webp"}
+              playsInline
+              muted
+              autoPlay
+            />
+          )}
+          {flashback && (
+            <img
+              className="campaign-still"
+              src={media + "end-3b.webp"}
+              alt="도성 광장에 홀로 선 왕의 뒷모습"
+            />
+          )}
+          {!flashback &&
+            !frame &&
+            (familyScene || later || page.illustration) && (
+              <img
+                className="campaign-still"
+                alt={
+                  familyScene
+                    ? "복홀 성문 앞의 양녕과 새끼 스피노사우르스 포와 혜"
+                    : (later?.alt ?? page.title)
+                }
+                src={`/story/campaign/${familyScene ? "royal-family" : (later?.image ?? page.illustration)}.webp`}
+              />
+            )}
+          {page.key === "summit" && cursor === 1 && (
+            <section className="prince-greetings" aria-label="두 왕자의 인사">
+              <p>
+                <strong>포</strong> 복홀 어른들, 안녕하세요! 쥬신의 왕자 포예요!
+              </p>
+              <p>
+                <strong>혜</strong> 저도 왕자예요! 혜라고 불러 주세요!
+              </p>
+            </section>
+          )}
+          {page.clip &&
+            !familyScene &&
+            !frame &&
+            (!(
+              page.clip === "hope" ||
+              page.clip === "escape" ||
+              page.clip === "mechanical-late" ||
+              page.clip === "order"
+            ) ||
+              cursor >= 1) && (
+              <video
+                key={page.clip}
+                src={media + page.clip + ".mp4"}
+                muted
+                playsInline
+                autoPlay
+                controls
+                preload="metadata"
+                aria-label={page.title + " 무성 컷씬"}
+              />
+            )}
+          {!flashback && page.goal && (
+            <p className="campaign-goal">{page.goal}</p>
+          )}
+          {!flashback && (!frame || frame.words) && (
+            <div className="campaign-speech" aria-live="polite">
+              {frame ? null : face >= 0 ? (
+                <PatrolPortrait index={face} />
+              ) : name === "나르미" || name === "달이" ? (
+                <img
+                  alt=""
+                  src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.png`}
+                />
+              ) : null}
+              <div>
+                <strong>{frame ? "복홀의 기록" : name}</strong>
+                <p>{frame?.words ?? words}</p>
+              </div>
+            </div>
+          )}
+          {!flashback && (!frame || frame.words) && advisory}
+        </>
       )}
-      {!flashback && (!frame || frame.words) && advisory}
       <footer>
         {cursor > 0 && (
           <button type="button" onClick={() => setCursor(cursor - 1)}>
@@ -205,7 +296,18 @@ function SceneDialog({
               type="button"
               key={x.action}
               disabled={x.disabled}
-              onClick={() => act(x.action)}
+              onClick={() => {
+                if (stage) {
+                  setLevel(
+                    page.key === "opening"
+                      ? x.action === "hard"
+                        ? "hard"
+                        : "normal"
+                      : difficulty,
+                  );
+                  setPending(x.action);
+                } else act(x.action);
+              }}
             >
               {x.label}
             </button>
@@ -390,8 +492,13 @@ export function CampaignPanel({
     setDismissed(p.key);
     setPetition(false);
   };
-  function act(action: string) {
-    command({ type: "campaign", beat: c.beat, action });
+  function act(action: string, difficulty?: "normal" | "hard") {
+    command({
+      type: "campaign",
+      beat: c.beat,
+      action,
+      ...(difficulty ? { difficulty } : {}),
+    });
     setOpened(
       c.beat === "verdict" &&
         action === "next" &&
@@ -822,6 +929,7 @@ export function CampaignPanel({
         <SceneDialog
           key={scene.key}
           page={scene}
+          difficulty={c.difficulty ?? "normal"}
           close={close}
           act={act}
           advisory={advisory}

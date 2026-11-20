@@ -73,6 +73,7 @@ import {
   type CitizenEvent,
   createPlayState,
   type FoodId,
+  GAME_RULES,
   type PlayState,
   parsePlayState,
 } from "./play.js";
@@ -2699,13 +2700,23 @@ function fireOndol(s: TimberState): TimberState {
     s.heating ?? 0,
     Math.min(3, Math.ceil(-villageTemperature(s) / 8)),
   );
-  const fuel = Math.min(Math.max(0, wood), demand * homes.length);
+  const needed = demand * homes.length;
+  const coalHeat = GAME_RULES.fuel.coalToWood;
+  const coal =
+    s.campaign?.beat === "capital"
+      ? Math.min(
+          Math.floor(s.world.resources.RES_COAL / AMOUNT_SCALE),
+          Math.floor(needed / coalHeat),
+        )
+      : 0;
+  const firewood = Math.min(Math.max(0, wood), needed - coal * coalHeat);
+  const fuel = coal * coalHeat + firewood;
   const base = homes.length ? Math.floor(fuel / homes.length) : 0;
   const warmerHomes = homes
     .slice(0, fuel - base * homes.length)
     .map((h) => h.id);
   return {
-    ...(fuel ? payTown(s, { RES_WOOD: fuel }) : s),
+    ...(fuel ? payTown(s, { RES_WOOD: firewood, RES_COAL: coal }) : s),
     firedHeat: base + Number(warmerHomes.length > 0),
     warmerHomes,
   };
@@ -2924,6 +2935,8 @@ export function advanceTimber(
   const target = Math.min(144000000, s.elapsed + minutes);
   let count = 0;
   while (s.elapsed < target) {
+    const beforeUpdate = s.campaign?.beat;
+    const previousEnding = s.campaign?.ending;
     if (++count > 1500) fail("작업 정산 경계가 너무 많습니다.");
     if (s.phase === "waiting-labor") s = startDrying(s);
     if (s.phase === "crew-wait") s = replaceCrew(s);
@@ -2935,8 +2948,6 @@ export function advanceTimber(
     const nextTime = Math.min(target, s.due ?? target, s.elapsed + 1),
       elapsed = nextTime - s.elapsed;
     s = {
-    const beforeUpdate = s.campaign?.beat;
-    const previousEnding = s.campaign?.ending;
       ...s,
       elapsed: nextTime,
       world: advancePlayClock(s.world, elapsed),
@@ -3180,6 +3191,16 @@ export function commandTimber(
     }
     case "campaign":
       n = actCampaign(s, command);
+      if (
+        n.campaign &&
+        n.campaign.beat !== command.beat &&
+        (command.difficulty === "normal" || command.difficulty === "hard")
+      ) {
+        n = {
+          ...n,
+          campaign: { ...n.campaign, difficulty: command.difficulty },
+        };
+      }
       break;
     case "plan-building":
       n = planBuilding(s, command.kind, {

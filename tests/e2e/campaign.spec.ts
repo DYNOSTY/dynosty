@@ -18,6 +18,17 @@ async function readScene(page: Page, label: string) {
   const next = dialog.getByRole("button", { name: /^다음 대사/ });
   while (await next.count()) await next.click();
   await dialog.getByRole("button", { name: label, exact: true }).click();
+  const start = page
+    .getByRole("dialog", { name: "미션 시작 준비" })
+    .getByRole("button", { name: "시작하기" });
+  if (await start.isVisible()) {
+    await expect(
+      dialog.getByRole("button", { name: "돌아가기" }),
+    ).toBeVisible();
+    await dialog.getByRole("button", { name: "난이도 설정" }).click();
+    await expect(dialog.getByRole("combobox")).toBeVisible();
+    await start.click();
+  }
 }
 test("출문을 눈으로 확인하고 장면을 접었다 돌아와도 재고가 중복 차감되지 않는다", async ({
   page,
@@ -86,6 +97,10 @@ test("함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단
   await expect(
     page.getByRole("dialog").locator("video.campaign-still"),
   ).toHaveAttribute("src", "/story/campaign/ending-1.mp4#t=0,7.5");
+  await expect(page.locator(".result-screen .result-quote p")).toBeVisible();
+  await expect(
+    page.locator(".result-screen .result-quote footer"),
+  ).toContainText("『");
   await page.getByRole("button", { name: "지금 단계에 머물기" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: /1단계 · 복홀의 첫 명령/ }).click();
@@ -124,9 +139,15 @@ test("밤에 달이가 배급령 변경을 재촉하고 주민 청을 거절하�
   await expect(warning).toContainText("오늘 밤 배급령부터 바꾸자");
   await page.getByRole("button", { name: "주민의 청 듣기" }).click();
   await readScene(page, "오늘은 창고의 비축 유지");
+  await expect(page.locator(".fallen-caption .result-quote footer")).toHaveText(
+    "고리",
+  );
   await expect(page.getByRole("dialog")).toHaveAccessibleName(
     "아무도 깨우지 않는 아침",
   );
+  await expect(
+    page.getByRole("dialog").locator('img[src$="gori-exile.webp"]'),
+  ).toBeVisible();
   await expect(warning).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole("dialog")).toHaveAccessibleName(
@@ -237,7 +258,7 @@ test("좁은 화면의 5단계 컷씬과 성안 변종 없는 반란을 이어 �
   await expect(dialog).toContainText("그날은 나도 아버지처럼 홀로 남겠다.");
   const rect = await dialog.boundingBox();
   expect(rect?.width).toBeLessThanOrEqual(390);
-  await readScene(page, "양녕 · 지휘권을 합치고 징발 허용");
+  await readScene(page, "양녕 · 식단마다 하루 배급의 상한을 정한다");
   for (let day = 0; day < 5; day++) {
     if (day === 4)
       await page.evaluate(() => {
@@ -777,7 +798,10 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   await page.getByRole("button", { name: "메인 메뉴", exact: true }).click();
   await dialog.getByRole("button", { name: "돌아보기" }).click();
   await dialog.getByRole("button", { name: "서막" }).click();
-  await expect(dialog.locator("video")).toHaveAttribute("src", "/story/campaign/opening.mp4");
+  await expect(dialog.locator("video")).toHaveAttribute(
+    "src",
+    "/story/campaign/opening.mp4",
+  );
   await dialog.getByRole("button", { name: "뒤로" }).click();
   await dialog.getByRole("button", { name: "이어하기" }).click();
   await dialog.getByRole("button", { name: "저장하기", exact: true }).click();
