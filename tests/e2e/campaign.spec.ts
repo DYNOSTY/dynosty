@@ -582,3 +582,38 @@ test("남문에서 손자들을 본 왕이 세 번째 행렬을 보내고 성안
       .join(" · "),
   );
 });
+
+for (const [label, raided, rally, verdict] of [
+  ["습격", true, "성문에 붉은 눈이 들이닥쳤소", "성문에 붉은 눈이 붙은 걸"],
+  ["조용한 밤", false, "창고에서 나와 약조한 이들", "문을 열기로 했잖소"],
+] as const) {
+  test("닷새째 목진의 외침과 판결 · " + label, async ({ page }) => {
+    const base = createVillageGame();
+    const save = createTimberSave({
+      ...base,
+      chapter: 5,
+      paused: true,
+      campaign: {
+        ...base.campaign!,
+        beat: "rally",
+        side: "control",
+        uprising: true,
+        coupGateRaided: raided,
+      },
+    });
+    await page.addInitScript((value) => {
+      if (!localStorage.getItem("dynosty.village.resume"))
+        localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
+    }, save);
+    await page.goto("/");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toHaveAccessibleName("혹한 닷새 전 · 배반자의 외침");
+    await expect(dialog).toContainText(rally);
+    await readScene(page, "풀 12를 풀고 대표들과 함께 식사");
+    await expect(dialog).toHaveAccessibleName("성문 빗장이 들리던 밤");
+    await expect(dialog).toContainText(verdict);
+    await page.reload();
+    await expect(dialog).toHaveAccessibleName("성문 빗장이 들리던 밤");
+    await expect(dialog).toContainText(verdict);
+  });
+}
