@@ -3579,65 +3579,22 @@ body,
   }
 }
 
-/* ═══ 시안(?proc=a|b): 조달도 게임 화면처럼 — 3D 풀스크린 · 오른쪽 옻칠 판 · 왼쪽 한지 안내 ═══ */
+/* 일손 현장: 조작 판과 3D 장면을 별도 열에 둬 현장 클릭을 가리지 않는다. */
 @media (min-width: 761px) {
   .is-procurement.is-labor .g-backdrop {
     display: none;
   }
   .is-procurement.is-labor .play-workspace.has-tools {
-    position: static;
-    display: block;
-    inset: auto;
-  }
-  .is-procurement.is-labor .play-scene {
-    position: fixed;
-    inset: 0;
-    height: auto;
-    overflow: visible;
-    background: none;
-    border-radius: 0;
-  }
-  .is-procurement.is-labor .scene-viewport {
-    position: absolute;
-    inset: 0;
-    height: 100%;
-  }
-  .is-procurement.is-labor .scene-heading,
-  .is-procurement.is-labor .scene-footer,
-  .is-procurement.is-labor .play-scene > .selection-actions {
-    display: none;
-  }
-  /* 오른쪽: 조달·일손 판 (위 막대와 콘솔 사이) */
-  .is-procurement.is-labor .workspace-tools.timber-tools {
-    position: fixed;
-    z-index: 6;
-    top: 80px;
-    right: 16px;
-    bottom: 206px;
-    left: auto;
-    width: 440px;
-    max-height: none;
-    transform: none;
-    padding: 0;
-    overflow-y: auto;
-    scrollbar-width: none;
+    grid-template-columns: minmax(0, 1fr) min(58%, 720px);
   }
   .is-procurement.is-labor .timber-tools .timber-demo {
     column-count: 1;
   }
-  /* 왼쪽: 지금 할 일 · 품질 흐름 · 진행 — 한지 띠 */
+  /* 지금 할 일 · 품질 흐름 · 진행 — 한지 띠 */
   .is-procurement.is-labor .site-column {
-    position: fixed;
-    z-index: 5;
-    top: 80px;
-    left: 16px;
-    bottom: 206px;
-    width: 380px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    overflow-y: auto;
-    scrollbar-width: none;
   }
   .is-procurement.is-labor .site-column > * {
     margin: 0;
@@ -3674,12 +3631,12 @@ body,
 
 /* ═══ 조달(목재 고르기): 섬 위에 가운데 창 하나 · 잘림 없이 · 두 단 (2026-11-18 "가운데 띄우라고 했는데") ═══ */
 @media (min-width: 761px) {
-  .is-procurement .play-workspace.has-tools {
+  .is-procurement.is-timber .play-workspace.has-tools {
     position: static;
     display: block;
     inset: auto;
   }
-  .is-procurement .play-scene {
+  .is-procurement.is-timber .play-scene {
     position: fixed;
     inset: 0;
     height: auto;
@@ -3687,14 +3644,14 @@ body,
     background: none;
     border-radius: 0;
   }
-  .is-procurement .scene-viewport {
+  .is-procurement.is-timber .scene-viewport {
     position: absolute;
     inset: 0;
     height: 100%;
   }
-  .is-procurement .scene-heading,
-  .is-procurement .scene-footer,
-  .is-procurement .play-scene > .selection-actions {
+  .is-procurement.is-timber .scene-heading,
+  .is-procurement.is-timber .scene-footer,
+  .is-procurement.is-timber .play-scene > .selection-actions {
     display: none;
   }
   .is-procurement.is-timber .workspace-tools.timber-tools {
@@ -3855,19 +3812,10 @@ body,
   display: none;
 }
 
-/* ═══ 일손 배치: 섬 광장을 보며 · 오른쪽 판은 탭으로 한 덩어리씩 · 왼쪽은 '지금 할 일' 띠 하나 (잘림 없음) ═══ */
+/* ═══ 일손 배치: 오른쪽 판은 탭으로 한 덩어리씩 ═══ */
 @media (min-width: 761px) {
   .is-procurement.is-labor .workspace-tools.timber-tools {
-    position: fixed;
     z-index: 6;
-    top: 80px;
-    right: 16px;
-    bottom: 206px;
-    left: auto;
-    transform: none;
-    width: 720px;
-    max-height: none;
-    overflow: hidden;
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -3959,19 +3907,7 @@ body,
     display: block;
     margin: 0 0 12px;
   }
-  /* 왼쪽: 지금 할 일 한 띠 · '현장' 탭이면 판 자리에 현장 진행을 띄움 */
-  .is-procurement.is-labor .site-column {
-    position: fixed;
-    z-index: 5;
-    top: 80px;
-    left: 16px;
-    bottom: auto;
-    width: 360px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
+  /* 지금 할 일 한 띠 · '현장' 탭이면 현장 진행을 띄움 */
   .is-labor .site-column > .quality-flow,
   .is-labor .site-column > .site-progress {
     display: none;
@@ -3983,20 +3919,9 @@ body,
     display: none;
   }
   .is-procurement.is-labor.labor-tab-site .site-column {
-    top: 80px;
-    left: auto;
-    right: 52px;
-    width: 648px;
-    bottom: 242px;
-    z-index: 7;
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-content: start;
-    padding-top: 108px;
-    pointer-events: none;
-  }
-  .is-labor.labor-tab-site .site-column > * {
-    pointer-events: auto;
   }
   .is-labor.labor-tab-site .site-column > .site-guide {
     display: none;
@@ -4220,14 +4145,7 @@ body,
   .is-labor .workspace-tools > .site-column {
     order: 2;
   }
-  .is-procurement.is-labor.labor-tab-site .site-column {
-    position: static;
-    inset: auto;
-    width: auto;
-    padding: 0;
-    pointer-events: auto;
-    overflow: hidden;
-  }
+
   .is-labor.labor-tab-site .site-column > * {
     box-shadow: none;
   }

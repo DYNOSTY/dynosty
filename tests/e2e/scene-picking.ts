@@ -150,23 +150,56 @@ export async function clickUnoccupiedGround(page: Page) {
 
 export async function clickFloor(page: Page) {
   const canvas = page.locator("canvas");
-  await canvas.evaluate((el) =>
-    el.scrollIntoView({
-      block: "center",
-      inline: "nearest",
-      behavior: "instant",
-    }),
-  );
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error("장면 캔버스가 없습니다.");
-  const x = box.x + box.width / 2;
-  let bottom = box.y + box.height;
-  for (const selector of [".g-console", ".g-console__cmd"]) {
-    const bar = await page.locator(selector).boundingBox();
-    if (bar && x >= bar.x && x <= bar.x + bar.width && bar.y > box.y)
-      bottom = Math.min(bottom, bar.y);
+  const floorPoint = () =>
+    canvas.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      const x = Math.round(rect.left + rect.width / 2);
+      let bottom = rect.bottom;
+      for (const selector of [".g-console", ".g-console__cmd"]) {
+        const bar = document.querySelector(selector)?.getBoundingClientRect();
+        if (bar && x >= bar.left && x <= bar.right && bar.top > rect.top)
+          bottom = Math.min(bottom, bar.top);
+      }
+      const y = Math.round(rect.top + (bottom - rect.top) * 0.85);
+      return document.elementFromPoint(x, y) === el ? { x, y } : null;
+    });
+  let point = await floorPoint();
+  if (!point) {
+    await canvas.evaluate((el) =>
+      el.scrollIntoView({
+        block: "center",
+        inline: "nearest",
+        behavior: "instant",
+      }),
+    );
+    point = await floorPoint();
   }
-  await page.mouse.click(x, box.y + (bottom - box.y) * 0.85);
+  if (!point) throw new Error("바닥 클릭 좌표가 캔버스에 닿지 않습니다.");
+  await page.mouse.click(point.x, point.y);
+}
+
+export function cyanEdgePixels(before: Buffer, after: Buffer) {
+  const a = PNG.sync.read(before);
+  const b = PNG.sync.read(after);
+  if (a.width !== b.width || a.height !== b.height)
+    throw new Error("윤곽선 비교 영역의 크기가 바뀌었습니다.");
+
+  const pixels: number[] = [];
+  for (let i = 0; i < b.data.length; i += 4) {
+    const r = b.data[i] ?? 0;
+    const g = b.data[i + 1] ?? 0;
+    const blue = b.data[i + 2] ?? 0;
+    // 안티앨리어싱된 선은 순수한 청록색이 아니다. PNG 내 같은 위치의
+    // 기준색보다 녹색과 파란색이 밝아진 부분만 셈해 기존 표지는 제외한다.
+    if (
+      g - r >= 15 &&
+      blue - r >= 15 &&
+      g - (a.data[i + 1] ?? 0) >= 20 &&
+      blue - (a.data[i + 2] ?? 0) >= 20
+    )
+      pixels.push(i);
+  }
+  return pixels;
 }
 
 export function outlinePixels(buffer: Buffer) {
