@@ -85,11 +85,31 @@ function SceneDialog({
           접기
         </button>
       </header>
-      {(frame || page.illustration) && (
+      {frame && (
+        <video
+          key={frame.image}
+          className="campaign-still"
+          aria-label={page.title + " 엔딩 영상"}
+          src={
+            media +
+            "ending-" +
+            frame.image.charAt(4) +
+            ".mp4#t=" +
+            frameIndex * 7.5 +
+            "," +
+            (frameIndex + 1) * 7.5
+          }
+          poster={media + frame.image + ".webp"}
+          playsInline
+          muted
+          autoPlay
+        />
+      )}
+      {!frame && page.illustration && (
         <img
           className="campaign-still"
           alt={page.title}
-          src={`/story/campaign/${frame?.image ?? page.illustration}.webp`}
+          src={`/story/campaign/${page.illustration}.webp`}
         />
       )}
       {page.clip &&
