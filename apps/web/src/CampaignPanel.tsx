@@ -2,7 +2,12 @@ import {
   CHAPTERS,
   campaignOf,
   canPay,
+  capitalMealsReady,
   foodWarnings,
+  mutantNames,
+  mutantRepairCost,
+  mutantStructure,
+  policyWait,
   type TimberCommand,
   type TimberState,
   villageDefenseActive,
@@ -177,7 +182,7 @@ export function CampaignPanel({
   const canPetition =
     ["patrol", "roads", "capital", "arrival", "winter", "vigil"].includes(
       c.beat,
-    ) && c.petitionDay !== s.world.day;
+    ) && policyWait(s) === 0;
   const petitionOpen = petition && canPetition;
   const open =
     petitionOpen || opened === p.key || (p.auto && dismissed !== p.key);
@@ -187,25 +192,39 @@ export function CampaignPanel({
     music: "10",
     goal: "오늘 저녁 배식",
     auto: false,
-    lines: [
-      [
-        "덕순이",
-        "고리님, 부상자 넷이 식당 줄에 설 수가 없어요. 오늘 잡은 물고기 넷만 따로 빼 주시면 살을 발라다 먹일 수 있어요.",
-      ],
-      [
-        "길룡",
-        "제 고깃국도 한 그릇 맡아 주세요. 일어나서 못 받는다고 제 몫이 사라지는 건 아니지요?",
-      ],
-      [
-        "나르미",
-        "생선 넷을 풀면 오늘 저녁은 제가 가져다드릴게요. 비축을 지키신다면 그 사정도 제가 가서 전할게요.",
-      ],
-    ],
+    lines:
+      c.beat === "capital"
+        ? [
+            [
+              "의원",
+              "전하, 남문 병상에 누운 넷이 배식을 받으러 나올 수 없습니다. 생선 넷을 따로 내주시면 제가 살을 발라 먹이겠습니다.",
+            ],
+            ["왕", "병상 넷이라 했느냐. 곳간에 남은 몫도 함께 적어 올리라."],
+          ]
+        : [
+            [
+              "덕순이",
+              "고리님, 부상자 넷이 식당 줄에 설 수가 없어요. 오늘 잡은 물고기 넷만 따로 빼 주시면 살을 발라다 먹일 수 있어요.",
+            ],
+            [
+              "길룡",
+              "제 고깃국도 한 그릇 맡아 주세요. 일어나서 못 받는다고 제 몫이 사라지는 건 아니지요?",
+            ],
+            [
+              "나르미",
+              "생선 넷을 풀면 오늘 저녁은 제가 가져다드릴게요. 비축을 지키신다면 그 사정도 제가 가서 전할게요.",
+            ],
+          ],
     choices: [
       {
         action: "share",
-        label: "어류 4를 내어 병상까지 배달",
-        disabled: !canPay(s, "RES_FISH", 4),
+        label:
+          c.beat === "capital"
+            ? "병상 배식 · 어류 4 (개량 연구·2단계 병원·식당 필요)"
+            : "어류 4를 내어 병상까지 배달",
+        disabled:
+          !canPay(s, "RES_FISH", 4) ||
+          (c.beat === "capital" && !capitalMealsReady(s)),
       },
       { action: "reserve", label: "오늘은 창고의 비축 유지" },
     ],
@@ -330,7 +349,8 @@ export function CampaignPanel({
               ))}
               <strong>온돌 · 현재 화력 {s.firedHeat ?? 0}단계</strong>
               <p>
-                단계마다 한 시간에 목재 1을 때서 거처를 8 °C 덥힙니다. 땔감이
+                추워지면 집집마다 불을 더 땝니다. 거주 중인 집 한 채가 화력 한
+                단계마다 한 시간에 목재 1을 써서 8 °C를 덥힙니다. 땔감이
                 모자라면 남은 만큼만 땝니다.
               </p>
               {[0, 1, 2, 3].map((level) => (
@@ -340,11 +360,100 @@ export function CampaignPanel({
                   aria-pressed={(s.heating ?? 0) === level}
                   onClick={() => command({ type: "set-heating", level })}
                 >
-                  {level ? level + "단계" : "불 끄기"}
+                  {level ? "최소 " + level + "단계" : "자동"}
                 </button>
               ))}
             </section>
           )}
+          {s.sighting && (
+            <section className="office-panel" aria-label="변종 목격 기록">
+              <img
+                src={"/art/mutant-" + s.sighting.species + ".webp"}
+                alt={"붉어진 눈의 " + mutantNames[s.sighting.species]}
+              />
+              <strong>
+                {s.sighting.source === "gate"
+                  ? "성문 야경 보고"
+                  : "정찰대 목격 보고"}{" "}
+                · {mutantNames[s.sighting.species]}
+              </strong>
+              <p>
+                {s.sighting.source === "gate"
+                  ? "문지기: 저놈, 지난겨울엔 내 손에서 여물을 받아먹었습니다. 오늘 밤엔 제 이름을 불러도 문짝만 들이받더군요."
+                  : "정찰대원: 처음엔 횃불인 줄 알았습니다. 불 두 점이 같이 깜박이더니 눈밭을 가로질러 우리한테 달려들었습니다."}
+              </p>
+            </section>
+          )}
+          {s.mutants?.map((m) => {
+            const species = s.world.citizens.find(
+              (r) => r.id === m.id,
+            )!.species;
+            return (
+              <section
+                key={m.id}
+                className="office-panel"
+                aria-label="마을 안 변종"
+              >
+                <img
+                  src={"/art/mutant-" + species + ".webp"}
+                  alt={"눈이 붉어진 " + mutantNames[species]}
+                />
+                <strong>마을 안 변종 · {mutantNames[species]}</strong>
+                <p>
+                  달이: 붕대를 갈아 주던 손을 뿌리쳤어. 저 힘으로 기둥을 밀면
+                  지붕이 내려앉아. 새끼들은 이쪽으로 데려올게!
+                </p>
+                {s.campaign?.beat === "capital" ? (
+                  <p>도성 치안대가 출동했습니다.</p>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={
+                      !s.residents.some(
+                        (r) =>
+                          r.workplaceId === "office" && r.health === "healthy",
+                      )
+                    }
+                    onClick={() =>
+                      command({ type: "contain-mutant", resident: m.id })
+                    }
+                  >
+                    치안대 출동
+                  </button>
+                )}
+              </section>
+            );
+          })}
+          {Object.entries(s.mutantDamage ?? {}).map(([id, damage]) => {
+            const target =
+              s.homes.find((h) => h.id === id) ??
+              s.town.facilities.find((f) => f.id === id);
+            if (!target) return null;
+            const cost = mutantRepairCost(s, id);
+            return (
+              <section className="office-panel" key={id}>
+                <strong>
+                  {mutantStructure(s, id)?.name} · 내구도 {100 - damage}/100
+                </strong>
+                <small>
+                  위치 {Math.round(target.position.x)},{" "}
+                  {Math.round(target.position.z)}
+                </small>
+                <button
+                  type="button"
+                  disabled={
+                    !canPay(s, "RES_WOOD", cost.RES_WOOD) ||
+                    !canPay(s, "RES_STONE", cost.RES_STONE)
+                  }
+                  onClick={() =>
+                    command({ type: "repair-mutant", building: id })
+                  }
+                >
+                  수리 · 목재 {cost.RES_WOOD}, 석재 {cost.RES_STONE}
+                </button>
+              </section>
+            );
+          })}
           {s.raid && (
             <section className="office-panel" aria-label="성문 전투 보고">
               <img
@@ -353,7 +462,7 @@ export function CampaignPanel({
               />
               <strong>성문 전투 보고</strong>
               <p>
-                습격대가 물러났습니다.{" "}
+                붉은 눈의 변종들이 성문에서 물러났습니다.{" "}
                 {s.raid.dead || s.raid.injured
                   ? `사망 ${s.raid.dead}명 · 부상 ${s.raid.injured}명`
                   : "모두 무사합니다."}
@@ -410,6 +519,12 @@ export function CampaignPanel({
           <small>“{s.decree.reaction}”</small>
         </aside>
       )}
+      {policyWait(s) > 0 && (
+        <small>
+          다음 정책 발효까지 {Math.floor(policyWait(s) / 60)}시간{" "}
+          {policyWait(s) % 60}분
+        </small>
+      )}
       {canPetition && (
         <button
           type="button"
@@ -425,9 +540,14 @@ export function CampaignPanel({
         <button
           type="button"
           className="scout-all"
-          onClick={() => command({ type: "advance", minutes: 1440 })}
+          onClick={() =>
+            command({
+              type: "advance",
+              minutes: c.beat === "capital" ? 720 : 1440,
+            })
+          }
         >
-          마을 하루 진행
+          {c.beat === "capital" ? "도성 반나절 경영" : "마을 하루 진행"}
         </button>
       )}
       {open ? (

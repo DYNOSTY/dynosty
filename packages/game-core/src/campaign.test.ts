@@ -13,6 +13,7 @@ import { RESEARCH_CATALOG } from "./development.js";
 import { AMOUNT_SCALE } from "./play.js";
 import { SCOUT_SITES } from "./scout-sites.js";
 import {
+  capitalRoad,
   commandTimber,
   createTimberSave,
   createTimberState,
@@ -240,7 +241,23 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
     s = restore(later(s, v.hours * 60));
   }
   s = act(s, "next");
-  s = act(s, "ward");
+  expect(s.residents).toHaveLength(1000);
+  expect(s.residents.every((r) => r.homeId)).toBe(true);
+  expect(s.town.facilities.length).toBeGreaterThan(10);
+  expect(s.town.development.completed).toContain("UPGRADE_HOSPITAL_2");
+  const city = restore(s);
+  const hospital = city.town.facilities.find(
+    (f) => f.kind === "hospital" && f.level === 2,
+  )!;
+  expect(() =>
+    act({ ...city, mutantDamage: { [hospital.id]: 100 } }, "share"),
+  ).toThrow("병원");
+  const decree = act(city, "share");
+  expect(() => act(later(decree, 719), "reserve")).toThrow();
+  expect(act(later(decree, 720), "reserve").campaign?.lastPolicyAt).toBe(
+    decree.elapsed + 720,
+  );
+  s = act(s, "report");
   expect(() => act(s, "next")).toThrow();
   s = act(later(s, 1440), "next");
   s = act(s, "next");
@@ -455,7 +472,14 @@ it("온돌 연료를 매시간 결제하고 성문 전투 결과와 삽화를 �
   const wood = s.world.resources.RES_WOOD;
   s = commandTimber(s, { type: "advance", minutes: 60 }, "hour");
   expect(s.firedHeat).toBe(3);
-  expect(s.world.resources.RES_WOOD).toBe(wood - 3 * AMOUNT_SCALE);
+  expect(s.world.resources.RES_WOOD).toBe(
+    wood -
+      new Set(s.residents.map((r) => r.homeId).filter(Boolean)).size *
+        3 *
+        AMOUNT_SCALE,
+  );
+  expect(gateRaid(s, () => 0)).toBe(s);
+  s = { ...s, world: { ...s.world, minute: 1260 } };
   const safe = restore(
     gateRaid(s, vi.fn().mockReturnValueOnce(0).mockReturnValue(0.99)),
   );
@@ -505,4 +529,29 @@ it("영상, 충분한 난방, 연료 부족과 장기 굶주림을 구별한다"
   );
   expect(heated.firedHeat).toBe(1);
   expect(heated.world.resources.RES_WOOD).toBe(0);
+});
+
+it("도성 한파가 길을 막고 집마다 불을 올리며 환자를 낸다", () => {
+  const base = createVillageGame(false, true);
+  const city: TimberState = {
+    ...base,
+    campaign: { ...campaignOf(base), beat: "capital", since: 0 },
+    chapter: 3,
+  };
+  expect(capitalRoad(city)).toBe("open");
+  const late = later(city, 1439);
+  expect(capitalRoad(late)).toBe("closed");
+  expect(() => commandTimber(late, { type: "contract" }, "closed")).toThrow(
+    "고갯길",
+  );
+  const end = commandTimber(
+    late,
+    { type: "advance", minutes: 1 },
+    "winter-hour",
+  );
+  expect(end.firedHeat).toBe(3);
+  expect(end.world.resources.RES_WOOD).toBeLessThan(
+    late.world.resources.RES_WOOD,
+  );
+  expect(end.world.citizenEvents).toContain("capital-cold-1440");
 });

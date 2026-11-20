@@ -21,6 +21,7 @@ import {
   loggingStaff,
   type PlayState,
   type ProductionSiteId,
+  policyWait,
   productionSiteDefinition,
   productionSites,
   RESIDENT_REQUEST_TEXT,
@@ -568,6 +569,7 @@ export function TimberDemo({
               배급 방식{" "}
               <select
                 aria-label="배급 방식"
+                disabled={!!state.campaign && policyWait(state) > 0}
                 value={state.rationPolicy}
                 onChange={(e) =>
                   command({
