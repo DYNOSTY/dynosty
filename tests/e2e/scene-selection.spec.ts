@@ -105,7 +105,7 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
   page,
 }) => {
   await ready(page);
-  await clickVisibleResident(page);
+  await press(page, "주민 예제 선택");
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
   await expect(info).toContainText("대기 표시");
   await press(page, "개발 도구");
@@ -133,34 +133,6 @@ test.describe("좁은 터치 화면", () => {
   }) => {
     await ready(page);
     const point = await examplePoint(page, "building");
-    const pickProbe = await page.locator("canvas").evaluate((canvas, p) => {
-      const scene = (
-        window as unknown as {
-          __scene: {
-            multiPick(
-              x: number,
-              y: number,
-            ): Array<{
-              distance: number;
-              pickedMesh: { name: string; parent: unknown } | null;
-            }> | null;
-          };
-        }
-      ).__scene;
-      const rect = canvas.getBoundingClientRect();
-      return {
-        at: p,
-        domTarget: document.elementFromPoint(p.x, p.y)?.tagName,
-        hits: scene.multiPick(p.x - rect.left, p.y - rect.top)?.map((hit) => {
-          const path: string[] = [];
-          type NamedNode = { name: string; parent: NamedNode | null };
-          for (let n = hit.pickedMesh as NamedNode | null; n; n = n.parent)
-            path.push(n.name);
-          return { path, distance: hit.distance };
-        }),
-      };
-    }, point);
-    console.log("touch-pick-probe", JSON.stringify(pickProbe));
     await page.touchscreen.tap(point.x, point.y);
     const info = page.getByRole("region", { name: "선택 정보", exact: true });
     await expect(info).toContainText("건물 예제");
