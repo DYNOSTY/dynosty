@@ -208,12 +208,12 @@ test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 
   await readScene(page, "양녕 · 지휘권을 합치고 징발 허용");
   for (let day = 0; day < 5; day++) {
     await page.getByRole("button", { name: "마을 하루 진행" }).click();
-    if (day === 1)
+    if (day === 1 || day === 2)
       await expect(
-        page.getByText(/푸른 보자기 맨 아주머니를 봤어요/),
-      ).toBeVisible();
-    if (day === 2)
-      await expect(page.getByText(/문틈으로 불빛이 새더라/)).toBeVisible();
+        page.getByText(
+          /푸른 보자기 맨 아주머니를 봤어요|빈 창고 쪽으로 혼자|문틈으로 불빛이 새더라/,
+        ),
+      ).toHaveCount(0);
     if (day === 3)
       await expect(page.getByText(/관측패를 모두 맞춰/)).toBeVisible();
   }

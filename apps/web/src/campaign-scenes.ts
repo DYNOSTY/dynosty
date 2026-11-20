@@ -81,15 +81,20 @@ export function gatheringRumor(s: TimberState): Line | undefined {
       "영실",
       "관측패를 모두 맞춰 보았습니다. 닷새 뒤 혹한이 복홀에 닿습니다.",
     ];
+  const { optimism, pessimism } = s.world;
+  const capped = s.rationPolicy === "cap";
+  if (pessimism > optimism || (capped && pessimism === optimism)) return;
   if (until <= 2340)
     return [
       "달이",
-      "나르미가 말한 그 창고 있지. 밤에 지나는데 문틈으로 불빛이 새더라. 안에서 내 발소리를 들었나 봐. 내가 문 앞을 지나자마자 불빛이 쏙 가려졌어.",
+      "그 빈 창고 있지. 밤에 지나는데 문틈으로 불빛이 새더라. 안에서 내 발소리를 들었나 봐. 내가 문 앞을 지나자마자 불빛이 쏙 가려졌어.",
     ];
   if (until <= 3780)
     return [
       "나르미",
-      "해 질 무렵에 푸른 보자기 맨 아주머니를 봤어요. 빈 창고 앞에서 뒤를 돌아보시더니, 뒤따라오던 이들한테 문을 잡아 주셨어요.",
+      capped
+        ? "배급을 마치는데 아주머니가 제 소매를 잡으셨어요. 오늘 저녁엔 빈 창고 쪽으로 혼자 다니지 말래요. 이유는 안 알려 주셨어요."
+        : "해 질 무렵에 푸른 보자기 맨 아주머니를 봤어요. 빈 창고 앞에서 뒤를 돌아보시더니, 뒤따라오던 이들한테 문을 잡아 주셨어요.",
     ];
 }
 export function moraleAdvice(s: TimberState): Line | undefined {
@@ -804,11 +809,24 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     case "forecast":
       page.auto = false;
-      page.title = "북녘에서 온 예보";
-      page.goal = `혹한까지 ${Math.max(0, 10 - days)}일`;
+      page.title =
+        minutesUntilCoup(s) <= 900
+          ? "영실이 가져온 혹한 예보"
+          : "복홀의 저녁 배식";
+      page.goal =
+        minutesUntilCoup(s) <= 900
+          ? "혹한 예보 · 닷새 뒤 도달"
+          : "복홀의 배급과 성문을 살핀다";
+      if (minutesUntilCoup(s) <= 900)
+        line(
+          "영실",
+          "북쪽 세 관측소에서 보낸 패가 모두 왔습니다. 닷새 뒤엔 복홀 나루가 바닥까지 얼겠습니다. 이번엔 물살 센 여울도 버티지 못합니다.",
+        );
       line(
-        "영실",
-        "북쪽 관측소 셋에서 같은 기별이 왔습니다. 열흘이면 얼음이 강바닥까지 닿겠습니다.",
+        "덕순이",
+        c.side === "control"
+          ? "포가 제 몫을 반이나 남겼어요. 혜가 더 달랄까 봐요. 둘 다 같은 만큼 받는다고, 제 것도 식기 전에 먹으라고 했지요."
+          : "포는 생선을 잘게 발라 주니 먹네요. 혜는 벌써 제 그릇을 비우고 포 것까지 발라 주겠다고 나섰어요.",
       );
       break;
     case "rally":

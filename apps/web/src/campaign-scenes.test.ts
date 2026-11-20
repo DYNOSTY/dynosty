@@ -6,6 +6,7 @@ import {
 import { expect, it } from "vitest";
 import {
   campaignPage,
+  gatheringRumor,
   moraleAdvice,
   villageAdvice,
 } from "./campaign-scenes.js";
@@ -106,4 +107,30 @@ it("충녕이 깨어난 소식은 확인 전까지 열리고 이후에는 마을
   expect(campaignPage(seen).auto).toBe(false);
   expect(campaignPage(seen).key).toBe("vigil");
   expect(() => actCampaign(seen, command)).toThrow();
+});
+
+it("배급 정책과 민심에 따라 창고 이야기를 달리 전하고 혹한 예보는 모두에게 전한다", () => {
+  const base = createVillageGame();
+  const rumor = (
+    day: number,
+    rationPolicy: "cap" | "needs",
+    optimism: number,
+    pessimism: number,
+  ) =>
+    gatheringRumor({
+      ...base,
+      elapsed: day * 1440,
+      rationPolicy,
+      campaign: { ...base.campaign!, beat: "forecast", since: 0 },
+      world: { ...base.world, minute: 360, optimism, pessimism },
+    });
+  expect(rumor(2, "needs", 50, 50)?.[1]).toContain("푸른 보자기");
+  expect(rumor(2, "cap", 50, 50)).toBeUndefined();
+  expect(rumor(2, "cap", 60, 40)?.[1]).toContain("혼자 다니지 말래요");
+  expect(rumor(3, "needs", 60, 40)?.[1]).toContain("내 발소리");
+  for (const policy of ["cap", "needs"] as const) {
+    expect(rumor(2, policy, 40, 60)).toBeUndefined();
+    expect(rumor(3, policy, 40, 60)).toBeUndefined();
+    expect(rumor(4, policy, 40, 60)?.[0]).toBe("영실");
+  }
 });
