@@ -21,24 +21,33 @@ export async function worldPoint(
 ) {
   const canvas = page.locator("canvas");
   if (scroll) await canvas.scrollIntoViewIfNeeded();
-  await canvas.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error("장면 캔버스가 없습니다.");
-  // 실제 카메라 행렬을 읽기만 한다. 선택/게임 상태를 주입하지 않는다.
-  // 마을 전체 시점과 현장 확대 시점 모두 같은 포인터 경로를 검증한다.
-  return canvas.evaluate(
-    (el, world) => {
-      const scene = (
-        window as unknown as {
-          __scene: { getTransformMatrix(): { m: number[] } };
-        }
-      ).__scene;
-      const m = scene.getTransformMatrix().m;
+  // 소프트웨어 렌더러에서는 브라우저의 rAF가 돌아도 장면은 이전
+  // 프레임일 수 있다. 실제 picking ray와 같은 카메라로 그려진 뒤 투영한다.
+  const projected = await page.waitForFunction(
+    (world) => {
+      type Matrix = {
+        m: ArrayLike<number>;
+        equals(other: Matrix): boolean;
+        multiply(other: Matrix): Matrix;
+      };
+      const { __scene: scene } = window as unknown as {
+        __scene?: {
+          getTransformMatrix(): Matrix;
+          activeCamera: {
+            getViewMatrix(): Matrix;
+            getProjectionMatrix(): Matrix;
+          } | null;
+        };
+      };
+      const el = document.querySelector("canvas");
+      const camera = scene?.activeCamera;
+      if (!el || !scene || !camera) return null;
+      const rendered = scene.getTransformMatrix();
+      const current = camera
+        .getViewMatrix()
+        .multiply(camera.getProjectionMatrix());
+      if (!rendered.equals(current)) return null;
+      const m = rendered.m;
       const [x, y, z] = world;
       const w =
         x * (m[3] ?? 0) + y * (m[7] ?? 0) + z * (m[11] ?? 0) + (m[15] ?? 0);
@@ -49,13 +58,19 @@ export async function worldPoint(
         (x * (m[1] ?? 0) + y * (m[5] ?? 0) + z * (m[9] ?? 0) + (m[13] ?? 0)) /
         w;
       const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return null;
       return {
         x: r.x + ((px + 1) / 2) * r.width,
         y: r.y + ((1 - py) / 2) * r.height,
       };
     },
     [...point],
+    { polling: 100, timeout: 30_000 },
   );
+  const cssPoint = await projected.jsonValue();
+  await projected.dispose();
+  if (!cssPoint) throw new Error("장면 캔버스 투영 좌표가 없습니다.");
+  return cssPoint;
 }
 
 export async function clickExample(
@@ -176,6 +191,42 @@ export async function clickFloor(page: Page) {
   }
   if (!point) throw new Error("바닥 클릭 좌표가 캔버스에 닿지 않습니다.");
   await page.mouse.click(point.x, point.y);
+}
+
+// Capture a fixed viewport crop without waiting for the canvas element to settle.
+export async function sceneOutlineCapture(
+  page: Page,
+  point: { x: number; y: number },
+) {
+  const clip = {
+    x: Math.round(point.x) - 24,
+    y: Math.round(point.y) - 20,
+    width: 48,
+    height: 40,
+  };
+  const cdp = await page.context().newCDPSession(page);
+  return async () => {
+    await page.locator("canvas").evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          const { __scene } = window as unknown as {
+            __scene: {
+              onAfterRenderObservable: { addOnce(fn: () => void): void };
+            };
+          };
+          __scene.onAfterRenderObservable.addOnce(() =>
+            requestAnimationFrame(() => resolve()),
+          );
+        }),
+    );
+    const { data } = await cdp.send("Page.captureScreenshot", {
+      format: "png",
+    });
+    const frame = PNG.sync.read(Buffer.from(data, "base64"));
+    const crop = new PNG({ width: clip.width, height: clip.height });
+    PNG.bitblt(frame, crop, clip.x, clip.y, clip.width, clip.height, 0, 0);
+    return PNG.sync.write(crop);
+  };
 }
 
 export function cyanEdgePixels(before: Buffer, after: Buffer) {

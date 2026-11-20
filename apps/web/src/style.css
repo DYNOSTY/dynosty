@@ -4413,11 +4413,14 @@ body,
 /* 자동 테스트에서만(App.tsx E2E_ALL): 일손 판 탭·현장 칸을 모두 펼침 */
 .e2e-all .labor-demo > *,
 .e2e-all .site-column > *,
-.e2e-all .site-guide > *,
+.e2e-all .site-guide > :not([hidden]),
 .e2e-all .site-guide .site-progress-heading button {
   display: block !important;
 }
-.e2e-all .labor-demo,
-.e2e-all .site-column {
-  overflow: auto !important;
+@media (max-width: 760px) {
+  /* 데스크톱에서는 바깥 작업 메뉴가 스크롤을 맡는다. */
+  .e2e-all .labor-demo,
+  .e2e-all .site-column {
+    overflow: auto !important;
+  }
 }
