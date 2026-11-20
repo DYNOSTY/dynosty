@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { press } from "./labor-tabs.js";
-import { clickExample, examplePoint } from "./scene-picking.js";
+import { examplePoint } from "./scene-picking.js";
 
 type SceneMesh = {
   isVisible: boolean;

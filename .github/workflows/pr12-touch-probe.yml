@@ -18,7 +18,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm check
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e tests/e2e/scene-selection.spec.ts -g '좁은 터치 화면' --repeat-each=5 --reporter=line
       - if: ${{ !cancelled() }}
         run: pnpm test:e2e tests/e2e/hud-integration.spec.ts -g 'GLB 일부 요청 실패' --repeat-each=3 --reporter=line
+      - if: ${{ !cancelled() }}
+        run: pnpm test:e2e tests/e2e/scene-selection.spec.ts -g '건물·주민을 실제 클릭|카메라 드래그|장면 갱신' --reporter=line
