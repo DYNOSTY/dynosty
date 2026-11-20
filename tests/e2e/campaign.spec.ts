@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
   commandTimber,
+  CONVOY_GOALS,
   createCapital,
   createTimberSave,
   createVillageGame,
@@ -462,4 +463,67 @@ test("복홀 성곽 엔딩은 기록과 경구 뒤에 무성 영상과 두 공�
   await expect(dialog).toContainText("네, 공주 마마.");
   await next.click();
   await expect(dialog).toContainText("저도 그 말을 하려던 참이었어요.");
+});
+
+test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 증가분에 맞는다", async ({
+  page,
+}) => {
+  const village = createVillageGame();
+  const save = createTimberSave({
+    ...village,
+    chapter: 4,
+    paused: true,
+    campaign: {
+      ...village.campaign!,
+      beat: "thaw",
+      departures: 3,
+      evacuees: 200,
+      cargo: { ...CONVOY_GOALS },
+    },
+  });
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveAccessibleName(/^4단계 완료/);
+  const counts = async () =>
+    Promise.all(
+      [
+        "play-population",
+        "resource-RES_WOOD",
+        "resource-RES_MEAT",
+        "resource-RES_FISH",
+        "resource-RES_COAL",
+      ].map(async (id) => {
+        const label = await page.getByTestId(id).innerText();
+        const match = label.match(/[\d,]+/);
+        if (!match) throw Error(id + " 수량 누락");
+        return Number(match[0].replaceAll(",", ""));
+      }),
+    );
+  const before = await counts();
+  await readScene(page, "5단계로 넘어갈까요? · 성문 앞으로");
+  await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
+  const delta = (await counts()).map((n, i) => n - before[i]);
+  expect(delta).toEqual([120, 3000, 1500, 1500, 1800]);
+  const advance = dialog.getByRole("button", { name: /^다음 대사/ });
+  while (
+    !(await dialog.getByText(/남문 명부 여기 있습니다/).count()) &&
+    (await advance.count())
+  )
+    await advance.click();
+  await expect(dialog).toContainText(
+    `오늘 이 문 안에 든 식구는 모두 ${delta[0]}명입니다.`,
+  );
+  await advance.click();
+  await advance.click();
+  await expect(dialog).toContainText("입고 장부");
+  await expect(dialog).toContainText(
+    ["목재", "고기", "어류", "석탄"]
+      .map((label, i) => label + " " + delta[i + 1]!.toLocaleString("ko-KR"))
+      .join(" · "),
+  );
 });
