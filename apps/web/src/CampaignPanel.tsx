@@ -72,6 +72,10 @@ function SceneDialog({
     return () => window.clearTimeout(timer);
   }, [cursor, frame, total]);
   const [name, words] = page.lines[lineIndex]!;
+  const later =
+    page.laterIllustration && cursor >= page.laterIllustration.from
+      ? page.laterIllustration
+      : undefined;
   const face = PATROL_NAMES.findIndex((x) => x === name);
   const last = cursor === total - 1;
   useEffect(() => {
@@ -128,9 +132,9 @@ function SceneDialog({
           alt={
             familyScene
               ? "복홀 성문 앞의 양녕과 새끼 스피노사우르스 포와 혜"
-              : page.title
+              : (later?.alt ?? page.title)
           }
-          src={`/story/campaign/${familyScene ? "royal-family" : page.illustration}.webp`}
+          src={`/story/campaign/${familyScene ? "royal-family" : (later?.image ?? page.illustration)}.webp`}
         />
       )}
       {page.key === "summit" && cursor === 1 && (

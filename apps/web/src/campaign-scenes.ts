@@ -69,6 +69,7 @@ export interface ScenePage {
   clip?: string;
   frames?: { image: string; words: string }[];
   illustration?: string;
+  laterIllustration?: { from: number; image: string; alt: string };
   lines: Line[];
   choices: Choice[];
   auto: boolean;
@@ -692,7 +693,7 @@ export function campaignPage(s: TimberState): ScenePage {
     case "escort":
       page.clip = "escort";
       page.music = "13";
-      page.title = "밤길에 옥관이 반짝였다";
+      page.title = "길가에서 기다린 목진";
       line(
         "목진",
         "공주 마마, 저도 데려가 주십시오. 고른 공의 아들은 아직 어립니다. 그 애가 성문을 지키라 한들 누가 듣겠습니까. 마마께서 한 말씀 하시니 저 많은 이가 길을 내지 않습니까.",
@@ -703,7 +704,7 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line(
         "복홀의 기록",
-        "목진은 옥관의 매듭을 세게 당겼다. 행렬이 지나간 뒤에도 한참 길가에 서 있었다.",
+        "행렬이 지나간 뒤에도 목진은 한참 길가에 서 있었다.",
       );
       line(
         "덕순이",
@@ -917,31 +918,27 @@ export function campaignPage(s: TimberState): ScenePage {
           "목진",
           "마마, 보셨지요? 제가 먼저 빗장을 들었습니다. 마마께서 오시면 다들 이리 올 줄 알았습니다. 저도 그 곁에 있게 해 주십시오.",
         );
-        line(
-          "양녕",
-          "고개 들어라, 목진. 어제는 내 동생 뒤에 섰고 오늘은 내 뒤에 섰지. 내일 나보다 센 놈이 오면 넌 또 저 문을 열겠구나. 다들 똑똑히 보아라.",
-        );
-        line(
-          "복홀의 기록",
-          "고리는 계단 한가운데서 목진을 똑바로 보았다. 양녕이 어깨에서 칼을 내렸다. 옥관이 계단 아래로 굴렀고, 뜰에 꿇어앉은 이들은 그대로 있었다.",
-        );
-        line(
-          "달이",
-          "방금 전까지 목진 뒤에 서 있던 이들이야. 지금은 아무도 고개를 못 드네.",
-        );
+        page.laterIllustration = {
+          from: page.lines.length,
+          image: "yangnyeong-mokjin",
+          alt: "관아 계단 중앙의 고리가 목진을 노려보고, 곁에 선 양녕이 칼을 어깨에 걸쳤다.",
+        };
+        line("양녕", "고개 들어라, 목진.");
+        line("양녕", "아니다. 들지도 마라. 가치도 없다.");
       }
       if (!c.uprising) {
         line(
           "목진",
           "마마, 안에서 문을 열 이들이 있었사옵니다. 저도 데려가 주십시오. 마마 곁에만 있으면…….",
         );
+        page.laterIllustration = {
+          from: page.lines.length,
+          image: "yangnyeong-mokjin",
+          alt: "관아 계단에서 양녕이 목진을 내려다본다.",
+        };
         line(
           "양녕",
           "내 깃발만 보면 다들 빗장을 들 거라 여겼느냐. 고리가 어려 보여서 버린 놈이 내가 약해 보이면 어찌할지 뻔하구나. 다들 잘 보아라.",
-        );
-        line(
-          "복홀의 기록",
-          "양녕이 몸소 칼을 내렸다. 목진의 옥관이 눈에 박히자 그 뒤에 꿇어앉았던 이들이 고개를 숙였다.",
         );
       }
       if (!c.uprising && c.side === "control") {
