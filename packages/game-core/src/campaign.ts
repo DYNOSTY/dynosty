@@ -103,6 +103,7 @@ export interface Campaign {
   side: "coexist" | "control" | null;
   uprising: boolean;
   revivalPrepared?: boolean;
+  awakeningSeen?: boolean;
   lastHigh: number;
   difficulty?: Difficulty;
   pessimismExtremeSince?: number | null;
@@ -180,6 +181,7 @@ export function campaignValid(c: unknown, elapsed: number) {
     [null, "ward", "kitchen", "report"].includes(c.relief as null) &&
     [null, "invite", "provisions"].includes(c.escort as null) &&
     [null, "coexist", "control"].includes(c.side as null) &&
+    (c.awakeningSeen === undefined || typeof c.awakeningSeen === "boolean") &&
     (c.revivalPrepared === undefined ||
       typeof c.revivalPrepared === "boolean") &&
     typeof c.uprising === "boolean" &&
@@ -634,6 +636,12 @@ export function actCampaign(
       }
       break;
     case "vigil": {
+      if (
+        action === "awakening" &&
+        !c.awakeningSeen &&
+        s.town.development.story.chungnyeong === "mechanical"
+      )
+        return change("vigil", { awakeningSeen: true });
       const ration = emergencyRation(s);
       if (!ration || action !== `ration:${s.world.day}:${ration}`) break;
       const trade = c.side === "coexist";

@@ -1,4 +1,8 @@
-import { createVillageGame } from "@dynosty/game-core";
+import {
+  actCampaign,
+  createVillageGame,
+  type TimberState,
+} from "@dynosty/game-core";
 import { expect, it } from "vitest";
 import {
   campaignPage,
@@ -73,4 +77,33 @@ it("안내는 도착한 상인과 주민, 돌아온 조와 아직 부족한 식�
     world: { ...s.world, resources: { ...s.world.resources, RES_FISH: 0 } },
   };
   expect(villageAdvice(shortage, true)).toContain("어획막");
+});
+
+it("충녕이 깨어난 소식은 확인 전까지 열리고 이후에는 마을 일과로 돌아간다", () => {
+  const base = createVillageGame();
+  const s: TimberState = {
+    ...base,
+    chapter: 5,
+    campaign: { ...base.campaign!, beat: "vigil" },
+    town: {
+      ...base.town,
+      development: {
+        ...base.town.development,
+        story: { ...base.town.development.story, chungnyeong: "mechanical" },
+      },
+    },
+  };
+  const page = campaignPage(s);
+  expect(page.key).toBe("awakening");
+  expect(page.auto).toBe(true);
+  expect(page.choices.map((c) => c.action)).toEqual(["awakening"]);
+  const command = {
+    type: "campaign",
+    beat: "vigil",
+    action: "awakening",
+  } as const;
+  const seen = actCampaign(s, command);
+  expect(campaignPage(seen).auto).toBe(false);
+  expect(campaignPage(seen).key).toBe("vigil");
+  expect(() => actCampaign(seen, command)).toThrow();
 });

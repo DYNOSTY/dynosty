@@ -885,14 +885,29 @@ export function campaignPage(s: TimberState): ScenePage {
             : "덕순이가 내일은 집에서 파를 좀 가져오겠대. 어제까지만 해도 제 그릇을 두 손에 꼭 쥐고 있던 이가 말이야.",
         );
       } else if (s.town.development.story.chungnyeong === "mechanical") {
-        page.title = "다시 들린 목소리";
+        if (!c.awakeningSeen) {
+          page.key = "awakening";
+          page.auto = true;
+          page.title = "다시 들린 목소리";
+          line("영실", "고리님, 이리 와 보세요. 방금 제 이름을 불렀습니다.");
+          line(
+            "충녕",
+            "영실, 들리나요? 그날 내 옆에 누웠던 아이는요? 어미 꼬리를 꼭 쥐고 있었는데.",
+          );
+          line(
+            "고리",
+            "집에 갔습니다. 어제는 제 발로 식당까지 걸어왔다더군요.",
+          );
+          line(
+            "충녕",
+            "다행이네요. 그 어미가 밤새 아이 곁에 앉아 있었어요. 만나거든 나도 일어났다고 전해 주세요.",
+          );
+          choice("awakening", "의원 밖에 소식을 전한다");
+          break;
+        }
         line(
-          "충녕",
-          "영실, 내 말이 들리나요? 그날 의원에 누워 있던 아이는요? 어미가 곁에서 줄곧 꼬리를 잡아 주고 있었는데.",
-        );
-        line(
-          "고리",
-          "둘 다 집에 갔습니다. 마마 목소리가 돌아왔다고, 제가 가서 전하지요.",
+          "나르미",
+          "마마가 깨어나셨다는 말을 듣고 그 아이가 또 왔어요. 이번엔 어미 꼬리를 놓고 혼자 문턱을 넘던걸요.",
         );
       } else {
         page.title = "의원의 등잔";
