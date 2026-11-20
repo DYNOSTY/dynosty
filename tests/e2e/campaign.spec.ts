@@ -337,16 +337,15 @@ test("쥬신 왕으로 도성 구호를 명하고 설정에서 변종 야습 기
   );
 });
 
-test("충녕의 소생 소식을 전한 뒤 이어 하면 의원 후일담을 듣는다", async ({
-  page,
-}) => {
-  const completed = ["R17", "R18", "TECH_MECHA2"];
+function awakenedVillageSave(completed: string[], days: number) {
   let base = createVillageGame();
   for (const id of completed)
     base = payTown(base, RESEARCH_CATALOG.find((r) => r.id === id)!.cost);
-  const save = createTimberSave({
+  return createTimberSave({
     ...base,
     chapter: 5,
+    elapsed: base.elapsed + days * 1440,
+    world: { ...base.world, day: base.world.day + days },
     campaign: {
       ...base.campaign!,
       beat: "vigil",
@@ -366,6 +365,12 @@ test("충녕의 소생 소식을 전한 뒤 이어 하면 의원 후일담을 �
       },
     },
   });
+}
+
+test("충녕의 소생 소식을 전한 뒤 이어 하면 의원 후일담을 듣는다", async ({
+  page,
+}) => {
+  const save = awakenedVillageSave(["R17", "R18", "TECH_MECHA2"], 0);
   await page.addInitScript((value) => {
     if (!localStorage.getItem("dynosty.village.resume"))
       localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
@@ -385,13 +390,7 @@ test("충녕의 소생 소식을 전한 뒤 이어 하면 의원 후일담을 �
 test("복홀 성곽 엔딩은 기록과 경구 뒤에 무성 영상과 두 공룡의 대화를 보여 준다", async ({
   page,
 }) => {
-  const base = createVillageGame();
-  const save = createTimberSave({
-    ...base,
-    chapter: 5,
-    paused: true,
-    campaign: { ...base.campaign!, beat: "ending", ending: "escape" },
-  });
+  const save = awakenedVillageSave(["R17", "R18", "TECH_MECHA2", "R19"], 11);
   await page.addInitScript(
     (value) =>
       localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
@@ -401,6 +400,10 @@ test("복홀 성곽 엔딩은 기록과 경구 뒤에 무성 영상과 두 공�
     (response) => response.url().endsWith("/B.ogg") && response.ok(),
   );
   await page.goto("/");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "다시 들린 목소리",
+  );
+  await readScene(page, "의원 밖에 소식을 전한다");
   const dialog = page.getByRole("dialog", { name: "복홀에 아침이 오면" });
   const next = dialog.getByRole("button", { name: /^다음 대사/ });
   await expect(dialog).toContainText("당신이 우리 곁을 지켜 준 덕입니다");
