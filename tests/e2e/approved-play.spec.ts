@@ -260,12 +260,11 @@ test("대표 모델 요청 실패는 명확히 안내하고 대체 표시로 게
     blockedWinterResident = true;
     return route.fulfill({ status: 404, body: "missing" });
   });
-  await page.route("**/models/triceratops.json", (route) =>
-    route.fulfill({ status: 404, body: "missing" }),
-  );
   await ready(page);
   await expect.poll(() => blockedWinterResident).toBe(true);
-  await expect(page.getByRole("alert")).toContainText("대표 모델");
+  await expect(page.getByRole("alert")).toHaveText(
+    "모델을 만들지 못해 연결 예제로 표시합니다.",
+  );
   const resident = page.getByRole("button", {
     name: "주민 예제 선택",
     exact: true,
@@ -274,6 +273,7 @@ test("대표 모델 요청 실패는 명확히 안내하고 대체 표시로 게
   const beforeScroll = await page.evaluate(() => scrollY);
   await page.keyboard.press("Enter");
   expect(await page.evaluate(() => scrollY)).toBe(beforeScroll);
+  await expect(resident).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByRole("region", { name: "선택 정보", exact: true }),
   ).toContainText("주민 예제");
