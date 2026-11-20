@@ -2,12 +2,6 @@ import raw from "./game-data.json" with { type: "json" };
 import { isRecord } from "./save.js";
 import type { SceneEntity, SceneSnapshot } from "./scene.js";
 import {
-  createWinterState,
-  parseWinterState,
-  stepWinter,
-  type WinterState,
-} from "./winter.js";
-import {
   absMinute,
   createStoryState,
   minutesUntilStory,
@@ -18,6 +12,12 @@ import {
   type StorySide,
   type StoryState,
 } from "./story.js";
+import {
+  createWinterState,
+  parseWinterState,
+  stepWinter,
+  type WinterState,
+} from "./winter.js";
 
 export type RuleSet = typeof raw;
 export type ResourceId = keyof RuleSet["resources"];
