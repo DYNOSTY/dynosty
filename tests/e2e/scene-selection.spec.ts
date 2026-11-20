@@ -69,6 +69,8 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   await expect(
     page.getByRole("button", { name: "건물 예제 선택", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
+  await press(page, "기본 시점");
+  await examplePoint(page, "building"); // Wait for the default camera to render.
   await clickFloor(page);
   await expect(info).toBeHidden();
   await expect
