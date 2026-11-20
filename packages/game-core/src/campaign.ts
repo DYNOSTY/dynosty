@@ -85,7 +85,54 @@ export const BEATS = [
   "finished",
 ] as const;
 export type Beat = (typeof BEATS)[number];
+export const CONVOY_GOALS = {
+  RES_WOOD: 10000,
+  RES_MEAT: 5000,
+  RES_FISH: 5000,
+  RES_COAL: 6000,
+} as const;
+export const CONVOY_ITEMS = Object.keys(
+  CONVOY_GOALS,
+) as (keyof typeof CONVOY_GOALS)[];
+type Cargo = Partial<Record<keyof typeof CONVOY_GOALS, number>>;
+export function convoyTarget(s: TimberState, item: keyof typeof CONVOY_GOALS) {
+  return Math.floor(
+    (CONVOY_GOALS[item] * Math.min(3, (s.campaign?.departures ?? 0) + 1)) / 3,
+  );
+}
+export function canDispatchConvoy(s: TimberState) {
+  const sent = s.campaign?.departures ?? 0;
+  return (
+    sent < 3 &&
+    CONVOY_ITEMS.every(
+      (item) => (s.campaign?.cargo?.[item] ?? 0) >= convoyTarget(s, item),
+    ) &&
+    (sent < 2 ||
+      ((s.campaign?.evacuees ?? 0) >= 200 &&
+        s.world.citizens.filter((p) => p.alive).length >= 200))
+  );
+}
+export function convoyLoad(s: TimberState, item: keyof typeof CONVOY_GOALS) {
+  const available =
+    Math.floor(s.world.resources[item] / AMOUNT_SCALE) -
+    (item === "RES_WOOD" ? s.reservedWood : 0);
+  return Math.max(
+    0,
+    Math.min(
+      convoyTarget(s, item) - (s.campaign?.cargo?.[item] ?? 0),
+      available,
+      1000,
+    ),
+  );
+}
+export function convoyReady(s: TimberState) {
+  return s.campaign?.departures === 3;
+}
 export interface Campaign {
+  cargo?: Cargo;
+  departures?: number;
+  evacuees?: number;
+  storeBatches?: number;
   victoryQuotes?: number[];
   beat: Beat;
   since: number;
@@ -147,6 +194,16 @@ export function campaignValid(c: unknown, elapsed: number) {
   const village = (n: unknown) => integer(n, SETTLEMENTS.length - 1);
   return (
     BEATS.includes(c.beat as Beat) &&
+    (c.cargo === undefined ||
+      (isRecord(c.cargo) &&
+        Object.entries(c.cargo).every(
+          ([key, n]) =>
+            Object.hasOwn(CONVOY_GOALS, key) &&
+            integer(n, CONVOY_GOALS[key as keyof Cargo]),
+        ))) &&
+    (c.evacuees === undefined || integer(c.evacuees, 1000)) &&
+    (c.departures === undefined || integer(c.departures, 3)) &&
+    (c.storeBatches === undefined || integer(c.storeBatches, 4)) &&
     (c.victoryQuotes === undefined ||
       (Array.isArray(c.victoryQuotes) &&
         c.victoryQuotes.length === CHAPTERS.length &&
@@ -557,10 +614,54 @@ export function actCampaign(
       if (action === "next" && c.treaties.length === 5) return createCapital(s);
       break;
     }
-    case "capital":
+    case "capital": {
+      const batches = Math.min(4, Math.floor((s.elapsed - c.since) / 360));
+      const availableBatches = batches - (c.storeBatches ?? 0);
+      if (action === "open-stores" && c.relief && availableBatches > 0) {
+        let city = s;
+        for (const item of CONVOY_ITEMS)
+          city = deposit(
+            city,
+            item,
+            (CONVOY_GOALS[item] / 4) * availableBatches,
+          );
+        return change("capital", { storeBatches: batches }, city);
+      }
+      const item = CONVOY_ITEMS.find((key) => action === "load:" + key);
+      if (item && c.relief) {
+        const n = convoyLoad(s, item);
+        if (n)
+          return change(
+            "capital",
+            { cargo: { ...c.cargo, [item]: (c.cargo?.[item] ?? 0) + n } },
+            pay(item, n),
+          );
+      }
+      const sent = c.departures ?? 0;
+      if (c.relief && action === `dispatch:${sent + 1}` && canDispatchConvoy(s))
+        return change("capital", {
+          departures: sent + 1,
+          evacuees: Math.min(
+            c.evacuees ?? 0,
+            s.world.citizens.filter((p) => p.alive).length,
+          ),
+        });
+      if (action === "muster" && c.relief && sent < 3) {
+        const count = Math.min(
+          (c.evacuees ?? 0) + 50,
+          Math.floor(
+            (1000 -
+              Math.max(600, (s.bokhol?.world.citizens.length ?? 0) + 10)) /
+              0.6,
+          ),
+          s.world.citizens.filter((p) => p.alive).length,
+        );
+        if (count > (c.evacuees ?? 0))
+          return change("capital", { evacuees: count });
+      }
       if (!c.relief && action === "report")
         return change("capital", { relief: "report" });
-      if (action === "next" && c.relief && s.elapsed - c.since >= 1440)
+      if (action === "next" && c.relief && convoyReady(s))
         return s.bokhol
           ? {
               ...parseTimberState(s.bokhol),
@@ -571,10 +672,13 @@ export function actCampaign(
                 beat: "seal",
                 since: s.bokhol.elapsed,
                 relief: c.relief,
+                cargo: c.cargo ?? {},
+                evacuees: c.evacuees ?? 0,
               },
             }
           : change("seal");
       break;
+    }
     case "seal":
       if (action === "next") return change("escort");
       break;
@@ -599,7 +703,31 @@ export function actCampaign(
       }
       break;
     case "thaw":
-      if (action === "next") return { ...change("summit"), chapter: 5 };
+      if (action === "next") {
+        let village = s;
+        const arrivals = Math.floor((c.evacuees ?? 0) * 0.6);
+        if (arrivals)
+          village = commandTimber(
+            village,
+            {
+              type: "citizen-event",
+              event: {
+                type: "arrival",
+                id: "capital-refugees",
+                groups: [
+                  { species: "R02", count: Math.ceil(arrivals / 2) },
+                  { species: "SPINO", count: Math.floor(arrivals / 2) },
+                ].filter((group) => group.count > 0),
+              },
+            },
+            "campaign-capital-refugees",
+          );
+        for (const item of CONVOY_ITEMS) {
+          const units = Math.floor((c.cargo?.[item] ?? 0) * 0.3);
+          if (units) village = deposit(village, item, units);
+        }
+        return { ...change("summit", {}, village), chapter: 5 };
+      }
       break;
     case "summit":
       if (action === "coexist" || action === "control") {

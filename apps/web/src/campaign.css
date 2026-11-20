@@ -198,7 +198,7 @@
   }
 }
 
-.play-shell .campaign-quest:has(.office-panel) {
+.play-shell .campaign-quest:has(.office-panel, .south-gate-panel) {
   max-height: min(56dvh, 36rem);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -225,4 +225,12 @@
 .fallen-caption small {
   display: block;
   margin-top: 1em;
+}
+
+.south-gate-farewell {
+  margin: 0.5rem 0;
+}
+.south-gate-farewell img {
+  display: block;
+  width: 100%;
 }

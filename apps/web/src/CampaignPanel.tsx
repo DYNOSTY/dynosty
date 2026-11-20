@@ -1,9 +1,16 @@
 import {
   CHAPTERS,
+  CONVOY_GOALS,
+  CONVOY_ITEMS,
   campaignOf,
+  canDispatchConvoy,
   canPay,
   capitalMealsReady,
+  capitalRoad,
+  convoyLoad,
+  convoyTarget,
   foodWarnings,
+  GAME_RULES,
   mutantNames,
   mutantRepairCost,
   mutantStructure,
@@ -215,6 +222,7 @@ export function CampaignPanel({
   setDefenseOpen,
   work,
 }: {
+  southVisits,
   state: TimberState;
   command: (cmd: TimberCommand) => void;
   trade: boolean;
@@ -224,6 +232,7 @@ export function CampaignPanel({
   setDefenseOpen?: (open: boolean) => void;
   work: boolean;
 }) {
+  southVisits?: number;
   const c = campaignOf(s);
   const p = campaignPage(s);
   const advice = moraleAdvice(s);
@@ -250,9 +259,14 @@ export function CampaignPanel({
   useEffect(() => {
     if (officeSelected) setOffice(true);
   }, [officeSelected]);
+  const [south, setSouth] = useState(false);
   useEffect(() => {
-    if (gateSelected) setDefenseOpen?.(true);
-  }, [gateSelected, setDefenseOpen]);
+    if (southVisits) setSouth(true);
+  }, [southVisits]);
+  useEffect(() => {
+    if (gateSelected && c.beat === "capital") setSouth(true);
+    else if (gateSelected) setDefenseOpen?.(true);
+  }, [gateSelected, setDefenseOpen, c.beat]);
   const [sound, setSound] = useState(false);
   const { audioRef } = useAudio();
   const canPetition =
@@ -399,6 +413,95 @@ export function CampaignPanel({
         <button
           type="button"
           className="scout-all"
+      {c.beat === "capital" && (
+        <>
+          <button
+            type="button"
+            aria-expanded={south}
+            onClick={() => setSouth(!south)}
+          >
+            남문 · 피난 수레
+          </button>
+          {south && (
+            <section className="south-gate-panel" aria-label="남문 피난 수레">
+              <h3>남문 피난 수레</h3>
+              <p>
+                북문 · 변종 접근　동문·서문 · 다섯 마을 교역{" "}
+                {capitalRoad(s) === "closed"
+                  ? "두절"
+                  : capitalRoad(s) === "slow"
+                    ? "지연"
+                    : "통행 가능"}
+              </p>
+              {!c.relief ? (
+                <p>먼저 어전에서 남문의 장부를 받으십시오.</p>
+              ) : (
+                <>
+                  <p>
+                    왕 “내 겨울 몫까지 풀어라. 양녕아, 남쪽 길에 솥을 걸거든
+                    뒤처진 이들도 먹이고 가거라.”
+                  </p>
+                  {(c.storeBatches ?? 0) < 4 && (
+                    <button
+                      type="button"
+                      disabled={
+                        Math.floor((s.elapsed - c.since) / 360) <=
+                        (c.storeBatches ?? 0)
+                      }
+                      onClick={() => act("open-stores")}
+                    >
+                      도성 각처에서 모아온 물자 인수 · 여섯 시간마다
+                    </button>
+                  )}
+                  {CONVOY_ITEMS.map((item) => (
+                    <div key={item}>
+                      {GAME_RULES.resources[item].name} · {c.cargo?.[item] ?? 0}{" "}
+                      / {CONVOY_GOALS[item]} · 이번 출발까지 누적{" "}
+                      {convoyTarget(s, item)}{" "}
+                      <button
+                        type="button"
+                        disabled={!convoyLoad(s, item)}
+                        onClick={() => act("load:" + item)}
+                      >
+                        {GAME_RULES.resources[item].name} {convoyLoad(s, item)}{" "}
+                        수레에 싣기
+                      </button>
+                    </div>
+                  ))}
+                  {c.departures === 2 && (
+                    <figure className="south-gate-farewell">
+                      <img
+                        src="/story/campaign/king-grandsons.webp"
+                        alt="도성 남문에서 왕이 수레 난간에 기댄 두 손자를 바라본다"
+                      />
+                      <figcaption>
+                        양녕의 세 아들이 마지막 행렬에 올랐다. 광장에 선 왕이
+                        수레 쪽을 한 번 보았다.
+                      </figcaption>
+                    </figure>
+                  )}
+                  <p>출발한 행렬 {c.departures ?? 0} / 3</p>
+                  {(c.departures ?? 0) < 3 && (
+                    <button
+                      type="button"
+                      disabled={!canDispatchConvoy(s)}
+                      onClick={() =>
+                        act("dispatch:" + ((c.departures ?? 0) + 1))
+                      }
+                    >
+                      {(c.departures ?? 0) + 1}차 수레 출발
+                    </button>
+                  )}
+                  <p>피난 명부 {c.evacuees ?? 0}명 · 목표 200명</p>
+                  <button type="button" onClick={() => act("muster")}>
+                    백성을 남문에 소집하기 · 50명씩
+                  </button>
+                </>
+              )}
+            </section>
+          )}
+        </>
+      )}
           aria-expanded={office}
           onClick={() => setOffice(!office)}
         >

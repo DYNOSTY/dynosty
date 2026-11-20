@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
-  commandTimber,
   CONVOY_GOALS,
+  commandTimber,
   createCapital,
   createTimberSave,
   createVillageGame,
@@ -384,6 +384,14 @@ function awakenedVillageSave(completed: string[], days: number) {
   for (const id of completed)
     base = payTown(base, RESEARCH_CATALOG.find((r) => r.id === id)!.cost);
   return createTimberSave({
+  await page
+    .getByRole("button", { name: "남문 · 피난 수레", exact: true })
+    .first()
+    .click();
+  const carts = page.getByRole("region", { name: "남문 피난 수레" });
+  await carts.getByRole("button", { name: "석탄 1000 수레에 싣기" }).click();
+  await expect(page.getByTestId("resource-RES_COAL")).toHaveText("0");
+  await expect(carts).toContainText("석탄 · 1000 / 6000");
     ...base,
     chapter: 5,
     elapsed: base.elapsed + days * 1440,
@@ -481,6 +489,53 @@ test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 �
       cargo: { ...CONVOY_GOALS },
     },
   });
+test("남문에서 손자들을 본 왕이 세 번째 행렬을 보내고 성안에 남는다", async ({
+  page,
+}) => {
+  const village = createVillageGame();
+  const capital = createCapital({
+    ...village,
+    campaign: { ...village.campaign!, beat: "roads" },
+  });
+  const save = createTimberSave({
+    ...capital,
+    campaign: {
+      ...capital.campaign!,
+      relief: "report",
+      departures: 2,
+      evacuees: 200,
+      cargo: { ...CONVOY_GOALS },
+    },
+  });
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "남문 · 피난 수레", exact: true })
+    .first()
+    .click();
+  const carts = page.getByRole("region", { name: "남문 피난 수레" });
+  const portrait = carts.getByRole("img", { name: /두 손자/ });
+  await expect
+    .poll(() =>
+      portrait.evaluate((el) => (el as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  await expect(carts).toContainText("양녕의 세 아들이 마지막 행렬에 올랐다");
+  await carts.getByRole("button", { name: "3차 수레 출발" }).click();
+  const ending = page.getByRole("dialog", {
+    name: "3단계 완료 · 남문에 남은 왕",
+  });
+  await expect(ending).toContainText("전하, 북문이 뚫렸습니다");
+  const next = ending.getByRole("button", { name: /^다음 대사/ });
+  await next.click();
+  await expect(ending.locator(".campaign-speech")).toHaveCount(0);
+  await expect(ending.locator("video")).toHaveAttribute("src", /ending-3\.mp4/);
+});
+
   await page.addInitScript(
     (value) =>
       localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),

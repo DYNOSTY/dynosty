@@ -4,6 +4,7 @@ import {
   campaignOf,
   canPay,
   capitalRoad,
+  convoyReady,
   emergencyRation,
   foodWarnings,
   GAME_RULES,
@@ -609,6 +610,28 @@ export function campaignPage(s: TimberState): ScenePage {
       page.title = "쥬신 왕의 어전 · 도성 남문";
       page.music = "10";
       const road = capitalRoad(s);
+      if (c.relief && convoyReady(s)) {
+        page.key = "capital-ready";
+        page.title = "3단계 완료 · 남문에 남은 왕";
+        page.auto = true;
+        page.goal = "3단계 완료";
+        line(
+          "수문장",
+          "전하, 북문이 뚫렸습니다. 붉은 눈의 변종들이 문루를 무너뜨리자 서문으로 가는 길까지 끊겼습니다. 파수 종을 쳐도 대답하는 초소가 없습니다.",
+        );
+        page.frames = [
+          { image: "end-3a", words: "" },
+          { image: "end-3b", words: "" },
+          { image: "end-3c", words: "" },
+          {
+            image: "end-3d",
+            words:
+              "끝내 왕의 등이 보이지 않았다. 당신이 남문을 지킨 그 짧은 동안, 아들과 백성은 다음 고개로 넘어갔습니다. 왕으로서 끝까지 책임을 다해 주셨습니다.",
+          },
+        ];
+        choice("next", "먼저 남하한 충녕의 소식");
+        break;
+      }
       if (s.bokhol && !c.relief) {
         line(
           "호조 관리",
@@ -619,18 +642,18 @@ export function campaignPage(s: TimberState): ScenePage {
           "평소의 배급은 그대로 시행하라. 각 관아는 지금 손에 있는 것으로 어느 일까지 맡을 수 있는지 아뢰라.",
         );
       }
-      page.goal = `도성 운영 ${Math.min(24, Math.floor(age / 60))}/24시간 · 교역로 ${road === "closed" ? "두절" : road === "slow" ? "지연" : "통행 가능"} · 앓거나 다친 주민 ${s.residents.filter((r) => r.health !== "healthy" && r.health !== "dead").length}명 · 성안 변종 습격 부상 ${(s.world.citizenEvents ?? []).filter((id) => id.startsWith("mutant-") && Number(id.split("-").at(-1)) >= c.since).length}명`;
+      page.goal = `남문 피난 명부 ${c.evacuees ?? 0}/200명 · 교역로 ${road === "closed" ? "두절" : road === "slow" ? "지연" : "통행 가능"} · 앓거나 다친 주민 ${s.residents.filter((r) => r.health !== "healthy" && r.health !== "dead").length}명 · 성안 변종 습격 부상 ${(s.world.citizenEvents ?? []).filter((id) => id.startsWith("mutant-") && Number(id.split("-").at(-1)) >= c.since).length}명`;
       line(
         "수문장",
-        "전하, 남문 밖에서 변종이 성벽을 긁고 있습니다. 안에서도 하나가 눈을 붉히자 순라 돌던 포졸들이 그 골목으로 달려갔습니다.",
+        "전하, 북문 밖에서 변종이 성벽을 긁고 있습니다. 안에서도 하나가 눈을 붉히자 순라 돌던 포졸들이 그 골목으로 달려갔습니다.",
       );
       line(
         "왕",
-        "포졸에게는 내 답을 기다리지 말라 일러라. 의원은 그사이 누가 다쳤는지 살피고, 남문에서는 마지막으로 들어온 수레가 언제였는지 알아보라.",
+        "포졸에게는 내 답을 기다리지 말라 일러라. 의원은 그사이 누가 다쳤는지 살피고, 동문과 서문에서는 마지막으로 들어온 수레가 언제였는지 알아보라.",
       );
       line(
-        "충녕",
-        "아바마마, 어제 땔감을 들인 집이 오늘 또 장작을 구합니다. 아랫목까지 식으니 새끼들이 잠을 못 잔다 합니다.",
+        "호조 관리",
+        "전하, 어제 땔감을 들인 집이 오늘 또 장작을 구합니다. 아랫목까지 식으니 새끼들이 잠을 못 잔다 합니다.",
       );
       if (!c.relief) {
         choice("report", "남문의 장부를 받아 도성을 살핀다");
@@ -646,28 +669,8 @@ export function campaignPage(s: TimberState): ScenePage {
             ? "전하, 고갯길이 막혔습니다. 마지막 수레도 돌아섰습니다."
             : road === "slow"
               ? "눈이 수레바퀴를 덮습니다. 해 뜰 때 보인 짐이 아직 고개를 못 넘었습니다."
-              : "남문 길은 아직 열려 있습니다. 들어오는 짐부터 세겠습니다.",
+              : "동문과 서문은 아직 열려 있습니다. 들어오는 짐부터 세겠습니다.",
         );
-        if (age >= 1440) {
-          page.key = "capital-ready";
-          page.title = "3단계 완료 · 남문에 남은 왕";
-          page.auto = true;
-          line(
-            "수문장",
-            "전하, 동문이 뚫렸습니다. 붉은 눈의 변종들이 문루를 무너뜨리자 서문으로 가는 길까지 끊겼습니다. 파수 종을 쳐도 대답하는 초소가 없습니다.",
-          );
-          page.frames = [
-            { image: "end-3a", words: "" },
-            { image: "end-3b", words: "" },
-            { image: "end-3c", words: "" },
-            {
-              image: "end-3d",
-              words:
-                "끝내 왕의 등이 보이지 않았다. 당신이 남문을 지킨 그 짧은 동안, 아들과 백성은 다음 고개로 넘어갔습니다. 왕으로서 끝까지 책임을 다해 주셨습니다.",
-            },
-          ];
-          choice("next", "먼저 남하한 충녕의 소식");
-        }
       }
       break;
     }
@@ -790,6 +793,21 @@ export function campaignPage(s: TimberState): ScenePage {
         "이 백성들은 나의 것이다. 그 같은 일이 또 벌어진다면 내 아들에게 이들을 맡기겠다. 그날은 나도 아버지처럼 홀로 남겠다.",
       );
       line(
+      if (c.evacuees)
+        line(
+          "남문에서 온 짐꾼",
+          `남문 명부 여기 있습니다. 오늘 이 문 안에 든 식구는 모두 ${Math.floor(c.evacuees * 0.6)}명입니다.`,
+        );
+      if (c.cargo) {
+        line(
+          "남문에서 온 짐꾼",
+          "석탄 위에 생선 광주리를 얹었습니다. 아래부터 풀면 다 쏟아져요. 가죽끈은 제가 풀 테니, 광주리 좀 받아 주시겠습니까?",
+        );
+        line(
+          "입고 장부",
+          `목재 ${Math.floor((c.cargo.RES_WOOD ?? 0) * 0.3).toLocaleString("ko-KR")} · 고기 ${Math.floor((c.cargo.RES_MEAT ?? 0) * 0.3).toLocaleString("ko-KR")} · 어류 ${Math.floor((c.cargo.RES_FISH ?? 0) * 0.3).toLocaleString("ko-KR")} · 석탄 ${Math.floor((c.cargo.RES_COAL ?? 0) * 0.3).toLocaleString("ko-KR")}`,
+        );
+      }
         "양녕",
         "우리 스피노사우루스 집안은 물고기가 끊긴 겨울도 겪었다. 고기 솥이 사흘을 빈다고 치자. 다리가 부러진 자는 내일도 부역을 못 나간다. 그 살로 성벽을 지킬 열을 먹일 수 있다면, 나는 그리 명하겠다.",
       );

@@ -4168,3 +4168,14 @@ body,
     grid-template-columns: 60px minmax(0, 1fr) auto;
   }
 }
+
+.village-visitor-marker.capital-gate {
+  width: max-content;
+  height: auto;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 13px;
+}
+span.capital-gate {
+  pointer-events: none;
+}

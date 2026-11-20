@@ -669,7 +669,11 @@ export function applyCitizenEvent(
       if (!definition || species.has(group.species)) fail();
       species.add(group.species);
       number(group.count, 1, 600, true);
-      if (citizens.length + group.count > 600) fail();
+      if (
+        citizens.length + group.count >
+        (event.id === "capital-refugees" ? 1000 : 600)
+      )
+        fail();
       for (let i = 0; i < group.count; i++) {
         const id = `arrival:${event.id}:${group.species}:${i}`;
         if (citizens.some((c) => c.id === id)) fail();

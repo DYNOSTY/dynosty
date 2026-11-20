@@ -1,7 +1,9 @@
 import { expect, it, vi } from "vitest";
 import {
+  CONVOY_ITEMS,
   campaignOf,
   campaignOutcome,
+  convoyLoad,
   emergencyRation,
   lostPatrol,
   newCampaign,
@@ -259,7 +261,30 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   );
   s = act(s, "report");
   expect(() => act(s, "next")).toThrow();
-  s = act(later(s, 1440), "next");
+  expect(() => act(later(s, 359), "open-stores")).toThrow();
+  const firstBatch = act(later(s, 360), "open-stores");
+  const coalBefore = firstBatch.world.resources.RES_COAL;
+  const loaded = restore(act(firstBatch, "load:RES_COAL"));
+  expect(loaded.world.resources.RES_COAL).toBe(
+    coalBefore - 1000 * AMOUNT_SCALE,
+  );
+  expect(loaded.campaign?.cargo?.RES_COAL).toBe(1000);
+  s = act(later(s, 1440), "open-stores");
+  expect(() => act(s, "open-stores")).toThrow();
+  for (let trip = 1; trip <= 3; trip++) {
+    expect(() => act(s, "dispatch:" + trip)).toThrow();
+    for (const item of CONVOY_ITEMS)
+      while (convoyLoad(s, item) > 0) s = act(s, "load:" + item);
+    expect(() => act(s, "next")).toThrow();
+    if (trip === 3) {
+      expect(() => act(s, "dispatch:3")).toThrow();
+      for (let i = 0; i < 4; i++) s = act(s, "muster");
+    }
+    s = restore(act(s, "dispatch:" + trip));
+    expect(s.campaign?.departures).toBe(trip);
+    expect(() => act(s, "dispatch:" + trip)).toThrow();
+  }
+  s = act(restore(s), "next");
   s = act(s, "next");
   s = act(s, "invite");
   expect(s.world.citizens.filter((c) => c.alive)).toHaveLength(68);
@@ -268,6 +293,7 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(s.town.cold).toBe(true);
   s = later(s, 15 * 1440);
   const arrival = { type: "campaign", beat: "thaw", action: "next" } as const;
+  const beforeArrival = s.world.resources;
   s = commandTimber(restore(s), arrival, "arrive-at-bokhol");
   s = restore(s);
   expect(s.chapter).toBe(5);
@@ -276,6 +302,18 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
     "이미 지난 장면",
   );
   let hope = act(later(act(s, "coexist"), 5 * 1440), "next");
+  for (const [item, units] of [
+    ["RES_WOOD", 3000],
+    ["RES_MEAT", 1500],
+    ["RES_FISH", 1500],
+    ["RES_COAL", 1800],
+  ] as const)
+    expect(s.world.resources[item] - beforeArrival[item]).toBe(
+      units * AMOUNT_SCALE,
+    );
+  expect(s.world.citizens.filter((p) => p.alive)).toHaveLength(188);
+  expect(s.town.received.RES_COAL).toBeGreaterThanOrEqual(1800);
+  s = restore(s);
   expect(hope.campaign?.uprising).toBe(false);
   hope = later(hope, 6 * 1440 - 1);
   expect(campaignOutcome(hope)).toBeNull();
