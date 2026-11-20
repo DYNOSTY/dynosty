@@ -1,0 +1,38 @@
+name: PR 34 isolated preview verification
+
+on:
+  push:
+    branches: [verify/pr34-preview-fe6c8a5]
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fe6c8a51b6447ea2f84c2d4da21ade984daa3116
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @dynosty/game-core build && pnpm --filter @dynosty/web build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr34-web-fe6c8a5
+          path: apps/web/dist/
+          retention-days: 1
+          if-no-files-found: error
+      - run: pnpm run setup
+      - run: pnpm db:up
+      - run: pnpm db:check
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e tests/e2e/campaign-visual.spec.ts --reporter=line
+      - if: always()
+        run: pnpm db:down
