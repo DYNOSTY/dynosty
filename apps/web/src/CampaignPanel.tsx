@@ -17,6 +17,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
 import {
   campaignPage,
+  gatheringRumor,
   moraleAdvice,
   PATROL_NAMES,
   type ScenePage,
@@ -200,10 +201,21 @@ export function CampaignPanel({
   const c = campaignOf(s);
   const p = campaignPage(s);
   const advice = moraleAdvice(s);
-  const advisory = advice && (
-    <p className="campaign-advisory" role="status">
-      <strong>{advice[0]}</strong> {advice[1]}
-    </p>
+  const rumor = gatheringRumor(s);
+  const advisory = (
+    <>
+      {" "}
+      {rumor && (
+        <p className="campaign-advisory" role="status">
+          <strong>{rumor[0]}</strong> {rumor[1]}
+        </p>
+      )}{" "}
+      {advice && (
+        <p className="campaign-advisory" role="status">
+          <strong>{advice[0]}</strong> {advice[1]}
+        </p>
+      )}
+    </>
   );
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);

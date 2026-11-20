@@ -8,6 +8,7 @@ import {
   foodWarnings,
   GAME_RULES,
   lostPatrol,
+  minutesUntilCoup,
   recoveryCrew,
   returnedScouts,
   SCOUT_SITES,
@@ -71,6 +72,25 @@ export interface ScenePage {
   choices: Choice[];
   auto: boolean;
   goal: string;
+}
+export function gatheringRumor(s: TimberState): Line | undefined {
+  if (s.campaign?.beat !== "forecast") return;
+  const until = minutesUntilCoup(s);
+  if (until <= 900)
+    return [
+      "영실",
+      "관측패를 모두 맞춰 보았습니다. 닷새 뒤 혹한이 복홀에 닿습니다.",
+    ];
+  if (until <= 2340)
+    return [
+      "달이",
+      "나르미가 말한 그 창고 있지. 밤에 지나는데 문틈으로 불빛이 새더라. 안에서 내 발소리를 들었나 봐. 내가 문 앞을 지나자마자 불빛이 쏙 가려졌어.",
+    ];
+  if (until <= 3780)
+    return [
+      "나르미",
+      "해 질 무렵에 푸른 보자기 맨 아주머니를 봤어요. 빈 창고 앞에서 뒤를 돌아보시더니, 뒤따라오던 이들한테 문을 잡아 주셨어요.",
+    ];
 }
 export function moraleAdvice(s: TimberState): Line | undefined {
   const { pessimism, minute } = s.world;

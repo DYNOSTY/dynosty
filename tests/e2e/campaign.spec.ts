@@ -206,8 +206,17 @@ test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 
   const rect = await dialog.boundingBox();
   expect(rect?.width).toBeLessThanOrEqual(390);
   await readScene(page, "양녕 · 지휘권을 합치고 징발 허용");
-  for (let day = 0; day < 5; day++)
+  for (let day = 0; day < 5; day++) {
     await page.getByRole("button", { name: "마을 하루 진행" }).click();
+    if (day === 1)
+      await expect(
+        page.getByText(/푸른 보자기 맨 아주머니를 봤어요/),
+      ).toBeVisible();
+    if (day === 2)
+      await expect(page.getByText(/문틈으로 불빛이 새더라/)).toBeVisible();
+    if (day === 3)
+      await expect(page.getByText(/관측패를 모두 맞춰/)).toBeVisible();
+  }
   await expect(dialog).toHaveAccessibleName("혹한 닷새 전 · 배반자의 외침");
   await readScene(page, "풀 12를 풀고 대표들과 함께 식사");
   await expect(dialog).toHaveAccessibleName("성문 빗장이 들리던 밤");

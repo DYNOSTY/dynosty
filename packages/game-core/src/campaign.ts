@@ -277,6 +277,13 @@ export function campaignOutcome(s: TimberState): Campaign["ending"] {
     return "escape";
   return null;
 }
+// Anchor the five nights to the first 21:00 after the council, including when a save starts late at night.
+export function minutesUntilCoup(s: TimberState) {
+  const age = s.elapsed - (s.campaign?.since ?? s.elapsed);
+  const firstNight =
+    (((1260 - s.world.minute + age) % 1440) + 1440) % 1440 || 1440;
+  return firstNight + 4 * 1440 - age;
+}
 export function updateCampaign(s: TimberState): TimberState {
   let c = s.campaign;
   if (c?.recoveryDue != null && s.elapsed >= c.recoveryDue) {
