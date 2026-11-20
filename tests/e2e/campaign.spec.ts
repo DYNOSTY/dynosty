@@ -381,3 +381,41 @@ test("충녕의 소생 소식을 전한 뒤 이어 하면 의원 후일담을 �
   await page.getByRole("button", { name: /^5단계 ·/ }).click();
   await expect(dialog).toContainText("혼자 문턱을 넘던걸요");
 });
+
+test("복홀 성곽 엔딩은 기록과 경구 뒤에 무성 영상과 두 공룡의 대화를 보여 준다", async ({
+  page,
+}) => {
+  const base = createVillageGame();
+  const save = createTimberSave({
+    ...base,
+    chapter: 5,
+    paused: true,
+    campaign: { ...base.campaign!, beat: "ending", ending: "escape" },
+  });
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  const music = page.waitForResponse(
+    (response) => response.url().endsWith("/B.ogg") && response.ok(),
+  );
+  await page.goto("/");
+  const dialog = page.getByRole("dialog", { name: "복홀에 아침이 오면" });
+  const next = dialog.getByRole("button", { name: /^다음 대사/ });
+  await expect(dialog).toContainText("당신이 우리 곁을 지켜 준 덕입니다");
+  await next.click();
+  await expect(dialog.locator("video")).toHaveCount(0);
+  await next.click();
+  const clip = dialog.locator("video");
+  await expect(clip).toHaveAttribute("src", "/story/campaign/escape.mp4");
+  await expect
+    .poll(() => clip.evaluate((v) => v.muted && v.currentTime > 0))
+    .toBe(true);
+  await music;
+  await expect(dialog).toContainText("공자님, 손 좀 내어 주실래요?");
+  await next.click();
+  await expect(dialog).toContainText("네, 공주 마마.");
+  await next.click();
+  await expect(dialog).toContainText("저도 그 말을 하려던 참이었어요.");
+});
