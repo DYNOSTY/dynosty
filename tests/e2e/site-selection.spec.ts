@@ -13,6 +13,43 @@ async function enter(p: Page) {
 }
 async function clickSite(p: Page, id: SiteId) {
   const point = await worldPoint(p, SITE_POINTS[id]);
+  const probe = await p
+    .locator("canvas")
+    .evaluate((el: SVGElement | HTMLElement, at: { x: number; y: number }) => {
+      type Mesh = {
+        name: string;
+        isVisible: boolean;
+        isPickable: boolean;
+        isEnabled(): boolean;
+      };
+      const { __scene } = window as unknown as {
+        __scene: {
+          getMeshByName(name: string): Mesh | null;
+          multiPick(
+            x: number,
+            y: number,
+          ): { distance: number; pickedMesh: Mesh | null }[] | null;
+        };
+      };
+      const rect = el.getBoundingClientRect();
+      const receiver = document.elementFromPoint(at.x, at.y);
+      const inspection = __scene.getMeshByName("exchange-inspection-table");
+      return {
+        at,
+        receiver: receiver?.outerHTML.split(">")[0],
+        inspection: inspection && {
+          enabled: inspection.isEnabled(),
+          visible: inspection.isVisible,
+          pickable: inspection.isPickable,
+        },
+        hits: __scene
+          .multiPick(at.x - rect.left, at.y - rect.top)
+          ?.sort((a, b) => a.distance - b.distance)
+          .slice(0, 8)
+          .map((h) => [h.pickedMesh?.name, h.distance]),
+      };
+    }, point);
+  console.log("site-pick-probe", id, JSON.stringify(probe));
   await p.mouse.click(point.x, point.y);
 }
 async function initial(p: Page) {
