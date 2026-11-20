@@ -775,6 +775,11 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
   await readScene(page, "충녕 · 먹는 것과 필요한 양에 맞춰 배급한다");
   await page.getByRole("button", { name: "메인 메뉴", exact: true }).click();
+  await dialog.getByRole("button", { name: "돌아보기" }).click();
+  await dialog.getByRole("button", { name: "서막" }).click();
+  await expect(dialog.locator("video")).toHaveAttribute("src", "/story/campaign/opening.mp4");
+  await dialog.getByRole("button", { name: "뒤로" }).click();
+  await dialog.getByRole("button", { name: "이어하기" }).click();
   await dialog.getByRole("button", { name: "저장하기", exact: true }).click();
   await dialog.getByRole("button", { name: /슬롯 2 · 빈 슬롯/ }).click();
   await expect(dialog).toContainText("슬롯 2에 저장했습니다.");
@@ -791,7 +796,7 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   await expect(dialog).toHaveAccessibleName("메인 메뉴");
   await page.reload();
   await expect(dialog).toHaveAccessibleName("메인 메뉴");
-  await dialog.getByRole("button", { name: "이어 하기" }).click();
+  await dialog.getByRole("button", { name: "이어하기" }).click();
   await dialog.getByRole("button", { name: /슬롯 2 · 5단계/ }).click();
   await expect
     .poll(() =>
@@ -808,7 +813,7 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   expect(loaded.world).toEqual(manual.world);
   expect(loaded.town).toEqual(manual.town);
   await page.getByRole("button", { name: "메인 메뉴", exact: true }).click();
-  await dialog.getByRole("button", { name: "다시 하기" }).click();
+  await dialog.getByRole("button", { name: "다시하기" }).click();
   await dialog.getByRole("button", { name: /^5단계 ·/ }).click();
   await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
   const resumed = await page.evaluate(

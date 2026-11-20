@@ -1,0 +1,76 @@
+dialog.bokhol-title {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  color: #ffedc8;
+  background:
+    linear-gradient(125deg, #10192380, transparent 40%),
+    linear-gradient(315deg, #101923dc, transparent 46%),
+    var(--cover, url("/story/campaign/menu-bokhol.webp")) center / cover;
+  font-family: Georgia, "Batang", serif;
+}
+.bokhol-title h1 {
+  position: absolute;
+  left: 6vw;
+  top: 6vh;
+  margin: 0;
+  font-size: clamp(52px, 8vw, 134px);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  text-shadow: 0 3px 16px #17140f;
+}
+.bokhol-title[data-survived="true"] {
+  --cover: url("/story/campaign/menu-bokhol-ending.webp");
+}
+.bokhol-title h1 span {
+  display: block;
+  text-align: center;
+  font-size: 0.24em;
+  letter-spacing: 0.45em;
+  text-indent: 0.45em;
+}
+.bokhol-title nav {
+  position: absolute;
+  right: 8vw;
+  bottom: 10vh;
+  display: grid;
+  gap: 0.4em;
+  width: clamp(150px, 15vw, 240px);
+}
+.bokhol-title nav > button,
+.bokhol-return {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  text-shadow: 0 2px 5px #17130d;
+}
+.bokhol-title nav > button {
+  padding: 0.4em 0.25em;
+  font-size: clamp(22px, 2.2vw, 37px);
+  letter-spacing: 0.13em;
+  border-bottom: 1px solid #e6ca9560;
+}
+.bokhol-title nav > button:hover,
+.bokhol-title nav > button:focus-visible {
+  background: #2c2826a8;
+  color: white;
+}
+.bokhol-title .bokhol-settings {
+  letter-spacing: 0.95em;
+  text-indent: 0.82em;
+}
+.bokhol-return {
+  position: absolute;
+  bottom: 4vh;
+  left: 6vw;
+  padding: 0.5em;
+  background: #191a1ab0;
+}
