@@ -67,6 +67,87 @@ export async function clickExample(
   await page.mouse.click(point.x, point.y);
 }
 
+// The example's center can be behind the ondol roof. Click exposed geometry.
+export async function clickVisibleResident(page: Page) {
+  const canvas = page.locator("canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  for (const alpha of [Math.PI / 2, Math.PI, 0, -Math.PI / 2]) {
+    // Set only the test camera; selection still uses a real mouse click.
+    await canvas.evaluate((_, angle) => {
+      const { __scene } = window as unknown as {
+        __scene: {
+          activeCamera: {
+            alpha: number;
+            beta: number;
+            radius: number;
+            target: { set(x: number, y: number, z: number): void };
+          };
+        };
+      };
+      const camera = __scene.activeCamera;
+      camera.target.set(-2, 0.5, 1);
+      camera.alpha = angle;
+      camera.beta = Math.PI / 3;
+      camera.radius = 8;
+    }, alpha);
+    const center = await examplePoint(page, "resident");
+    const point = await canvas.evaluate((el, origin) => {
+      type Mesh = { name: string; parent: Mesh | null };
+      const { __scene } = window as unknown as {
+        __scene: { pick(x: number, y: number): { pickedMesh: Mesh | null } };
+      };
+      const rect = el.getBoundingClientRect();
+      for (let radius = 0; radius <= 80; radius += 6) {
+        for (let i = 0; i < (radius ? 16 : 1); i++) {
+          const angle = (i * 2 * Math.PI) / 16;
+          const x = Math.round(origin.x + radius * Math.cos(angle));
+          const y = Math.round(origin.y + radius * Math.sin(angle));
+          if (document.elementFromPoint(x, y) !== el) continue;
+          for (
+            let m = __scene.pick(x - rect.left, y - rect.top).pickedMesh;
+            m;
+            m = m.parent
+          ) {
+            if (m.name === "example-resident-1") return { x, y };
+          }
+        }
+      }
+      return null;
+    }, center);
+    if (point) {
+      await page.mouse.click(point.x, point.y);
+      return;
+    }
+  }
+  throw new Error("가려지지 않은 주민 표면 없음");
+}
+
+export async function clickUnoccupiedGround(page: Page) {
+  const point = await page.locator("canvas").evaluate((el) => {
+    const { __scene } = window as unknown as {
+      __scene: {
+        pick(x: number, y: number): { pickedMesh: { name: string } | null };
+      };
+    };
+    const rect = el.getBoundingClientRect();
+    for (const fy of [0.6, 0.5, 0.7, 0.4, 0.8, 0.3]) {
+      for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+        const x = Math.round(rect.left + rect.width * fx);
+        const y = Math.round(rect.top + rect.height * fy);
+        if (document.elementFromPoint(x, y) !== el) continue;
+        if (
+          __scene.pick(x - rect.left, y - rect.top).pickedMesh?.name ===
+          "ground"
+        )
+          return { x, y };
+      }
+    }
+    return null;
+  });
+  if (!point) throw new Error("캔버스에서 비어 있는 바닥을 찾지 못했습니다.");
+  await page.mouse.click(point.x, point.y);
+}
+
 export async function clickFloor(page: Page) {
   const canvas = page.locator("canvas");
   await canvas.evaluate((el) =>
