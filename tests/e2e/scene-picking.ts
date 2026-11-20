@@ -71,7 +71,25 @@ export async function clickExample(
 export async function clickVisibleResident(page: Page) {
   const canvas = page.locator("canvas");
   await canvas.scrollIntoViewIfNeeded();
-  for (let view = 0; view < 6; view++) {
+  for (const alpha of [Math.PI / 2, Math.PI, 0, -Math.PI / 2]) {
+    // Set only the test camera; selection still uses a real mouse click.
+    await canvas.evaluate((_, angle) => {
+      const { __scene } = window as unknown as {
+        __scene: {
+          activeCamera: {
+            alpha: number;
+            beta: number;
+            radius: number;
+            target: { set(x: number, y: number, z: number): void };
+          };
+        };
+      };
+      const camera = __scene.activeCamera;
+      camera.target.set(-2, 0.5, 1);
+      camera.alpha = angle;
+      camera.beta = Math.PI / 3;
+      camera.radius = 8;
+    }, alpha);
     const center = await examplePoint(page, "resident");
     const point = await canvas.evaluate((el, origin) => {
       type Mesh = { name: string; parent: Mesh | null };
@@ -100,15 +118,6 @@ export async function clickVisibleResident(page: Page) {
       await page.mouse.click(point.x, point.y);
       return;
     }
-    // Orbit using normal pointer input if the starting view hides the resident.
-    const box = await canvas.boundingBox();
-    if (!box) break;
-    const x = box.x + box.width * 0.25;
-    const y = box.y + box.height * 0.4;
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x + box.width * 0.5, y, { steps: 12 });
-    await page.mouse.up();
   }
   throw new Error("가려지지 않은 주민 표면 없음");
 }
