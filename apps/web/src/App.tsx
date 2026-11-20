@@ -663,14 +663,16 @@ export function App() {
               );
           let x = cx + dx * t,
             y = cy + dy * t;
-          // 오른쪽 위 의뢰 목록과 겹치면 목록 아래로
+          // 오른쪽 위 의뢰 목록과 겹치면 목록 아래로.
+          // 표식은 아래 끝이 기준점(translate -90%)이라 표식 높이만큼 더 내려야 통째로 목록 밖에 놓임
+          const up = el.offsetHeight * 0.9;
           if (
             !inside &&
             quests &&
             x + hw > quests.left &&
-            y < quests.bottom + 16
+            y - up < quests.bottom + 8
           )
-            y = quests.bottom + 24;
+            y = quests.bottom + 8 + up;
           el.style.left = `${x}px`;
           el.style.top = `${y}px`;
           el.classList.toggle("is-edge", !inside);

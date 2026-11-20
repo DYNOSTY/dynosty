@@ -56,7 +56,7 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
       gl: scene.getEngine().getGlInfo(),
       scaling: scene.getEngine().getHardwareScalingLevel(),
       villageMeshes:
-        scene.getTransformNodeByName("BLD_OFFICE.glb")?.getChildMeshes()
+        scene.getTransformNodeByName("BLD_OFFICE_v2.glb")?.getChildMeshes()
           .length ?? 0,
       representativeMeshes:
         scene.getTransformNodeByName("example-building-1:glb")?.getChildMeshes()
@@ -145,7 +145,7 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.route("**/models/buildings/BLD_NEST.glb", (r) =>
+  await page.route("**/models/buildings/BLD_ONDOL_v2.glb", (r) =>
     r.fulfill({ status: 404, body: "missing" }),
   );
   await ready(page);

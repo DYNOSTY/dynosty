@@ -95,7 +95,8 @@ const PALETTE = {
   winter: {
     snowA: [0.74, 0.79, 0.88],
     snowB: [0.86, 0.9, 0.97],
-    dirt: [0.34, 0.31, 0.31],
+    // 다져진 눈길(회청) — 짙은 흙색이면 거친 땅 격자에 번져 검은 연기 띠처럼 보였음 (11/20 숲 점검)
+    dirt: [0.58, 0.58, 0.64],
     lip: [0.84, 0.88, 0.95],
     waste: [0.6, 0.65, 0.74],
     fog: [0.6, 0.66, 0.77],
@@ -400,7 +401,7 @@ export function buildWorld(
     let c = mix(P.snowA, P.snowB, Math.max(0, Math.min(1, g)));
     c = mix(c, P.waste, smooth(30, 55, d) * 0.8); // 바깥 황무지는 잿빛
     const wob = Math.sin(x * 0.9) * 0.35 + Math.cos(z * 1.1) * 0.3;
-    const roadW = 1.1 + smooth(25, 60, d) * -0.5; // 마을 밖 길은 좁아지고 눈에 묻힘
+    const roadW = 0.9 + smooth(25, 60, d) * -0.45; // 마을 밖 길은 좁아지고 눈에 묻힘
     const pathD = Math.min(
       d - 7.2 + wob * 1.5,
       ...ROADS.map(
@@ -411,8 +412,8 @@ export function buildWorld(
       c,
       P.dirt,
       (1 - smooth(-0.2, 0.9, pathD)) *
-        (0.8 + noise() * 0.2) *
-        (1 - smooth(40, 62, d) * 0.6),
+        (0.65 + noise() * 0.15) *
+        (1 - smooth(30, 62, d) * 0.75),
     );
     c = mix(c, P.lip, smooth(R - 1.4, R, Math.min(d, R)));
     colors.push(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, 1);
@@ -571,28 +572,47 @@ export function buildWorld(
   const fitTree = (mesh: Mesh, kind: string) => {
     const src = treeGeo?.get(kind);
     if (!src) return;
-    // 코드로 만든 옛 나무와 같은 감김(바깥 방향)이 되게 맞추고, 법선도 옛 나무처럼 감김에서 다시 계산
-    const oldPos = mesh.getVerticesData("position"),
-      oldIx = mesh.getIndices();
+    // 겉면 방향 맞추기: 블렌더가 내보낸 법선이 바깥 방향의 기준(믿을 수 있음).
+    // 감김에서 계산한 법선이 그 법선과 대부분 반대면 감김을 뒤집어 겉면이 앞면이 되게 함 (안 그러면 아랫면이 보이거나 까맣게)
     const vd = new VertexData();
     vd.positions = Array.from(src.positions ?? []);
     vd.colors = Array.from(src.colors ?? []);
     const ix = Array.from(src.indices ?? []);
-    if (
-      oldPos &&
-      oldIx &&
-      Math.sign(windingScore(oldPos, oldIx)) !==
-        Math.sign(windingScore(vd.positions, ix))
-    )
+    const flip = () => {
       for (let i = 0; i < ix.length; i += 3) {
         const t = ix[i + 1] ?? 0;
         ix[i + 1] = ix[i + 2] ?? 0;
         ix[i + 2] = t;
       }
+    };
+    const geomN: number[] = [];
+    VertexData.ComputeNormals(vd.positions, ix, geomN);
+    if (src.normals && src.normals.length === vd.positions.length) {
+      const n = Array.from(src.normals);
+      let agree = 0;
+      for (let i = 0; i < n.length; i += 3)
+        agree +=
+          (n[i] ?? 0) * (geomN[i] ?? 0) +
+          (n[i + 1] ?? 0) * (geomN[i + 1] ?? 0) +
+          (n[i + 2] ?? 0) * (geomN[i + 2] ?? 0);
+      if (agree < 0) flip();
+      vd.normals = n;
+    } else {
+      // 법선이 없으면 코드로 만든 옛 나무와 같은 감김으로 맞추고 감김에서 법선 계산
+      const oldPos = mesh.getVerticesData("position"),
+        oldIx = mesh.getIndices();
+      if (
+        oldPos &&
+        oldIx &&
+        Math.sign(windingScore(oldPos, oldIx)) !==
+          Math.sign(windingScore(vd.positions, ix))
+      )
+        flip();
+      const normals: number[] = [];
+      VertexData.ComputeNormals(vd.positions, ix, normals);
+      vd.normals = normals;
+    }
     vd.indices = ix;
-    const normals: number[] = [];
-    VertexData.ComputeNormals(vd.positions, ix, normals);
-    vd.normals = normals;
     // 이미 thin instance가 붙은 메시의 모양을 제자리에서 바꾸면 그려지지 않음(Babylon) →
     // 새 메시를 만들어 옛 메시의 행렬을 받아 쓰고, 옛 메시는 감춤 (옛 메시는 행렬 보관용으로 남김)
     const fresh = new Mesh(`${mesh.name}-glb`, scene);
@@ -677,16 +697,20 @@ export function buildWorld(
     // 꼭대기 눈 뾰족
     if (P.cap)
       parts.push(frustum(tr, 0.75 + height, 0.45, 0.18, 0.01, 6, P.cap, 0.1));
-    // 세 갈래 중 둘째는 적송, 나머지는 전나무
+    // 네 갈래: 전나무 셋(보통·가늘고 높은·넓고 빽빽한) + 적송 하나 — 같은 나무가 줄지어 보이지 않게
+    // 먼 숲(40m~)은 가벼운 모양(_FAR): 안개 속이라 차이가 안 보이고 그리는 면은 절반
+    const kinds = far
+      ? ["TREE_FIR_FAR", "TREE_PINE_FAR", "TREE_FIR_FAR", "TREE_FIR_FAR"]
+      : ["TREE_FIR", "TREE_PINE", "TREE_FIR_B", "TREE_FIR_C"];
     return hostTree(
       mergedMesh(name, parts, scene, treeMat),
-      v === 1 ? "TREE_PINE" : "TREE_FIR",
+      kinds[v % 4] ?? "TREE_FIR",
     );
   };
-  const pines = [0, 1, 2].map((v) => makePine(v));
-  const pinesFar = [0, 1, 2].map((v) => makePine(v, `pine-far-${v}`, true));
+  const pines = [0, 1, 2, 3].map((v) => makePine(v));
+  const pinesFar = [0, 1, 2, 3].map((v) => makePine(v, `pine-far-${v}`, true));
   const pineAt = (d: number, n: number) =>
-    (d > 40 ? pinesFar : pines)[n % 3] as Mesh;
+    (d > 40 ? pinesFar : pines)[n % 4] as Mesh;
   const cap = P.cap ?? [0.5, 0.45, 0.4];
   const makeStump = (name = "stump") => hostStump(name);
   const hostStump = (name: string) =>
@@ -706,9 +730,36 @@ export function buildWorld(
       "TREE_STUMP",
     );
   const stump = makeStump();
+  // 숲 바닥을 채우는 것들: 어린 전나무·쓰러진 적송·덤불 (자리만 먼저 잡고 모양은 GLB가 오면 바뀜)
+  const holder = (name: string, kind: string) =>
+    hostTree(
+      mergedMesh(
+        name,
+        [frustum(rng(9), 0, 0.3, 0.2, 0.15, 6, cap, 0.1)],
+        scene,
+        treeMat,
+      ),
+      kind,
+    );
+  const youngFir = holder("young-fir", "TREE_FIR_YOUNG");
+  const fallenPine = holder("fallen-pine", "TREE_PINE_FALLEN");
+  const shrub = holder("shrub", "TREE_SHRUB");
   void (async () => {
     const geo = new Map<string, VertexData>();
-    for (const kind of ["TREE_FIR", "TREE_PINE", "TREE_STUMP"]) {
+    for (const kind of [
+      "TREE_FIR",
+      "TREE_FIR_B",
+      "TREE_FIR_C",
+      "TREE_PINE",
+      "TREE_STUMP",
+      "TREE_FIR_YOUNG",
+      "TREE_PINE_FALLEN",
+      "TREE_SHRUB",
+      "TREE_SNAG",
+      "TREE_SNAG_B",
+      "TREE_FIR_FAR",
+      "TREE_PINE_FAR",
+    ]) {
       try {
         const asset = await loadSceneAsset(scene, `/models/trees/${kind}.glb`);
         const inst = asset.instantiateModelsToScene(
@@ -726,10 +777,13 @@ export function buildWorld(
           const c =
             (m.material as { albedoColor?: Color3 } | null)?.albedoColor ??
             Color3.White();
-          const n = m.getTotalVertices();
-          const cols = new Float32Array(n * 4);
-          for (let i = 0; i < n; i++) cols.set([c.r, c.g, c.b, 1], i * 4);
-          m.setVerticesData("color", cols);
+          // 블렌더가 구운 정점 색(그라데이션)이 있으면 그대로, 없으면 재질 색으로 칠함
+          if (!m.isVerticesDataPresent("color")) {
+            const n = m.getTotalVertices();
+            const cols = new Float32Array(n * 4);
+            for (let i = 0; i < n; i++) cols.set([c.r, c.g, c.b, 1], i * 4);
+            m.setVerticesData("color", cols);
+          }
         }
         const merged = Mesh.MergeMeshes(parts, true, true);
         if (merged) {
@@ -768,7 +822,11 @@ export function buildWorld(
         ),
       );
     }
-    return mergedMesh(`dead-${v}`, parts, scene, treeMat);
+    // 프로스트펑크의 얼어붙은 고목 (GLB가 오면 그 모양으로)
+    return hostTree(
+      mergedMesh(`dead-${v}`, parts, scene, treeMat),
+      v ? "TREE_SNAG_B" : "TREE_SNAG",
+    );
   });
   const rockMat = vertexMat("rock-material");
   const rocks = [0, 1].map((v) => {
@@ -814,7 +872,8 @@ export function buildWorld(
     );
     if (Math.hypot(x, z) < 34) shadow(new Vector3(x, y, z), blob * s);
   };
-  for (let n = 0; n < 9000; n++) {
+  // 숲은 한 덩어리로 빽빽하게, 사이사이 얼어붙은 고목 (레퍼런스 프로스트펑크·실록, 11/20)
+  for (let n = 0; n < 12000; n++) {
     const a = r() * Math.PI * 2,
       d = 9 + Math.sqrt(r()) * (R - 11);
     const x = Math.cos(a) * d,
@@ -824,15 +883,20 @@ export function buildWorld(
       roll = r();
     // 마을 둘레(22~27m)는 땔감으로 베어 낸 그루터기 벌판, 27m부터 숲 가장자리
     if (d > 27 && d < 34) {
-      if (roll < 0.16) put(pineAt(d, n), x, z, s, `pine-${n}`, 1.4);
-      else if (roll < 0.18)
+      if (roll < 0.22) put(pineAt(d, n), x, z, s, `pine-${n}`, 1.4);
+      else if (roll < 0.24)
         put(stump, x, z, 0.8 + r() * 0.5, `stump-${n}`, 0.4);
+      else if (roll < 0.3) put(youngFir, x, z, s, `young-${n}`, 0.8);
+      else if (roll < 0.33) put(shrub, x, z, s, `shrub-${n}`, 0.6);
+      else if (roll < 0.36)
+        put(deadTrees[n % 2] as Mesh, x, z, s, `dead-${n}`, 0.7);
       continue;
     }
     if (d > 21 && d <= 27) {
       if (roll < 0.035) put(stump, x, z, 0.8 + r() * 0.5, `stump-${n}`, 0.4);
       else if (roll < 0.04)
         put(deadTrees[n % 2] as Mesh, x, z, s, `dead-${n}`, 0.7);
+      else if (roll < 0.055) put(shrub, x, z, s, `shrub-${n}`, 0.6);
       continue;
     }
     if (d <= 21) {
@@ -840,10 +904,14 @@ export function buildWorld(
       continue;
     }
     // 바깥: 숲, 군데군데 죽은 나무와 바위
-    if (roll < 0.22) put(pineAt(d, n), x, z, s * 1.1, `pine-${n}`, 1.4);
-    else if (roll < 0.235)
+    if (roll < 0.3) put(pineAt(d, n), x, z, s, `pine-${n}`, 1.4);
+    else if (roll < 0.33) put(youngFir, x, z, s, `young-${n}`, 0.8);
+    else if (roll < 0.35) put(shrub, x, z, s, `shrub-${n}`, 0.6);
+    else if (roll < 0.355 && d < 50)
+      put(fallenPine, x, z, s, `fallen-${n}`, 1.2);
+    else if (roll < 0.395)
       put(deadTrees[n % 2] as Mesh, x, z, s, `dead-${n}`, 0.7);
-    else if (roll < 0.245 || (d > R - 3 && roll < 0.4)) {
+    else if (roll < 0.405 || (d > R - 3 && roll < 0.5)) {
       put(
         rocks[n % 2] as Mesh,
         x,
