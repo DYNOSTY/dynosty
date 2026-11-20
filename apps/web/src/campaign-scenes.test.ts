@@ -134,3 +134,24 @@ it("배급 정책과 민심에 따라 창고 이야기를 달리 전하고 혹�
     expect(rumor(4, policy, 40, 60)?.[0]).toBe("영실");
   }
 });
+
+it("성문에서 주민이 배급을 기억하고 민심에 따라 빗장을 들거나 건다", () => {
+  const base = createVillageGame();
+  for (const [rationPolicy, uprising, words] of [
+    ["cap", true, "이쪽 빗장은 내가 들 테니"],
+    ["needs", true, "자, 빗장 듭시다"],
+    ["cap", false, "빗장 걸 거요"],
+    ["needs", false, "내가 걸겠소"],
+  ] as const) {
+    const page = campaignPage({
+      ...base,
+      chapter: 5,
+      rationPolicy,
+      campaign: { ...base.campaign!, beat: "verdict", uprising },
+    });
+    expect(page.lines[1]).toEqual([
+      "푸른 보자기를 맨 주민",
+      expect.stringContaining(words),
+    ]);
+  }
+});

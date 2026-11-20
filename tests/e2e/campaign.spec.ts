@@ -221,7 +221,8 @@ test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 
   await readScene(page, "풀 12를 풀고 대표들과 함께 식사");
   await expect(dialog).toHaveAccessibleName("성문 빗장이 들리던 밤");
   await dialog.getByRole("button", { name: /^다음 대사/ }).click();
-  await expect(dialog).toContainText("오늘은 목진 곁에 섰어");
+  await expect(dialog).toContainText("푸른 보자기를 맨 주민");
+  await expect(dialog).toContainText("이쪽 빗장은 내가 들 테니");
   await dialog.getByRole("button", { name: /^다음 대사/ }).click();
   await expect(dialog).toContainText("충녕 마마가 돌아가셨어요");
   await readScene(page, "판결을 기록하고 의원으로");
