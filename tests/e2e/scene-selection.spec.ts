@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { press } from "./labor-tabs.js";
 import {
   clickExample,
-  clickFloor,
+  clickUnoccupiedGround,
   clickVisibleResident,
   examplePoint,
   outlinePixels,
@@ -71,7 +71,7 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   ).toHaveAttribute("aria-pressed", "false");
   await press(page, "기본 시점");
   await examplePoint(page, "building"); // Wait for the default camera to render.
-  await clickFloor(page);
+  await clickUnoccupiedGround(page);
   await expect(info).toBeHidden();
   await expect
     .poll(async () => outlinePixels(await canvas.screenshot()))

@@ -122,6 +122,32 @@ export async function clickVisibleResident(page: Page) {
   throw new Error("가려지지 않은 주민 표면 없음");
 }
 
+export async function clickUnoccupiedGround(page: Page) {
+  const point = await page.locator("canvas").evaluate((el) => {
+    const { __scene } = window as unknown as {
+      __scene: {
+        pick(x: number, y: number): { pickedMesh: { name: string } | null };
+      };
+    };
+    const rect = el.getBoundingClientRect();
+    for (const fy of [0.6, 0.5, 0.7, 0.4, 0.8, 0.3]) {
+      for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+        const x = Math.round(rect.left + rect.width * fx);
+        const y = Math.round(rect.top + rect.height * fy);
+        if (document.elementFromPoint(x, y) !== el) continue;
+        if (
+          __scene.pick(x - rect.left, y - rect.top).pickedMesh?.name ===
+          "ground"
+        )
+          return { x, y };
+      }
+    }
+    return null;
+  });
+  if (!point) throw new Error("캔버스에서 비어 있는 바닥을 찾지 못했습니다.");
+  await page.mouse.click(point.x, point.y);
+}
+
 export async function clickFloor(page: Page) {
   const canvas = page.locator("canvas");
   await canvas.evaluate((el) =>
