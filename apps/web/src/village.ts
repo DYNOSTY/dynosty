@@ -2,6 +2,7 @@
 import "@babylonjs/loaders/glTF";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
@@ -16,8 +17,13 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
+import {
+  DEPARTURE_SURVIVING_HOME_COUNT,
+  initialHomes,
+} from "@dynosty/game-core";
 import { loadSceneAsset as load } from "./scene-assets.js";
-import { elevation, rng } from "./world.js";
+import { RESTAURANT_CENTER } from "./timber-scene.js";
+import { elevation, rng, type Season } from "./world.js";
 
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
 export const BUILDING_SCALE = 0.75; // 둥지 지붕 1.85m = 목재 체험 보수 표시 높이
@@ -40,6 +46,20 @@ export const LAYOUT: Array<[string, number, number]> = [
   ["BLD_SALVAGE", 9, -20],
   ["BLD_GATE", 0, 23],
 ];
+// 공룡마다 원래 몸집 차이는 살리되, 가장 큰 브라키오사우루스도 둥지 문(약 1.38m) 안으로 들어가게
+// [게임 안 키(m), 모델 키] — 모델은 종과 상관없이 비슷한 크기로 만들어져 있어 종별로 따로 줄임
+const RESIDENT_HEIGHT: Record<string, [number, number]> = {
+  R08_Brachiosaurus: [1.3, 3.63],
+  R07_Parasaurolophus: [1.15, 3.38],
+  R10_Iguanodon: [1.12, 3.27],
+  R05_Gallimimus: [1.0, 3.4],
+  R02_Triceratops: [0.95, 2.77],
+  R01_Pachycephalosaurus: [0.95, 3.52],
+  R03_Velociraptor: [0.8, 3.36],
+  R09_Oviraptor: [0.78, 3.49],
+  R04_Ankylosaurus: [0.75, 2.45],
+  R12_Protoceratops: [0.6, 2.28],
+};
 const RESIDENTS = [
   "R01_Pachycephalosaurus",
   "R02_Triceratops",
@@ -84,6 +104,13 @@ export interface GlbVisual {
   animate(delta: number): void;
   dispose(): void;
 }
+
+export type VillageTargetInfo = {
+  name: string;
+  detail: string;
+  portrait?: string;
+  buildingPosition?: { x: number; z: number };
+};
 
 type Shadow = (
   at: TransformNode,
@@ -150,12 +177,13 @@ type Light = {
 export function createVillage(
   scene: Scene,
   shadow: Shadow,
-  light?: Light,
-  worldRoot?: TransformNode,
+  light: Light,
+  worldRoot: TransformNode,
+  season: Season,
 ) {
   const targets = new Map<
     string,
-    { name: string; detail: string; meshes: AbstractMesh[] }
+    VillageTargetInfo & { meshes: AbstractMesh[] }
   >();
   let marked: string | null = null;
   function mark(id: string | null) {
@@ -201,7 +229,7 @@ export function createVillage(
   plinthMat.specularColor = Color3.Black();
   plinthMat.freeze();
   const place = async (
-    url: string,
+    model: string,
     x: number,
     z: number,
     yaw: number,
@@ -211,15 +239,32 @@ export function createVillage(
     depth = 3.8,
     role?: "walk" | Omit<Hauler, "state" | "timer">,
   ) => {
-    const asset = await load(scene, url);
+    let winter = season === "winter";
+    const folder = role ? "residents" : "buildings";
+    const asset = await load(
+      scene,
+      `/models/${folder}/${model}${winter ? "_v2" : ""}.glb`,
+    ).catch((error: unknown) => {
+      if (!winter || disposed) throw error;
+      winter = false;
+      return load(scene, `/models/${folder}/${model}.glb`);
+    });
     if (disposed) return;
-    const node = new TransformNode(url.split("/").pop() ?? "glb", scene);
-    node.parent = worldRoot ?? null;
+    // Keep scene/selection identities independent of the asset variant.
+    const node = new TransformNode(`${model}.glb`, scene);
+    node.parent = worldRoot;
     node.position.set(x, elevation(x, z), z);
     node.rotation.y = yaw;
     nodes.push(node);
-    const v = instantiate(asset, node, scale, shadow, radius, depth);
-    const model = node.name.replace(".glb", "");
+    const height = winter && role ? RESIDENT_HEIGHT[model] : undefined;
+    const v = instantiate(
+      asset,
+      node,
+      height ? height[0] / height[1] : scale,
+      shadow,
+      radius,
+      depth,
+    );
     const id = "village:" + model + ":" + x + ":" + z;
     const detail = !role
       ? "복홀 · 마을 시설"
@@ -229,6 +274,11 @@ export function createVillage(
     targets.set(id, {
       name: villageNames[model] ?? model,
       detail,
+      // Only the fixed village buildings have a matching concept portrait.
+      ...(!role && {
+        portrait: `/ui/buildings/${model}.jpg`,
+        buildingPosition: { x, z },
+      }),
       meshes: v.meshes,
     });
     for (const m of v.meshes) {
@@ -240,6 +290,17 @@ export function createVillage(
     }
     if (!role) {
       node.computeWorldMatrix(true);
+      if (winter) {
+        const smoke = smokeByBuilding.get(model);
+        const chimney = node
+          .getDescendants()
+          .find(
+            (child): child is TransformNode =>
+              child instanceof TransformNode && child.name.endsWith(":smoke"),
+          );
+        if (smoke && chimney)
+          smoke.emitter = chimney.computeWorldMatrix(true).getTranslation();
+      }
       for (const m of v.meshes) {
         m.computeWorldMatrix(true);
         m.freezeWorldMatrix();
@@ -249,8 +310,8 @@ export function createVillage(
     }
     if (clip) v.play(clip, r());
     disposers.push(v.dispose);
-    const door = DOOR[url.split("/").pop()?.replace(".glb", "") ?? ""];
-    if (door && light) {
+    const door = winter ? undefined : DOOR[model];
+    if (door) {
       const lamp = CreateBox(
         `${node.name}-door`,
         { width: 1.1, height: 0.95, depth: 0.06 },
@@ -279,13 +340,7 @@ export function createVillage(
   const jobs: Array<Promise<void>> = LAYOUT.filter(
     ([id]) => id !== "BLD_NEST",
   ).map(([id, x, z]) =>
-    place(
-      `/models/buildings/${id}.glb`,
-      x,
-      z,
-      id === "BLD_GATE" ? Math.PI : face(x, z),
-      BUILDING_SCALE,
-    ),
+    place(id, x, z, id === "BLD_GATE" ? Math.PI : face(x, z), BUILDING_SCALE),
   );
 
   // 등에 지는 짐 (모델 단위: 주민 0.5배 안에서 등 높이)
@@ -355,7 +410,7 @@ export function createVillage(
       const work = spot(haul[0]);
       jobs.push(
         place(
-          `/models/residents/${file}.glb`,
+          file,
           work.x,
           work.z,
           r() * Math.PI * 2,
@@ -363,7 +418,11 @@ export function createVillage(
           "Idle",
           1.3,
           2,
-          { work, store: store.clone(), prop: makeProp(haul[1]) },
+          {
+            work,
+            store: store.clone(),
+            prop: makeProp(haul[1]),
+          },
         ),
       );
       return;
@@ -372,7 +431,7 @@ export function createVillage(
       d = 5 + r() * 3;
     jobs.push(
       place(
-        `/models/residents/${file}.glb`,
+        file,
         Math.cos(a) * d,
         Math.sin(a) * d,
         r() * Math.PI * 2,
@@ -399,13 +458,14 @@ export function createVillage(
   puff.update();
   puff.hasAlpha = true;
   const fires = [
-    [-7, -20],
-    [15, 0],
-    [-11, -9],
-  ].map(([x = 0, z = 0], i) => {
+    { ...RESTAURANT_CENTER, height: 0.55 },
+    ...initialHomes()
+      .slice(DEPARTURE_SURVIVING_HOME_COUNT)
+      .map(({ position }) => ({ ...position, height: 1.8 })),
+  ].map(({ x, z, height }, i) => {
     const fire = new ParticleSystem("처마 불길-" + i, 90, scene);
     fire.particleTexture = puff;
-    fire.emitter = new Vector3(x, elevation(x, z) + 1.8, z);
+    fire.emitter = new Vector3(x, elevation(x, z) + height, z);
     fire.minEmitBox = new Vector3(-1, 0, -0.5);
     fire.maxEmitBox = new Vector3(1, 0, 0.5);
     fire.direction1 = new Vector3(-0.4, 1.8, -0.2);
@@ -426,6 +486,7 @@ export function createVillage(
     BLD_GREENHOUSE: 2.4,
     BLD_CLINIC: 2.2,
   };
+  const smokeByBuilding = new Map<string, ParticleSystem>();
   const smokes = LAYOUT.filter(([id]) => id in CHIMNEY).map(([id, x, z], i) => {
     const ps = new ParticleSystem(`smoke-${i}`, 80, scene);
     ps.particleTexture = puff;
@@ -446,6 +507,7 @@ export function createVillage(
     ps.colorDead = new Color4(0.95, 0.95, 0.97, 0);
     ps.emitRate = 7;
     ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    smokeByBuilding.set(id, ps);
     return ps;
   });
 
@@ -778,6 +840,28 @@ export function createVillage(
       light.glow.addIncludedOnlyMesh(lamp);
       lamp.setEnabled(false);
     }
+    // 겨울 연출만: 대표 둥지의 입구 주변 표면에만 따뜻한 빛을 반사한다.
+    // 기존 입주·시각에 따른 문 불빛(setLit)은 계절에 관계없이 그대로 둔다.
+    const ondolMeshes =
+      season === "winter" &&
+      kind === "building" &&
+      parent.id === "example-building-1"
+        ? v.meshes.filter((mesh) => mesh.getTotalVertices() > 0)
+        : [];
+    let ondolGlow: PointLight | undefined;
+    if (ondolMeshes.length > 0) {
+      ondolGlow = new PointLight(
+        "representative-ondol-glow",
+        new Vector3(0, 1, 3.25),
+        scene,
+      );
+      ondolGlow.includedOnlyMeshes = ondolMeshes;
+      ondolGlow.parent = node;
+      ondolGlow.diffuse = new Color3(1, 0.53, 0.22);
+      ondolGlow.specular = Color3.Black();
+      ondolGlow.intensity = 0.18;
+      ondolGlow.range = 2;
+    }
     v.play("Idle", 0);
     return {
       setLit(value) {
@@ -795,6 +879,7 @@ export function createVillage(
       },
       animate() {},
       dispose() {
+        ondolGlow?.dispose();
         v.dispose();
         node.dispose();
       },
@@ -810,14 +895,12 @@ export function createVillage(
       herald.setEnabled(false);
       writ.setEnabled(false);
     },
-    setFireDamage(burned: boolean, burning: boolean) {
-      for (const fire of fires) {
-        if (burning && !fire.isStarted()) fire.start();
-        if (!burning && fire.isStarted()) fire.stop();
+    setDepartureFire(burning: boolean, restaurantBuilt: boolean) {
+      for (const [i, fire] of fires.entries()) {
+        const active = burning && (i > 0 || restaurantBuilt);
+        if (active && !fire.isStarted()) fire.start();
+        if (!active && fire.isStarted()) fire.stop();
       }
-      for (const node of nodes)
-        if (["BLD_CLINIC.glb", "BLD_WORKSHOP.glb"].includes(node.name))
-          node.setEnabled(!burned);
     },
     setPreviewResidentsVisible(visible: boolean) {
       for (const walker of walkers) walker.node.setEnabled(visible);

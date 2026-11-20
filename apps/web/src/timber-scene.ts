@@ -15,6 +15,12 @@ import {
 } from "@dynosty/game-core";
 import { createLoggingVisual } from "./logging-scene.js";
 import { terrainElevation } from "./terrain.js";
+
+export const RESTAURANT_CENTER = {
+  x: TIMBER_RULES.restaurant.x + 1.2,
+  z: TIMBER_RULES.restaurant.z + 1.2,
+};
+
 export function createTimberVisual(scene: Scene) {
   const loggingVisual = createLoggingVisual(scene);
   const brown = new StandardMaterial("timber-cart-material", scene);
@@ -78,11 +84,7 @@ export function createTimberVisual(scene: Scene) {
     { width: 4.5, height: 0.18, depth: 4.5 },
     scene,
   );
-  restaurant.position.set(
-    TIMBER_RULES.restaurant.x + 1.2,
-    0.15,
-    TIMBER_RULES.restaurant.z + 1.2,
-  );
+  restaurant.position.set(RESTAURANT_CENTER.x, 0.15, RESTAURANT_CENTER.z);
   restaurant.material = brown;
   parts.push(restaurant);
   const mealTable = CreateBox(
@@ -90,11 +92,7 @@ export function createTimberVisual(scene: Scene) {
     { width: 3.6, height: 0.6, depth: 0.6 },
     scene,
   );
-  mealTable.position.set(
-    TIMBER_RULES.restaurant.x + 1.2,
-    0.55,
-    TIMBER_RULES.restaurant.z + 1.2,
-  );
+  mealTable.position.set(RESTAURANT_CENTER.x, 0.55, RESTAURANT_CENTER.z);
   mealTable.material = dry;
   parts.push(mealTable);
   const buildSite = new TransformNode("village-construction", scene);

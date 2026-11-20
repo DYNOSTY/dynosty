@@ -630,12 +630,13 @@ export type CitizenEvent =
 export function applyCitizenEvent(
   input: PlayState,
   event: CitizenEvent,
+  record = true,
 ): PlayState {
   const s = parsePlayState(input);
   text(event.id);
   if (event.id.length > 100) fail();
   if (s.citizenEvents?.includes(event.id)) return s;
-  if ((s.citizenEvents?.length ?? 0) >= 2000) fail();
+  if (record && (s.citizenEvents?.length ?? 0) >= 2000) fail();
   let citizens = [...s.citizens];
   if (event.type === "mechanize") {
     const source = citizens.find((c) => c.id === event.sourceCitizenId);
@@ -715,7 +716,7 @@ export function applyCitizenEvent(
   return parsePlayState({
     ...s,
     citizens,
-    citizenEvents: [...(s.citizenEvents ?? []), event.id],
+    ...(record && { citizenEvents: [...(s.citizenEvents ?? []), event.id] }),
   });
 }
 export function advancePlayClock(input: PlayState, minutes: number): PlayState {

@@ -138,12 +138,14 @@ export function CampaignPanel({
   command,
   trade,
   officeSelected,
+  clearOfficeSelection,
   work,
 }: {
   state: TimberState;
   command: (cmd: TimberCommand) => void;
   trade: boolean;
   officeSelected?: boolean;
+  clearOfficeSelection: () => void;
   work: boolean;
 }) {
   const c = campaignOf(s);
@@ -157,10 +159,9 @@ export function CampaignPanel({
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
   const [petition, setPetition] = useState(false);
-  const [office, setOffice] = useState(false);
-  useEffect(() => {
-    if (officeSelected) setOffice(true);
-  }, [officeSelected]);
+  const [manualOffice, setManualOffice] = useState(false);
+  const canOpenOffice = !["opening", "departure"].includes(c.beat);
+  const office = canOpenOffice && (manualOffice || officeSelected);
   const [sound, setSound] = useState(false);
   const { audioRef } = useAudio();
   const canPetition =
@@ -267,12 +268,15 @@ export function CampaignPanel({
         {s.chapter ?? 1}단계 · {CHAPTERS[(s.chapter ?? 1) - 1]}
         <small>{p.goal || p.title}</small>
       </button>
-      {!["opening", "departure"].includes(c.beat) && (
+      {canOpenOffice && (
         <button
           type="button"
           className="scout-all"
           aria-expanded={office}
-          onClick={() => setOffice(!office)}
+          onClick={() => {
+            if (office && officeSelected) clearOfficeSelection();
+            setManualOffice(!office);
+          }}
         >
           관아 · 순라 배치
         </button>
