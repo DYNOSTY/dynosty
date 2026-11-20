@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { PNG } from "pngjs";
 
 // 기존 예제의 고정 카메라(거리 12, 고도 π/3, FOV 0.8)로 월드 좌표를
@@ -71,10 +71,9 @@ export async function clickExample(
 export async function clickVisibleResident(page: Page) {
   const canvas = page.locator("canvas");
   await canvas.scrollIntoViewIfNeeded();
-  const result: { point: { x: number; y: number } | null } = { point: null };
-  await expect(async () => {
+  for (let view = 0; view < 6; view++) {
     const center = await examplePoint(page, "resident");
-    result.point = await canvas.evaluate((el, origin) => {
+    const point = await canvas.evaluate((el, origin) => {
       type Mesh = { name: string; parent: Mesh | null };
       const { __scene } = window as unknown as {
         __scene: { pick(x: number, y: number): { pickedMesh: Mesh | null } };
@@ -97,10 +96,21 @@ export async function clickVisibleResident(page: Page) {
       }
       return null;
     }, center);
-    expect(result.point, "가려지지 않은 주민 표면").not.toBeNull();
-  }).toPass({ timeout: 10_000 });
-  if (!result.point) throw new Error("가려지지 않은 주민 표면 없음");
-  await page.mouse.click(result.point.x, result.point.y);
+    if (point) {
+      await page.mouse.click(point.x, point.y);
+      return;
+    }
+    // Orbit using normal pointer input if the starting view hides the resident.
+    const box = await canvas.boundingBox();
+    if (!box) break;
+    const x = box.x + box.width * 0.25;
+    const y = box.y + box.height * 0.4;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + box.width * 0.5, y, { steps: 12 });
+    await page.mouse.up();
+  }
+  throw new Error("가려지지 않은 주민 표면 없음");
 }
 
 export async function clickFloor(page: Page) {
