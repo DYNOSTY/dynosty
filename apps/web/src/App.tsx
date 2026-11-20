@@ -851,6 +851,8 @@ export function App() {
           <CampaignPanel
             state={timberState}
             command={(cmd) => villageCommand.current?.(cmd)}
+            officeSelected={!!selectedId?.startsWith("village:BLD_OFFICE:")}
+            clearOfficeSelection={clearSelection}
             trade={showTrade}
             work={
               villageSection?.label === "건설과 식량 수급" ||
@@ -1718,6 +1720,12 @@ export function App() {
                   ? [
                       ...(timberState
                         ? [
+                            ...(timberState.decree
+                              ? [
+                                  timberState.decree.title,
+                                  timberState.decree.reaction,
+                                ]
+                              : []),
                             "정책 시행 · " +
                               (timberState.rationPolicy === "cap"
                                 ? "식단별 상한 배급"

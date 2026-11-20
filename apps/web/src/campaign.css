@@ -11,6 +11,21 @@
 .play-shell .g-quests > .campaign-quest {
   display: grid;
 }
+.campaign-advisory {
+  margin: 0;
+  max-width: 32em;
+  padding: 0.5em 0.75em;
+  background: #392d25;
+  color: #fff2d6;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.campaign-dialog .campaign-advisory {
+  margin-bottom: 0.75em;
+}
 .campaign-dialog {
   position: fixed;
   inset: 0;
@@ -127,5 +142,58 @@
   .campaign-speech .patrol-portrait {
     width: 48px;
     height: 54px;
+  }
+}
+
+.office-panel,
+.office-decree {
+  background: #302b24;
+  color: #fff4d9;
+  padding: 0.6rem;
+  max-width: 19rem;
+}
+.office-panel img {
+  width: 100%;
+  max-height: 9rem;
+  object-fit: cover;
+}
+.office-decree small,
+.office-panel strong {
+  display: block;
+}
+.office-herald {
+  display: inline-block;
+  animation: deliver-decree 1.3s ease-out;
+}
+.office-decree strong {
+  display: inline-block;
+  animation: pin-decree 1.4s ease-out;
+  background: #ecd39b;
+  color: #392816;
+  padding: 0.2em 0.5em;
+}
+@keyframes deliver-decree {
+  from {
+    transform: translateX(-3rem);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes pin-decree {
+  0%,
+  75% {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .office-herald,
+  .office-decree strong {
+    animation: none;
   }
 }

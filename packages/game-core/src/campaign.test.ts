@@ -1,7 +1,8 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import {
   campaignOf,
   campaignOutcome,
+  emergencyRation,
   lostPatrol,
   newCampaign,
   returnedScouts,
@@ -12,6 +13,7 @@ import { RESEARCH_CATALOG } from "./development.js";
 import { AMOUNT_SCALE } from "./play.js";
 import { SCOUT_SITES } from "./scout-sites.js";
 import {
+  advanceTimber,
   commandTimber,
   createTimberSave,
   createTimberState,
@@ -148,12 +150,14 @@ it.each([
 
 it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹한과 열흘 평가를 이어 저장한다", () => {
   let s = restore(createVillageGame(true));
-  expect(s.residents).toHaveLength(300);
+  expect(s.residents).toHaveLength(600);
   expect(new Set(Object.values(s.world.resources))).toEqual(
     new Set([10000 * AMOUNT_SCALE]),
   );
   s = restore(act(s, "next"));
   s = act(s, "leave");
+  expect(s.world.pessimism).toBe(30);
+  expect(s.homes).toHaveLength(2);
   expect(s.residents).toHaveLength(60);
   expect(new Set(Object.values(s.world.resources))).toEqual(
     new Set([1000 * AMOUNT_SCALE]),
@@ -200,7 +204,7 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(control.campaign?.beat).toBe("rally");
   expect(() => act(control, "next")).toThrow();
   control = act(control, "listen");
-  expect(control.world.pessimism).toBe(47);
+  expect(control.world.pessimism).toBe(48);
   control = act(control, "next");
   expect(control.town.development.story.chungnyeong).toBe("dead");
   control = later(control, 10 * 1440);
@@ -229,27 +233,67 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   ).toBeNull();
 });
 
-it.each([
-  ["pessimism", 100, 99],
-  ["optimism", 0, 1],
-] as const)(
-  "%s 극단값이 24시간 연속일 때만 추방하고 저장·회복을 처리한다",
-  (metric, extreme, recovered) => {
-    const start = {
-      ...createVillageGame(),
-      chapter: 5 as const,
-      campaign: newCampaign("vigil"),
-    };
-    const set = (s: TimberState, value: number) =>
-      updateCampaign({ ...s, world: { ...s.world, [metric]: value } });
-    const before = later(restore(set(start, extreme)), 1439);
+it.each([1, 2, 3, 4, 5] as const)(
+  "단계 %i에서 99는 버티고 100에 닿으면 난이도에 따라 추방된다",
+  (chapter) => {
+    const base = createVillageGame();
+    const s = restore({
+      ...base,
+      ...(chapter === 1 ? {} : { chapter }),
+      campaign: newCampaign(
+        (["patrol", "roads", "capital", "winter", "vigil"] as const)[
+          chapter - 1
+        ]!,
+      ),
+      world: { ...base.world, pessimism: 99 },
+    });
+    expect(campaignOutcome(s)).toBeNull();
+    const grace = act(s, "reserve");
+    expect(grace.campaign?.ending).toBeNull();
+    const before = restore(later(grace, 1439));
     expect(before.campaign?.ending).toBeNull();
-    expect(later(restore(before), 1).campaign?.ending).toBe("collapse");
-    const reset = set(set(before, recovered), extreme);
-    expect(later(reset, 1).campaign?.ending).toBeNull();
-    expect(later(reset, 1440).campaign?.ending).toBe("collapse");
+    expect(later(before, 1).campaign?.ending).toBe("collapse");
+    const recovered = updateCampaign({
+      ...before,
+      world: { ...before.world, pessimism: 99 },
+    });
+    const relapse = updateCampaign({
+      ...recovered,
+      world: { ...recovered.world, pessimism: 100 },
+    });
+    expect(later(relapse, 1).campaign?.ending).toBeNull();
+    const end = act(
+      { ...s, campaign: { ...s.campaign!, difficulty: "hard" } },
+      "reserve",
+    );
+    expect(end.elapsed).toBe(s.elapsed);
+    expect(end.paused).toBe(true);
+    expect(restore(end).campaign?.ending).toBe("collapse");
   },
 );
+it("지지가 완전히 사라진 상태는 저장을 이어 24시간 지속될 때 추방한다", () => {
+  const start = {
+    ...createVillageGame(),
+    chapter: 5 as const,
+    campaign: newCampaign("vigil"),
+  };
+  const set = (s: TimberState, optimism: number) =>
+    updateCampaign({ ...s, world: { ...s.world, optimism } });
+  const hard = restore({
+    ...start,
+    campaign: { ...start.campaign, difficulty: "hard" },
+  });
+  expect(set(hard, 1).campaign?.ending).toBeNull();
+  const expelled = set(hard, 0);
+  expect(expelled.elapsed).toBe(hard.elapsed);
+  expect(restore(expelled).campaign?.ending).toBe("collapse");
+  const before = later(restore(set(start, 0)), 1439);
+  expect(before.campaign?.ending).toBeNull();
+  expect(later(restore(before), 1).campaign?.ending).toBe("collapse");
+  const reset = set(set(before, 1), 0);
+  expect(later(reset, 1).campaign?.ending).toBeNull();
+  expect(later(reset, 1440).campaign?.ending).toBe("collapse");
+});
 it("주민 청은 하루 한 번만 비용과 민심을 바꾸고 이전 저장의 출문은 재연하지 않는다", () => {
   const s = createVillageGame();
   const n = act(s, "share");
@@ -264,4 +308,203 @@ it("주민 청은 하루 한 번만 비용과 민심을 바꾸고 이전 저장�
   expect(() =>
     restore({ ...s, campaign: { ...newCampaign("patrol"), treaties: [1, 1] } }),
   ).toThrow();
+});
+
+it.each(["control", "coexist"] as const)(
+  "식량 위기에서 %s 비상 배급의 비용과 하루 집행 기록을 보존한다",
+  (side) => {
+    const base = createVillageGame();
+    const s: TimberState = {
+      ...base,
+      chapter: 5,
+      campaign: { ...newCampaign("vigil"), side },
+      world: {
+        ...base.world,
+        pessimism: 20,
+        resources: { ...base.world.resources, RES_MEAT: 0 },
+      },
+    };
+    const target = emergencyRation(s);
+    expect(target).toBeTruthy();
+    const action = `ration:${s.world.day}:${target}`;
+    const n = restore(act(s, action));
+    expect(n.world.resources.RES_MEAT).toBe(8 * AMOUNT_SCALE);
+    expect(n.world.resources.RES_WOOD).toBe(
+      s.world.resources.RES_WOOD - (side === "coexist" ? 12 * AMOUNT_SCALE : 0),
+    );
+    expect(n.world.citizens.filter((p) => p.alive)).toHaveLength(
+      s.world.citizens.length - (side === "control" ? 1 : 0),
+    );
+    expect(n.world.pessimism).toBe(side === "control" ? 32 : 18);
+    expect(emergencyRation(n)).toBeUndefined();
+    expect(() => act(n, action)).toThrow();
+    expect(emergencyRation(later(n, 1440))).toBeTruthy();
+  },
+);
+
+it("재건 중 순라 인원과 배식소 부상을 실제 주민에게 기록한다", () => {
+  let s = createVillageGame(false, true);
+  for (const count of [4, 8, 16, 4, 0] as const) {
+    s = commandTimber(
+      s,
+      { type: "set-guards", count },
+      "guards-" + s.processed.length,
+    );
+    expect(
+      restore(s).residents.filter((r) => r.workplaceId === "office"),
+    ).toHaveLength(count);
+  }
+  s = commandTimber(s, { type: "set-ration-policy", policy: "cap" }, "decree");
+  expect(s.decree?.title).toBe("식단별 배급 상한");
+  expect(s.world.pessimism).toBe(31);
+  s = commandTimber(s, { type: "set-ration-policy", policy: "cap" }, "same");
+  expect(s.decree?.serial).toBe(1);
+  s = commandTimber(
+    { ...s, restaurantBuilt: true, logging: { ...s.logging, built: true } },
+    { type: "advance", minutes: 1 },
+    "fight",
+  );
+  expect(s.openingFight).toBe(true);
+  expect(s.world.citizens.filter((r) => r.health === "sick")).toHaveLength(2);
+});
+
+it("자동 화재와 추방이 같은 분에 일어나면 그 분에서 멈춘다", () => {
+  const base = createVillageGame(false, true);
+  const state: TimberState = {
+    ...base,
+    elapsed: 1439,
+    openingFight: true,
+    campaign: { ...newCampaign("vigil"), pessimismExtremeSince: 0 },
+    world: { ...base.world, minute: 1439, pessimism: 100 },
+  };
+  const random = vi.spyOn(Math, "random").mockReturnValue(0.2);
+  try {
+    random.mockReturnValueOnce(0.2).mockReturnValueOnce(0.8);
+    const result = advanceTimber(state, 10);
+    expect(result.buildingHealth).toBe(base.buildingHealth - 25);
+    expect(result.campaign?.ending).toBe("collapse");
+    expect(result.elapsed).toBe(1440);
+    expect(advanceTimber(result, 1).elapsed).toBe(1440);
+  } finally {
+    random.mockRestore();
+  }
+});
+
+it("명령 기록이 가득 차도 자동 화재는 시간 진행을 막지 않는다", () => {
+  const base = createVillageGame(false, true);
+  const state: TimberState = {
+    ...base,
+    elapsed: 1439,
+    openingFight: true,
+    world: { ...base.world, minute: 1439 },
+    processed: Array.from({ length: 1999 }, (_, i) => `command-${i}`),
+  };
+  const random = vi.spyOn(Math, "random").mockReturnValue(0.2);
+  try {
+    random.mockReturnValueOnce(0.2).mockReturnValueOnce(0.8);
+    const result = advanceTimber(state, 1);
+    expect(result.elapsed).toBe(1440);
+    expect(result.buildingHealth).toBe(base.buildingHealth - 25);
+    expect(result.processed).toEqual(state.processed);
+  } finally {
+    random.mockRestore();
+  }
+});
+
+it("자동 배식소 다툼은 마지막 사용자 명령 기록 자리를 차지하지 않는다", () => {
+  const base = createVillageGame(false, true);
+  const state: TimberState = {
+    ...base,
+    restaurantBuilt: true,
+    logging: { ...base.logging, built: true },
+    processed: Array.from({ length: 1998 }, (_, i) => `command-${i}`),
+  };
+  const result = commandTimber(state, { type: "advance", minutes: 1 }, "step");
+  expect(result.openingFight).toBe(true);
+  expect(result.world.citizens.filter((r) => r.health === "sick")).toHaveLength(
+    2,
+  );
+  expect(result.processed).toEqual([...state.processed, "step"]);
+});
+
+it("기존 저장의 주민 사건 기록이 가득 차도 자동 다툼을 처리한다", () => {
+  const base = createVillageGame();
+  const before = restore({
+    ...base,
+    elapsed: 1439,
+    world: {
+      ...base.world,
+      minute: 1439,
+      citizenEvents: Array.from({ length: 2000 }, (_, i) => `event-${i}`),
+    },
+  });
+  const random = vi.spyOn(Math, "random").mockReturnValue(0);
+  try {
+    const after = advanceTimber(before, 1);
+    expect(after.elapsed).toBe(1440);
+    expect(
+      after.world.citizens.filter((citizen) => citizen.health === "sick"),
+    ).toHaveLength(2);
+    expect(after.world.citizenEvents).toEqual(before.world.citizenEvents);
+    expect(after.history.at(-1)?.text).toBe(
+      "마을에서 다툼이 벌어져 주민 둘이 다쳤습니다.",
+    );
+  } finally {
+    random.mockRestore();
+  }
+});
+
+it("같은 날 배급 전환을 반복해도 민심이 누적되지 않고 새날에는 다시 반응한다", () => {
+  const base = createVillageGame(false, true);
+  const change = (state: TimberState, policy: "needs" | "cap", id: string) =>
+    commandTimber(state, { type: "set-ration-policy", policy }, id);
+  const first = restore(change(base, "cap", "first"));
+  expect(first.world.pessimism).toBe(base.world.pessimism + 1);
+  const back = change(first, "needs", "back");
+  const again = change(back, "cap", "again");
+  expect(back.rationPolicy).toBe("needs");
+  expect(back.decree?.title).toBe("필요량에 따른 배급");
+  expect(back.world.optimism).toBe(first.world.optimism);
+  expect(again.world.pessimism).toBe(first.world.pessimism);
+
+  const nextDay = {
+    ...again,
+    world: { ...again.world, day: again.world.day + 1 },
+  };
+  expect(change(nextDay, "needs", "day-two").world.optimism).toBe(
+    first.world.optimism + 1,
+  );
+});
+
+it("재건 표시가 없는 기존 저장에서도 포졸 배치가 일일 화재 확률을 낮춘다", () => {
+  const base = createVillageGame();
+  const oldSave = createTimberSave({
+    ...base,
+    elapsed: 1439,
+    world: { ...base.world, minute: 1439 },
+  });
+  const data = JSON.parse(JSON.stringify(oldSave));
+  delete data.state.rebuilding;
+  const state = parseTimberSave(data).state;
+  const withGuards = restore(
+    commandTimber(state, { type: "set-guards", count: 4 }, "patrol"),
+  );
+  expect(
+    withGuards.residents.filter((r) => r.workplaceId === "office"),
+  ).toHaveLength(4);
+
+  const random = vi.spyOn(Math, "random");
+  try {
+    // This roll is below 24%, but above the 12% threshold with four guards.
+    random.mockReturnValueOnce(0.18).mockReturnValue(0.8);
+    expect(advanceTimber(state, 1).buildingHealth).toBe(
+      base.buildingHealth - 25,
+    );
+    random.mockReturnValueOnce(0.18);
+    expect(advanceTimber(withGuards, 1).buildingHealth).toBe(
+      base.buildingHealth,
+    );
+  } finally {
+    random.mockRestore();
+  }
 });

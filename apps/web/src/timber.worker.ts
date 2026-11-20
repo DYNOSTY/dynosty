@@ -6,6 +6,7 @@ import {
   createVillageGame,
   parseTimberSave,
   tickTimber,
+  updateCampaign,
 } from "@dynosty/game-core";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 
@@ -16,7 +17,7 @@ function resumeVillage(data: unknown) {
     saved.campaign || !saved.town.development.story.rebellion
       ? { campaign: campaignOf(saved) }
       : {};
-  return { ...saved, ...campaign, paused: true, remainder: 0 };
+  return updateCampaign({ ...saved, ...campaign, paused: true, remainder: 0 });
 }
 let state = createVillageGame(true),
   last = performance.now();

@@ -5,6 +5,7 @@ import {
   createVillageGame,
   SCOUT_SITES,
 } from "../../packages/game-core/dist/index.js";
+import { worldPoint } from "./scene-picking.js";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -12,35 +13,109 @@ async function readScene(page: Page, label: string) {
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   const next = dialog.getByRole("button", { name: /^다음 대사/ });
-  while (await next.count()) await next.click();
-  await dialog.getByRole("button", { name: label, exact: true }).click();
+  const choice = dialog.getByRole("button", { name: label, exact: true });
+  await expect(next.or(choice)).toBeVisible();
+  while (!(await choice.isVisible())) {
+    const current = dialog.getByRole("button", {
+      name: (await next.textContent())?.trim(),
+      exact: true,
+    });
+    await expect(current).toBeEnabled();
+    await current.dispatchEvent("click");
+    await expect(current).toHaveCount(0);
+    await expect(next.or(choice)).toBeVisible();
+  }
+  await expect(choice).toBeEnabled();
+  await choice.dispatchEvent("click");
 }
-test("출문을 눈으로 확인하고 장면을 접었다 돌아와도 재고가 중복 차감되지 않는다", async ({
+test("출문 후 새로고침해도 난이도와 인구·재고가 보존된다 (WebGL 없이)", async ({
   page,
 }) => {
-  // Three 3D loads and the complete prologue share this budget on software-rendered CI.
-  test.setTimeout(240_000);
+  // Exercise the real UI, Worker and autosave without software 3D contention.
+  await page.addInitScript(() => {
+    const prototype = HTMLCanvasElement.prototype;
+    prototype.getContext = new Proxy(prototype.getContext, {
+      apply(target, canvas, args) {
+        if (/webgl/i.test(String(args[0]))) return null;
+        return Reflect.apply(target, canvas, args);
+      },
+    });
+  });
   await page.goto("/");
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveAccessibleName("별이 진 뒤, 복홀");
-  await expect(page.getByTestId("play-population")).toContainText("300");
+  await expect(page.getByTestId("play-population")).toContainText("600");
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("10,000");
-  await readScene(page, "복홀 성문으로");
+  await readScene(page, "어려움 · 복홀 성문으로");
   await expect(dialog).toHaveAccessibleName("목진이 문을 열어 달라고 했다");
   await page.reload();
   await expect(dialog).toHaveAccessibleName("목진이 문을 열어 달라고 했다");
   await readScene(page, "성문을 열고 남은 장부 확인");
   await expect(page.getByTestId("play-population")).toContainText("60");
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,000");
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
+          .campaign.difficulty,
+    ),
+  ).toBe("hard");
   await readScene(page, "남은 예순 명과 시작");
+  await page.getByRole("button", { name: "관아 · 순라 배치" }).click();
+  const office = page.getByRole("region", { name: "관아" });
+  await office.getByRole("button", { name: "1단계 · 4명" }).click();
+  await expect(office).toContainText("순라 포졸 4명");
+  await page.getByRole("button", { name: "관아 · 순라 배치" }).click();
   await page.getByRole("button", { name: "주민의 청 듣기" }).click();
   await expect(dialog.locator(".patrol-portrait")).toBeVisible();
   await readScene(page, "어류 4를 내어 병상까지 배달");
   await expect(page.getByTestId("resource-RES_FISH")).toHaveText("996");
   await page.reload();
   await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId("play-population")).toContainText("60");
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,000");
   await expect(page.getByTestId("resource-RES_FISH")).toHaveText("996");
 });
+
+test("출문 대화 중 실제 3D 장면에서 불길이 그려진다", async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 600 });
+  // Start at the actual departure beat without replaying the prologue.
+  const save = createTimberSave(
+    commandTimber(
+      createVillageGame(true),
+      { type: "campaign", beat: "opening", action: "hard" },
+      "visual-departure",
+    ),
+  );
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "목진이 문을 열어 달라고 했다",
+  );
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+    { timeout: 60_000 },
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const { __scene } = window as unknown as {
+          __scene: {
+            particleSystems: { name: string; getActiveCount(): number }[];
+          };
+        };
+        return __scene.particleSystems
+          .filter((system) => system.name.startsWith("처마 불길-"))
+          .reduce((count, system) => count + system.getActiveCount(), 0);
+      }),
+    )
+    .toBeGreaterThan(0);
+});
+
 test("함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단계는 플레이어가 선택한다", async ({
   page,
 }) => {
@@ -84,6 +159,111 @@ test("함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단
         .getByRole("button", { name: new RegExp("^" + name + " ·") }),
     ).toBeVisible();
   }
+});
+test("밤에 달이가 배급령 변경을 재촉하고 주민 청을 거절하면 그 자리에서 추방된다", async ({
+  page,
+}) => {
+  const start = createVillageGame();
+  const save = createTimberSave({
+    ...start,
+    world: { ...start.world, minute: 1080, pessimism: 94 },
+    campaign: { ...start.campaign!, difficulty: "hard" },
+  });
+  await page.addInitScript((value) => {
+    if (!localStorage.getItem("dynosty.village.resume"))
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
+  }, save);
+  await page.goto("/");
+  const warning = page.locator(".campaign-advisory");
+  await expect(warning).toContainText("달이");
+  await expect(warning).toContainText("오늘 밤 배급령부터 바꾸자");
+  await page.getByRole("button", { name: "주민의 청 듣기" }).click();
+  await readScene(page, "오늘은 창고의 비축 유지");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "아무도 깨우지 않는 아침",
+  );
+  await expect(warning).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "아무도 깨우지 않는 아침",
+  );
+});
+test("3D 관아 선택과 해제가 순라 패널에 반영된다", async ({ page }) => {
+  const save = createTimberSave(createVillageGame(false, true));
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+  );
+  await page.getByRole("button", { name: "명령 열기", exact: true }).click();
+  const office = page.getByRole("region", { name: "관아", exact: true });
+  const selection = page.getByRole("region", {
+    name: "선택 정보",
+    exact: true,
+  });
+  const pickOffice = async (scroll = false) => {
+    const point = await worldPoint(page, [0, 1.4, -14], scroll);
+    await page.mouse.click(point.x, point.y);
+    await expect(office).toBeVisible();
+  };
+  await pickOffice();
+  await office.getByRole("button", { name: "1단계 · 4명" }).click();
+  await expect(office).toContainText("순라 포졸 4명");
+  await selection.getByRole("button", { name: "가까이 보기" }).click();
+  await selection.getByRole("button", { name: "선택 해제" }).click();
+  await expect(office).toHaveCount(0, { timeout: 5_000 });
+  await pickOffice(true);
+  await expect(office).toContainText("순라 포졸 4명");
+});
+
+test("어려움으로 저장된 5단계에서 지지가 사라지면 시간 진행 없이 추방된다", async ({
+  page,
+}) => {
+  const s = createVillageGame();
+  const save = createTimberSave({
+    ...s,
+    chapter: 5,
+    campaign: { ...s.campaign!, beat: "vigil", difficulty: "hard" },
+    world: { ...s.world, optimism: 0, pessimism: 20 },
+  });
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "아무도 깨우지 않는 아침",
+  );
+});
+test("옛 저장은 기본 보통 난이도로 남은 유예 시간을 이어간다", async ({
+  page,
+}) => {
+  const s = createVillageGame();
+  const save = createTimberSave({
+    ...s,
+    chapter: 5,
+    campaign: { ...s.campaign!, beat: "vigil", pessimismExtremeSince: 0 },
+    elapsed: 1439,
+    world: { ...s.world, pessimism: 100 },
+  });
+  delete save.state.campaign!.difficulty;
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  await expect(page.locator(".campaign-advisory")).toContainText("배급령");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "마을 하루 진행" }).click();
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "아무도 깨우지 않는 아침",
+  );
 });
 test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 본다", async ({
   page,

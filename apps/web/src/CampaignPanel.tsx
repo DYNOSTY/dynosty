@@ -6,10 +6,11 @@ import {
   type TimberCommand,
   type TimberState,
 } from "@dynosty/game-core";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
 import {
   campaignPage,
+  moraleAdvice,
   PATROL_NAMES,
   type ScenePage,
 } from "./campaign-scenes.js";
@@ -32,8 +33,10 @@ function SceneDialog({
   page,
   close,
   act,
+  advisory,
 }: {
   page: ScenePage;
+  advisory: ReactNode;
   close: () => void;
   act: (action: string) => void;
 }) {
@@ -98,6 +101,7 @@ function SceneDialog({
           <p>{words}</p>
         </div>
       </div>
+      {advisory}
       <footer>
         {cursor > 0 && (
           <button type="button" onClick={() => setCursor(lineIndex - 1)}>
@@ -133,18 +137,31 @@ export function CampaignPanel({
   state: s,
   command,
   trade,
+  officeSelected,
+  clearOfficeSelection,
   work,
 }: {
   state: TimberState;
   command: (cmd: TimberCommand) => void;
   trade: boolean;
+  officeSelected?: boolean;
+  clearOfficeSelection: () => void;
   work: boolean;
 }) {
   const c = campaignOf(s);
   const p = campaignPage(s);
+  const advice = moraleAdvice(s);
+  const advisory = advice && (
+    <p className="campaign-advisory" role="status">
+      <strong>{advice[0]}</strong> {advice[1]}
+    </p>
+  );
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
   const [petition, setPetition] = useState(false);
+  const [manualOffice, setManualOffice] = useState(false);
+  const canOpenOffice = !["opening", "departure"].includes(c.beat);
+  const office = canOpenOffice && (manualOffice || officeSelected);
   const [sound, setSound] = useState(false);
   const { audioRef } = useAudio();
   const canPetition =
@@ -251,6 +268,61 @@ export function CampaignPanel({
         {s.chapter ?? 1}단계 · {CHAPTERS[(s.chapter ?? 1) - 1]}
         <small>{p.goal || p.title}</small>
       </button>
+      {canOpenOffice && (
+        <button
+          type="button"
+          className="scout-all"
+          aria-expanded={office}
+          onClick={() => {
+            if (office && officeSelected) clearOfficeSelection();
+            setManualOffice(!office);
+          }}
+        >
+          관아 · 순라 배치
+        </button>
+      )}
+      {office && (
+        <section className="office-panel" aria-label="관아">
+          <img
+            src="/art/village-office.webp"
+            alt="마을 북쪽 관아와 방을 붙이는 포졸"
+          />
+          <strong>
+            관아 · 순라 포졸{" "}
+            {
+              s.residents.filter(
+                (r) => r.workplaceId === "office" && r.health === "healthy",
+              ).length
+            }
+            명
+          </strong>
+          <p>
+            순라 단계를 높일 때마다 다툼과 화재가 일어날 확률이 절반으로 줄어요.
+          </p>
+          {([0, 4, 8, 16] as const).map((count, i) => (
+            <button
+              type="button"
+              key={count}
+              onClick={() => command({ type: "set-guards", count })}
+            >
+              {i ? i + "단계 · " + count + "명" : "순라 해제"}
+            </button>
+          ))}
+        </section>
+      )}
+      {s.decree && (
+        <aside
+          className="office-decree"
+          key={s.decree.serial}
+          aria-live="polite"
+        >
+          <span aria-hidden="true" className="office-herald">
+            🦖
+          </span>
+          <strong>방 · {s.decree.title}</strong>
+          <small>“{s.decree.reaction}”</small>
+        </aside>
+      )}
       {canPetition && (
         <button
           type="button"
@@ -271,8 +343,16 @@ export function CampaignPanel({
           마을 하루 진행
         </button>
       )}
-      {open && (
-        <SceneDialog key={scene.key} page={scene} close={close} act={act} />
+      {open ? (
+        <SceneDialog
+          key={scene.key}
+          page={scene}
+          close={close}
+          act={act}
+          advisory={advisory}
+        />
+      ) : (
+        advisory
       )}
     </div>
   );

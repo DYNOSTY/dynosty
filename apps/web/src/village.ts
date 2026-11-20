@@ -17,7 +17,12 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
+import {
+  DEPARTURE_SURVIVING_HOME_COUNT,
+  initialHomes,
+} from "@dynosty/game-core";
 import { loadSceneAsset as load } from "./scene-assets.js";
+import { RESTAURANT_CENTER } from "./timber-scene.js";
 import { elevation, rng, type Season } from "./world.js";
 
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
@@ -452,6 +457,29 @@ export function createVillage(
   pc.fillRect(0, 0, 64, 64);
   puff.update();
   puff.hasAlpha = true;
+  const fires = [
+    { ...RESTAURANT_CENTER, height: 0.55 },
+    ...initialHomes()
+      .slice(DEPARTURE_SURVIVING_HOME_COUNT)
+      .map(({ position }) => ({ ...position, height: 1.8 })),
+  ].map(({ x, z, height }, i) => {
+    const fire = new ParticleSystem("처마 불길-" + i, 90, scene);
+    fire.particleTexture = puff;
+    fire.emitter = new Vector3(x, elevation(x, z) + height, z);
+    fire.minEmitBox = new Vector3(-1, 0, -0.5);
+    fire.maxEmitBox = new Vector3(1, 0, 0.5);
+    fire.direction1 = new Vector3(-0.4, 1.8, -0.2);
+    fire.direction2 = new Vector3(0.4, 3, 0.2);
+    fire.minLifeTime = 0.4;
+    fire.maxLifeTime = 1.2;
+    fire.minSize = 0.4;
+    fire.maxSize = 1.2;
+    fire.emitRate = 55;
+    fire.color1 = new Color4(1, 0.65, 0.08, 1);
+    fire.color2 = new Color4(0.9, 0.22, 0.02, 1);
+    fire.colorDead = new Color4(0.2, 0.12, 0.09, 0);
+    return fire;
+  });
   const CHIMNEY: Record<string, number> = {
     BLD_OFFICE: 2.5,
     BLD_WORKSHOP: 3,
@@ -660,7 +688,68 @@ export function createVillage(
     w.node.rotation.y = Math.atan2(dx, dz);
     return false;
   };
+  const herald = new TransformNode("관아 포졸", scene);
+  herald.parent = worldRoot ?? null;
+  herald.setEnabled(false);
+  const writ = CreateBox(
+    "법령 한지",
+    { width: 0.95, height: 1.22, depth: 0.035 },
+    scene,
+  );
+  writ.parent = worldRoot ?? null;
+  writ.isPickable = false;
+  const paper = new StandardMaterial("방 한지", scene);
+  const ink = new DynamicTexture(
+    "법령 글씨",
+    { width: 256, height: 320 },
+    scene,
+    false,
+  );
+  paper.diffuseTexture = ink;
+  writ.material = paper;
+  writ.setEnabled(false);
+  let delivery = -1;
+  let messenger: GlbVisual | undefined;
+  function postDecree(title: string, deliver: boolean) {
+    const pen = ink.getContext() as CanvasRenderingContext2D;
+    pen.fillStyle = "#ead9ac";
+    pen.fillRect(0, 0, 256, 320);
+    pen.fillStyle = "#38271a";
+    pen.font = "bold 48px serif";
+    pen.fillText("방", 102, 70);
+    pen.font = "28px serif";
+    for (const [i, word] of title.split(" ").entries())
+      pen.fillText(word, 30, 122 + i * 36);
+    pen.fillStyle = "#973929";
+    pen.fillRect(183, 245, 35, 35);
+    ink.update();
+    delivery = deliver ? 0 : 1;
+    if (deliver && !messenger)
+      void entityVisual("resident", herald, 0)
+        .then((visual) => {
+          if (disposed) {
+            visual.dispose();
+            return;
+          }
+          messenger = visual;
+          visual.setMotion("walking");
+        })
+        .catch(() => {});
+  }
   function animate(dt: number) {
+    if (delivery >= 0) {
+      delivery = Math.min(1, delivery + dt / 3);
+      const z = -10 + 13.6 * delivery;
+      herald.setEnabled(delivery < 1);
+      herald.position.set(0, elevation(0, z), z);
+      writ.setEnabled(true);
+      writ.position.set(
+        delivery < 1 ? 0.55 : 0,
+        elevation(0, z) + 1.2,
+        delivery < 1 ? z : 3.79,
+      );
+      if (delivery === 1) delivery = -1;
+    }
     animateRisers(dt);
     if (!running) return;
     for (const w of walkers) {
@@ -800,6 +889,19 @@ export function createVillage(
   return {
     ready,
     entityVisual,
+    postDecree,
+    clearDecree() {
+      delivery = -1;
+      herald.setEnabled(false);
+      writ.setEnabled(false);
+    },
+    setDepartureFire(burning: boolean, restaurantBuilt: boolean) {
+      for (const [i, fire] of fires.entries()) {
+        const active = burning && (i > 0 || restaurantBuilt);
+        if (active && !fire.isStarted()) fire.start();
+        if (!active && fire.isStarted()) fire.stop();
+      }
+    },
     setPreviewResidentsVisible(visible: boolean) {
       for (const walker of walkers) walker.node.setEnabled(visible);
     },
@@ -828,7 +930,13 @@ export function createVillage(
     },
     dispose() {
       disposed = true;
+      messenger?.dispose();
+      herald.dispose();
+      writ.dispose();
+      ink.dispose();
+      paper.dispose();
       plinthMat.dispose();
+      for (const fire of fires) fire.dispose(false);
       for (const ps of smokes) ps.dispose();
       for (const p of parties.values())
         for (const mb of p.members) {

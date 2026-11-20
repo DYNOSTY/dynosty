@@ -766,6 +766,19 @@ export function mountScene(
       if (state && !villageState) resetWorldCamera();
       updateGround(state);
       entities.setElevation(elevation);
+      const decree = state?.decree;
+      const priorDecree = villageState?.decree;
+      if (
+        decree &&
+        (decree.serial !== priorDecree?.serial ||
+          decree.title !== priorDecree?.title)
+      )
+        village.postDecree(decree.title, !!villageState);
+      if (!decree && priorDecree) village.clearDecree();
+      village.setDepartureFire(
+        state?.campaign?.beat === "departure",
+        state?.restaurantBuilt ?? false,
+      );
       villageState = state;
       animationSpeed = state?.speed ?? 1;
       entities.setObstacles(

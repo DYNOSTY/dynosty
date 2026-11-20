@@ -3,6 +3,7 @@ import {
   CHAPTERS,
   campaignOf,
   canPay,
+  emergencyRation,
   foodWarnings,
   GAME_RULES,
   lostPatrol,
@@ -32,6 +33,42 @@ export interface ScenePage {
   auto: boolean;
   goal: string;
 }
+export function moraleAdvice(s: TimberState): Line | undefined {
+  const { pessimism, minute } = s.world;
+  const limits = GAME_RULES.endings;
+  if (s.campaign?.ending || pessimism < limits.concernPessimism) return;
+  const day = minute >= 360 && minute < 1080;
+  if (pessimism > limits.urgentPessimism)
+    return day
+      ? [
+          "나르미",
+          "고리님, 창고지기마저 열쇠를 내려놨어요. 지금 배급령을 고쳐 주세요. 제가 사람들과 여기서 기다릴게요.",
+        ]
+      : [
+          "달이",
+          "고리야, 문 좀 열어. 망을 보던 이들까지 빗장을 내려놓고 왔어. 날 밝을 때까지 기다릴 수 없어. 오늘 밤 배급령부터 바꾸자.",
+        ];
+  if (pessimism > limits.warningPessimism)
+    return day
+      ? [
+          "나르미",
+          "배식 줄에서 다툼이 났어요. 내일도 같은 집이 빈 그릇을 들고 돌아가면 제가 무슨 낯으로 줄을 세우겠어요? 오늘 그 집들 얘기를 들어 주세요.",
+        ]
+      : [
+          "달이",
+          "고리야, 교대 종이 울렸는데도 망루가 비었어. 사람들이 네 대답을 들을 때까지는 올라가지 않겠대. 나랑 지금 가 보자.",
+        ];
+  return day
+    ? [
+        "나르미",
+        "고리님, 오늘은 누가 말을 꺼내려다 곁사람 눈치부터 보더라고요. 무슨 일인지 걱정돼요. 배식 끝날 때 저랑 잠깐 들러 주실래요?",
+      ]
+    : [
+        "달이",
+        "고리야, 우물가에서 늘 떠들던 이들이 오늘은 내가 가니까 입을 다물더라. 무슨 속앓이를 하는지 걱정돼.",
+      ];
+}
+
 export function villageAdvice(
   s: TimberState,
   daylight: boolean,
@@ -57,14 +94,53 @@ export function villageAdvice(
       ? "마을 입구에 새로 온 이들이 있어요. 성문 표식을 눌러 누구와 함께 왔는지 들어 보세요."
       : "성문 밖에서 사람 목소리가 나. 새로 온 이들인가 봐. 입구에 가서 만나 보자.";
   const { optimism, pessimism } = s.world;
-  if (pessimism - optimism >= 25)
-    return daylight
-      ? "요즘은 고리님이 배식 줄을 지나도 다들 고개를 숙여요. 이대로 마음이 더 멀어지면 무슨 일이 생길까 걱정돼요."
-      : "고리야, 사람들이 전엔 네게 직접 와서 말을 했잖아. 이렇게 자꾸 등을 돌리면 무슨 일이 날까 봐 겁이 나.";
-  if (optimism >= 65 && optimism - pessimism >= 25)
+  if (
+    pessimism < GAME_RULES.endings.concernPessimism &&
+    optimism >= 65 &&
+    optimism - pessimism >= 25
+  )
     return daylight
       ? "고리님이 배식 줄에서 끝까지 얘길 들어 주셨잖아요. 오늘은 주민들이 먼저 곁에 자리를 내주네요. 잘하셨어요."
       : "오늘 사람들이 네 곁으로 의자를 당겨 앉더라. 고리야, 네가 한 일이야. 잘했어.";
+  if (s.rebuilding && !s.restaurantBuilt)
+    return daylight
+      ? "솥은 제가 씻어 놓았어요. 건설에서 공동 식당 터부터 잡아 주세요."
+      : "솥단지는 무사해. 공동 식당부터 다시 짓자.";
+  if (
+    s.rebuilding &&
+    s.openingFight &&
+    !s.town.facilities.some((f) => f.kind === "hospital")
+  )
+    return daylight
+      ? "배식 줄에서 둘이 엉켜 넘어졌어요. 한 분은 발을 딛지도 못해요. 병원을 세워 돌봐 드려요."
+      : "다친 둘을 내 방에 눕혔어. 상처를 돌볼 병원이 있어야겠어.";
+  if (
+    s.rebuilding &&
+    s.homes.length <= 2 &&
+    !s.town.orders.some((o) => o.kind === "home")
+  )
+    return daylight
+      ? "오늘도 문밖에서 잘 분들이 있어요. 온돌 둥지를 더 지어 주세요."
+      : "둘이 몸을 포개도 아랫목이 모자라. 둥지를 더 짓자.";
+  if (
+    s.rebuilding &&
+    s.woodSpent > 0 &&
+    !s.logging.built &&
+    !s.loggingSites.some((site) => site.built) &&
+    !s.town.facilities.some((f) => f.kind === "logging")
+  )
+    return daylight
+      ? "식당과 둥지에 들보를 쓰고 나니 목재 더미가 줄었어요. 숲 가까이에 제재소를 지어 둘까요?"
+      : "내일 쓸 재목도 켜야지. 숲가에 제재소를 세우자.";
+  if (
+    s.rebuilding &&
+    s.openingFight &&
+    s.town.facilities.some((f) => f.kind === "hospital") &&
+    (s.chapter ?? 1) === 1
+  )
+    return daylight
+      ? "식당과 병원, 제재소에는 일할 분이 있어야 해요. 공사를 마친 분들이 남아 일해요. 빈자리는 건물에서 채워 주세요."
+      : "공사를 끝낸 이들이 그대로 일을 맡았어. 식당이며 병원이며 제재소에 빈자리가 없는지 봐 줘.";
   const shortage = foodWarnings(s.world)[0];
   if (shortage) {
     const kind = (
@@ -134,13 +210,16 @@ export function campaignPage(s: TimberState): ScenePage {
         "지금 다리 건너오는 건 쥬신 전령이야. 고른 어른 방 앞에서부터 갓을 벗고 오더라. 고리야, 내가 곁에 있어 줄까?",
       );
       line("고리", "들어가자. 아버지 방에 불은 켜 두고.");
-      choice("next", "복홀 성문으로");
+      page.goal =
+        "난이도를 고르세요. 불안이 한계에 닿으면 보통은 하루 동안 수습할 수 있고, 어려움은 즉시 추방됩니다.";
+      choice("next", "보통 · 복홀 성문으로");
+      choice("hard", "어려움 · 복홀 성문으로");
       break;
     case "departure":
       page.title = "목진이 문을 열어 달라고 했다";
       page.clip = "one";
       page.music = "09";
-      page.goal = "출문 전 · 주민 300명 · 자원별 10,000";
+      page.goal = `출문 전 · 주민 ${s.residents.length}명 · 자원별 10,000`;
       line(
         "목진",
         "상중에 하직을 고하오니 면목이 없소이다. 허나 고른 공을 시해한 자가 그 처소 문턱을 어찌 넘었는지, 아직 아무도 모르지 않소. 오늘 밤 우리 집 아이들의 문 앞에는 누가 서 주겠소?",
@@ -165,6 +244,12 @@ export function campaignPage(s: TimberState): ScenePage {
         "고리",
         "문을 열어라. 수레마다 누가 타고 무엇을 가져가는지 적어 두어라. 남을 사람은 이리로 오시오. 여기서는 누구도 억지로 데려가지 못하오.",
       );
+      line(
+        "돌쇠",
+        s.restaurantBuilt
+          ? "나리! 식당 처마에 불이 붙었습니다. 불씨가 둥지 지붕으로 넘어갑니다!"
+          : "나리! 둥지 지붕에 불이 붙었습니다!",
+      );
       choice("leave", "성문을 열고 남은 장부 확인");
       break;
     case "after":
@@ -172,7 +257,7 @@ export function campaignPage(s: TimberState): ScenePage {
       page.goal = "출문 뒤 · 주민 60명 · 자원별 1,000";
       line(
         "나르미",
-        "삼백 줄이던 호구 장부를 다시 불렀어요. 끝까지 대답한 건 예순이에요. 곳간도 칸마다 만에서 천씩만 남았고요.",
+        "장부 끝까지 이름을 불렀어요. 예순 분이 대답했어요. 곳간도 칸마다 천씩 남았고요. 고리님, 그만 물동이 놓으세요. 손이 다 까졌어요.",
       );
       line(
         "돌쇠",
@@ -189,6 +274,18 @@ export function campaignPage(s: TimberState): ScenePage {
       line(
         "달이",
         "고리야, 저 양팔저울을 봐. 네가 하는 일 하나하나에 저울이 움직여. 여기 남은 사람들 마음을 얻어 줘.",
+      );
+      line(
+        "달이",
+        "불 끄느라 네 얼굴도 온통 검댕이야. 이리 와, 좀 닦자. 새벽까지 물 나른 이들이 아직 여기 있어. 우리도 같이 다시 지으면 돼.",
+      );
+      line(
+        "나르미",
+        "식당 지붕이 내려앉았어요. 솥은 건졌으니 식당부터 다시 지어요. 오늘 저녁엔 다들 앉아서 따뜻한 걸 먹게요.",
+      );
+      line(
+        "달이",
+        "온돌에 불이 드는 둥지도 둘뿐이야. 오늘 밤 지붕 아래서 잘 자리도 같이 마련하자.",
       );
       choice("next", "남은 예순 명과 시작");
       break;
@@ -518,7 +615,7 @@ export function campaignPage(s: TimberState): ScenePage {
       page.goal = "복홀의 배급 원칙 결정";
       line(
         "양녕",
-        "고기 솥이 사흘을 빈다고 치자. 다리가 부러진 자는 내일도 부역을 못 나간다. 그 살로 성벽을 지킬 열을 먹일 수 있다면, 나는 그리 명하겠다.",
+        "우리 스피노사우루스 집안은 물고기가 끊긴 겨울도 겪었다. 고기 솥이 사흘을 빈다고 치자. 다리가 부러진 자는 내일도 부역을 못 나간다. 그 살로 성벽을 지킬 열을 먹일 수 있다면, 나는 그리 명하겠다.",
       );
       line(
         "길룡",
@@ -526,7 +623,7 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line(
         "충녕",
-        "길룡 씨가 제 수레바퀴를 고쳐 줬어요. 그래도 그 값을 따져서 지켜 달라 하진 않겠습니다. 다리를 다친 다음 날도 자기 이름으로 불리는 곳이어야 저도 여기 살 수 있어요.",
+        "압해에선 고기를 말려 놓고도 땔감이 없어 떨고 있어요. 우리 들보를 조금 내주고 그 고기를 받아 오면 길룡 씨도 내일 아침을 먹습니다. 그만큼 우리 집 짓는 날이 늦어지겠지요. 제 처소부터 미루세요.",
       );
       line(
         "양녕",
@@ -642,6 +739,32 @@ export function campaignPage(s: TimberState): ScenePage {
             ? "강가에 매어 둔 배가 있어요. 기관에 불이 붙으면 마마께서도 함께 강을 건너실 수 있대요."
             : "공방 불은 제가 지킬게요. 의원이 마마 곁을 비우면 안 돼요. 혹시 우리 말을 듣고 계실지도 모르잖아요.",
         );
+      }
+      {
+        const ration = emergencyRation(s);
+        if (ration) {
+          const trade = c.side === "coexist";
+          page.goal = trade ? "압해의 식량 교환 제안" : "양녕의 비상 배급령";
+          line(
+            trade ? "충녕" : "양녕",
+            trade
+              ? "압해 수레가 왔어요. 마른 고기를 싣고 왔는데 돌아가는 길엔 땔감을 싣고 싶대요. 우리 몫의 나무를 내줄까요?"
+              : "고기 장부를 보았다. 초식이든 우리처럼 고기를 먹는 혈족이든 예외는 없다. 주민 하나를 군량으로 돌리겠다. 고리, 네 인장을 찍겠느냐?",
+          );
+          choice(
+            `ration:${s.world.day}:${ration}`,
+            trade
+              ? "압해와 교환 · 목재 12를 내고 고기 8 받기"
+              : "비상 배급령 집행 · 주민 1명 사망, 고기 8 확보",
+          );
+        } else if (c.emergencyDay === s.world.day) {
+          line(
+            "달이",
+            c.side === "coexist"
+              ? "고깃국 냄새가 나. 내일은 우리가 약속한 땔감이 저 집 아궁이에서도 타겠지."
+              : "고기 솥 앞에 줄이 섰어. 그런데 아무도 그릇을 먼저 내밀질 않아. 어제까지 거기 서 있던 이가 누군지 다들 알거든.",
+          );
+        }
       }
       break;
     case "ending":
