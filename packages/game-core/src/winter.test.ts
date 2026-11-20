@@ -127,6 +127,20 @@ describe("벌목 생산 (기획 B02)", () => {
     for (let i = 0; i < 144; i++) split = advancePlayMinutes(split, 10);
     expect(split.resources.RES_WOOD).toBe(day.resources.RES_WOOD);
   });
+  it("연료가 없는 벌목 시간에도 나눠 진행한 것과 난방 결과가 같다", () => {
+    const fresh = createPlayState();
+    const start = parsePlayState({
+      ...fresh,
+      minute: 9 * 60,
+      resources: { ...fresh.resources, RES_COAL: 0, RES_WOOD: 0 },
+    });
+    const once = advancePlayMinutes(start, 60);
+    let split = start;
+    for (let i = 0; i < 60; i++) split = advancePlayMinutes(split, 1);
+    expect(split.winter.todayWood).toBeGreaterThan(0);
+    expect(once.resources.RES_WOOD).toBe(split.resources.RES_WOOD);
+    expect(once.winter).toEqual(split.winter);
+  });
   it("밤에는 목재가 늘지 않는다", () => {
     const s = createPlayState(); // 00:00
     expect(advancePlayMinutes(s, 8 * 60).resources.RES_WOOD).toBe(
