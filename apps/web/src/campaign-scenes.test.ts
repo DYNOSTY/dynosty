@@ -1,4 +1,10 @@
-import { createVillageGame } from "@dynosty/game-core";
+import {
+  commandTimber,
+  createTimberSave,
+  createVillageGame,
+  parseTimberSave,
+  recordResearchStory,
+} from "@dynosty/game-core";
 import { expect, it } from "vitest";
 import {
   campaignPage,
@@ -74,3 +80,46 @@ it("안내는 도착한 상인과 주민, 돌아온 조와 아직 부족한 식�
   };
   expect(villageAdvice(shortage, true)).toContain("어획막");
 });
+
+it.each([
+  ["기존 저장", false, "alive"],
+  ["시해가 기록된 저장", true, "dead"],
+] as const)(
+  "%s의 판결 대사는 충녕의 생사와 일치한다",
+  (_, assassinated, health) => {
+    const s = createVillageGame();
+    const { victoryQuotes: _quotes, ...legacyCampaign } = s.campaign!;
+    const verdict = recordResearchStory(
+      {
+        ...s,
+        chapter: 5,
+        campaign: {
+          ...legacyCampaign,
+          beat: "verdict",
+          side: "coexist",
+          uprising: true,
+          ...(assassinated && { revivalPrepared: false }),
+        },
+      },
+      "rebellion-started",
+    );
+    const saved = createTimberSave(
+      assassinated
+        ? recordResearchStory(verdict, "chungnyeong-assassinated")
+        : verdict,
+    );
+    const restored = parseTimberSave(JSON.parse(JSON.stringify(saved))).state;
+    const next = commandTimber(
+      restored,
+      { type: "campaign", beat: "verdict", action: "next" },
+      "record-verdict",
+    );
+
+    expect(next.town.development.story.chungnyeong).toBe(health);
+    expect(
+      campaignPage(restored).lines.some(([, words]) =>
+        words.includes("충녕 마마가 돌아가셨어요"),
+      ),
+    ).toBe(assassinated);
+  },
+);

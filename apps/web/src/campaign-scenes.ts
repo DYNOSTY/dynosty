@@ -819,7 +819,7 @@ export function campaignPage(s: TimberState): ScenePage {
           ? "저기, 푸른 보자기 맨 아주머니 보여? 어제 솥이 비어서 빈손으로 돌아갔거든. 오늘은 목진 곁에 섰어."
           : "망을 보던 이들이 자기 손으로 빗장을 걸었어. 지휘관이 약속을 지키는지 끝까지 여기서 보겠대.",
       );
-      if (c.uprising) {
+      if (s.town.development.story.chungnyeong !== "alive") {
         line(
           "나르미",
           "고리님, 의원이 오기도 전에 충녕 마마가 돌아가셨어요. 성안에서 붕대를 감고 있던 이의 눈이 붉어졌어요. 마마가 새끼를 밀어내는 사이에 그이가 덮쳤어요. 길룡 씨가 손을 놓지 못해요.",

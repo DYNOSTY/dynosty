@@ -63,6 +63,61 @@ describe("변종 야습", () => {
       hit.world.citizenEvents?.some((id) => id.startsWith("mutant-")),
     ).toBe(true);
   });
+  it("마지막 순라 포졸이 다쳐도 시간이 흐르고 변종 사건은 남는다", () => {
+    const assigned = commandTimber(
+      bitten(0),
+      { type: "set-guards", count: 4 },
+      "guards",
+    );
+    const guards = assigned.residents.filter((r) => r.workplaceId === "office");
+    const lastGuard = guards[3]!;
+    const before = parseTimberSave(
+      createTimberSave(
+        commandTimber(
+          assigned,
+          {
+            type: "citizen-event",
+            event: {
+              id: "wounded-guards",
+              type: "illness",
+              severity: "major",
+              citizenIds: guards.slice(0, 3).map((r) => r.id),
+            },
+          },
+          "wounded-guards",
+        ),
+      ),
+    ).state;
+    const healthy = before.residents.filter((r) => r.health === "healthy");
+    expect(healthy.filter((r) => r.workplaceId === "office")).toEqual([
+      lastGuard,
+    ]);
+    const roll = vi
+      .spyOn(Math, "random")
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(
+        (healthy.findIndex((r) => r.id === lastGuard.id) + 0.5) /
+          healthy.length,
+      )
+      .mockReturnValue(0.99);
+    try {
+      const next = commandTimber(
+        before,
+        { type: "advance", minutes: 1 },
+        "tick",
+      );
+      expect(next.elapsed).toBe(before.elapsed + 1);
+      expect(next.residents.find((r) => r.id === lastGuard.id)?.health).toBe(
+        "sick",
+      );
+      expect(next.mutants).toEqual([
+        { id: before.mutants![0]!.id, due: next.elapsed + 30 },
+      ]);
+    } finally {
+      roll.mockRestore();
+    }
+  });
   it("출동, 미대응 시 주민 피해, 건물별 누적 손상과 자원 결제를 구별한다", () => {
     const s = bitten(0);
     const waiting = parseTimberSave(

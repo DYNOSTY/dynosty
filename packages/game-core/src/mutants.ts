@@ -164,7 +164,8 @@ export function advanceMutants(
           residents: assignHomes(s.residents, s.world.citizens, usableHomes(s)),
         };
     }
-    if (responding) {
+    // The attack may have injured the last available guard.
+    if (policeAvailable(s)) {
       s = containMutant(s, m.id);
       continue;
     }
