@@ -34,9 +34,32 @@ async function clickSite(p: Page, id: SiteId) {
       const rect = el.getBoundingClientRect();
       const receiver = document.elementFromPoint(at.x, at.y);
       const inspection = __scene.getMeshByName("exchange-inspection-table");
+      const describeReceiver = (node: Element | null) => ({
+        tag: node?.tagName,
+        label:
+          node?.getAttribute("aria-label") ??
+          node?.textContent?.trim().slice(0, 80),
+        panel: node?.closest(".g-console, .g-console__cmd")?.className,
+      });
+      const visibleTablePoints: { x: number; y: number }[] = [];
+      if (inspection?.isPickable) {
+        for (let dy = -30; dy <= 30; dy += 3) {
+          for (let dx = -30; dx <= 30; dx += 3) {
+            const x = Math.round(at.x + dx);
+            const y = Math.round(at.y + dy);
+            if (document.elementFromPoint(x, y) !== el) continue;
+            const nearest = __scene
+              .multiPick(x - rect.left, y - rect.top)
+              ?.sort((a, b) => a.distance - b.distance)[0];
+            if (nearest?.pickedMesh === inspection)
+              visibleTablePoints.push({ x, y });
+          }
+        }
+      }
       return {
         at,
-        receiver: receiver?.outerHTML.split(">")[0],
+        receiver: describeReceiver(receiver),
+        visibleTablePoints: visibleTablePoints.length,
         inspection: inspection && {
           enabled: inspection.isEnabled(),
           visible: inspection.isVisible,
