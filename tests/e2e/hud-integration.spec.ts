@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { press } from "./labor-tabs.js";
-import { clickExample } from "./scene-picking.js";
+import { clickExample, examplePoint } from "./scene-picking.js";
 
 type SceneMesh = {
   isVisible: boolean;
@@ -172,7 +172,30 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
   });
   expect(fallback.glb).toBe(false);
   expect(fallback.meshes).toBeGreaterThan(0);
-  await clickExample(page, "building");
+  const point = await examplePoint(page, "building");
+  const probe = await page.locator("canvas").evaluate((el, p) => {
+    type Mesh = { name: string; parent: Mesh | null };
+    const { __scene } = window as unknown as {
+      __scene: {
+        multiPick(
+          x: number,
+          y: number,
+        ): { pickedMesh: Mesh | null; distance: number }[] | null;
+      };
+    };
+    const rect = el.getBoundingClientRect();
+    return {
+      at: p,
+      domTarget: document.elementFromPoint(p.x, p.y)?.tagName,
+      hits: __scene.multiPick(p.x - rect.left, p.y - rect.top)?.map((h) => {
+        const path: string[] = [];
+        for (let m = h.pickedMesh; m; m = m.parent) path.push(m.name);
+        return { path, distance: h.distance };
+      }),
+    };
+  }, point);
+  console.log("ondol-fallback-pick", JSON.stringify(probe));
+  await page.mouse.click(point.x, point.y);
   await expect(
     page.getByRole("region", { name: "선택 정보", exact: true }),
   ).toContainText("건물 예제");
