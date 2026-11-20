@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 // 선택 화면 시안 (사용자 11/19, 프로스트펑크 사건 창 레퍼런스): 퀘스트 → 큰 화면 반으로 나눈 제안 A/B(그림 위주, 글 최소)
-// 엔딩 분기는 제안하는 인물(공룡) 초상과 한마디 — 누구 말을 따를지. 시안: ?story=trade | ?story=ending
+// 엔딩 분기는 제안하는 인물(공룡) 초상과 한마디 — 누구 말을 따를지. 시안: ?story=trade | ?story=ending. 게임에서는 사건이 뜰 때 App이 onPick을 넘겨 고른 쪽(가 = a, 나 = b)을 계산 쪽에 전함
 // 그림: 시나리오 삽화(팀 자산) + 코덱스 생성 제안 그림 — public/ui/story
 // 얻음·잃음 문구 = 시나리오기획서 4.1 정책표(P05) · 3.1 노선 비교표 그대로. 인물 대사는 자리표시(시나리오 확정본으로 교체)
 // 엔딩 노선: 5단계에 한 번만 고르고 마지막 확인을 한 번 더 (온돌 UI v0.4 「최종 통치 노선」) — 반란·피살은 미리 알리지 않음
@@ -70,7 +70,13 @@ const STORIES: Record<string, Story> = {
   },
 };
 
-export function StoryChoice({ id }: { id: string }) {
+export function StoryChoice({
+  id,
+  onPick,
+}: {
+  id: string;
+  onPick?: (side: "a" | "b") => void;
+}) {
   const story = STORIES[id];
   const [step, setStep] = useState<"quest" | "choose" | "done">(
     story?.questImg ? "quest" : "choose",
@@ -113,7 +119,7 @@ export function StoryChoice({ id }: { id: string }) {
         <h2>{story.title}</h2>
       </header>
       <div className="story-split">
-        {story.sides.map((s) => (
+        {story.sides.map((s, i) => (
           <button
             key={s.title}
             type="button"
@@ -121,7 +127,10 @@ export function StoryChoice({ id }: { id: string }) {
             onClick={() => {
               setPicked(s.title);
               if (!story.backdrop)
-                window.setTimeout(() => setStep("done"), 700);
+                window.setTimeout(() => {
+                  setStep("done");
+                  onPick?.(i === 0 ? "a" : "b");
+                }, 700);
             }}
           >
             <img src={s.img} alt="" />

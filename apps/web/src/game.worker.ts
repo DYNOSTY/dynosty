@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import {
   advanceDay,
-  advancePlayMinutes,
+  advanceToStory,
   createExampleSave,
   createInitialState,
   createPlaySave,
@@ -14,6 +14,7 @@ import {
   type PlayState,
   parseExampleSave,
   parsePlaySave,
+  pickStory,
   setPlayPaused,
   setZoneHeat,
   supplyFood,
@@ -70,9 +71,11 @@ self.onmessage = (event: MessageEvent<GameCommand>) => {
         else if (command.type === "pause")
           play = setPlayPaused(play, command.paused);
         else if (command.type === "advance-day")
-          play = advancePlayMinutes(play, 1440);
+          play = advanceToStory(play, 1440);
         else if (command.type === "test-food")
           play = supplyFood(play, command.days);
+        else if (command.type === "story-pick")
+          play = pickStory(play, command.id, command.side);
         else if (command.type === "set-heat")
           play = {
             ...play,

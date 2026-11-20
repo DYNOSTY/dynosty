@@ -12,6 +12,7 @@ import {
   type LaborState,
   laborScene,
   laborStock,
+  pendingStory,
   type TimberState,
   timberScene,
   winterReport,
@@ -115,6 +116,10 @@ export function App() {
   const [timberState, setTimberState] = useState<TimberState | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
   const [playState, setPlayState] = useState<PlayState | null>(null);
+  // 때가 됐는데 아직 고르지 않은 사건 (있으면 선택 화면을 띄움 — 계산 쪽은 그 시각에 멈춰 있음)
+  const storyDue = playState
+    ? pendingStory(playState.story, playState.day, playState.minute)
+    : null;
   const [playError, setPlayError] = useState<string | null>(null);
   const [exampleClock, setExampleClock] = useState(false);
   const [playSaveBusy, setPlaySaveBusy] = useState(false);
@@ -1419,7 +1424,17 @@ export function App() {
           }
         />
       ) : null}
-      {STORY ? <StoryChoice id={STORY} /> : null}
+      {STORY ? (
+        <StoryChoice id={STORY} />
+      ) : storyDue ? (
+        <StoryChoice
+          key={storyDue}
+          id={storyDue}
+          onPick={(side) =>
+            commandPlay({ type: "story-pick", id: storyDue, side })
+          }
+        />
+      ) : null}
     </main>
   );
 }
