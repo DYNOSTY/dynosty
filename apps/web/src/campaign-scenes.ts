@@ -872,7 +872,7 @@ export function campaignPage(s: TimberState): ScenePage {
       page.goal =
         c.side === "coexist"
           ? `봄 장부를 펴기까지 · 마을이 잠잠했던 날 ${Math.min(10, Math.floor((s.elapsed - Math.max(c.since, c.lastHigh)) / 1440))} / 10일`
-          : `출항 준비 · 새 배급령을 내린 지 ${Math.min(10, days)} / 10일`;
+          : `겨울나기 · 새 배급령을 내린 지 ${Math.min(10, days)} / 10일`;
       if (s.town.development.story.chungnyeong === "alive") {
         line(
           "충녕",
@@ -989,7 +989,7 @@ export function campaignPage(s: TimberState): ScenePage {
         end === "hope"
           ? "이듬해, 복홀"
           : end === "escape"
-            ? "뭍의 불빛이 멀어지고"
+            ? "복홀에 아침이 오면"
             : end === "order"
               ? "다시 열린 성문"
               : "아무도 깨우지 않는 아침";
@@ -1003,14 +1003,9 @@ export function campaignPage(s: TimberState): ScenePage {
           "그럼 내가 거기 앉았다가 일러 주지. 오늘은 밥이 식기 전에 나도 좀 먹읍시다.",
         );
       } else if (end === "escape") {
-        line(
-          "충녕",
-          "고리 공자, 제 손을 좀 잡아 주시겠어요? 쇠라서 찬 줄은 아는데, 아직 어느 만큼 차가운지는 모르겠어요.",
-        );
-        line(
-          "고리",
-          "잡았소. 저기 마지막 불빛이 복홀이오. 안 보일 때까지 같이 봅시다.",
-        );
+        line("충녕", "공자님, 손 좀 내어 주실래요?");
+        line("고리", "네, 공주 마마. ……내려갈 때도 이렇게 가도 될까요?");
+        line("충녕", "저도 그 말을 하려던 참이었어요.");
       } else if (end === "order") {
         line(
           "고리",
