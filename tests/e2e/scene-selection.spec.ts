@@ -3,6 +3,7 @@ import { press } from "./labor-tabs.js";
 import {
   clickExample,
   clickFloor,
+  clickVisibleResident,
   examplePoint,
   outlinePixels,
 } from "./scene-picking.js";
@@ -62,7 +63,7 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   await expect
     .poll(async () => outlinePixels(await canvas.screenshot()))
     .toBeGreaterThan(20);
-  await clickExample(page, "resident");
+  await clickVisibleResident(page);
   await expect(info.getByText("주민 예제", { exact: false })).toBeVisible();
   await expect(info.getByText("대기 표시", { exact: true })).toBeVisible();
   await expect(
@@ -104,7 +105,7 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
   page,
 }) => {
   await ready(page);
-  await clickExample(page, "resident");
+  await clickVisibleResident(page);
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
   await expect(info).toContainText("대기 표시");
   await press(page, "개발 도구");

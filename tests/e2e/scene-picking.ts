@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { PNG } from "pngjs";
 
 // 기존 예제의 고정 카메라(거리 12, 고도 π/3, FOV 0.8)로 월드 좌표를
@@ -65,6 +65,42 @@ export async function clickExample(
 ) {
   const point = await examplePoint(page, kind, updated);
   await page.mouse.click(point.x, point.y);
+}
+
+// The example's center can be behind the ondol roof. Click exposed geometry.
+export async function clickVisibleResident(page: Page) {
+  const canvas = page.locator("canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const result: { point: { x: number; y: number } | null } = { point: null };
+  await expect(async () => {
+    const center = await examplePoint(page, "resident");
+    result.point = await canvas.evaluate((el, origin) => {
+      type Mesh = { name: string; parent: Mesh | null };
+      const { __scene } = window as unknown as {
+        __scene: { pick(x: number, y: number): { pickedMesh: Mesh | null } };
+      };
+      const rect = el.getBoundingClientRect();
+      for (let radius = 0; radius <= 80; radius += 6) {
+        for (let i = 0; i < (radius ? 16 : 1); i++) {
+          const angle = (i * 2 * Math.PI) / 16;
+          const x = Math.round(origin.x + radius * Math.cos(angle));
+          const y = Math.round(origin.y + radius * Math.sin(angle));
+          if (document.elementFromPoint(x, y) !== el) continue;
+          for (
+            let m = __scene.pick(x - rect.left, y - rect.top).pickedMesh;
+            m;
+            m = m.parent
+          ) {
+            if (m.name === "example-resident-1") return { x, y };
+          }
+        }
+      }
+      return null;
+    }, center);
+    expect(result.point, "가려지지 않은 주민 표면").not.toBeNull();
+  }).toPass({ timeout: 10_000 });
+  if (!result.point) throw new Error("가려지지 않은 주민 표면 없음");
+  await page.mouse.click(result.point.x, result.point.y);
 }
 
 export async function clickFloor(page: Page) {
