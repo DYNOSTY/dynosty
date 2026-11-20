@@ -329,12 +329,12 @@ export function campaignPage(s: TimberState): ScenePage {
       choice("hard", "어려움 · 복홀 성문으로");
       break;
     case "departure":
-      page.title = "목진이 문을 열어 달라고 했다";
+      page.title = "귀족들이 출문을 청했다";
       page.clip = "one";
       page.music = "09";
       page.goal = `출문 전 · 주민 ${s.residents.length}명 · 자원별 10,000`;
       line(
-        "목진",
+        "가솔을 이끄는 귀족",
         "상중에 하직을 고하오니 면목이 없소이다. 허나 고른 공을 시해한 자가 그 처소 문턱을 어찌 넘었는지, 아직 아무도 모르지 않소. 오늘 밤 우리 집 아이들의 문 앞에는 누가 서 주겠소?",
       );
       line(
@@ -346,7 +346,7 @@ export function campaignPage(s: TimberState): ScenePage {
         "공자께서는 밤새 그 문을 지키실 분이오. 그래서 더 두렵소. 동문에서도 살려 달라 부르면, 어느 문을 비우실 테요?",
       );
       line(
-        "목진",
+        "가솔을 이끄는 귀족",
         "운석이 고려의 지붕을 앗아 갔을 때 단의 깃발 아래 든 집들은 족보라도 건졌소이다. 쥬신 조정에 문서를 올릴 길이 있을 적에 가겠소. 가솔과 사창의 짐을 내주시오.",
       );
       line(
@@ -372,7 +372,7 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line(
         "돌쇠",
-        "나리, 문빗장을 다시 걸까요? 저잣거리의 큰 수레들은 벌써 목진 공 뒤를 따라갔습니다.",
+        "나리, 문빗장을 다시 걸까요? 저잣거리의 큰 수레들은 벌써 귀족들의 뒤를 따라갔습니다.",
       );
       line(
         "고리",
@@ -410,7 +410,7 @@ export function campaignPage(s: TimberState): ScenePage {
           page.auto = true;
           line(
             "나르미",
-            "마지막 수레에서 내린 분이 고른 어른의 장부를 알아보셨어요. 목진을 따라갔다 돌아온 집이에요. 이번엔 우리가 이야기를 들으러 갈까요?",
+            "마지막 수레에서 내린 분이 고른 어른의 장부를 알아보셨어요. 귀족들을 따라갔다 돌아온 집이에요. 이번엔 우리가 이야기를 들으러 갈까요?",
           );
           complete("2단계로 넘어갈까요? · 다섯 마을로");
         } else {
@@ -518,7 +518,7 @@ export function campaignPage(s: TimberState): ScenePage {
       if (c.reports.length === 4)
         line(
           "달이",
-          "뒤따라온 수레도 우리 편이야. 목진을 따라 떠났던 집에서 이제야 돌아올 마음을 냈대.",
+          "뒤따라온 수레도 우리 편이야. 귀족들을 따라 떠났던 집에서 이제야 돌아올 마음을 냈대.",
         );
       page.goal = site.find;
       choice("report:" + id, "보고를 장부에 적기");
@@ -569,7 +569,7 @@ export function campaignPage(s: TimberState): ScenePage {
         complete("3단계로 넘어갈까요? · 도성으로");
         line(
           "정찰대원",
-          "지휘관님, 목진 공을 데려왔습니다. 고른 어른 돌아가시고 복홀을 떠난 뒤로 가는 마을마다 쫓겨났다더군요. 우리 뒤를 따라오다가 성문이 보이니까 그제야 주저앉았습니다.",
+          "지휘관님, 돌아오는 길에 바람 막으려고 수레바퀴 뒤에 웅크린 이를 봤습니다. 가까이 가 보니 목진 공이었습니다. 귀족들 나가던 날 함께 성문을 나섰다는데, 그 뒤론 가는 데마다 문전에서 쫓겨났답니다. 여기까지 저희가 부축해 왔습니다.",
         );
         line(
           "고리",

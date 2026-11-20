@@ -29,9 +29,9 @@ test("출문을 눈으로 확인하고 장면을 접었다 돌아와도 재고�
   await expect(page.getByTestId("play-population")).toContainText("600");
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("10,000");
   await readScene(page, "어려움 · 복홀 성문으로");
-  await expect(dialog).toHaveAccessibleName("목진이 문을 열어 달라고 했다");
+  await expect(dialog).toHaveAccessibleName("귀족들이 출문을 청했다");
   await page.reload();
-  await expect(dialog).toHaveAccessibleName("목진이 문을 열어 달라고 했다");
+  await expect(dialog).toHaveAccessibleName("귀족들이 출문을 청했다");
   await readScene(page, "성문을 열고 남은 장부 확인");
   await expect(page.getByTestId("play-population")).toContainText("60");
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,000");
