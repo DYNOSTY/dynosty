@@ -1,8 +1,7 @@
 import { CHAPTERS, type TimberState } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
-import { listSlots, loadSlot, replayStage, writeSlot } from "./stage-replay.js";
-
 import { SettingsMenu } from "./SettingsMenu.js";
+import { listSlots, loadSlot, replayStage, writeSlot } from "./stage-replay.js";
 import "./main-menu.css";
 
 const films: [string, string][] = [
@@ -95,12 +94,18 @@ export function EndingMenu({
             Dynosty<span>재의 왕조</span>
           </h1>
           <nav aria-label="메인 메뉴">
-            <button onClick={() => setView("load")}>이어하기</button>
-            <button onClick={() => setView("replay")}>다시하기</button>
-            <button onClick={() => setView("films")}>돌아보기</button>
+            <button type="button" onClick={() => setView("load")}>
+              이어하기
+            </button>
+            <button type="button" onClick={() => setView("replay")}>
+              다시하기
+            </button>
+            <button type="button" onClick={() => setView("films")}>
+              돌아보기
+            </button>
             <SettingsMenu className="bokhol-settings" />
           </nav>
-          <button className="bokhol-return" onClick={resume}>
+          <button type="button" className="bokhol-return" onClick={resume}>
             마을 보기
           </button>
         </>
@@ -121,9 +126,13 @@ export function EndingMenu({
           <footer>
             {view === "load" && (
               <>
-                <button onClick={restart}>새로 시작</button>
+                <button type="button" onClick={restart}>
+                  새로 시작
+                </button>
                 {state.campaign?.beat !== "finished" && (
-                  <button onClick={() => setView("save")}>저장하기</button>
+                  <button type="button" onClick={() => setView("save")}>
+                    저장하기
+                  </button>
                 )}
               </>
             )}
@@ -131,6 +140,7 @@ export function EndingMenu({
               (film ? (
                 <>
                   <video
+                    muted
                     key={film}
                     controls
                     autoPlay
@@ -139,11 +149,13 @@ export function EndingMenu({
                     style={{ width: "100%" }}
                     src={`/story/campaign/${film}.mp4`}
                   />
-                  <button onClick={() => setFilm("")}>컷씬 목록</button>
+                  <button type="button" onClick={() => setFilm("")}>
+                    컷씬 목록
+                  </button>
                 </>
               ) : (
                 films.map(([id, label]) => (
-                  <button key={id} onClick={() => setFilm(id)}>
+                  <button type="button" key={id} onClick={() => setFilm(id)}>
                     {label}
                   </button>
                 ))
@@ -154,6 +166,7 @@ export function EndingMenu({
               ) : (
                 slots.map((slot) => (
                   <button
+                    type="button"
                     key={slot.id}
                     disabled={busy}
                     onClick={() => run(() => loadSlot(slot.id))}
@@ -167,6 +180,7 @@ export function EndingMenu({
                 const slot = slots.find((s) => s.id === id);
                 return (
                   <button
+                    type="button"
                     key={id}
                     disabled={busy}
                     onClick={() =>
@@ -202,6 +216,7 @@ export function EndingMenu({
                 {state.campaign?.beat !== "finished" &&
                   (state.chapter ?? 1) > unlocked && (
                     <button
+                      type="button"
                       disabled={busy}
                       onClick={() =>
                         run(() => replayStage(state.chapter ?? 1, restartLevel))
@@ -215,6 +230,7 @@ export function EndingMenu({
             {view === "replay" &&
               CHAPTERS.slice(0, unlocked).map((name, i) => (
                 <button
+                  type="button"
                   key={name}
                   disabled={busy}
                   onClick={() => run(() => replayStage(i + 1, restartLevel))}
@@ -229,6 +245,7 @@ export function EndingMenu({
               )}
             {
               <button
+                type="button"
                 disabled={busy}
                 onClick={() => {
                   setFilm("");
