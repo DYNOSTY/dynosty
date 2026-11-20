@@ -270,6 +270,7 @@ export function campaignOutcome(s: TimberState): Campaign["ending"] {
   )
     return "order";
   if (
+    c.awakeningSeen &&
     s.town.development.story.chungnyeong === "mechanical" &&
     s.town.development.completed.includes("R19")
   )

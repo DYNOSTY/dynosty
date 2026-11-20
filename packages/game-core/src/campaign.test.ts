@@ -290,7 +290,7 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(campaignOutcome(control)).toBeNull();
   control = payTown(control, { RES_WOOD: 60, RES_METAL: 54, RES_COAL: 16 });
   const development = control.town.development;
-  const escaped = updateCampaign({
+  const awakened = updateCampaign({
     ...control,
     town: {
       ...control.town,
@@ -301,7 +301,9 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
       },
     },
   });
-  expect(restore(escaped).campaign?.ending).toBe("escape");
+  expect(awakened.campaign?.beat).toBe("vigil");
+  const ending = act(restore(awakened), "awakening");
+  expect(restore(ending).campaign?.ending).toBe("escape");
   expect(
     restore(
       updateCampaign({
