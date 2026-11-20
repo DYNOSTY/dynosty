@@ -81,8 +81,8 @@ test("함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단
   }
   await page.getByRole("button", { name: /^다음 대사/ }).click();
   await expect(
-    page.getByRole("dialog").locator("img.campaign-still"),
-  ).toHaveAttribute("src", "/story/campaign/end-1.webp");
+    page.getByRole("dialog").locator("video.campaign-still"),
+  ).toHaveAttribute("src", "/story/campaign/ending-1.mp4#t=0,7.5");
   await page.getByRole("button", { name: "지금 단계에 머물기" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: /1단계 · 복홀의 첫 명령/ }).click();
