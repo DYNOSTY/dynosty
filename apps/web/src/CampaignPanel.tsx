@@ -52,6 +52,8 @@ function SceneDialog({
   const [cursor, setCursor] = useState(0);
   const frameIndex = cursor - page.lines.length;
   const frame = page.frames?.[frameIndex];
+  const flashback = page.key === "summit" && page.lines[cursor]?.[1] === "";
+  const familyScene = page.key === "summit" && cursor > 0 && cursor <= 5;
   const total = page.lines.length + (page.frames?.length ?? 0);
   const lineIndex = Math.min(cursor, page.lines.length - 1);
   useEffect(() => {
@@ -106,14 +108,36 @@ function SceneDialog({
           autoPlay
         />
       )}
-      {!frame && page.illustration && (
+      {flashback && (
         <img
           className="campaign-still"
-          alt={page.title}
-          src={`/story/campaign/${page.illustration}.webp`}
+          src={media + "end-3b.webp"}
+          alt="도성 광장에 홀로 선 왕의 뒷모습"
         />
       )}
+      {!flashback && !frame && (familyScene || page.illustration) && (
+        <img
+          className="campaign-still"
+          alt={
+            familyScene
+              ? "복홀 성문 앞의 양녕과 새끼 스피노사우르스 포와 혜"
+              : page.title
+          }
+          src={`/story/campaign/${familyScene ? "royal-family" : page.illustration}.webp`}
+        />
+      )}
+      {page.key === "summit" && cursor === 1 && (
+        <section className="prince-greetings" aria-label="두 왕자의 인사">
+          <p>
+            <strong>포</strong> 복홀 어른들, 안녕하세요! 쥬신의 왕자 포예요!
+          </p>
+          <p>
+            <strong>혜</strong> 저도 왕자예요! 혜라고 불러 주세요!
+          </p>
+        </section>
+      )}
       {page.clip &&
+        !familyScene &&
         !frame &&
         (!(
           page.clip === "hope" ||
@@ -132,22 +156,24 @@ function SceneDialog({
             aria-label={page.title + " 무성 컷씬"}
           />
         )}
-      {page.goal && <p className="campaign-goal">{page.goal}</p>}
-      <div className="campaign-speech" aria-live="polite">
-        {frame ? null : face >= 0 ? (
-          <PatrolPortrait index={face} />
-        ) : name === "나르미" || name === "달이" ? (
-          <img
-            alt=""
-            src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.png`}
-          />
-        ) : null}
-        <div>
-          <strong>{frame ? "복홀의 기록" : name}</strong>
-          <p>{frame?.words ?? words}</p>
+      {!flashback && page.goal && <p className="campaign-goal">{page.goal}</p>}
+      {!flashback && (!frame || frame.words) && (
+        <div className="campaign-speech" aria-live="polite">
+          {frame ? null : face >= 0 ? (
+            <PatrolPortrait index={face} />
+          ) : name === "나르미" || name === "달이" ? (
+            <img
+              alt=""
+              src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.png`}
+            />
+          ) : null}
+          <div>
+            <strong>{frame ? "복홀의 기록" : name}</strong>
+            <p>{frame?.words ?? words}</p>
+          </div>
         </div>
-      </div>
-      {advisory}
+      )}
+      {!flashback && (!frame || frame.words) && advisory}
       <footer>
         {cursor > 0 && (
           <button type="button" onClick={() => setCursor(cursor - 1)}>
