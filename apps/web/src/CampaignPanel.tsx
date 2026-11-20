@@ -128,7 +128,7 @@ function SceneDialog({
           alt="도성 광장에 홀로 선 왕의 뒷모습"
         />
       )}
-      {!flashback && !frame && (familyScene || page.illustration) && (
+      {!flashback && !frame && (familyScene || later || page.illustration) && (
         <img
           className="campaign-still"
           alt={

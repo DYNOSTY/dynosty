@@ -1028,26 +1028,21 @@ export function campaignPage(s: TimberState): ScenePage {
         );
         if (c.revivalPrepared === false) {
           line(
-            "영실",
-            "마마께서 살아 계실 때 맞춰 둔 기록이 없습니다. 이제는 그 목소리를 되찾을 수 없습니다.",
-          );
-          line(
             "고리",
-            "……내가 전하마. 문은 조금 열어 두어라. 마지막 인사를 올리러 올 테니.",
-          );
-        } else if (s.town.development.completed.includes("R18")) {
-          line(
-            "영실",
-            "보십시오. 마마의 기록을 읽을 때마다 장치의 바늘이 뜁니다. 이제 이걸 받아 줄 몸을 지어야 합니다.",
+            "문은 조금 열어 두어라. 마지막 인사를 올리러 올 테니.",
           );
         } else if (
           c.revivalPrepared ||
-          s.town.development.completed.includes("R17")
+          s.town.development.completed.includes("R17") ||
+          s.town.development.completed.includes("R18")
         ) {
-          line(
-            "영실",
-            "마마께서 살아 계실 적에 맞춰 둔 기록이 여기 있습니다. 의식을 옮길 장치를 만들겠습니다. 아직은 깨어나신다고 약조할 수 없습니다.",
-          );
+          line("영실", "잠깐만요, 고리님.");
+          page.lineIllustration = {
+            at: page.lines.length,
+            image: "infirmary-record",
+            alt: "등잔 아래 영실이 건 기록판 위로 조금 들린 바늘",
+          };
+          line("고리", "공주 마마?");
         } else {
           line(
             "영실",

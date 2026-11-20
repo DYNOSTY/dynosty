@@ -163,10 +163,39 @@ it("목진은 반란 당일 성문 습격 기록이 있을 때만 붉은 눈을 
       const scene = campaignPage({
         ...base,
         chapter: 5,
-        campaign: { ...base.campaign!, beat, coupGateRaided },
+        campaign: {
+          ...base.campaign!,
+          beat,
+          ...(coupGateRaided === undefined ? {} : { coupGateRaided }),
+        },
       });
       expect(scene.lines[0]?.[1].includes("붉은 눈")).toBe(
         Boolean(coupGateRaided),
+      );
+    }
+  }
+});
+
+it("의원에서는 남겨 둔 기록이 있어야 고리의 부름에 바늘 삽화가 뜬다", () => {
+  const s = createVillageGame();
+  s.town.development.story.chungnyeong = "dead";
+  for (const revivalPrepared of [true, false]) {
+    const page = campaignPage({
+      ...s,
+      chapter: 5,
+      campaign: { ...s.campaign!, beat: "vigil", revivalPrepared },
+    });
+    expect(page.lines.some(([name]) => name === "충녕")).toBe(false);
+    if (revivalPrepared) {
+      expect(page.lineIllustration?.image).toBe("infirmary-record");
+      expect(page.lines[page.lineIllustration!.at]).toEqual([
+        "고리",
+        "공주 마마?",
+      ]);
+    } else {
+      expect(page.lineIllustration).toBeUndefined();
+      expect(page.lines[1]?.[1]).toBe(
+        "문은 조금 열어 두어라. 마지막 인사를 올리러 올 테니.",
       );
     }
   }
