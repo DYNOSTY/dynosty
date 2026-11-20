@@ -49,10 +49,21 @@ function SceneDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [cursor, setCursor] = useState(0);
+  const frameIndex = cursor - page.lines.length;
+  const frame = page.frames?.[frameIndex];
+  const total = page.lines.length + (page.frames?.length ?? 0);
   const lineIndex = Math.min(cursor, page.lines.length - 1);
+  useEffect(() => {
+    if (!frame || cursor >= total - 1) return;
+    const timer = window.setTimeout(
+      () => setCursor((i) => Math.min(i + 1, total - 1)),
+      7500,
+    );
+    return () => window.clearTimeout(timer);
+  }, [cursor, frame, total]);
   const [name, words] = page.lines[lineIndex]!;
   const face = PATROL_NAMES.findIndex((x) => x === name);
-  const last = lineIndex === page.lines.length - 1;
+  const last = cursor === total - 1;
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();
@@ -74,28 +85,35 @@ function SceneDialog({
           접기
         </button>
       </header>
-      {page.illustration && (
+      {(frame || page.illustration) && (
         <img
           className="campaign-still"
           alt={page.title}
-          src={`/story/campaign/${page.illustration}.webp`}
+          src={`/story/campaign/${frame?.image ?? page.illustration}.webp`}
         />
       )}
-      {page.clip && (
-        <video
-          key={page.clip}
-          src={media + page.clip + ".mp4"}
-          muted
-          playsInline
-          autoPlay
-          controls
-          preload="metadata"
-          aria-label={page.title + " 무성 컷씬"}
-        />
-      )}
+      {page.clip &&
+        !frame &&
+        (!(
+          page.clip === "hope" ||
+          page.clip === "escape" ||
+          page.clip === "order"
+        ) ||
+          cursor >= 2) && (
+          <video
+            key={page.clip}
+            src={media + page.clip + ".mp4"}
+            muted
+            playsInline
+            autoPlay
+            controls
+            preload="metadata"
+            aria-label={page.title + " 무성 컷씬"}
+          />
+        )}
       {page.goal && <p className="campaign-goal">{page.goal}</p>}
       <div className="campaign-speech" aria-live="polite">
-        {face >= 0 ? (
+        {frame ? null : face >= 0 ? (
           <PatrolPortrait index={face} />
         ) : name === "나르미" || name === "달이" ? (
           <img
@@ -104,20 +122,20 @@ function SceneDialog({
           />
         ) : null}
         <div>
-          <strong>{name}</strong>
-          <p>{words}</p>
+          <strong>{frame ? "복홀의 기록" : name}</strong>
+          <p>{frame?.words ?? words}</p>
         </div>
       </div>
       {advisory}
       <footer>
         {cursor > 0 && (
-          <button type="button" onClick={() => setCursor(lineIndex - 1)}>
+          <button type="button" onClick={() => setCursor(cursor - 1)}>
             이전 대사
           </button>
         )}
         {!last ? (
-          <button type="button" onClick={() => setCursor(lineIndex + 1)}>
-            다음 대사 · {lineIndex + 1}/{page.lines.length}
+          <button type="button" onClick={() => setCursor(cursor + 1)}>
+            다음 대사 · {cursor + 1}/{total}
           </button>
         ) : (
           page.choices.map((x) => (
@@ -180,12 +198,28 @@ export function CampaignPanel({
   const [sound, setSound] = useState(false);
   const { audioRef } = useAudio();
   const canPetition =
-    ["patrol", "roads", "capital", "arrival", "winter", "vigil"].includes(
-      c.beat,
-    ) && policyWait(s) === 0;
+    [
+      "patrol",
+      "roads",
+      "capital",
+      "arrival",
+      "winter",
+      "forecast",
+      "vigil",
+    ].includes(c.beat) && policyWait(s) === 0;
   const petitionOpen = petition && canPetition;
+  const [lossShown, setLossShown] = useState(false);
+  useEffect(() => {
+    if (c.ending !== "collapse") {
+      setLossShown(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setLossShown(true), 4500);
+    return () => window.clearTimeout(timer);
+  }, [c.ending]);
   const open =
-    petitionOpen || opened === p.key || (p.auto && dismissed !== p.key);
+    (c.ending !== "collapse" || lossShown) &&
+    (petitionOpen || opened === p.key || (p.auto && dismissed !== p.key));
   const petitionPage: ScenePage = {
     key: "petition-" + s.world.day,
     title: "배식 줄에서 온 청",
@@ -220,7 +254,7 @@ export function CampaignPanel({
         action: "share",
         label:
           c.beat === "capital"
-            ? "병상 배식 · 어류 4 (개량 연구·2단계 병원·식당 필요)"
+            ? "병상 배식 반포 · 어류 4 (개량 연구·2단계 병원·식당 필요)"
             : "어류 4를 내어 병상까지 배달",
         disabled:
           !canPay(s, "RES_FISH", 4) ||
@@ -479,6 +513,31 @@ export function CampaignPanel({
       )}
       {office && (
         <section className="office-panel" aria-label="관아">
+          <strong>관아에서 반포할 배급령</strong>
+          {(["needs", "cap"] as const).map((policy) => (
+            <button
+              key={policy}
+              type="button"
+              aria-pressed={s.rationPolicy === policy}
+              disabled={policyWait(s) > 0 || s.rationPolicy === policy}
+              onClick={() => command({ type: "set-ration-policy", policy })}
+            >
+              {policy === "needs" ? "필요량에 따른 배급" : "식단별 배급 상한"}{" "}
+              {s.rationPolicy === policy ? "시행 중" : "반포"}
+            </button>
+          ))}
+          {c.beat === "capital" && (
+            <p>
+              {capitalMealsReady(s)
+                ? "병상 배식을 맡길 병원과 식당이 준비됐습니다."
+                : "병상 배식에는 병원 개량 연구와 운영 가능한 2단계 병원·식당이 필요합니다."}
+            </p>
+          )}
+          {canPetition && (
+            <button type="button" onClick={() => setPetition(true)}>
+              청원을 읽고 반포
+            </button>
+          )}
           <img
             src="/art/village-office.webp"
             alt="마을 북쪽 관아와 방을 붙이는 포졸"
@@ -521,7 +580,7 @@ export function CampaignPanel({
       )}
       {policyWait(s) > 0 && (
         <small>
-          다음 정책 발효까지 {Math.floor(policyWait(s) / 60)}시간{" "}
+          다음 반포까지 {Math.floor(policyWait(s) / 60)}시간{" "}
           {policyWait(s) % 60}분
         </small>
       )}
@@ -534,9 +593,15 @@ export function CampaignPanel({
           주민의 청 듣기
         </button>
       )}
-      {["patrol", "roads", "capital", "arrival", "winter", "vigil"].includes(
-        c.beat,
-      ) && (
+      {[
+        "patrol",
+        "roads",
+        "capital",
+        "arrival",
+        "winter",
+        "forecast",
+        "vigil",
+      ].includes(c.beat) && (
         <button
           type="button"
           className="scout-all"

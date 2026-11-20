@@ -280,6 +280,8 @@ export function researchIssue(s: TimberState, id: string): string | null {
       return "양녕의 반란 사건 이후 열리는 후반 연구입니다.";
     if (r.route && story.route !== r.route)
       return "선택한 이야기 분기에서는 연구할 수 없습니다.";
+    if (r.id === "R18" && s.campaign?.revivalPrepared === false)
+      return "습격 당시 유산 기록 대조를 마치지 못했습니다.";
     if (r.id === "TECH_MECHA2" && story.chungnyeong !== "dead")
       return "충녕 시해 사건과 의식 이전 연구가 필요합니다.";
   }

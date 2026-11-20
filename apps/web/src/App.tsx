@@ -587,6 +587,10 @@ export function App() {
       sceneRef.current?.setGameMinutes(gameMinutes);
   }, [gameMinutes, sceneStatus]);
   const villageVisible = !!timberState && !laborOpen;
+  const fallen = timberState?.campaign?.ending === "collapse";
+  useEffect(() => {
+    if (fallen && sceneStatus === "준비 완료") sceneRef.current?.overview(true);
+  }, [fallen, sceneStatus]);
   const gatePending =
     villageVisible &&
     (timberState?.mission === "register-policy" ||
@@ -1034,7 +1038,17 @@ export function App() {
               {assetWarning}
             </p>
           ) : null}
-          <div className="scene-viewport">
+          <div
+            className={
+              fallen ? "scene-viewport fallen-settlement" : "scene-viewport"
+            }
+          >
+            {fallen && (
+              <div className="fallen-caption">
+                당신이 알던 대로 공룡 문명은 멸망했습니다.
+                <small>과거의 편린</small>
+              </div>
+            )}
             <canvas
               ref={canvasRef}
               aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
