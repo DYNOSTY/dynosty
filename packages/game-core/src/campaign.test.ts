@@ -267,7 +267,14 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   s = later(s, 15 * 1440);
   expect(s.town.cold).toBe(true);
   s = later(s, 15 * 1440);
-  s = act(s, "next");
+  const arrival = { type: "campaign", beat: "thaw", action: "next" } as const;
+  s = commandTimber(restore(s), arrival, "arrive-at-bokhol");
+  s = restore(s);
+  expect(s.chapter).toBe(5);
+  expect(commandTimber(s, arrival, "arrive-at-bokhol")).toEqual(s);
+  expect(() => commandTimber(s, arrival, "repeat-arrival")).toThrow(
+    "이미 지난 장면",
+  );
   let hope = act(later(act(s, "coexist"), 5 * 1440), "next");
   expect(hope.campaign?.uprising).toBe(false);
   hope = later(hope, 6 * 1440 - 1);
