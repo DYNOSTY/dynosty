@@ -203,6 +203,37 @@ test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 
   await expect
     .poll(() => dialog.locator("video").evaluate((v) => v.readyState))
     .toBeGreaterThan(1);
+  await dialog.getByRole("button", { name: /^다음 대사/ }).click();
+  const family = dialog.getByRole("img", { name: /포와 혜/ });
+  await expect
+    .poll(() => family.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(dialog).toContainText("포야, 혜야");
+  await expect(
+    dialog.getByRole("region", { name: "두 왕자의 인사" }),
+  ).toContainText("혜라고 불러 주세요!");
+  const advance = dialog.getByRole("button", { name: /^다음 대사/ });
+  await advance.click();
+  await advance.click();
+  await expect(dialog).toContainText("두 분이 먼저 와서 발 좀 녹이실래요?");
+  await advance.click();
+  const memory = dialog.getByRole("img", {
+    name: "도성 광장에 홀로 선 왕의 뒷모습",
+  });
+  await expect(memory).toBeVisible();
+  await expect
+    .poll(() => memory.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(dialog.locator("img")).toHaveCount(1);
+  await expect(
+    dialog.locator(
+      ".campaign-speech, .campaign-advisory, .campaign-goal, video",
+    ),
+  ).toHaveCount(0);
+  await advance.click();
+  await expect(memory).toHaveCount(0);
+  await expect(family).toBeVisible();
+  await expect(dialog).toContainText("그날은 나도 아버지처럼 홀로 남겠다.");
   const rect = await dialog.boundingBox();
   expect(rect?.width).toBeLessThanOrEqual(390);
   await readScene(page, "양녕 · 지휘권을 합치고 징발 허용");
