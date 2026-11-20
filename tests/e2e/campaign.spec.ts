@@ -213,6 +213,10 @@ test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 
   await expect(dialog).toContainText("오늘은 목진 곁에 섰어");
   await dialog.getByRole("button", { name: /^다음 대사/ }).click();
   await expect(dialog).toContainText("충녕 마마가 돌아가셨어요");
+  await readScene(page, "판결을 기록하고 의원으로");
+  await expect(dialog).toHaveAccessibleName("의원의 등잔");
+  await dialog.getByRole("button", { name: /^다음 대사/ }).click();
+  await expect(dialog).toContainText("이제는 그 목소리를 되찾을 수 없습니다");
   await expect
     .poll(() => tracks.some((url) => url.endsWith("/13.ogg")))
     .toBe(true);

@@ -859,7 +859,12 @@ export function campaignPage(s: TimberState): ScenePage {
           "심리가 끝났어. 반란을 일으킨 양녕과 문을 넘기려던 목진에게 사형이 집행됐어. 고리는 판결문을 읽고도 한참 인장을 내려놓지 못했어.",
         );
       }
-      choice("next", "판결을 기록하고 마을로");
+      choice(
+        "next",
+        s.town.development.story.chungnyeong === "dead"
+          ? "판결을 기록하고 의원으로"
+          : "판결을 기록하고 마을로",
+      );
       break;
     case "vigil":
       page.auto = false;
@@ -879,24 +884,50 @@ export function campaignPage(s: TimberState): ScenePage {
             ? "오늘도 사람들이 빈 그릇을 들고 곳간 앞에 서 있어. 고리야, 봄 얘기는 조금 이른가 봐. 같이 내려갈래?"
             : "덕순이가 내일은 집에서 파를 좀 가져오겠대. 어제까지만 해도 제 그릇을 두 손에 꼭 쥐고 있던 이가 말이야.",
         );
-      } else if (c.revivalPrepared === false) {
+      } else if (s.town.development.story.chungnyeong === "mechanical") {
+        page.title = "다시 들린 목소리";
         line(
-          "영실",
-          "마마가 들려주신 말씀은 기억합니다. 하지만 그때 대조해 둔 기록이 없습니다. 그 목소리를 되돌릴 길은 없습니다.",
+          "충녕",
+          "영실, 내 말이 들리나요? 그날 의원에 누워 있던 아이는요? 어미가 곁에서 줄곧 꼬리를 잡아 주고 있었는데.",
+        );
+        line(
+          "고리",
+          "둘 다 집에 갔습니다. 마마 목소리가 돌아왔다고, 제가 가서 전하지요.",
         );
       } else {
+        page.title = "의원의 등잔";
         line(
-          "장영실",
-          s.town.development.story.chungnyeong === "mechanical"
-            ? "장치가 제 이름을 불렀습니다. 그 목소리로 처음 묻는 게 밥은 다들 먹었느냐는 말이었습니다."
-            : "목소리를 기억하는 것과 한 사람을 돌려보내는 건 다른 일입니다. 공방에서 유산 기록을 대조한 뒤 의식 이전 장치를 연구하겠습니다.",
+          "고리",
+          "영실아. 밖에서 다들 기다린다. 내가 나가서 무어라 전하랴?",
         );
-        line(
-          "나르미",
-          s.town.development.story.chungnyeong === "mechanical"
-            ? "강가에 매어 둔 배가 있어요. 기관에 불이 붙으면 마마께서도 함께 강을 건너실 수 있대요."
-            : "공방 불은 제가 지킬게요. 의원이 마마 곁을 비우면 안 돼요. 혹시 우리 말을 듣고 계실지도 모르잖아요.",
-        );
+        if (c.revivalPrepared === false) {
+          line(
+            "영실",
+            "마마께서 살아 계실 때 맞춰 둔 기록이 없습니다. 이제는 그 목소리를 되찾을 수 없습니다.",
+          );
+          line(
+            "고리",
+            "……내가 전하마. 문은 조금 열어 두어라. 마지막 인사를 올리러 올 테니.",
+          );
+        } else if (s.town.development.completed.includes("R18")) {
+          line(
+            "영실",
+            "보십시오. 마마의 기록을 읽을 때마다 장치의 바늘이 뜁니다. 이제 이걸 받아 줄 몸을 지어야 합니다.",
+          );
+        } else if (
+          c.revivalPrepared ||
+          s.town.development.completed.includes("R17")
+        ) {
+          line(
+            "영실",
+            "마마께서 살아 계실 적에 맞춰 둔 기록이 여기 있습니다. 의식을 옮길 장치를 만들겠습니다. 아직은 깨어나신다고 약조할 수 없습니다.",
+          );
+        } else {
+          line(
+            "영실",
+            "먼저 공방에 남은 기록부터 살피겠습니다. 마마의 흔적을 찾거든 지휘관께 곧장 기별하겠습니다.",
+          );
+        }
       }
       {
         const ration = emergencyRation(s);

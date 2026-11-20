@@ -331,7 +331,13 @@ export function CampaignPanel({
   };
   function act(action: string) {
     command({ type: "campaign", beat: c.beat, action });
-    setOpened(null);
+    setOpened(
+      c.beat === "verdict" &&
+        action === "next" &&
+        s.town.development.story.chungnyeong === "dead"
+        ? "vigil"
+        : null,
+    );
     if (petitionOpen) {
       setPetition(false);
       return;
