@@ -4,6 +4,8 @@ import {
   createCapital,
   createTimberSave,
   createVillageGame,
+  payTown,
+  RESEARCH_CATALOG,
   SCOUT_SITES,
 } from "../../packages/game-core/dist/index.js";
 
@@ -333,4 +335,49 @@ test("쥬신 왕으로 도성 구호를 명하고 설정에서 변종 야습 기
   await expect(page.getByRole("dialog")).toContainText(
     "왕도는 함락되고 쥬신은 멸망했다",
   );
+});
+
+test("충녕의 소생 소식을 전한 뒤 이어 하면 의원 후일담을 듣는다", async ({
+  page,
+}) => {
+  const completed = ["R17", "R18", "TECH_MECHA2"];
+  let base = createVillageGame();
+  for (const id of completed)
+    base = payTown(base, RESEARCH_CATALOG.find((r) => r.id === id)!.cost);
+  const save = createTimberSave({
+    ...base,
+    chapter: 5,
+    campaign: {
+      ...base.campaign!,
+      beat: "vigil",
+      side: "control",
+      revivalPrepared: true,
+    },
+    town: {
+      ...base.town,
+      development: {
+        ...base.town.development,
+        completed,
+        story: {
+          rebellion: true,
+          route: "mechanical",
+          chungnyeong: "mechanical",
+        },
+      },
+    },
+  });
+  await page.addInitScript((value) => {
+    if (!localStorage.getItem("dynosty.village.resume"))
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
+  }, save);
+  await page.goto("/");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveAccessibleName("다시 들린 목소리");
+  await dialog.getByRole("button", { name: /^다음 대사/ }).click();
+  await expect(dialog).toContainText("그날 내 옆에 누웠던 아이는요?");
+  await readScene(page, "의원 밖에 소식을 전한다");
+  await expect(dialog).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("button", { name: /^5단계 ·/ }).click();
+  await expect(dialog).toContainText("혼자 문턱을 넘던걸요");
 });
