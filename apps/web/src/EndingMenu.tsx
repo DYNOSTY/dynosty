@@ -43,6 +43,9 @@ export function EndingMenu({
   >(initialView);
   const [slots, setSlots] = useState<Awaited<ReturnType<typeof listSlots>>>([]);
   const [film, setFilm] = useState("");
+  const [restartLevel, setRestartLevel] = useState<"normal" | "hard">(
+    state.campaign?.difficulty ?? "normal",
+  );
   const [notice, setNotice] = useState("");
   const [unlocked, setUnlocked] = useState(limit);
   const [busy, setBusy] = useState(false);
@@ -180,17 +183,50 @@ export function EndingMenu({
                   </button>
                 );
               })}
+            {view === "replay" && (
+              <>
+                <label>
+                  시작 난이도{" "}
+                  <select
+                    value={restartLevel}
+                    onChange={(e) =>
+                      setRestartLevel(
+                        e.target.value === "hard" ? "hard" : "normal",
+                      )
+                    }
+                  >
+                    <option value="normal">보통</option>
+                    <option value="hard">어려움</option>
+                  </select>
+                </label>
+                {state.campaign?.beat !== "finished" &&
+                  (state.chapter ?? 1) > unlocked && (
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        run(() => replayStage(state.chapter ?? 1, restartLevel))
+                      }
+                    >
+                      현재 {state.chapter ?? 1}단계 처음부터 시작
+                    </button>
+                  )}
+              </>
+            )}
             {view === "replay" &&
               CHAPTERS.slice(0, unlocked).map((name, i) => (
                 <button
                   key={name}
                   disabled={busy}
-                  onClick={() => run(() => replayStage(i + 1))}
+                  onClick={() => run(() => replayStage(i + 1, restartLevel))}
                 >
                   {i + 1}단계 · {name}
                 </button>
               ))}
-            {view === "replay" && !unlocked && <p>완료한 미션이 없습니다.</p>}
+            {view === "replay" &&
+              !unlocked &&
+              state.campaign?.beat === "finished" && (
+                <p>완료한 미션이 없습니다.</p>
+              )}
             {
               <button
                 disabled={busy}
