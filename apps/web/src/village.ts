@@ -104,6 +104,7 @@ export type VillageTargetInfo = {
   name: string;
   detail: string;
   portrait?: string;
+  buildingPosition?: { x: number; z: number };
 };
 
 type Shadow = (
@@ -269,7 +270,10 @@ export function createVillage(
       name: villageNames[model] ?? model,
       detail,
       // Only the fixed village buildings have a matching concept portrait.
-      ...(!role && { portrait: `/ui/buildings/${model}.jpg` }),
+      ...(!role && {
+        portrait: `/ui/buildings/${model}.jpg`,
+        buildingPosition: { x, z },
+      }),
       meshes: v.meshes,
     });
     for (const m of v.meshes) {

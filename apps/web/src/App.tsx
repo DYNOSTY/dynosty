@@ -1681,6 +1681,24 @@ export function App() {
               )}
               <h2>{villageInfo.name}</h2>
               <p>{villageInfo.detail}</p>
+              {villageInfo.buildingPosition && (
+                <>
+                  <button
+                    type="button"
+                    className="quiet-button"
+                    onClick={() => sceneRef.current?.focusSelected()}
+                  >
+                    가까이 보기
+                  </button>{" "}
+                  <button
+                    type="button"
+                    className="quiet-button"
+                    onClick={clearSelection}
+                  >
+                    선택 해제
+                  </button>
+                </>
+              )}
             </section>
           ) : selectedEntity ? (
             <SelectionPanel

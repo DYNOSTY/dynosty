@@ -15,24 +15,61 @@ test("selecting a village building shows its portrait without replacing the exis
   });
   await expect(selection).toHaveCount(0);
 
-  const office = await worldPoint(page, [0, 1.4, -14]);
+  const office = await worldPoint(page, [0, 1.4, -14], false);
   await page.mouse.click(office.x, office.y);
   await expect(selection.getByRole("heading", { name: "관아" })).toBeVisible();
   await expect(selection).toContainText("복홀 · 마을 시설");
   const portrait = selection.locator('img[src="/ui/buildings/BLD_OFFICE.jpg"]');
   await expect(portrait).toHaveAttribute("alt", "");
-  await portrait.scrollIntoViewIfNeeded();
   await expect
     .poll(() => portrait.evaluate((img: HTMLImageElement) => img.naturalWidth))
     .toBeGreaterThan(0);
-  await page.keyboard.press("Escape");
+  await expect(
+    selection.getByRole("button", { name: /^(가까이 보기|선택 해제)$/ }),
+  ).toHaveText(["가까이 보기", "선택 해제"], { timeout: 5_000 });
+  const camera = () =>
+    page.evaluate(() => {
+      const { activeCamera } = (
+        window as unknown as {
+          __scene: {
+            activeCamera: {
+              radius: number;
+              target: { x: number; z: number };
+            };
+          };
+        }
+      ).__scene;
+      return {
+        radius: activeCamera.radius,
+        x: activeCamera.target.x,
+        z: activeCamera.target.z,
+      };
+    });
+  const before = await camera();
+  await selection.getByRole("button", { name: "가까이 보기" }).click();
+  await expect
+    .poll(async () => {
+      const { radius, x, z } = await camera();
+      return radius < before.radius && Math.hypot(x, z + 14) < 0.5;
+    })
+    .toBe(true);
+  await expect(selection.getByRole("heading", { name: "관아" })).toBeVisible();
+  await selection.getByRole("button", { name: "선택 해제" }).click();
   await expect(selection).toHaveCount(0);
-  await page.locator("canvas").scrollIntoViewIfNeeded();
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeFocused();
+  await page.getByRole("button", { name: "시점을 가운데로" }).click();
   await clickExample(page, "building");
   await expect(
     selection.getByRole("heading", { name: "건물 예제 · 온돌 둥지" }),
   ).toBeVisible();
   await expect(selection.locator("img")).toHaveCount(0);
+  await expect(
+    selection.getByRole("button", { name: "가까이 보기" }),
+  ).toHaveCount(0);
+  await expect(selection.getByRole("button", { name: "선택 해제" })).toHaveText(
+    "×",
+  );
 });
 
 test("a missing building portrait leaves its selection text usable", async ({

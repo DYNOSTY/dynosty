@@ -61,6 +61,7 @@ export interface SceneController {
   villageInfo(id: string): VillageTargetInfo | undefined;
   update(snapshot: SceneSnapshot, showBoard?: boolean): void;
   select(id: string | null): void;
+  focusSelected(): void;
   focusSite(id: SiteId): boolean;
   dispose(): void;
   readonly ready: Promise<void>;
@@ -991,6 +992,15 @@ export function mountScene(
       camera.target.set(x * k, 0, z * k); // 각도·거리는 그대로 두고 바라보는 점만 옮김
     },
     villageInfo: (id) => village.targets.get(id),
+    focusSelected() {
+      const position =
+        selected && village.targets.get(selected)?.buildingPosition;
+      if (!position) return;
+      camera.inertialPanningX = camera.inertialPanningY = 0;
+      camera.inertialRadiusOffset = 0;
+      camera.target.set(position.x, 1, position.z);
+      camera.radius = 16;
+    },
     update: entities.update,
     select,
     dispose() {
