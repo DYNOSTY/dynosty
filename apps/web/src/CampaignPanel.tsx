@@ -22,6 +22,7 @@ import {
 } from "@dynosty/game-core";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
+import { EndingMenu } from "./EndingMenu.js";
 import {
   campaignPage,
   gatheringRumor,
@@ -260,16 +261,17 @@ export function CampaignPanel({
     </>
   );
   const [dismissed, setDismissed] = useState<string | null>(null);
+  const [mainMenu, setMainMenu] = useState(false);
   const [opened, setOpened] = useState<string | null>(null);
   const [petition, setPetition] = useState(false);
-  const [office, setOffice] = useState(false);
-  useEffect(() => {
-    if (officeSelected) setOffice(true);
-  }, [officeSelected]);
   const [south, setSouth] = useState(false);
   useEffect(() => {
     if (southVisits) setSouth(true);
   }, [southVisits]);
+  const [office, setOffice] = useState(false);
+  useEffect(() => {
+    if (officeSelected) setOffice(true);
+  }, [officeSelected]);
   useEffect(() => {
     if (gateSelected && c.beat === "capital") setSouth(true);
     else if (gateSelected) setDefenseOpen?.(true);
@@ -403,8 +405,35 @@ export function CampaignPanel({
     }
     setDismissed(p.key);
   }
+  if (c.beat === "finished" || mainMenu) {
+    return !mainMenu && dismissed === p.key ? (
+      <button type="button" onClick={() => setMainMenu(true)}>
+        메인 메뉴
+      </button>
+    ) : (
+      <EndingMenu
+        state={s}
+        limit={
+          c.beat === "finished" && c.ending !== "collapse"
+            ? 5
+            : (s.chapter ?? 1) - 1
+        }
+        resume={() => {
+          setMainMenu(false);
+          if (c.beat === "finished") close();
+        }}
+        restart={() => {
+          setMainMenu(false);
+          command({ type: "restart" });
+        }}
+      />
+    );
+  }
   return (
     <div className="campaign-quest">
+      <button type="button" onClick={() => setMainMenu(true)}>
+        메인 메뉴
+      </button>
       <button
         type="button"
         className="scout-all"

@@ -40,6 +40,8 @@ import { useEffect, useRef, useState } from "react";
 import { LaborDemo } from "./LaborDemo.js";
 import { MerchantOffers, merchantCards } from "./MerchantOffers.js";
 import { residentName } from "./resident-names.js";
+import { saveStageStart } from "./stage-replay.js";
+import { EndingMenu } from "./EndingMenu.js";
 import type { SiteId } from "./site-targets.js";
 import { buildingCost, TownPanel } from "./TownPanel.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
@@ -107,6 +109,7 @@ export function TimberDemo({
   world,
 }: Props) {
   const [laborMode, setLaborMode] = useState(false);
+  const [slotPicker, setSlotPicker] = useState(false);
   useEffect(() => onLaborModeChange(laborMode), [laborMode, onLaborModeChange]);
   const [placingKind, setPlacingKind] = useState<BuildingKind>("home");
   const [placingHome, setPlacingHome] = useState(false);
@@ -195,9 +198,26 @@ export function TimberDemo({
       type: "module",
     });
     worker.current = w;
+    let previousChapter: number | undefined;
     w.onmessage = (e: MessageEvent<TimberResponse>) => {
       const m = e.data;
       if (m.type === "state") {
+        const stage = m.state.chapter ?? 1;
+        const campaign = m.state.campaign;
+        if (
+          campaign &&
+          stage !== previousChapter &&
+          campaign.since === m.state.elapsed &&
+          campaign.beat ===
+            ["opening", "roads", "capital", "arrival", "summit"][stage - 1] &&
+          (stage !== 2 || (!campaign.caravan && !campaign.treaties.length)) &&
+          (stage !== 3 || !campaign.relief)
+        ) {
+          void saveStageStart(m.state).catch(() =>
+            setError("단계 시작 기록을 저장하지 못했습니다."),
+          );
+        }
+        previousChapter = stage;
         try {
           localStorage.setItem(
             "dynosty.village.resume",
@@ -1159,6 +1179,21 @@ export function TimberDemo({
           )}
           {saveOpen ? (
             <div className="timber-controls">
+              <button type="button" onClick={() => setSlotPicker(true)}>
+                슬롯에 저장하기
+              </button>
+              {slotPicker && (
+                <EndingMenu
+                  state={state}
+                  initialView="save"
+                  limit={(state.chapter ?? 1) - 1}
+                  resume={() => setSlotPicker(false)}
+                  restart={() => {
+                    setSlotPicker(false);
+                    command({ type: "restart" });
+                  }}
+                />
+              )}
               <button
                 type="button"
                 disabled={busy}

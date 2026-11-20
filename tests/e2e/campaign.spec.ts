@@ -752,3 +752,68 @@ for (const [hope, allegiance, film] of [
     }
   });
 }
+test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장부를 복원한다", async ({
+  page,
+}) => {
+  const village = createVillageGame();
+  const checkpoint = createTimberSave({
+    ...village,
+    chapter: 5,
+    paused: true,
+    campaign: { ...village.campaign!, beat: "summit" },
+  });
+  const ending = createTimberSave({
+    ...checkpoint.state,
+    campaign: { ...checkpoint.state.campaign!, beat: "ending", ending: "hope" },
+  });
+  await page.addInitScript((value) => {
+    if (!localStorage.getItem("dynosty.village.resume"))
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
+  }, checkpoint);
+  await page.goto("/");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
+  await readScene(page, "충녕 · 먹는 것과 필요한 양에 맞춰 배급한다");
+  await page.getByRole("button", { name: "메인 메뉴", exact: true }).click();
+  await dialog.getByRole("button", { name: "저장하기", exact: true }).click();
+  await dialog.getByRole("button", { name: /슬롯 2 · 빈 슬롯/ }).click();
+  await expect(dialog).toContainText("슬롯 2에 저장했습니다.");
+  const manual = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("dynosty.village.resume")!).state,
+  );
+  await page.evaluate(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    ending,
+  );
+  await page.reload();
+  await readScene(page, "5단계 완료 · 마지막 장을 덮을까요?");
+  await expect(dialog).toHaveAccessibleName("메인 메뉴");
+  await page.reload();
+  await expect(dialog).toHaveAccessibleName("메인 메뉴");
+  await dialog.getByRole("button", { name: "이어 하기" }).click();
+  await dialog.getByRole("button", { name: /슬롯 2 · 5단계/ }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
+            .campaign.beat,
+      ),
+    )
+    .toBe("forecast");
+  const loaded = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("dynosty.village.resume")!).state,
+  );
+  expect(loaded.world).toEqual(manual.world);
+  expect(loaded.town).toEqual(manual.town);
+  await page.getByRole("button", { name: "메인 메뉴", exact: true }).click();
+  await dialog.getByRole("button", { name: "다시 하기" }).click();
+  await dialog.getByRole("button", { name: /^5단계 ·/ }).click();
+  await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
+  const resumed = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("dynosty.village.resume")!).state,
+  );
+  expect(resumed.world.resources).toEqual(checkpoint.state.world.resources);
+  expect(resumed.world.citizens).toEqual(checkpoint.state.world.citizens);
+});
