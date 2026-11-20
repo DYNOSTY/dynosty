@@ -8,11 +8,13 @@ import type {
 } from "@dynosty/game-core";
 import {
   AMOUNT_SCALE,
+  absMinute,
   type HeatLevel,
   type LaborState,
   laborScene,
   laborStock,
   pendingStory,
+  STORY_RULES,
   type TimberState,
   timberScene,
   winterReport,
@@ -49,6 +51,7 @@ import { SettingsMenu } from "./SettingsMenu.js";
 import { SiteGuide } from "./SiteGuide.js";
 import { SiteProgress } from "./SiteProgress.js";
 import { StoryChoice } from "./StoryChoice.js";
+import { StoryNotice } from "./StoryNotice.js";
 import type { CameraInfo, SceneController, ScreenPoint } from "./scene.js";
 import { SCOUT_CREW, SCOUT_GOAL, SCOUT_SITES } from "./scout-sites.js";
 import { type SiteNotice, siteCompletions } from "./site-progress.js";
@@ -59,6 +62,11 @@ import {
   siteAvailable,
 } from "./site-targets.js";
 import { SCENE_SIGNS } from "./site-zones.js";
+import {
+  type StoryMoment,
+  type StoryNoticeData,
+  storyNotice,
+} from "./story-notice.js";
 import { TimberDemo } from "./TimberDemo.js";
 import { VideoPanel } from "./VideoPanel.js";
 import { CREW_BADGES, cartBadge } from "./visual-badges.js";
@@ -120,6 +128,34 @@ export function App() {
   const storyDue = playState
     ? pendingStory(playState.story, playState.day, playState.minute)
     : null;
+  // 이야기 알림: 사건에서 고른 결과·늦게 들어온 물자를 7초 동안 알림
+  const [notice, setNotice] = useState<
+    (StoryNoticeData & { key: number }) | null
+  >(null);
+  const storySeen = useRef<StoryMoment | null>(null);
+  useEffect(() => {
+    if (!playState) return;
+    const next = {
+      story: playState.story,
+      now: absMinute(playState.day, playState.minute),
+    };
+    const found = storyNotice(storySeen.current, next);
+    storySeen.current = next;
+    if (found) setNotice({ ...found, key: Date.now() });
+  }, [playState]);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+  // 전량 검수 중인 목재가 들어올 때까지 남은 분 (없으면 null)
+  const woodLeft =
+    playState && playState.story.woodDue !== null
+      ? Math.max(
+          0,
+          playState.story.woodDue - absMinute(playState.day, playState.minute),
+        )
+      : null;
   const [playError, setPlayError] = useState<string | null>(null);
   const [exampleClock, setExampleClock] = useState(false);
   const [playSaveBusy, setPlaySaveBusy] = useState(false);
@@ -814,6 +850,23 @@ export function App() {
             {foundCount} / {SCOUT_GOAL}
           </b>
         </button>
+        {/* 전량 검수 중인 목재: 들어올 때까지 남은 시간 (사건·정책 선택) */}
+        {woodLeft !== null ? (
+          <div className="g-quest">
+            <img src="/ui/resources/RES_WOOD.png" alt="" />
+            <span className="g-quest__body">
+              <span>전량 검수 중 · 목재 {STORY_RULES.trade.wood}</span>
+              <span className="g-bar" aria-hidden="true">
+                <i
+                  style={{
+                    width: `${Math.round((1 - woodLeft / STORY_RULES.trade.fullDelayMinutes) * 100)}%`,
+                  }}
+                />
+              </span>
+            </span>
+            <b>{Math.ceil(woodLeft / 60)}시간</b>
+          </div>
+        ) : null}
         {/* 진행 중 정찰: 남은 시간 막대 */}
         {SCOUT_SITES.filter((site) => scouts[site.id]?.status === "going").map(
           (site) => (
@@ -1424,6 +1477,7 @@ export function App() {
           }
         />
       ) : null}
+      <StoryNotice notice={notice} />
       {STORY ? (
         <StoryChoice id={STORY} />
       ) : storyDue ? (
