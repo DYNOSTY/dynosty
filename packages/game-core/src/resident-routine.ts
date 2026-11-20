@@ -229,7 +229,7 @@ export function advanceResidentRoutine<T extends ResidentRoutine>(
 }
 
 export const RESIDENT_REQUEST_TEXT = {
-  "no-restaurant": "지휘관님, 배가 고파요. 식당을 지어 주세요!",
+  "no-restaurant": "공자님, 배가 고파요. 식당을 지어 주세요!",
   "restaurant-closed": "배가 고픈데 식당이 닫혀 있어요.",
   "no-staff": "식당에서 일할 주민을 배치해 주세요!",
   "no-food": "먹을 수 있는 식량이 부족해요!",
