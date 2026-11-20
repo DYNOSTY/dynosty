@@ -651,7 +651,7 @@ export function TimberDemo({
                 }
                 alt={foodShortage ? "걱정스러운 나르미" : "평상시의 나르미"}
               />{" "}
-              {foodShortage && "고리님, 오늘 먹일 식량이 모자랍니다. "}
+              {foodShortage && "고리야, 오늘 먹일 식량이 모자랍니다. "}
               나르미 · 하루 필요량 / 공동 재고{" "}
               {(["RES_PLANT", "RES_MEAT", "RES_FISH"] as const)
                 .map(

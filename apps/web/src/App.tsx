@@ -1582,7 +1582,7 @@ export function App() {
           <img alt="" src="/ui/cmd/research.png" />
           <span>
             영실 · 연구 완료
-            <small>고리님, ‘{reports[0]}’ 연구를 마쳤습니다.</small>
+            <small>공자님, ‘{reports[0]}’ 연구를 마쳤습니다.</small>
           </span>{" "}
           ✓
         </button>
