@@ -4818,7 +4818,11 @@ body,
     url(/ui/kit/fire_band.webp) 0 50% / 280px 140% repeat-x,
     linear-gradient(90deg, #7a2008, #4a1005 60%, #2a0804);
   background-blend-mode: screen, normal;
-  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    #000 calc(100% - 22px),
+    transparent
+  );
   mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
   box-shadow: 0 0 10px 2px rgb(255 120 30 / calc(0.2 + 0.5 * var(--heat)));
   animation: ondol-flow 2.2s linear infinite;
@@ -4832,13 +4836,12 @@ body,
   width: 9%;
   height: calc(30% + 45% * var(--fire));
   opacity: calc(0.35 + 0.65 * var(--fire));
-  background:
-    radial-gradient(
-      ellipse 45% 100% at 50% 100%,
-      rgb(255 250 210) 0%,
-      rgb(255 180 60 / 90%) 35%,
-      rgb(230 70 20 / 0%) 75%
-    );
+  background: radial-gradient(
+    ellipse 45% 100% at 50% 100%,
+    rgb(255 250 210) 0%,
+    rgb(255 180 60 / 90%) 35%,
+    rgb(230 70 20 / 0%) 75%
+  );
   filter: blur(0.4px) drop-shadow(0 0 6px rgb(255 140 40 / 90%));
   transform-origin: 50% 100%;
   animation: ondol-fire 0.6s ease-in-out infinite alternate;
@@ -4852,8 +4855,16 @@ body,
   height: 45%;
   opacity: 0;
   background:
-    radial-gradient(circle at 50% 80%, rgb(70 64 60 / 75%) 0 22%, transparent 48%),
-    radial-gradient(circle at 40% 35%, rgb(90 84 78 / 55%) 0 18%, transparent 42%);
+    radial-gradient(
+      circle at 50% 80%,
+      rgb(70 64 60 / 75%) 0 22%,
+      transparent 48%
+    ),
+    radial-gradient(
+      circle at 40% 35%,
+      rgb(90 84 78 / 55%) 0 18%,
+      transparent 42%
+    );
   transition: opacity 0.8s;
 }
 .ondol-x.is-full .ondol-x__smoke {
@@ -5081,7 +5092,13 @@ body,
   width: 16px;
   height: 16px;
   margin: -8px 0 0 -8px;
-  background: radial-gradient(circle at 42% 40%, #f0a050 0 18%, #dc5a2c 55%, #c2402a 72%, rgb(194 64 42 / 0%) 78%);
+  background: radial-gradient(
+    circle at 42% 40%,
+    #f0a050 0 18%,
+    #dc5a2c 55%,
+    #c2402a 72%,
+    rgb(194 64 42 / 0%) 78%
+  );
   box-shadow: 0 0 8px 2px rgb(240 140 70 / 40%);
 }
 .g-time__orb.is-moon {
@@ -5586,12 +5603,20 @@ body,
 .qc__path {
   position: relative;
   height: 3px;
-  background: repeating-linear-gradient(90deg, rgb(43 38 32 / 35%) 0 6px, transparent 6px 10px);
+  background: repeating-linear-gradient(
+    90deg,
+    rgb(43 38 32 / 35%) 0 6px,
+    transparent 6px 10px
+  );
 }
 .qc__path i {
   position: absolute;
   inset: 0 auto 0 0;
-  background: repeating-linear-gradient(90deg, #a8501a 0 6px, transparent 6px 10px);
+  background: repeating-linear-gradient(
+    90deg,
+    #a8501a 0 6px,
+    transparent 6px 10px
+  );
   transition: width 0.8s ease;
 }
 .qc__route li.is-found .qc__path i {
@@ -5700,7 +5725,11 @@ body,
   filter: brightness(calc(0.85 + 0.35 * var(--v)));
   box-shadow: 0 0 calc(2px + 14px * var(--v)) calc(3px * var(--v))
     rgb(255 220 150 / calc(0.15 + 0.6 * var(--v)));
-  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 10px), rgb(0 0 0 / 40%));
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    #000 calc(100% - 10px),
+    rgb(0 0 0 / 40%)
+  );
   mask-image: linear-gradient(90deg, #000 calc(100% - 10px), rgb(0 0 0 / 40%));
   animation: mood-drift 30s linear infinite;
 }
@@ -5713,8 +5742,10 @@ body,
   height: 30px;
   opacity: min(1, calc(var(--v) * var(--v) * 1.4));
   background:
-    radial-gradient(circle, rgb(255 246 214) 0 1px, transparent 2px) 0 0 / 23px 26px,
-    radial-gradient(circle, rgb(255 230 170 / 80%) 0 1px, transparent 2px) 9px 7px / 31px 26px;
+    radial-gradient(circle, rgb(255 246 214) 0 1px, transparent 2px) 0 0 / 23px
+    26px,
+    radial-gradient(circle, rgb(255 230 170 / 80%) 0 1px, transparent 2px) 9px
+    7px / 31px 26px;
   animation: mood-rise 4s linear infinite;
   -webkit-mask-image: linear-gradient(to top, #000, transparent);
   mask-image: linear-gradient(to top, #000, transparent);
@@ -5732,11 +5763,16 @@ body,
 }
 .is-despair .mood__bar > i {
   background: url(/ui/kit/ink_bleed.webp) 0 50% / 384px 48px repeat-x;
-  filter: saturate(calc(0.7 + 0.9 * var(--v))) brightness(calc(1.25 - 0.4 * var(--v)));
+  filter: saturate(calc(0.7 + 0.9 * var(--v)))
+    brightness(calc(1.25 - 0.4 * var(--v)));
   box-shadow: 0 0 calc(4px + 14px * var(--v) * var(--v)) calc(4px * var(--v))
     rgb(70 8 6 / calc(0.25 + 0.6 * var(--v)));
   /* 앞머리는 먹이 번지듯 흐려짐 */
-  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    #000 calc(100% - 22px),
+    transparent
+  );
   mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
   animation: mood-drift 40s linear infinite reverse;
 }
@@ -5751,8 +5787,10 @@ body,
 .is-critical .mood__drip {
   height: 14px;
   background:
-    radial-gradient(ellipse 2px 6px at 20% 0, #2a0806 0 70%, transparent 72%) 0 0 / 40px 100% repeat-x,
-    radial-gradient(ellipse 1.5px 9px at 60% 0, #4a0b08 0 70%, transparent 72%) 13px 0 / 57px 100% repeat-x;
+    radial-gradient(ellipse 2px 6px at 20% 0, #2a0806 0 70%, transparent 72%) 0
+    0 / 40px 100% repeat-x,
+    radial-gradient(ellipse 1.5px 9px at 60% 0, #4a0b08 0 70%, transparent 72%)
+    13px 0 / 57px 100% repeat-x;
   animation: mood-drip 2.6s ease-in infinite;
 }
 .mood__bar em {
@@ -6007,9 +6045,14 @@ body,
   border-radius: 0;
   box-shadow: none;
   background: url(/ui/time/sun.webp) center / contain no-repeat;
-  -webkit-mask-image: radial-gradient(circle closest-side, #000 60%, transparent 74%);
+  -webkit-mask-image: radial-gradient(
+    circle closest-side,
+    #000 60%,
+    transparent 74%
+  );
   mask-image: radial-gradient(circle closest-side, #000 60%, transparent 74%);
-  filter: saturate(calc(1.35 - 0.35 * var(--alt))) hue-rotate(calc((1 - var(--alt)) * -12deg))
+  filter: saturate(calc(1.35 - 0.35 * var(--alt)))
+    hue-rotate(calc((1 - var(--alt)) * -12deg))
     brightness(calc(0.95 + 0.15 * var(--alt)));
 }
 .g-time__orb.is-moon {
