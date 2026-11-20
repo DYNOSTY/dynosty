@@ -3095,9 +3095,14 @@ export function advanceTimber(
       if (s.world.minute === 1260) s = gateRaid(s);
       if (s.mutants?.length) s = advanceMutants(s);
     }
+    const beforeUpdate = s.campaign?.beat;
     const previousEnding = s.campaign?.ending;
     s = updateCampaign(s);
-    if (!previousEnding && s.campaign?.ending) break;
+    if (
+      (!previousEnding && s.campaign?.ending) ||
+      (beforeUpdate === "forecast" && s.campaign?.beat !== "forecast")
+    )
+      break;
   }
   return parseTimberState(s);
 }

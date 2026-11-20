@@ -76,6 +76,7 @@ export const BEATS = [
   "arrival",
   "winter",
   "thaw",
+  "forecast",
   "summit",
   "rally",
   "verdict",
@@ -85,6 +86,7 @@ export const BEATS = [
 ] as const;
 export type Beat = (typeof BEATS)[number];
 export interface Campaign {
+  victoryQuotes?: number[];
   beat: Beat;
   since: number;
   reports: string[];
@@ -100,15 +102,19 @@ export interface Campaign {
   escort: "invite" | "provisions" | null;
   side: "coexist" | "control" | null;
   uprising: boolean;
+  revivalPrepared?: boolean;
   lastHigh: number;
   difficulty?: Difficulty;
   pessimismExtremeSince?: number | null;
   optimismZeroSince?: number | null;
-  ending: "hope" | "escape" | "collapse" | null;
+  ending: "hope" | "escape" | "order" | "collapse" | null;
 }
 export function newCampaign(beat: Beat, since = 0): Campaign {
   return {
     beat,
+    victoryQuotes: Array.from({ length: CHAPTERS.length }, () =>
+      Math.floor(Math.random() * 10),
+    ),
     difficulty: "normal",
     since,
     reports: [],
@@ -140,6 +146,10 @@ export function campaignValid(c: unknown, elapsed: number) {
   const village = (n: unknown) => integer(n, SETTLEMENTS.length - 1);
   return (
     BEATS.includes(c.beat as Beat) &&
+    (c.victoryQuotes === undefined ||
+      (Array.isArray(c.victoryQuotes) &&
+        c.victoryQuotes.length === CHAPTERS.length &&
+        c.victoryQuotes.every((n) => integer(n, 9)))) &&
     (c.difficulty === undefined ||
       c.difficulty === "normal" ||
       c.difficulty === "hard") &&
@@ -170,8 +180,10 @@ export function campaignValid(c: unknown, elapsed: number) {
     [null, "ward", "kitchen", "report"].includes(c.relief as null) &&
     [null, "invite", "provisions"].includes(c.escort as null) &&
     [null, "coexist", "control"].includes(c.side as null) &&
+    (c.revivalPrepared === undefined ||
+      typeof c.revivalPrepared === "boolean") &&
     typeof c.uprising === "boolean" &&
-    [null, "hope", "escape", "collapse"].includes(c.ending as null) &&
+    [null, "hope", "escape", "order", "collapse"].includes(c.ending as null) &&
     ["ending", "finished"].includes(c.beat as string) === (c.ending !== null)
   );
 }
@@ -238,17 +250,24 @@ export function campaignOutcome(s: TimberState): Campaign["ending"] {
     return "collapse";
   if (
     c.beat !== "vigil" ||
-    s.elapsed - c.since < GAME_RULES.campaign.stage5MinimumDays * 1440
+    s.elapsed - c.since <
+      (GAME_RULES.campaign.stage5MinimumDays +
+        Number(c.revivalPrepared !== undefined)) *
+        1440
   )
     return null;
   if (
-    c.side === "coexist" &&
+    s.town.development.story.chungnyeong === "alive" &&
     s.world.pessimism <= 30 &&
     s.elapsed - Math.max(c.since, c.lastHigh) >= 10 * 1440
   )
-    return "hope";
+    return c.side === "control" ? "order" : "hope";
   if (
-    c.side === "control" &&
+    c.revivalPrepared === false &&
+    s.town.development.story.chungnyeong === "dead"
+  )
+    return "order";
+  if (
     s.town.development.story.chungnyeong === "mechanical" &&
     s.town.development.completed.includes("R19")
   )
@@ -287,6 +306,29 @@ export function updateCampaign(s: TimberState): TimberState {
     c = { ...c, pessimismExtremeSince, optimismZeroSince };
     s = { ...s, campaign: c };
   }
+  if (c.beat === "forecast" && s.elapsed - c.since >= 5 * 1440) {
+    const uprising = s.world.pessimism > s.world.optimism;
+    const prepared = s.town.development.completed.includes("R17");
+    let next = recordResearchStory(s, "rebellion-started");
+    if (uprising) next = recordResearchStory(next, "chungnyeong-assassinated");
+    return {
+      ...next,
+      paused: true,
+      campaign: {
+        ...c,
+        beat: uprising ? "rally" : "verdict",
+        uprising,
+        revivalPrepared: prepared,
+      },
+    };
+  }
+  if (
+    s.chapter === 5 &&
+    ["rally", "verdict", "vigil"].includes(c.beat) &&
+    s.elapsed - c.since >= 10 * 1440 &&
+    !s.town.cold
+  )
+    s = { ...s, town: { ...s.town, cold: true } };
   const ending = campaignOutcome(s);
   if (ending)
     return { ...s, paused: true, campaign: { ...c, beat: "ending", ending } };
@@ -367,9 +409,15 @@ export function actCampaign(
   const pay = (resource: ResourceId, amount: number) =>
     payTown(s, { [resource]: amount });
   if (
-    ["patrol", "roads", "capital", "arrival", "winter", "vigil"].includes(
-      c.beat,
-    ) &&
+    [
+      "patrol",
+      "roads",
+      "capital",
+      "arrival",
+      "winter",
+      "forecast",
+      "vigil",
+    ].includes(c.beat) &&
     policyWait(s) === 0 &&
     (action === "share" || action === "reserve")
   ) {
@@ -545,15 +593,10 @@ export function actCampaign(
       break;
     case "summit":
       if (action === "coexist" || action === "control") {
-        const uprising = s.world.pessimism > s.world.optimism;
-        const base = recordResearchStory(
-          { ...s, rationPolicy: action === "coexist" ? "needs" : "cap" },
-          "rebellion-started",
-        );
         return change(
-          uprising ? "rally" : "verdict",
-          { side: action, uprising, lastHigh: s.elapsed },
-          base,
+          "forecast",
+          { side: action, lastHigh: s.elapsed },
+          { ...s, rationPolicy: action === "coexist" ? "needs" : "cap" },
         );
       }
       break;
@@ -584,7 +627,7 @@ export function actCampaign(
           : recordResearchStory(
               s,
               c.side === "control"
-                ? "chungnyeong-assassinated"
+                ? "allied-yangnyeong"
                 : "rebellion-suppressed",
             );
         return change("vigil", { since: c.since }, base);

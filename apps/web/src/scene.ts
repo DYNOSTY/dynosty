@@ -97,7 +97,7 @@ export interface SceneController {
     cb: (pos: Record<string, ScreenPoint>) => void,
   ): void;
   focus(position: GroundPoint, distance?: number): void;
-  overview(): void;
+  overview(topDown?: boolean): void;
   beginHomePlacement(
     confirm: (pose: HomePlacement) => void,
     feedback: (message: string, active: boolean) => void,
@@ -791,12 +791,12 @@ export function mountScene(
       selectionEnabled = enabled;
       if (!enabled) entities.select(null);
     },
-    overview() {
+    overview(topDown = false) {
       camera.inertialPanningX = 0;
       camera.inertialPanningY = 0;
       camera.inertialRadiusOffset = 0;
       camera.radius = 640;
-      camera.beta = 0.7;
+      camera.beta = topDown ? 0.2 : 0.7;
       camera.setTarget(Vector3.Zero(), false, true, true);
     },
     focus(position, distance = 32) {

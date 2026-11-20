@@ -268,13 +268,18 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(s.town.cold).toBe(true);
   s = later(s, 15 * 1440);
   s = act(s, "next");
-  let hope = act(act(s, "coexist"), "next");
+  let hope = act(later(act(s, "coexist"), 5 * 1440), "next");
   expect(hope.campaign?.uprising).toBe(false);
-  hope = later(hope, 10 * 1440 - 1);
+  hope = later(hope, 6 * 1440 - 1);
   expect(campaignOutcome(hope)).toBeNull();
   hope = later(hope, 1);
   expect(restore(act(hope, "finish")).campaign?.ending).toBe("hope");
-  let control = act({ ...s, world: { ...s.world, pessimism: 55 } }, "control");
+  let control = act(
+    withResearch({ ...s, world: { ...s.world, pessimism: 55 } }, ["R17"]),
+    "control",
+  );
+  expect(control.campaign?.beat).toBe("forecast");
+  control = later(control, 5 * 1440);
   expect(control.campaign?.beat).toBe("rally");
   expect(() => act(control, "next")).toThrow();
   control = act(control, "listen");
@@ -554,4 +559,45 @@ it("도성 한파가 길을 막고 집마다 불을 올리며 환자를 낸다",
     late.world.resources.RES_WOOD,
   );
   expect(end.world.citizenEvents).toContain("capital-cold-1440");
+});
+
+it("닷새째의 민심과 그때까지 끝낸 연구를 저장해 반란의 결과를 정한다", () => {
+  const start = createVillageGame();
+  const base: TimberState = {
+    ...start,
+    chapter: 5,
+    campaign: newCampaign("summit"),
+    world: { ...start.world, pessimism: 65, optimism: 30 },
+  };
+  const chosen = act(base, "coexist");
+  const before = later(chosen, 5 * 1440 - 1);
+  expect(before.town.development.story.rebellion).toBe(false);
+  const event = restore(later(before, 1));
+  expect(event.town.development.story.chungnyeong).toBe("dead");
+  expect(event.campaign?.revivalPrepared).toBe(false);
+  const vigil = act(act(event, "listen"), "next");
+  const onset = later(vigil, 5 * 1440);
+  expect(onset.town.cold).toBe(true);
+  expect(onset.campaign?.ending).toBeNull();
+  expect(later(onset, 1440).campaign?.ending).toBe("order");
+  const backed = later(
+    act({ ...base, world: { ...base.world, optimism: 80 } }, "control"),
+    5 * 1440,
+  );
+  expect(backed.town.development.story.rebellion).toBe(true);
+  expect(backed.town.development.story.chungnyeong).toBe("alive");
+});
+
+it("단계별 경구 추첨을 저장하고 이어 할 때 같은 경구를 보여준다", () => {
+  const state = createVillageGame();
+  const roll = vi.spyOn(Math, "random").mockReturnValue(0.99);
+  try {
+    const campaign = newCampaign("patrol");
+    expect(campaign.victoryQuotes).toEqual([9, 9, 9, 9, 9]);
+    expect(restore({ ...state, campaign }).campaign?.victoryQuotes).toEqual(
+      campaign.victoryQuotes,
+    );
+  } finally {
+    roll.mockRestore();
+  }
 });

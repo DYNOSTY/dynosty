@@ -79,6 +79,10 @@ test("함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단
         : "보고를 장부에 적기",
     );
   }
+  await page.getByRole("button", { name: /^다음 대사/ }).click();
+  await expect(
+    page.getByRole("dialog").locator("video.campaign-still"),
+  ).toHaveAttribute("src", "/story/campaign/ending-1.mp4#t=0,7.5");
   await page.getByRole("button", { name: "지금 단계에 머물기" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: /1단계 · 복홀의 첫 명령/ }).click();
@@ -200,7 +204,9 @@ test("좁은 화면의 5단계 컷씬, 반란 대응과 충녕 시해를 이어 
   const rect = await dialog.boundingBox();
   expect(rect?.width).toBeLessThanOrEqual(390);
   await readScene(page, "양녕 · 지휘권을 합치고 징발 허용");
-  await expect(dialog).toHaveAccessibleName("곳간 앞에 내려놓은 일삯패");
+  for (let day = 0; day < 5; day++)
+    await page.getByRole("button", { name: "마을 하루 진행" }).click();
+  await expect(dialog).toHaveAccessibleName("혹한 닷새 전 · 배반자의 외침");
   await readScene(page, "풀 12를 풀고 대표들과 함께 식사");
   await expect(dialog).toHaveAccessibleName("성문 빗장이 들리던 밤");
   await dialog.getByRole("button", { name: /^다음 대사/ }).click();
