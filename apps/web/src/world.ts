@@ -23,7 +23,7 @@ export const ISLAND_RADIUS = 70;
 /** 미니맵 한 변(m) */
 export const MAP_SPAN = (ISLAND_RADIUS + 1) * 2;
 export const POND = { x: 17, z: 15, r: 3.6 };
-const LAKE = { x: 40, z: -26, r: 10 };
+export const LAKE = { x: 40, z: -26, r: 10 };
 
 const smooth = (a: number, b: number, v: number) => {
   const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
@@ -393,7 +393,7 @@ export function buildWorld(
     const x = pos[i] ?? 0,
       z = pos[i + 2] ?? 0,
       d = Math.hypot(x, z);
-    pos[i + 1] = elevation(x, z) - smooth(R - 0.8, R, d) * 0.4;
+    pos[i + 1] = elevation(x, z);
     const g =
       0.5 +
       0.5 * Math.sin(x * 0.31 + Math.cos(z * 0.27) * 2) * Math.cos(z * 0.17) +
@@ -415,7 +415,6 @@ export function buildWorld(
         (0.65 + noise() * 0.15) *
         (1 - smooth(30, 62, d) * 0.75),
     );
-    c = mix(c, P.lip, smooth(R - 1.4, R, Math.min(d, R)));
     colors.push(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, 1);
   }
   const normals: number[] = [];
@@ -459,56 +458,43 @@ export function buildWorld(
   ground.material = vertexMat("ground-material");
   ground.freezeWorldMatrix();
 
-  // ── 섬 밑면: 울퉁불퉁 바위 절벽 ──
+  // ── 바깥 눈밭: 섬 절벽을 걷고 땅을 시야 밖까지 이음 (2026-11-21 사용자 "지금은 섬처럼 떠 있잖아") ──
+  // 마을 둘레 밖은 먹빛으로 덮여 있다가(fog.ts) 정찰하면 드러난다. 드러난 자리에 허공이 보이지 않게 잿빛 눈밭을 깔아 둠
   {
-    const cr = rng(19),
-      LAYERS = 10,
-      S = 140,
-      cp: number[] = [],
-      ci: number[] = [],
-      cc: number[] = [];
-    for (let l = 0; l <= LAYERS; l++) {
-      const t = l / LAYERS,
-        y = -0.4 - t * 22;
-      const base = R * (1 - t ** 1.5 * 0.93);
-      for (let s = 0; s < S; s++) {
-        const a = (s / S) * Math.PI * 2;
-        const rr = l === 0 ? R : base * (1 + (cr() - 0.5) * 0.1 * (1 + t));
-        cp.push(
-          Math.cos(a) * rr,
-          y + (l === 0 ? 0 : (cr() - 0.5) * 1.6),
-          Math.sin(a) * rr,
-        );
-        const col =
-          l === 0
-            ? P.lip
-            : l === 1
-              ? [0.45, 0.38, 0.34]
-              : mix([0.4, 0.35, 0.34], [0.2, 0.19, 0.23], t);
-        const sh = 0.86 + cr() * 0.26;
-        cc.push((col[0] ?? 0) * sh, (col[1] ?? 0) * sh, (col[2] ?? 0) * sh, 1);
+    const AR = 14,
+      AS = 120,
+      OUT = 120,
+      ap: number[] = [],
+      ai: number[] = [],
+      ac: number[] = [];
+    const far = mix(mix(P.snowA, P.snowB, 0.5), P.waste, 0.8);
+    for (let r = 0; r <= AR; r++)
+      for (let k = 0; k < AS; k++) {
+        const a = (k / AS) * Math.PI * 2,
+          rr = R + (r / AR) * OUT,
+          x = Math.cos(a) * rr,
+          z = Math.sin(a) * rr;
+        ap.push(x, elevation(x, z), z);
+        ac.push(far[0] ?? 0, far[1] ?? 0, far[2] ?? 0, 1);
       }
-    }
-    for (let l = 0; l < LAYERS; l++)
-      for (let s = 0; s < S; s++) {
-        const a = l * S + s,
-          b = l * S + ((s + 1) % S),
-          c = a + S,
-          d2 = b + S;
-        ci.push(a, b, d2, a, d2, c);
+    for (let r = 0; r < AR; r++)
+      for (let k = 0; k < AS; k++) {
+        const p0 = r * AS + k,
+          p1 = r * AS + ((k + 1) % AS);
+        ai.push(p0, p1 + AS, p1, p0, p0 + AS, p1 + AS);
       }
-    const cn: number[] = [];
-    VertexData.ComputeNormals(cp, ci, cn);
-    const cliff = new Mesh("island-cliff", scene);
-    const cvd = new VertexData();
-    cvd.positions = cp;
-    cvd.indices = ci;
-    cvd.normals = cn;
-    cvd.colors = cc;
-    cvd.applyToMesh(cliff);
-    cliff.convertToFlatShadedMesh();
-    cliff.material = vertexMat("cliff-material");
-    cliff.isPickable = false;
+    const an: number[] = [];
+    VertexData.ComputeNormals(ap, ai, an);
+    const apron = new Mesh("ground-far", scene);
+    const avd = new VertexData();
+    avd.positions = ap;
+    avd.indices = ai;
+    avd.normals = an;
+    avd.colors = ac;
+    avd.applyToMesh(apron);
+    apron.material = vertexMat("ground-far-material");
+    apron.isPickable = false;
+    apron.freezeWorldMatrix();
   }
 
   // 언 연못·호수
@@ -1109,6 +1095,14 @@ export function buildWorld(
     const warm = smooth(0, 0.18, daylight) * (1 - smooth(0.18, 0.5, daylight));
     sun.diffuse = c3(mix(P.sun, [1, 0.72, 0.55], warm));
     glow.intensity = 0.85 + 0.7 * (1 - daylight); // 밤일수록 불빛이 번짐
+    // 밤에는 안개·먼 곳 빛깔도 어둡게: 낮 색 그대로 두면 어두운 마을을 흰 테가 두른 것처럼 보임 (11/21)
+    scene.fogColor = c3(
+      mix(
+        P.fog.map((v, k) => v * ([0.3, 0.34, 0.5][k] ?? 1)),
+        P.fog,
+        smooth(0, 0.35, daylight),
+      ),
+    );
     // 배경 밝기는 20단계로만 바꿈 (매 프레임 바꾸면 화면 전체를 다시 그려 느려짐)
     const level = (0.72 + (0.28 * Math.round(daylight * 20)) / 20).toFixed(3);
     if (level !== lastLevel) {

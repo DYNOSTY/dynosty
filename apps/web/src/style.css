@@ -76,6 +76,39 @@ canvas {
 .settings-dialog::backdrop {
   background: rgb(0 0 0 / 65%);
 }
+.g-scout-list {
+  box-sizing: border-box;
+  width: min(560px, calc(100vw - 16px));
+  max-height: calc(100dvh - 8px);
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--meok);
+}
+.g-scout-list::backdrop {
+  background: rgb(24 18 14 / 45%);
+}
+.g-scout-list__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.g-scout-list__heading h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.g-scout-list__sites {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px;
+}
+.g-scout-list__sites button {
+  flex: none;
+}
 .settings-heading {
   display: flex;
   align-items: center;
@@ -4536,10 +4569,6 @@ body,
   font: 700 22px / 1 var(--font-title);
   font-variant-numeric: tabular-nums;
 }
-.g-season__next {
-  font-size: 13px;
-  color: var(--meok-sub);
-}
 /* 보온 칸 */
 .warmth-card .warmth-extra {
   display: inline-flex;
@@ -6024,6 +6053,43 @@ body,
     box-shadow: none;
     transform: translate(-50%, -90%);
   }
+  .g-pins__sites.is-docked {
+    position: absolute;
+    display: flex;
+    align-items: flex-start;
+    box-sizing: border-box;
+    width: max-content;
+    height: max-content;
+    gap: 8px;
+    padding: 4px;
+    overflow: auto;
+    pointer-events: auto;
+    background: rgb(239 230 210 / 90%);
+  }
+  /* Hidden pins still have dimensions for the next placement pass. */
+  .g-pins__sites.is-no-space {
+    visibility: hidden;
+  }
+  /* Keep the fallback out of the measured HUD bounds. */
+  .g-topcmd .g-scout-menu {
+    position: absolute;
+    left: calc(100% + 8px);
+    bottom: max(0px, calc(114px - 100dvh));
+  }
+
+  .workspace-tools.is-menu-scout {
+    top: 50%;
+    max-height: calc(100dvh - 8px);
+    overflow: auto;
+  }
+  .g-pins__sites.is-docked .g-pin {
+    position: static;
+    flex: none;
+    transform: none;
+  }
+  .g-pins__sites.is-docked .g-pin > span {
+    opacity: 1;
+  }
   .g-pin__mark {
     width: 52px;
     height: 52px;
@@ -6106,15 +6172,18 @@ body,
 
 /* ═══ 시각은 의뢰 위쪽, 의뢰와 같은 톤 — 판 없이 밝은 글자 + 먹 테두리 빛 + 가는 줄
    (사용자 11/20: 2.5D 나무 틀에도 담아 봤지만 "시간은 아까 그 투명이 더 나음") ═══
-   오른쪽 기둥(폭 320): 시계(0.72배) + 글 네 줄 → 가는 줄 → 의뢰. 시각 칸 높이는 고정(152px)이라
-   내일 날씨 글이 두세 줄이 돼도 의뢰가 밀리지 않음 */
+   오른쪽 기둥(폭 320): 시계(0.66배) + 글 세 줄(시각 · 절기와 날수 · 날씨와 기온) → 가는 줄 → 의뢰.
+   내일 날씨 줄은 뺌(11/21 사용자) — 기획서의 정밀 예보는 4단계 장영실 합류 때 열림. 시각 칸 높이는 고정(166px).
+   세로 자리(11/21 "시간이 UI하고 겹친다"): 위 자원 줄이 64px까지 내려오고, 십이간지 테 그림은 동물 자리까지
+   164px 네모라 시각 칸보다 큼 → 칸을 66px에서 시작하고 높이를 테 그림만큼 잡아, 테 위 동물이 자원 줄을,
+   테 아래 동물이 의뢰 제목을 덮지 않게 함 */
 @media (min-width: 761px) {
   .g-season {
-    top: 44px;
+    top: 66px;
     left: auto;
     right: 18px;
     width: 320px;
-    height: 152px;
+    height: 166px;
     gap: 8px;
     color: var(--hanji);
     text-shadow:
@@ -6122,7 +6191,7 @@ body,
       0 1px 6px rgb(20 16 22 / 85%);
   }
   .g-season__dial.g-time {
-    zoom: 0.72;
+    zoom: 0.66;
   }
   .g-season__text {
     flex: 1;
@@ -6135,8 +6204,7 @@ body,
     color: inherit;
   }
   .g-season__term span,
-  .g-season__term small,
-  .g-season__next {
+  .g-season__term small {
     color: inherit;
     opacity: 0.85;
   }
@@ -6151,15 +6219,8 @@ body,
   .g-season__now img {
     filter: drop-shadow(0 1px 2px rgb(0 0 0 / 60%));
   }
-  .g-season .g-season__next {
-    min-height: 2.7em; /* 늘 두 줄 자리 — 예보가 길어져도 위 글 세 줄이 움직이지 않게 */
-    font-size: var(--hud-t3);
-    line-height: 1.35;
-    white-space: normal;
-    text-wrap: balance;
-  }
   .g-quests {
-    top: 206px;
+    top: 240px;
     padding-top: 8px;
     border-top: 1px solid rgb(239 230 210 / 40%);
   }

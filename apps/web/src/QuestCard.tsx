@@ -57,7 +57,10 @@ export function QuestCard({ q, onClose }: { q: Quest; onClose: () => void }) {
               </span>
             )}
             <b>
-              {q.progress.now} / {q.progress.goal}
+              {/* 정찰은 몇 곳을 찾아야 하는지 알려 주지 않음 (찾은 수만) */}
+              {q.progress.route
+                ? q.progress.now
+                : `${q.progress.now} / ${q.progress.goal}`}
             </b>
           </div>
         ) : null}

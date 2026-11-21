@@ -52,14 +52,6 @@ export const WEATHER_ICON: Record<Weather, string> = {
   눈보라: "blizzard",
   한파: "coldsnap",
 };
-// 기획 v0.4 「날씨와 온돌」 칸의 말투: "맑을 듯합니다"
-const TOMORROW: Record<Weather, string> = {
-  맑음: "내일은 맑을 듯합니다",
-  흐림: "내일은 흐릴 듯합니다",
-  눈: "내일은 눈이 올 듯합니다",
-  눈보라: "내일은 눈보라가 몰아칠 듯합니다",
-  한파: "내일은 한파가 올 듯합니다 — 연료를 비축하세요",
-};
 
 /** 해·달 길: 지평선(cy) 위 반원. 원(반지름 50) 안에 다 들어오게 r 32, 지평선은 하늘 그림의 산 능선 높이 */
 const ARC = { cx: 50, cy: 72, r: 32 };
@@ -67,7 +59,6 @@ const ARC = { cx: 50, cy: 72, r: 32 };
 export function SeasonDial({ state }: { state: PlayState | null }) {
   if (!state) return null;
   const r = winterReport(state.winter, state.day, state.minute, state.citizens);
-  const tomorrow = r.forecast[0];
   const t = sichenOf(state.minute);
   const hour = state.minute / 60;
   // 해는 6시 왼쪽 지평선 → 12시 꼭대기 → 18시 오른쪽, 밤엔 달이 같은 길 (원 안 좌표 0~100)
@@ -143,11 +134,6 @@ export function SeasonDial({ state }: { state: PlayState | null }) {
             {r.temp > 0 ? `+${r.temp}` : r.temp}°
           </strong>
         </p>
-        {tomorrow ? (
-          <p className="g-season__next">
-            {TOMORROW[tomorrow.weather]} (새벽 {tomorrow.low}°)
-          </p>
-        ) : null}
       </div>
     </section>
   );
