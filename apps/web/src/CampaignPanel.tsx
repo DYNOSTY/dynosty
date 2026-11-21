@@ -235,6 +235,7 @@ function SceneDialog({
             </section>
           )}
           {page.clip &&
+            page.lineIllustration?.at !== cursor &&
             !familyScene &&
             !frame &&
             (!(
@@ -258,7 +259,7 @@ function SceneDialog({
           {!flashback && page.goal && (
             <p className="campaign-goal">{page.goal}</p>
           )}
-          {!flashback && (!frame || frame.words) && (
+          {!flashback && (frame ? frame.words : words) && (
             <div className="campaign-speech" aria-live="polite">
               {frame ? null : face >= 0 ? (
                 <PatrolPortrait index={face} />
