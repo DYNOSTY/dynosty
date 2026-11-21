@@ -42,7 +42,7 @@ async function load(page: Page, s: TimberState) {
       ),
     createTimberSave(s),
   );
-  await button(page, "마른 목재20 조달 체험하기").click();
+  await button(page, "마른 목재 20 조달").click();
   await expect(page.getByTestId("timber-clock")).toBeVisible();
   await button(page, "저장").click();
   await button(page, "진행 불러오기").click();

@@ -177,7 +177,7 @@ export function siteView(s: LaborState, id: SiteId) {
     hint =
       t.phase === "inspected"
         ? "검수대에서 정상분을 먼저 수령하면 보완·교환을 선택할 수 있습니다."
-        : `현장 보완 ${LABOR_RULES.repairWorkers}명·${siteTime(LABOR_RULES.repairMinutes)} / 교환 ${EXCHANGE_RULES.workers}명·왕복${siteTime(EXCHANGE_RULES.returnMinutes + EXCHANGE_RULES.redeliveryMinutes)}·재검수${siteTime(EXCHANGE_RULES.inspectionMinutes)}, 추가 철재${EXCHANGE_RULES.extraIron}. 모두 기존 체험 개발값입니다.`;
+        : `현장 보완 ${LABOR_RULES.repairWorkers}명·${siteTime(LABOR_RULES.repairMinutes)} / 교환 ${EXCHANGE_RULES.workers}명·왕복${siteTime(EXCHANGE_RULES.returnMinutes + EXCHANGE_RULES.redeliveryMinutes)}·재검수${siteTime(EXCHANGE_RULES.inspectionMinutes)}, 추가 철재${EXCHANGE_RULES.extraIron}.`;
   } else {
     status =
       s.elapsed < LABOR_RULES.prepOpensAt

@@ -965,10 +965,10 @@ export function App() {
                 openTimber();
               }}
             >
-              마른 목재20 조달 체험하기
+              마른 목재 20 조달
             </button>
           ) : (
-            <p>마른 목재20 · 조달 체험판</p>
+            <p>마른 목재 20 조달</p>
           )}
           <span data-testid="play-scene-status">3D {sceneStatus}</span>
         </div>
@@ -1043,10 +1043,10 @@ export function App() {
       <div
         className={`play-workspace${hasPanels || timberOpen ? " has-tools" : ""}`}
       >
-        <section aria-label="3D 개발 장면" className="play-scene">
+        <section aria-label="마을 전경" className="play-scene">
           <div className="scene-heading">
             <h2>{timberOpen ? "복홀 구릉지" : "3D 장면"}</h2>
-            <span className="prototype-label">복홀 · 개발 모델</span>
+            <span className="prototype-label">복홀</span>
           </div>
           {assetWarning ? (
             <p role="alert" className="hint model-warning">
@@ -1556,16 +1556,18 @@ export function App() {
         >
           ⌂
         </button>
-        <button
-          ref={toolsMenuRef}
-          type="button"
-          className="g-dev"
-          aria-expanded={toolsOpen}
-          aria-controls={toolsPanelId}
-          onClick={() => toggleAuxiliary("tools")}
-        >
-          개발 도구
-        </button>
+        {import.meta.env.DEV && (
+          <button
+            ref={toolsMenuRef}
+            type="button"
+            className="g-dev"
+            aria-expanded={toolsOpen}
+            aria-controls={toolsPanelId}
+            onClick={() => toggleAuxiliary("tools")}
+          >
+            개발 도구
+          </button>
+        )}
       </div>
       <FpsBadge />
       {reports.length > 0 && !visitor && (

@@ -5,6 +5,7 @@ import {
   receiveProgress,
 } from "./progress-helpers.js";
 import { clickFloor } from "./scene-picking.js";
+import { openLaborPanel } from "./workspace.js";
 
 async function horizontalOffset(p: Page, id: string) {
   const c = await p.locator("canvas").boundingBox(),
@@ -102,14 +103,14 @@ test("보완 역할 표지·먼저 배분 링크·장소 이동·빈 바닥·저
   );
   await clickFloor(p);
   await expect(p.getByTestId("site-name")).toHaveCount(0);
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );

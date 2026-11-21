@@ -16,3 +16,10 @@ export async function closeWorkspace(page: Page) {
   });
   if (await close.isVisible()) await close.click();
 }
+
+export async function openLaborPanel(page: Page) {
+  await openWorkspace(page);
+  await page
+    .getByRole("button", { name: "일손 배치·배급", exact: true })
+    .click();
+}

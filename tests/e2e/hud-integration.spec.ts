@@ -5,6 +5,7 @@ import {
   payTown,
 } from "../../packages/game-core/dist/index.js";
 import { clickExample } from "./scene-picking.js";
+import { openLaborPanel } from "./workspace.js";
 
 type SceneMesh = {
   isVisible: boolean;
@@ -76,7 +77,7 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   const canvas = await page.locator("canvas").elementHandle();
   await page.screenshot({ path: info.outputPath("integrated-hud.png") });
   await button(page, "조달").click();
-  await button(page, "일손 배치·배급 체험하기").click();
+  await openLaborPanel(page);
   await expect.poll(() => islandVisible(page)).toBe(false);
   await expect(
     page.getByRole("region", { name: "첫 플레이 안내" }),
@@ -88,7 +89,7 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   await page.screenshot({
     path: info.outputPath("integrated-procurement.png"),
   });
-  await button(page, "생존 예제로 돌아가기").click();
+  await button(page, "마을로 돌아가기").click();
   await expect.poll(() => islandVisible(page)).toBe(true);
   expect(
     await canvas?.evaluate((c) => c === document.querySelector("canvas")),

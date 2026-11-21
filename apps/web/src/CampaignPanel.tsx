@@ -33,6 +33,7 @@ import { EndingMenu } from "./EndingMenu.js";
 
 import "./campaign.css";
 
+const levelMarks = ["□□□", "■□□", "□■□", "□□■"] as const;
 const media = "/story/campaign/";
 export function PatrolPortrait({ index }: { index: number }) {
   return (
@@ -354,6 +355,9 @@ export function CampaignPanel({
 }) {
   const c = campaignOf(s);
   const p = campaignPage(s);
+  const gateCrew = s.residents.filter(
+    (r) => r.workplaceId === "gate" && r.health === "healthy",
+  ).length;
   const advice = moraleAdvice(s);
   const rumor = gatheringRumor(s);
   const advisory = (
@@ -690,22 +694,16 @@ export function CampaignPanel({
           </button>
           {defenseOpen && (
             <section className="office-panel" aria-label="성문과 온돌">
-              <strong>
-                성문 수비병{" "}
-                {
-                  s.residents.filter(
-                    (r) => r.workplaceId === "gate" && r.health === "healthy",
-                  ).length
-                }
-                명
-              </strong>
+              <strong>성문 수비병 {gateCrew}명</strong>
               <p>수비병이 많으면 습격 때 다치거나 숨지는 주민이 줄어듭니다.</p>
-              {([0, 4, 8, 16] as const).map((count) => (
+              {([0, 4, 8, 16] as const).map((count, level) => (
                 <button
                   key={count}
                   type="button"
+                  aria-pressed={gateCrew === count}
                   onClick={() => command({ type: "set-gate", count })}
                 >
+                  <span aria-hidden="true">{levelMarks[level]} </span>
                   {count}명 배치
                 </button>
               ))}
@@ -722,6 +720,7 @@ export function CampaignPanel({
                   aria-pressed={(s.heating ?? 0) === level}
                   onClick={() => command({ type: "set-heating", level })}
                 >
+                  <span aria-hidden="true">{levelMarks[level]} </span>
                   {level ? "최소 " + level + "단계" : "자동"}
                 </button>
               ))}

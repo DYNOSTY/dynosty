@@ -8,6 +8,7 @@ import {
   siteAction,
 } from "./progress-helpers.js";
 import { clickFloor, worldPoint } from "./scene-picking.js";
+import { openLaborPanel } from "./workspace.js";
 
 test("선택하지 않은 세 장소의 상태와 현장 번호를 표시하며 클릭·카메라 입력을 가리지 않는다", async ({
   page: p,
@@ -37,7 +38,7 @@ test("선택하지 않은 세 장소의 상태와 현장 번호를 표시하며 
   await clickFloor(p);
   await expect(p.getByTestId("site-name")).toHaveCount(0);
   await expect(card(p, "inspection")).toBeVisible();
-  await b(p, "생존 예제로 돌아가기").click();
+  await b(p, "마을로 돌아가기").click();
   await expect(p.getByRole("region", { name: "현장 작업 진행" })).toHaveCount(
     0,
   );
@@ -58,14 +59,14 @@ test("재배치의 부족 이유·진행량을 복원하고 실패 불러오기�
   await expect(card(p, "quarantine")).toContainText("60/240분");
   await expect(card(p, "quarantine")).toContainText("1/2명");
   await expect(card(p, "ration")).toContainText("담당 3명");
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );
@@ -85,7 +86,7 @@ test("재배치의 부족 이유·진행량을 복원하고 실패 불러오기�
   await p.evaluate(() =>
     localStorage.setItem("dynosty.labor.saves", "{invalid"),
   );
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByRole("alert")).toBeVisible();
   await expect(card(p, "quarantine")).toContainText("240/240분");
   await expect(p.getByTestId("site-notices")).toContainText("보완 완료");
@@ -94,8 +95,8 @@ test("재배치의 부족 이유·진행량을 복원하고 실패 불러오기�
   ).toBe("{invalid");
   await b(p, "완료 알림 닫기").click();
   await expect(p.getByTestId("site-notices")).toBeEmpty();
-  await b(p, "일손 체험 다시 시작").click();
-  await b(p, "새 일손 체험 확인").click();
+  await b(p, "일손 배치 다시 시작").click();
+  await b(p, "새 일손 배치 확인").click();
   await expect(card(p, "quarantine")).toContainText("격리품 없음");
   await expect(p.getByTestId("site-notices")).toBeEmpty();
 });
@@ -126,14 +127,14 @@ test("교환의 대기·예약 인원·재검수·수령 완료를 보여주고 
   await b(p, "현장 합격 교환품4 수령").click();
   await expect(card(p, "quarantine")).toContainText("4/4개");
   await expect(p.getByTestId("site-notices")).toContainText("4개 수령 완료");
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );

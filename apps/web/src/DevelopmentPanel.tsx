@@ -229,10 +229,6 @@ export function DevelopmentPanel({
             })
           : `완료 연구 ${d.completed.length}개`}
       </div>
-      <p className="hint">
-        새 공통 연구와 후반 기술의 비용·기간은 개발용입니다. 한 연구를 여러 번
-        완료해 효과를 중첩할 수 없습니다.
-      </p>
       <details>
         <summary>완료한 연구</summary>
         <ul>

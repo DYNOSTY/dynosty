@@ -1,13 +1,14 @@
 import { expect, type Page, test } from "@playwright/test";
 import { SITE_POINTS, type SiteId } from "../../apps/web/src/site-targets.js";
 import { clickFloor, outlinePixels, worldPoint } from "./scene-picking.js";
+import { openLaborPanel } from "./workspace.js";
 
 const b = (p: Page, n: string) =>
   p.getByRole("button", { name: n, exact: true });
 async function enter(p: Page) {
   await p.goto("/");
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 }
 async function clickSite(p: Page, id: SiteId) {
@@ -104,7 +105,7 @@ test("현장 재배치는 보완 진행량을 보존하고 저장·새로고침 
   await expect(p.getByTestId("labor-repair")).toContainText(
     "60/240분 · 배정 1/2명",
   );
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
@@ -113,9 +114,9 @@ test("현장 재배치는 보완 진행량을 보존하고 저장·새로고침 
   );
   expect(save).not.toContain("site-preview");
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-clock")).toContainText("9시간 0분");
   await expect(p.getByTestId("site-name")).toHaveCount(0);
   await clickSite(p, "site-quarantine");
@@ -134,7 +135,7 @@ test("손상 저장 불러오기 실패는 현재 선택·진행·원문을 보�
 }) => {
   await initial(p);
   await clickSite(p, "site-quarantine");
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
@@ -143,7 +144,7 @@ test("손상 저장 불러오기 실패는 현재 선택·진행·원문을 보�
     localStorage.setItem("dynosty.labor.saves", text);
     return text;
   });
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("site-name")).toHaveText("격리품");
   await expect(p.getByRole("alert")).toContainText("손상");
   await expect(b(p, "격리품 선택")).toHaveAttribute("aria-pressed", "true");
@@ -164,14 +165,14 @@ test("장소 전환은Worker를 초기화하지 않고 모드 종료·재시작�
     await clickSite(p, id);
   await expect(p.getByTestId("labor-clock")).toContainText("8시간 0분");
   await expect(p.getByTestId("labor-iron")).toContainText("철재 4");
-  await b(p, "기존 목재 체험 보기").click();
+  await b(p, "목재 조달 보기").click();
   await expect(p.getByTestId("site-name")).toHaveCount(0);
   await expect(b(p, "검수대 선택")).toHaveCount(0);
-  await b(p, "일손 배치·배급 체험하기").click();
+  await openLaborPanel(p);
   await expect(p.getByTestId("labor-clock")).toContainText("8시간 0분");
   await clickSite(p, "site-inspection");
-  await b(p, "일손 체험 다시 시작").click();
-  await b(p, "새 일손 체험 확인").click();
+  await b(p, "일손 배치 다시 시작").click();
+  await b(p, "새 일손 배치 확인").click();
   await expect(p.getByTestId("site-name")).toHaveCount(0);
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 });

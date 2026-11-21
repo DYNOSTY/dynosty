@@ -6,6 +6,7 @@ import {
   receiveProgress,
 } from "./progress-helpers.js";
 import { clickFloor, outlinePixels, worldPoint } from "./scene-picking.js";
+import { openLaborPanel } from "./workspace.js";
 
 test("빈 구역의 표식·글자 안내는 유지하고 실제 목재 클릭·테두리·바닥 해제를 보존한다", async ({
   page: p,
@@ -51,14 +52,14 @@ test("묶음 표시의 저장 복원·사용 후 빈 구역·모드 종료를 �
   await b(p, "현장 교환 회수 출발").click();
   await expect(p.locator('[data-site-marker="site-quarantine"]')).toBeVisible();
   await expect(b(p, "격리품 선택")).toBeDisabled();
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );
@@ -76,7 +77,7 @@ test("묶음 표시의 저장 복원·사용 후 빈 구역·모드 종료를 �
   await expect(p.getByTestId("flow-used")).toContainText("20개");
   for (const id of ["site-quarantine", "zone-storage", "zone-allocation"])
     await expect(p.locator(`[data-site-marker="${id}"]`)).toBeVisible();
-  await b(p, "생존 예제로 돌아가기").click();
+  await b(p, "마을로 돌아가기").click();
   await expect(p.locator(".site-markers")).toHaveCount(0);
   await expect(p.getByRole("list", { name: "현장 구역 안내" })).toHaveCount(0);
   expect(errors).toEqual([]);

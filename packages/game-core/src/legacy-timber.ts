@@ -85,7 +85,7 @@ function fail(message = "체험판 상태가 올바르지 않습니다."): never
 }
 function num(v: unknown, max = 14400): asserts v is number {
   if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 0 || v > max)
-    fail("체험판 저장 수치가 올바르지 않습니다.");
+    fail("마을 저장 수치가 올바르지 않습니다.");
 }
 const PHASES: readonly string[] = [
   "select",
@@ -144,7 +144,7 @@ export function parseTimberState(v: unknown): TimberState {
     !Array.isArray(v.processed) ||
     !Array.isArray(v.history)
   )
-    fail("지원하지 않는 체험판 저장입니다. 기존 기록은 유지됩니다.");
+    fail("지원하지 않는 마을 저장입니다. 기존 기록은 유지됩니다.");
   num(v.elapsed);
   num(v.remainder, 999);
   num(v.iron, 8);
@@ -491,7 +491,7 @@ export function commandTimber(
       n = { ...s, speed: command.speed };
       break;
     default:
-      fail("지원하지 않는 체험판 명령입니다.");
+      fail("지원하지 않는 마을 명령입니다.");
   }
   const decision = !["pause", "speed", "next", "advance"].includes(
     command.type,
@@ -518,7 +518,7 @@ export interface TimberSave {
 }
 export function parseTimberSave(v: unknown): TimberSave {
   if (!isRecord(v) || v.format !== "dynosty-timber" || v.saveVersion !== 1)
-    fail("지원하지 않는 체험판 저장입니다. 기존 기록은 유지됩니다.");
+    fail("지원하지 않는 마을 저장입니다. 기존 기록은 유지됩니다.");
   return {
     format: "dynosty-timber",
     saveVersion: 1,

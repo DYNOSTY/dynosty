@@ -72,6 +72,7 @@ import {
   type Citizen,
   type CitizenEvent,
   createPlayState,
+  FOOD_IDS,
   type FoodId,
   GAME_RULES,
   type PlayState,
@@ -250,6 +251,7 @@ export interface TimberState {
   readonly campaign?: Campaign;
   readonly scoutDepartures?: Record<string, number>;
   readonly scoutTripDurations?: Record<string, number>;
+  readonly yardFoodSince?: Partial<Record<FoodId, number>>;
   readonly yardDryAt?: number | undefined;
   readonly woodSpent: number;
   readonly logging: LoggingState;
@@ -1541,7 +1543,9 @@ function completeStep(s: TimberState): TimberState {
     case "approaching":
       return note(
         schedule(finishMovement(s), "transport", s.workerIds),
-        "수레를 인계받아 입고 장소로 운송합니다.",
+        warehouseDoor(s)
+          ? "수레를 인계받아 저장소로 운반합니다."
+          : "수레를 인계받아 야적장으로 운반합니다.",
       );
     case "transport":
       return note(
@@ -2120,6 +2124,13 @@ export function parseTimberState(value: unknown): TimberState {
         fail("정찰 시간 기록 오류");
       num(minutes, scoutTripMinutes(site));
       if (minutes === 0) fail("정찰 시간 기록 오류");
+    }
+  }
+  if (value.yardFoodSince !== undefined) {
+    if (!isRecord(value.yardFoodSince)) fail("야적장 보관 기록 오류");
+    for (const [food, since] of Object.entries(value.yardFoodSince)) {
+      if (!FOOD_IDS.includes(food as FoodId)) fail("야적장 식량 종류 오류");
+      num(since, value.elapsed as number);
     }
   }
   if (value.yardDryAt !== undefined) num(value.yardDryAt);
@@ -2920,6 +2931,45 @@ export function villageFatalIncident(
   };
   return wounded ? mutantWound(seen, casualty.id, random) : seen;
 }
+function ageYardFood(s: TimberState, previousMinute: number): TimberState {
+  if (warehouseDoor(s)) {
+    if (!s.yardFoodSince) return s;
+    const { yardFoodSince: _, ...covered } = s;
+    return covered;
+  }
+  let next = s;
+  for (const food of FOOD_IDS) {
+    const since = next.yardFoodSince?.[food];
+    const available = next.world.resources[food];
+    if (available < AMOUNT_SCALE) {
+      if (since === undefined) continue;
+      const ages = { ...next.yardFoodSince };
+      delete ages[food];
+      next = { ...next, yardFoodSince: ages };
+    } else if (since === undefined) {
+      next = {
+        ...next,
+        yardFoodSince: { ...next.yardFoodSince, [food]: previousMinute },
+      };
+    } else if (next.elapsed - since >= 1440) {
+      next = note(
+        {
+          ...next,
+          world: {
+            ...next.world,
+            resources: {
+              ...next.world.resources,
+              [food]: available - AMOUNT_SCALE,
+            },
+          },
+          yardFoodSince: { ...next.yardFoodSince, [food]: next.elapsed },
+        },
+        `야적장에 하루 동안 둔 ${GAME_RULES.resources[food].name} 1개가 상했습니다.`,
+      );
+    }
+  }
+  return next;
+}
 export function advanceTimber(
   input: TimberState,
   minutes: number,
@@ -2952,6 +3002,7 @@ export function advanceTimber(
       elapsed: nextTime,
       world: advancePlayClock(s.world, elapsed),
     };
+    s = ageYardFood(s, nextTime - elapsed);
     if (s.yardDryAt && s.elapsed >= s.yardDryAt) {
       s = note(
         {

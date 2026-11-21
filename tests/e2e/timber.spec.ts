@@ -80,7 +80,7 @@ for (const siteId of ["coal-west", "iron-north", "stone-east"] as const) {
       "3D 준비 완료",
       { timeout: 90_000 },
     );
-    await button(page, "마른 목재20 조달 체험하기").click();
+    await button(page, "마른 목재 20 조달").click();
     await saves(page);
     await button(page, "진행 불러오기").click();
     await page.getByLabel("작업장 권역", { exact: true }).selectOption(siteId);
@@ -95,7 +95,7 @@ async function enter(page: Page) {
     "3D 준비 완료",
     { timeout: 90_000 },
   );
-  await button(page, "마른 목재20 조달 체험하기").click();
+  await button(page, "마른 목재 20 조달").click();
   await expect(page.getByTestId("timber-phase")).toHaveText("공급 제안 비교");
 }
 async function homeCursor(
@@ -193,7 +193,7 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
     ),
   ).toHaveLength(0);
   await page.reload();
-  await button(page, "마른 목재20 조달 체험하기").click();
+  await button(page, "마른 목재 20 조달").click();
   await saves(page);
   await button(page, "진행 불러오기").click();
   await expect(page.getByTestId("housing-status")).toContainText("둥지 7곳");
@@ -327,7 +327,7 @@ test("식성별 주민 구성과 수레 내려놓기·이탈 단계를 표시한
   await button(page, "일시정지").click();
   await dev(page);
   for (const phase of [
-    "야적장으로 운송",
+    "야적장으로 운반",
     "수레 내려놓기",
     "손잡이에서 물러나기",
     "자동 하역",
@@ -455,17 +455,17 @@ test("운송 중 저장과 새로고침 복원은 자동 업무와 공동 재고
   await button(page, "일시정지").click();
   await dev(page);
   await button(page, "다음 작업 완료까지").click();
-  await expect(page.getByTestId("timber-phase")).toHaveText("야적장으로 운송");
+  await expect(page.getByTestId("timber-phase")).toHaveText("야적장으로 운반");
   await saves(page);
   await button(page, "진행 저장").click();
   await expect(page.getByTestId("timber-save-status")).toContainText(
     "저장했습니다",
   );
   await page.reload();
-  await button(page, "마른 목재20 조달 체험하기").click();
+  await button(page, "마른 목재 20 조달").click();
   await saves(page);
   await button(page, "진행 불러오기").click();
-  await expect(page.getByTestId("timber-phase")).toHaveText("야적장으로 운송");
+  await expect(page.getByTestId("timber-phase")).toHaveText("야적장으로 운반");
   await expect(button(page, "시간 재개")).toBeVisible();
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("120");
   await expect(page.getByTestId("resource-RES_METAL")).toHaveText("34");
@@ -777,7 +777,7 @@ test("거주 공간이 부족한 합류 주민을 둥지 증설 후 자동 입�
     "저장했습니다",
   );
   await page.reload();
-  await button(page, "마른 목재20 조달 체험하기").click();
+  await button(page, "마른 목재 20 조달").click();
   await saves(page);
   await button(page, "진행 불러오기").click();
   await expect(page.getByTestId("housing-status")).toContainText(

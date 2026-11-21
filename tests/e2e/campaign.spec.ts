@@ -390,9 +390,9 @@ test("성문 수비와 온돌을 배치하고 삽화가 있는 전투 보고를 
   const panel = page.getByRole("region", { name: "성문과 온돌", exact: true });
   await panel.getByRole("button", { name: "4명 배치", exact: true }).click();
   await expect(panel).toContainText("성문 수비병 4명");
-  await panel.getByRole("button", { name: "2단계", exact: true }).click();
+  await panel.getByRole("button", { name: "최소 2단계", exact: true }).click();
   await expect(
-    panel.getByRole("button", { name: "2단계", exact: true }),
+    panel.getByRole("button", { name: "최소 2단계", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   const report = page.getByRole("region", { name: "성문 전투 보고" });
   await expect(report).toContainText("부상 1명");
@@ -545,7 +545,6 @@ for (const prepared of [true, false]) {
       await page.goto("/");
       const dialog = page.getByRole("dialog");
       const next = dialog.getByRole("button", { name: /^다음 대사/ });
-      await next.click();
       await next.click();
       await expect(dialog).toContainText("공주마마?");
       const clip = dialog.locator("video");
@@ -868,7 +867,6 @@ for (const [hope, allegiance, film] of [
     }
     for (let i = 0; i < 12 && !(await readProgress()).ending; i++) await day();
     const next = dialog.getByRole("button", { name: /^다음 대사/ });
-    await next.click();
     await next.click();
     const clip = dialog.locator("video");
     await expect(clip).toHaveAttribute(
