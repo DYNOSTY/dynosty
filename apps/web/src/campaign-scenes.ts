@@ -73,6 +73,7 @@ export interface ScenePage {
   frames?: { image: string; words: string }[];
   illustration?: string;
   laterIllustration?: { from: number; image: string; alt: string };
+  lineImages?: Record<number, { image: string; alt: string }>;
   lineIllustration?: { at: number; image: string; alt: string };
   lines: Line[];
   choices: Choice[];
@@ -715,15 +716,20 @@ export function campaignPage(s: TimberState): ScenePage {
         image: "mokjin-night",
         alt: "밤중에 붕대를 감은 목진이 홀로 복홀의 작은 성문을 빠져나간다.",
       };
+      page.lineImages = {
+        1: {
+          image: "palace-letter",
+          alt: "도성 궁궐의 회랑에서 양녕이 봉서를 든 충녕에게 말을 건넨다.",
+        },
+        2: {
+          image: "road-letter",
+          alt: "남하길에서 충녕이 봉서를 접는다. 곁에 선 호위무사가 어깨너머로 바라본다.",
+        },
+      };
       line("", "");
-      line(
-        "호위병",
-        "마마, 도성에서 가져온 봉서입니다. 복홀에 닿거든 이대로 전할까요?",
-      );
-      line(
-        "충녕",
-        "‘고려의 후손을 데려오라. 거역하면 처단하라.’ ……접어 두세요. 그분 얼굴 한 번 뵌 적이 없는데, 이런 것부터 내보일 순 없어요.",
-      );
+      line("", "");
+      line("호위무사", "공주마마, 복홀에 닿으면 그 봉서를 먼저 전할까요?");
+      line("충녕", "아직은요. 그분을 먼저 만나 보고 싶어요.");
       choice("next", "남하 호송에 동행할까요?");
       break;
     case "escort":

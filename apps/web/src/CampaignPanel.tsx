@@ -84,11 +84,12 @@ function SceneDialog({
   }, [cursor, frame, total]);
   const [name, words] = page.lines[lineIndex]!;
   const later =
-    page.lineIllustration?.at === cursor
+    page.lineImages?.[cursor] ??
+    (page.lineIllustration?.at === cursor
       ? page.lineIllustration
       : page.laterIllustration && cursor >= page.laterIllustration.from
         ? page.laterIllustration
-        : undefined;
+        : undefined);
   const face = PATROL_NAMES.findIndex((x) => x === name);
   const last = cursor === total - 1;
   useEffect(() => {
@@ -244,6 +245,7 @@ function SceneDialog({
             </section>
           )}
           {page.clip &&
+            !page.lineImages?.[cursor] &&
             page.lineIllustration?.at !== cursor &&
             !familyScene &&
             !frame &&
