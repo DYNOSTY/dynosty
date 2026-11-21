@@ -1,5 +1,9 @@
 import { isMechanical, upgradeCost } from "./development.js";
-import { commandTimber, note, type TimberState } from "./timber.js";
+import {
+  applyAutomaticCitizenEvent,
+  note,
+  type TimberState,
+} from "./timber.js";
 import { BUILDING_RULES, payTown } from "./town.js";
 import { assignHomes } from "./village-services.js";
 
@@ -133,19 +137,12 @@ export function advanceMutants(
     if (residents.length && (!targets.length || random() < 0.5)) {
       const victim = residents[Math.floor(random() * residents.length)]!;
       const key = "mutant-" + m.id + "-" + s.elapsed;
-      s = commandTimber(
-        s,
-        {
-          type: "citizen-event",
-          event: {
-            id: key,
-            type: "illness",
-            citizenIds: [victim.id],
-            severity: "major",
-          },
-        },
-        key,
-      );
+      s = applyAutomaticCitizenEvent(s, {
+        id: key,
+        type: "illness",
+        citizenIds: [victim.id],
+        severity: "major",
+      });
       s = note(
         mutantWound(s, victim.id, random),
         "주민: 날 못 알아보더니 그대로 덮쳤어. 의원 좀 불러 줘!",
@@ -164,7 +161,8 @@ export function advanceMutants(
           residents: assignHomes(s.residents, s.world.citizens, usableHomes(s)),
         };
     }
-    if (responding) {
+    // The attack may have injured the last available guard.
+    if (policeAvailable(s)) {
       s = containMutant(s, m.id);
       continue;
     }

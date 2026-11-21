@@ -621,15 +621,18 @@ export type CitizenEvent =
       citizenIds: readonly string[];
       severity?: "minor" | "major" | "critical";
     };
+export type CitizenEventRecording = boolean | "if-room";
 export function applyCitizenEvent(
   input: PlayState,
   event: CitizenEvent,
+  record: CitizenEventRecording = true,
 ): PlayState {
   const s = parsePlayState(input);
   text(event.id);
   if (event.id.length > 100) fail();
   if (s.citizenEvents?.includes(event.id)) return s;
-  if ((s.citizenEvents?.length ?? 0) >= 2000) fail();
+  const full = (s.citizenEvents?.length ?? 0) >= 2000;
+  if (record === true && full) fail();
   let citizens = [...s.citizens];
   if (event.type === "mechanize") {
     const source = citizens.find((c) => c.id === event.sourceCitizenId);
@@ -713,7 +716,10 @@ export function applyCitizenEvent(
   return parsePlayState({
     ...s,
     citizens,
-    citizenEvents: [...(s.citizenEvents ?? []), event.id],
+    ...(record &&
+      !full && {
+        citizenEvents: [...(s.citizenEvents ?? []), event.id],
+      }),
   });
 }
 export function advancePlayClock(input: PlayState, minutes: number): PlayState {
