@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { SITE_POINTS } from "../../apps/web/src/site-targets.js";
-import { press, reveal } from "./labor-tabs.js";
+import { press, reveal, startTimber } from "./labor-tabs.js";
 import {
   progressButton as b,
   enterProgress,
@@ -91,7 +91,7 @@ test("묶음 표시의 저장 복원·사용 후 빈 구역·모드 종료를 �
     "저장했습니다",
   );
   await p.reload();
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-save-status")).toContainText(

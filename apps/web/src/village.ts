@@ -2,7 +2,6 @@
 import "@babylonjs/loaders/glTF";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
-import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
@@ -13,7 +12,6 @@ import {
 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
-import { CreateTorus } from "@babylonjs/core/Meshes/Builders/torusBuilder";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
@@ -75,9 +73,11 @@ const RESIDENT_HEIGHT: Record<string, [number, number]> = {
 };
 /** 겨울 차림(컨셉 시트 재질 누빔·비늘, 털 테두리·목도리·짚 장화·등불·등짐) — tools/blender/tex.py → dino2.py */
 export const residentGlb = (file: string) => `/models/residents/${file}_v2.glb`;
+/** 사용자 11/19 "공룡 크기 좀만 더" — 종별 차이는 그대로 두고 모두 15% 키움 */
+const RESIDENT_GROW = 1.15;
 export const residentScale = (file: string) => {
   const h = RESIDENT_HEIGHT[file];
-  return h ? h[0] / h[1] : RESIDENT_SCALE;
+  return (h ? h[0] / h[1] : RESIDENT_SCALE) * RESIDENT_GROW;
 };
 const RESIDENTS = [
   "R01_Pachycephalosaurus",
@@ -194,8 +194,22 @@ export function createVillage(
     target: Vector3 | null;
     wait: number;
     haul?: Hauler;
+    /** 둥지 문(약 1.38m)보다 커서 밤에 밖에서 자는지 */
+    tall: boolean;
+    /** 밤에 갈 자리(둥지 문 앞 또는 둥지 옆 바깥) */
+    bed: Vector3 | null;
+    asleep: boolean;
   };
   const walkers: Walker[] = [];
+  /** 하루 안의 게임 시각(분) — updateParties가 매 프레임 넣어 줌 */
+  let clockMin = 0;
+  let started = false;
+  const NEST_DOOR = 1.38;
+  const isTall = (url: string) => {
+    const file = (url.split("/").pop() ?? "").replace("_v2.glb", "");
+    const h = RESIDENT_HEIGHT[file];
+    return h ? h[0] * RESIDENT_GROW > NEST_DOOR : false;
+  };
   const plinthMat = new StandardMaterial("plinth-snow", scene);
   // 땅(StandardMaterial)과 같은 빛 계산이라야 눈밭에 묻힘 — PBR 그대로면 색을 낮춰도 하얗게 뜸
   plinthMat.diffuseColor = new Color3(0.82, 0.82, 0.88);
@@ -212,23 +226,7 @@ export function createVillage(
     const i = LAYOUT.findIndex(([, lx, lz]) => lx === x && lz === z);
     if (i >= 0) buildingNodes.set(node, i);
   };
-  // 고른 건물 발밑 금빛 고리 (윤곽선 대신: 인스턴스에도 되고 싸다)
-  const ring = CreateTorus(
-    "select-ring",
-    { diameter: 1, thickness: 0.05, tessellation: 64 },
-    scene,
-  );
-  const ringMat = new StandardMaterial("select-ring-mat", scene);
-  ringMat.disableLighting = true;
-  // 순금빛 · 색 보정·안개를 받지 않아 어디서나 같은 색 (선택 확인 테스트도 이 색을 셈)
-  ringMat.emissiveColor = new Color3(1, 0.85, 0.05);
-  ringMat.diffuseColor = Color3.Black();
-  ringMat.fogEnabled = false;
-  ringMat.imageProcessingConfiguration = new ImageProcessingConfiguration();
-  ringMat.imageProcessingConfiguration.isEnabled = false;
-  ring.material = ringMat;
-  ring.isPickable = false;
-  ring.setEnabled(false);
+  // 고른 건물 발밑 금빛 고리는 없앰 (사용자 11/19: "분위기 깬다") — 고른 건 오른쪽 아래 메달 창으로 알 수 있음
   plinthMat.freeze();
   const place = async (
     url: string,
@@ -342,8 +340,17 @@ export function createVillage(
       lamp.material = light.warmMat;
       lamp.isPickable = false; // 문 불빛도 지붕 너머로 번지지 않게 글로우 제외
     }
+    const tall = isTall(url);
     if (role === "walk")
-      walkers.push({ node, play: v.play, target: null, wait: r() * 2 });
+      walkers.push({
+        node,
+        play: v.play,
+        target: null,
+        wait: r() * 2,
+        tall,
+        bed: null,
+        asleep: false,
+      });
     else if (role) {
       role.rig.parent = node;
       walkers.push({
@@ -352,6 +359,9 @@ export function createVillage(
         target: null,
         wait: 0,
         haul: { ...role, state: "work", timer: 2 + r() * 3 },
+        tall,
+        bed: null,
+        asleep: false,
       });
     }
   };
@@ -597,6 +607,7 @@ export function createVillage(
   }
   // 게임 시각(분)에 맞춰 위치를 정함 → 멈추면 그 자리에 멈춤
   function updateParties(gameMin: number) {
+    clockMin = ((gameMin % 1440) + 1440) % 1440;
     for (const p of parties.values()) {
       const total = p.m.hours * 60,
         e = gameMin - p.m.start;
@@ -636,11 +647,8 @@ export function createVillage(
   function setRunning(value: boolean) {
     if (value === running) return;
     running = value;
+    if (value) started = true;
     for (const ps of smokes) value ? ps.start() : ps.stop();
-    for (const w of walkers) {
-      w.target = null;
-      w.play(value && w.haul?.state === "work" ? "Work" : "Idle");
-    }
   }
   const moveTo = (w: Walker, to: Vector3, dt: number) => {
     const p = w.node.position,
@@ -657,8 +665,47 @@ export function createVillage(
   };
   function animate(dt: number) {
     animateRisers(dt);
-    if (!running) return;
+    // 마을 생활은 일시정지와 상관없이 늘 움직임 (사용자 11/19: "상호작용 하는 움직임이 계속 있어야")
+    // — 일시정지는 시간·자원 계산(game-core)에만 걸림
+    // 게임을 시작한 뒤부터 (첫 화면이 밤 0시라 켜자마자 마을이 비지 않게)
+    const night = started && (clockMin >= 21 * 60 || clockMin < 5 * 60);
     for (const w of walkers) {
+      // 밤: 문에 들어가는 주민은 가까운 둥지 안으로, 큰 주민(문보다 큼)은 둥지 옆 바깥에서 잠
+      if (night) {
+        if (w.asleep) continue;
+        if (!w.bed) {
+          const p = w.node.position;
+          const nest = LAYOUT.filter(([id]) => id === "BLD_NEST").reduce(
+            (best, n) =>
+              Math.hypot(n[1] - p.x, n[2] - p.z) <
+              Math.hypot(best[1] - p.x, best[2] - p.z)
+                ? n
+                : best,
+          );
+          const [, nx, nz] = nest;
+          const d = Math.hypot(nx, nz) || 1;
+          // 문은 가운데(온돌) 쪽, 큰 주민은 반대편 바깥
+          const out = w.tall ? 2.8 : -2.1;
+          w.bed = new Vector3(nx + (nx / d) * out, 0, nz + (nz / d) * out);
+          w.haul?.prop.setEnabled(false);
+          w.play("Walk");
+        }
+        if (moveTo(w, w.bed, dt)) {
+          w.asleep = true;
+          if (w.tall) w.play("Idle");
+          else w.node.setEnabled(false);
+        }
+        continue;
+      }
+      if (w.asleep || w.bed) {
+        // 새벽: 둥지에서 나와 하던 일로
+        w.asleep = false;
+        w.bed = null;
+        w.node.setEnabled(true);
+        w.target = null;
+        if (w.haul) w.haul.state = "toWork";
+        w.play("Walk");
+      }
       const h = w.haul;
       if (h) {
         // 일꾼: 일터에서 작업 → 짐 지고 창고로 → 내려놓고 → 빈손으로 돌아감
@@ -697,8 +744,19 @@ export function createVillage(
       }
       if (moveTo(w, w.target, dt)) {
         w.target = null;
-        w.wait = 1.5 + r() * 3.5;
-        w.play("Idle");
+        // 가만히 서 있지 않고: 가까운 이웃을 보고 손짓(일하는 동작) — 이웃이 멀면 가까운 건물 쪽으로
+        const near = walkers
+          .filter((o) => o !== w)
+          .map((o) => o.node.position)
+          .concat(LAYOUT.map(([, x, z]) => new Vector3(x, 0, z)))
+          .reduce((best, q) =>
+            Vector3.DistanceSquared(q, p) < Vector3.DistanceSquared(best, p)
+              ? q
+              : best,
+          );
+        w.node.rotation.y = Math.atan2(near.x - p.x, near.z - p.z);
+        w.wait = 1.6 + r() * 2;
+        w.play("Work");
       }
     }
   }
@@ -743,19 +801,11 @@ export function createVillage(
     }
     return {
       setOutline(value) {
-        if (kind === "building") {
-          ring.setEnabled(value);
-          if (value) {
-            node.computeWorldMatrix(true);
-            const p = node.getAbsolutePosition();
-            ring.position.set(p.x, p.y + 0.12, p.z + 0.3);
-            ring.scaling.setAll(10.5);
-          }
-          return;
-        }
+        if (kind === "building") return; // 건물은 바닥 고리·윤곽선 없이
         for (const m of v.meshes) {
           m.outlineColor = OUTLINE;
-          m.outlineWidth = 0.025;
+          // 주민은 작게 줄여 그려서(0.3배대) 0.025면 1픽셀도 안 됨 — 고르면 보이게 두껍게
+          m.outlineWidth = 0.09;
           m.renderOutline = value;
         }
       },
@@ -783,14 +833,8 @@ export function createVillage(
       return null;
     },
     /** 고른 건물 발밑 고리 (null이면 숨김) */
-    highlight(i: number | null) {
-      const at = i === null ? undefined : LAYOUT[i];
-      ring.setEnabled(!!at);
-      if (!at) return;
-      const [id, x, z] = at;
-      ring.position.set(x, elevation(x, z) + 0.12, z);
-      ring.scaling.setAll(id === "BLD_NEST" ? 5.4 : 6.4);
-    },
+    /** 고른 마을 건물 표시 — 바닥 고리는 없앰(메달 창으로 대신) */
+    highlight(_i: number | null) {},
     setRunning,
     animate,
     setMissions,

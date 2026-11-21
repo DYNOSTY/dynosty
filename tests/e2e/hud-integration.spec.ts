@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { press } from "./labor-tabs.js";
+import { press, startTimber } from "./labor-tabs.js";
 import { clickExample } from "./scene-picking.js";
 
 type SceneMesh = {
@@ -72,7 +72,7 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   const canvas = await page.locator("canvas").elementHandle();
   await page.screenshot({ path: info.outputPath("integrated-hud.png") });
   // 조달은 의뢰 목록에서 연다 (하단 명령판은 조달소를 골랐을 때만)
-  await press(page, "마른 목재20 조달 체험하기");
+  await startTimber(page);
   await press(page, "일손 배치·배급 체험하기");
   // 조달은 따로 떨어진 판이 아니라 섬 광장 안에서 진행 — 섬은 계속 보임
   await expect.poll(() => islandVisible(page)).toBe(true);
@@ -175,7 +175,7 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
   await clickExample(page, "building");
   await expect(
     page.getByRole("region", { name: "선택 정보", exact: true }),
-  ).toContainText("건물 예제");
+  ).toContainText("온돌");
   await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
   expect(errors).toEqual([]);
 });

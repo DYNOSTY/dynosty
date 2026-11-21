@@ -27,3 +27,9 @@ export async function choose(p: Page, label: string, value: string) {
   await showIn(p, select);
   await select.selectOption(value);
 }
+
+/** 의뢰 목록 → 공통 의뢰 카드 → 조달 체험 시작 (2026-11-19 의뢰 카드 도입) */
+export async function startTimber(p: Page) {
+  await press(p, "의뢰 · 마른 목재 20 조달");
+  await press(p, "마른 목재20 조달 체험하기");
+}

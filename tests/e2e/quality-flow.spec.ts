@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { press } from "./labor-tabs.js";
+import { press, startTimber } from "./labor-tabs.js";
 import {
   progressButton as b,
   enterProgress,
@@ -55,7 +55,7 @@ test("품질흐름: 배분과 보완 재고를 중복 없이 표시하고 저장
     "저장했습니다",
   );
   await p.reload();
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-save-status")).toContainText(
@@ -101,7 +101,7 @@ test("품질흐름: 교환 처리4와 정상 배분16을 분리하고 예약·�
     "저장했습니다",
   );
   await p.reload();
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-save-status")).toContainText(

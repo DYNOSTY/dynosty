@@ -1,12 +1,12 @@
 import { expect, type Page } from "@playwright/test";
-import { press } from "./labor-tabs.js";
+import { press, startTimber } from "./labor-tabs.js";
 export const progressButton = (p: Page, name: string) =>
   p.getByRole("button", { name, exact: true });
 export const progressCard = (p: Page, id: string) =>
   p.getByTestId(`progress-site-${id}`);
 export async function enterProgress(p: Page) {
   await p.goto("/");
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 }

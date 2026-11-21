@@ -170,7 +170,7 @@ export async function clickFloor(page: Page) {
       const rect = el.getBoundingClientRect();
       const x = Math.round(rect.left + rect.width / 2);
       let bottom = rect.bottom;
-      for (const selector of [".g-console", ".g-console__cmd"]) {
+      for (const selector of [".g-console", ".g-console__cmd", ".sc"]) {
         const bar = document.querySelector(selector)?.getBoundingClientRect();
         if (bar && x >= bar.left && x <= bar.right && bar.top > rect.top)
           bottom = Math.min(bottom, bar.top);

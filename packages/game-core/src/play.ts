@@ -2,6 +2,17 @@ import raw from "./game-data.json" with { type: "json" };
 import { isRecord } from "./save.js";
 import type { SceneEntity, SceneSnapshot } from "./scene.js";
 import {
+  absMinute,
+  createStoryState,
+  minutesUntilStory,
+  parseStoryState,
+  pendingStory,
+  STORY_RULES,
+  type StoryId,
+  type StorySide,
+  type StoryState,
+} from "./story.js";
+import {
   createWinterState,
   parseWinterState,
   stepWinter,
@@ -228,6 +239,8 @@ export interface PlayState {
   readonly winter: WinterState;
   /** 생산 분자 이월 (벌목 목재, food와 같은 고정 소수점) */
   readonly work: { readonly woodCarry: number };
+  /** 사건·정책 선택 (story.ts) — 옛 저장에는 없어서 불러올 때 기본값으로 채움 */
+  readonly story: StoryState;
 }
 // 벌목장 B02 (온돌 UI v0.4 표): 정원6 · 목재18/일 → 1단계 초기 배치 4명 = 하루 12, 낮 9~18시에만
 export const LOGGING = { woodPerDay: 12, from: 9, to: 18 } as const;
@@ -272,6 +285,7 @@ export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
     pessimism: r.initial.pessimism,
     winter: createWinterState(citizens.map((c) => c.id)),
     work: { woodCarry: 0 },
+    story: createStoryState(),
   };
 }
 export function parsePlayState(
@@ -378,6 +392,13 @@ export function parsePlayState(
       number(w.woodCarry, 0, Number.MAX_SAFE_INTEGER, true);
       return { woodCarry: w.woodCarry };
     })(),
+    story: (() => {
+      try {
+        return parseStoryState(value.story);
+      } catch {
+        fail();
+      }
+    })(),
   };
 }
 export function dailyFoodDemand(
@@ -467,10 +488,20 @@ export function advancePlayMinutes(
   const elapsed = state.minute + minutes;
   const day = state.day + Math.floor(elapsed / rules.time.minutesPerDay);
   number(day, 1, 100_000, true);
+  // 전량 검수로 늦춘 목재가 도착 (사건·정책 선택, story.ts)
+  let story = state.story;
+  if (
+    story.woodDue !== null &&
+    absMinute(day, elapsed % rules.time.minutesPerDay) >= story.woodDue
+  ) {
+    resources.RES_WOOD += STORY_RULES.trade.wood * AMOUNT_SCALE;
+    story = { ...story, woodDue: null };
+  }
   return {
     ...state,
     day,
     minute: elapsed % rules.time.minutesPerDay,
+    story,
     resources,
     foodCarry: carry,
     unmet,
@@ -495,8 +526,54 @@ export function tickPlay(
     state.tickRemainder;
   const minutes = Math.floor(numerator / 1000);
   return {
-    ...advancePlayMinutes(state, minutes, rules),
+    ...advanceToStory(state, minutes, rules),
     tickRemainder: numerator % 1000,
+  };
+}
+/** 사건이 뜰 시각에서 시간을 끊고 멈추는 진행 — 실시간 진행과 '하루 진행'이 쓴다.
+ *  사건을 고를 때까지 시간은 그 시각에 서 있다 (다시 시작을 눌러도 곧바로 다시 멈춤) */
+export function advanceToStory(
+  input: PlayState,
+  minutes: number,
+  rules: RuleSet = GAME_RULES,
+): PlayState {
+  const state = parsePlayState(input, rules);
+  const until = minutesUntilStory(state.story, state.day, state.minute);
+  if (until === null || minutes < until)
+    return advancePlayMinutes(state, minutes, rules);
+  return { ...advancePlayMinutes(state, until, rules), paused: true };
+}
+/** 떠 있는 사건에서 한쪽을 고름 (가 = a, 나 = b). 수치는 story.ts STORY_RULES(임시 값) */
+export function pickStory(
+  input: PlayState,
+  id: StoryId,
+  side: StorySide,
+  rules: RuleSet = GAME_RULES,
+): PlayState {
+  const state = parsePlayState(input, rules);
+  if (pendingStory(state.story, state.day, state.minute) !== id) fail();
+  const rule = STORY_RULES[id];
+  const picked = { ...state.story.picked, [id]: side };
+  // 가: 전량 검수 — 불량은 막지만 하루 뒤에 들어옴
+  if (side === "a")
+    return {
+      ...state,
+      paused: false,
+      story: {
+        picked,
+        woodDue: absMinute(state.day, state.minute) + rule.fullDelayMinutes,
+      },
+    };
+  // 나: 표본 검수 — 바로 들어오지만 젖은 목재가 섞여 비관이 오름
+  return {
+    ...state,
+    paused: false,
+    resources: {
+      ...state.resources,
+      RES_WOOD: state.resources.RES_WOOD + rule.wood * AMOUNT_SCALE,
+    },
+    pessimism: Math.min(100, state.pessimism + rule.samplePessimism),
+    story: { picked, woodDue: state.story.woodDue },
   };
 }
 export function setPlayPaused(state: PlayState, paused: boolean): PlayState {

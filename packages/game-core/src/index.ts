@@ -33,6 +33,11 @@ export type PlayCommand =
       readonly type: "set-heat";
       readonly zone: import("./winter.js").Zone;
       readonly heat: import("./winter.js").HeatLevel;
+    }
+  | {
+      readonly type: "story-pick";
+      readonly id: import("./story.js").StoryId;
+      readonly side: import("./story.js").StorySide;
     };
 export type GameCommand =
   | { readonly type: "play-command"; readonly command: PlayCommand }
@@ -99,6 +104,7 @@ export * from "./labor.js";
 export {
   AMOUNT_SCALE,
   advancePlayMinutes,
+  advanceToStory,
   type Citizen,
   createPlaySave,
   createPlayScene,
@@ -117,6 +123,7 @@ export {
   parsePlaySave,
   parsePlayState,
   parseRules,
+  pickStory,
   RESOURCE_IDS,
   type ResourceId,
   type RuleSet,
@@ -124,5 +131,6 @@ export {
   supplyFood,
   tickPlay,
 } from "./play.js";
+export * from "./story.js";
 export * from "./timber.js";
 export * from "./winter.js";

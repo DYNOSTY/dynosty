@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { press, reveal } from "./labor-tabs.js";
+import { press, reveal, startTimber } from "./labor-tabs.js";
 import {
   progressButton as b,
   enterProgress,
@@ -111,7 +111,7 @@ test("보완 역할 표지·먼저 배분 링크·장소 이동·빈 바닥·저
     "저장했습니다",
   );
   await p.reload();
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-save-status")).toContainText(

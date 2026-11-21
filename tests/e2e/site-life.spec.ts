@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { press, reveal } from "./labor-tabs.js";
+import { press, reveal, startTimber } from "./labor-tabs.js";
 import {
   progressButton as b,
   enterProgress,
@@ -56,7 +56,7 @@ test("교환 운송 저장·새로고침 복원과 재검수·수령·완료 안
   );
   const before = await p.getByTestId("transport-status").textContent();
   await p.reload();
-  await press(p, "마른 목재20 조달 체험하기");
+  await startTimber(p);
   await press(p, "일손 배치·배급 체험하기");
   await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-save-status")).toContainText(
