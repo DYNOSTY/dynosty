@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { press, reveal } from "./labor-tabs.js";
 import {
   progressButton as b,
   enterProgress,
@@ -44,15 +45,17 @@ test("다음 조작 링크는 실제 공급·약정·출발로 이동하고 장�
   await expect(
     p.getByRole("region", { name: "공급 제안 비교", exact: true }),
   ).toBeFocused();
-  await b(p, "확장 제안 A 선택").click();
+  await press(p, "확장 제안 A 선택");
   await p
     .getByRole("link", { name: "목재 다음 조작으로 이동", exact: true })
     .click();
+  await reveal(p, "확장 약정하기");
   await expect(b(p, "확장 약정하기")).toBeFocused();
   await p.keyboard.press("Enter");
   await p
     .getByRole("link", { name: "목재 다음 조작으로 이동", exact: true })
     .click();
+  await reveal(p, "확장 수레 출발");
   await expect(b(p, "확장 수레 출발")).toBeFocused();
   await p.keyboard.press("Enter");
   await p.locator("canvas").scrollIntoViewIfNeeded();
@@ -63,15 +66,15 @@ test("다음 조작 링크는 실제 공급·약정·출발로 이동하고 장�
     "운송·검사",
   );
   await expect.poll(() => overlappingMarkers(p)).toEqual([]);
-  await b(p, "다음 일손 사건까지").click();
-  await b(p, "목재 다음 작업 장소 보기").click();
+  await press(p, "다음 일손 사건까지");
+  await press(p, "목재 다음 작업 장소 보기");
   await expect(p.getByTestId("site-name")).toHaveText("검수대");
   await expect(p.locator("canvas")).toBeFocused();
   await expect
     .poll(() => horizontalOffset(p, "site-inspection"))
     .toBeLessThan(5);
   await expect(p.locator("canvas")).toBeInViewport({ ratio: 0.5 });
-  await b(p, "기본 시점").click();
+  await press(p, "기본 시점");
   await expect
     .poll(() => horizontalOffset(p, "site-inspection"))
     .toBeGreaterThan(30);
@@ -85,14 +88,15 @@ test("보완 역할 표지·먼저 배분 링크·장소 이동·빈 바닥·저
   await p
     .getByRole("link", { name: "정상 목재 배분으로 이동", exact: true })
     .click();
+  await reveal(p, "확장 정상 목재 16 배분");
   await expect(b(p, "확장 정상 목재 16 배분")).toBeFocused();
   await p.keyboard.press("Enter");
-  await b(p, "목재 다음 작업 장소 보기").click();
+  await press(p, "목재 다음 작업 장소 보기");
   await expect
     .poll(() => horizontalOffset(p, "site-quarantine"))
     .toBeLessThan(5);
   await expect(p.getByTestId("site-name")).toBeInViewport({ ratio: 1 });
-  await b(p, "현장 보완 인원 배정").click();
+  await press(p, "현장 보완 인원 배정");
   await expect(p.locator('[data-crew-marker="crew-1"]')).toHaveAttribute(
     "data-job",
     "repair",
@@ -102,14 +106,14 @@ test("보완 역할 표지·먼저 배분 링크·장소 이동·빈 바닥·저
   );
   await clickFloor(p);
   await expect(p.getByTestId("site-name")).toHaveCount(0);
-  await b(p, "일손 체험 저장").click();
+  await press(p, "일손 체험 저장");
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await press(p, "마른 목재20 조달 체험하기");
+  await press(p, "일손 배치·배급 체험하기");
+  await press(p, "일손 체험 불러오기");
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );
@@ -130,7 +134,7 @@ test("375px 키보드 장소 이동·기본 복귀·기호 표지는 가로 넘�
   await expect(p.locator("canvas")).toBeFocused();
   await expect.poll(() => horizontalOffset(p, "site-ration")).toBeLessThan(5);
   await expect(p.locator("canvas")).toBeInViewport({ ratio: 0.5 });
-  await b(p, "기본 시점").click();
+  await press(p, "기본 시점");
   await expect(p.locator('[data-site-marker="site-quarantine"]')).toContainText(
     "×",
   );

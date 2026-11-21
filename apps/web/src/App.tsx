@@ -14,15 +14,16 @@ import {
   timberScene,
 } from "@dynosty/game-core";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { BUILDINGS, type BuildingAction, commandGrid } from "./buildings.js";
 import {
   CmdButton,
   CmdFace,
   ConsoleFrame,
   FpsBadge,
   IconText,
-  MoodScale,
   TopFrame,
 } from "./GameHud.js";
+import { LAYOUT } from "./layout.js";
 import {
   loadLocalExample,
   localSaveError,
@@ -35,7 +36,7 @@ import { PlaySavePanel } from "./PlaySavePanel.js";
 import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { QualityFlow } from "./QualityFlow.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
-import { SelectionPanel } from "./SelectionPanel.js";
+import { SelectionMeta } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import { SiteGuide } from "./SiteGuide.js";
 import { SiteProgress } from "./SiteProgress.js";
@@ -55,8 +56,17 @@ import { CREW_BADGES, cartBadge } from "./visual-badges.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
 import { elevation, MAP_SPAN } from "./world.js";
 
+// 자동 테스트 브라우저(navigator.webdriver)에서만 일손 판 탭을 모두 펼침 — 흐름 테스트가 한 화면 전제로 짜여 있음.
+// 사람이 보는 화면에는 영향 없음 (탭 화면은 캡처로 따로 확인)
+const E2E_ALL =
+  typeof navigator !== "undefined" && navigator.webdriver === true;
+
 export function App() {
   const [laborOpen, setLaborOpen] = useState(false);
+  // 일손 판은 내용이 길어 탭으로 한 덩어리씩 (프로스트펑크 건물 창처럼)
+  const [laborTab, setLaborTab] = useState<
+    "work" | "request" | "site" | "report" | "save"
+  >("work");
   const [laborState, setLaborState] = useState<LaborState | null>(null);
   const [siteNotices, setSiteNotices] = useState<SiteNotice[]>([]);
   const priorLabor = useRef<LaborState | null>(null);
@@ -402,6 +412,26 @@ export function App() {
       (entity) => entity.id === selectedId && entity.visible,
     ) ?? null;
   const hasPanels = saveOpen || toolsOpen || scoutOpen !== null;
+  // 하단 콘솔 내용: 마을 건물(bld:번호) · 가운데 온돌(건물 예제) · 주민 예제
+  const selectedBuilding = selectedId?.startsWith("bld:")
+    ? (LAYOUT[Number(selectedId.slice(4))]?.[0] ?? null)
+    : selectedEntity?.kind === "building"
+      ? "BLD_ONDOL"
+      : null;
+  const selection =
+    selectedBuilding || selectedEntity
+      ? {
+          building: selectedBuilding,
+          grid: commandGrid(
+            (selectedBuilding && BUILDINGS[selectedBuilding]) || {
+              name: "",
+              role: "",
+              facts: [],
+              commands: [],
+            },
+          ),
+        }
+      : null;
   const gameMinutes = playState
     ? (playState.day - 1) * 1440 + playState.minute
     : 0;
@@ -577,6 +607,16 @@ export function App() {
     sceneRef.current?.select(null);
     canvasRef.current?.focus();
   }, []);
+  function runAction(action: BuildingAction) {
+    if (action === "procure") openTimber();
+    else if (action === "focus") sceneRef.current?.focusSelected();
+    else if (action === "clear") clearSelection();
+    else if (action === "scout") {
+      // 아직 안 가 본 첫 거점의 정찰 창
+      const next = SCOUT_SITES.find((site) => !scouts[site.id]);
+      if (next) openOnly(() => setScoutOpen(next.id));
+    }
+  }
   const showSite = useCallback((id: import("./site-targets.js").SiteId) => {
     if (!sceneRef.current?.focusSite(id)) return;
     asideRef.current?.scrollTo({ top: 0, behavior: "instant" });
@@ -587,7 +627,9 @@ export function App() {
     timberOpen && laborOpen && isSiteId(selectedId) ? selectedId : null;
 
   return (
-    <main className={`play-shell${timberOpen ? " is-procurement" : ""}`}>
+    <main
+      className={`play-shell${timberOpen ? ` is-procurement ${laborOpen ? `is-labor labor-tab-${laborTab}` : "is-timber"}` : ""}${E2E_ALL ? " e2e-all" : ""}`}
+    >
       <header className="play-header">
         <TopFrame />
         <div className="play-brand">
@@ -806,18 +848,6 @@ export function App() {
                 : "대표 주민 1종 · 온돌 둥지"}
             </span>
           </div>
-          {timberOpen && laborOpen && laborState ? (
-            <>
-              <SiteGuide state={laborState} onSelect={showSite} />
-              <QualityFlow state={laborState} />{" "}
-              <SiteProgress
-                state={laborState}
-                notices={siteNotices}
-                onDismiss={() => setSiteNotices([])}
-                onSelect={showSite}
-              />
-            </>
-          ) : null}
           <fieldset className="selection-actions" aria-label="예제 대상 선택">
             <button
               type="button"
@@ -866,6 +896,42 @@ export function App() {
           aria-label="작업 메뉴"
           hidden={!hasPanels && !timberOpen}
         >
+          {timberOpen && laborOpen ? (
+            <nav className="g-tabs" aria-label="일손 판 보기">
+              {(
+                [
+                  ["work", "배치"],
+                  ["request", "요청"],
+                  ["site", "현장"],
+                  ["report", "품질"],
+                  ["save", "저장"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="g-tab"
+                  aria-label={`${label} 탭`}
+                  aria-pressed={laborTab === id}
+                  onClick={() => setLaborTab(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+          ) : null}
+          {timberOpen && laborOpen && laborState ? (
+            <div className="site-column">
+              <SiteGuide state={laborState} onSelect={showSite} />
+              <QualityFlow state={laborState} />{" "}
+              <SiteProgress
+                state={laborState}
+                notices={siteNotices}
+                onDismiss={() => setSiteNotices([])}
+                onSelect={showSite}
+              />
+            </div>
+          ) : null}
           <TimberDemo
             active={timberOpen}
             onState={setTimberState}
@@ -1095,8 +1161,29 @@ export function App() {
       {hasPanels ? (
         <div className="g-backdrop" aria-hidden="true" onClick={closePopups} />
       ) : null}
+      {/* 혹한 톤: 화면 가장자리 서리 · 위 막대 고드름 */}
+      <div className="g-frost" aria-hidden="true" />
+      <div className="g-frost-edge g-frost-edge--top" aria-hidden="true" />
       <FpsBadge />
-      <section className="g-console" aria-label="명령 콘솔">
+      {/* 늘 쓰는 저장·설정은 위쪽 왼편 (하단은 건물을 고를 때만) */}
+      <nav className="g-topcmd" aria-label="게임 메뉴">
+        <CmdButton
+          buttonRef={saveMenuRef}
+          icon="records"
+          label="저장"
+          hotkey="J"
+          pressed={saveOpen}
+          controls={savePanelId}
+          onClick={() => openOnly(() => setSaveOpen(!saveOpen))}
+        />
+        <SettingsMenu className="g-cmd">
+          <CmdFace icon="settings" label="설정" hotkey="Esc" />
+        </SettingsMenu>
+      </nav>
+      <section
+        className={`g-console${selection ? " is-selected" : " is-idle"}`}
+        aria-label="명령 콘솔"
+      >
         <ConsoleFrame />
         <div className="g-console__map">
           <button
@@ -1142,44 +1229,47 @@ export function App() {
             개발 도구
           </button>
         </div>
-        <div className="g-console__info">
-          {selectedEntity ? (
-            <SelectionPanel entity={selectedEntity} onClear={clearSelection} />
-          ) : (
-            <div className="g-idle">
-              <h2>복홀 본진</h2>
-              <p>건물이나 주민을 누르면 이 자리에 정보가 나옵니다.</p>
-            </div>
-          )}
-          <MoodScale hope={null} despair={null} />
-        </div>
-        <nav className="play-menu g-console__cmd" aria-label="게임 메뉴">
-          <CmdButton icon="build" label="건설" hotkey="B" disabled />
-          <CmdButton icon="residents" label="주민" hotkey="U" disabled />
-          <CmdButton icon="research" label="연구" hotkey="T" disabled />
-          <CmdButton icon="policy" label="정책" hotkey="P" disabled />
-          <CmdButton icon="map" label="지도" hotkey="M" disabled />
-          <CmdButton
-            icon="economy"
-            label="조달"
-            hotkey="E"
-            disabled={!timberReady || timberOpen}
-            onClick={openTimber}
-          />
-          <CmdButton icon="ondol" label="온돌" hotkey="H" disabled />
-          <CmdButton
-            buttonRef={saveMenuRef}
-            icon="records"
-            label="저장"
-            hotkey="J"
-            pressed={saveOpen}
-            controls={savePanelId}
-            onClick={() => openOnly(() => setSaveOpen(!saveOpen))}
-          />
-          <SettingsMenu className="g-cmd">
-            <CmdFace icon="settings" label="설정" hotkey="Esc" />
-          </SettingsMenu>
-        </nav>
+        {/* 고른 것이 있을 때만: 왼쪽 초상·이름·역할 · 오른쪽 건물별 명령 9칸 */}
+        {selection ? (
+          <>
+            <section className="g-console__info g-sel" aria-label="선택 정보">
+              <h2>
+                {selection.building
+                  ? (BUILDINGS[selection.building]?.name ?? "건물")
+                  : "트리케라톱스"}
+              </h2>
+              <p>
+                {selection.building
+                  ? BUILDINGS[selection.building]?.role
+                  : "마을 주민. 일터와 둥지를 오가며 일합니다."}
+              </p>
+              <SelectionMeta entity={selectedEntity} />
+            </section>
+            <nav className="play-menu g-console__cmd" aria-label="건물 명령">
+              {selection.grid.map(({ slot, cmd }) =>
+                cmd ? (
+                  <CmdButton
+                    key={slot}
+                    icon={cmd.icon}
+                    label={cmd.label}
+                    hotkey={cmd.hotkey ?? ""}
+                    disabled={
+                      !cmd.action ||
+                      (cmd.action === "procure" && (!timberReady || timberOpen))
+                    }
+                    onClick={() => cmd.action && runAction(cmd.action)}
+                  />
+                ) : (
+                  <span
+                    key={slot}
+                    className="g-cmd g-cmd--empty"
+                    aria-hidden="true"
+                  />
+                ),
+              )}
+            </nav>
+          </>
+        ) : null}
       </section>
     </main>
   );

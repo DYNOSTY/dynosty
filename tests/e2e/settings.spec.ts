@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { press } from "./labor-tabs.js";
 
 const settingsKey = "dynosty.settings";
 const gameKey = "dynosty.example.saves";
@@ -71,7 +72,7 @@ test("저장된 음량이 실제 오디오 출력에 적용되고 자동 재생�
     Object.assign(window, { settingsAudioProbe: probe });
   }, settingsKey);
   await page.goto("/");
-  await page.getByRole("button", { name: "설정", exact: true }).click();
+  await press(page, "설정");
   const dialog = page.getByRole("dialog");
   const volume = dialog.getByRole("slider", { name: "전체 음량" });
   await expect(volume).toHaveValue("25");
@@ -133,7 +134,7 @@ for (const raw of [
       value: raw,
     });
     await page.reload();
-    await page.getByRole("button", { name: "설정", exact: true }).click();
+    await press(page, "설정");
     const dialog = page.getByRole("dialog");
     const volume = dialog.getByRole("slider", { name: "전체 음량" });
     await expect(volume).toHaveValue("50");
@@ -153,7 +154,7 @@ test("설정 쓰기 실패는 이번 실행에만 적용하고 이전 설정·�
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "설정", exact: true }).click();
+  await press(page, "설정");
   const dialog = page.getByRole("dialog");
   const volume = dialog.getByRole("slider", { name: "전체 음량" });
   await volume.press("End");
@@ -186,7 +187,7 @@ test("설정 쓰기 실패는 이번 실행에만 적용하고 이전 설정·�
     "keep game save",
   );
   await page.reload();
-  await page.getByRole("button", { name: "설정", exact: true }).click();
+  await press(page, "설정");
   await expect(volume).toHaveValue("100");
 });
 
@@ -203,7 +204,7 @@ test("오디오를 사용할 수 없어도 안전한 안내 후 설정을 변경
     });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "설정", exact: true }).click();
+  await press(page, "설정");
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "확인음 듣기" }).click();
   await expect(dialog.getByTestId("audio-preview-status")).toContainText(

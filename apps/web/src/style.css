@@ -3204,7 +3204,7 @@ body {
   box-shadow: 0 0 0 1px var(--hanji-line);
 }
 .g-scout__facts {
-  margin-top: 0 !important;
+  margin-top: 0;
 }
 .g-scout__find,
 .g-scout .hint {
@@ -3214,7 +3214,7 @@ body {
   align-self: end;
 }
 .g-scout .hint {
-  margin: 16px 0 0 !important;
+  margin: 16px 0 0;
 }
 
 /* 화면 밖 정찰 거점: 가장자리에 붙고 방향 화살표 */
@@ -3294,7 +3294,7 @@ body,
     width: min(640px, calc(100vw - 64px));
   }
   .g-scout__facts {
-    grid-template-columns: 72px 1fr !important;
+    grid-template-columns: 72px 1fr;
   }
   .g-scout__facts dd {
     white-space: nowrap;
@@ -3576,5 +3576,851 @@ body,
     inset: 0;
     z-index: 19;
     background: rgb(24 18 14 / 45%);
+  }
+}
+
+/* 일손 현장: 조작 판과 3D 장면을 별도 열에 둬 현장 클릭을 가리지 않는다. */
+@media (min-width: 761px) {
+  .is-procurement.is-labor .g-backdrop {
+    display: none;
+  }
+  .is-procurement.is-labor .play-workspace.has-tools {
+    grid-template-columns: minmax(0, 1fr) min(58%, 720px);
+  }
+  .is-procurement.is-labor .timber-tools .timber-demo {
+    column-count: 1;
+  }
+  /* 지금 할 일 · 품질 흐름 · 진행 — 한지 띠 */
+  .is-procurement.is-labor .site-column {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .is-procurement.is-labor .site-column > * {
+    margin: 0;
+    padding: 12px 16px;
+    border: 1px solid var(--hanji-line);
+    border-radius: 6px;
+    background: rgb(239 230 210 / 94%);
+    color: var(--meok);
+    box-shadow: 0 2px 8px rgb(24 18 14 / 25%);
+  }
+  .is-procurement.is-labor .site-column h3 {
+    font: 700 var(--hud-t1) / 1.3 var(--font-title);
+  }
+  .is-procurement.is-labor .site-column .hint {
+    color: var(--meok-sub);
+  }
+  .is-procurement.is-labor .site-progress-grid {
+    grid-template-columns: 1fr;
+  }
+  .is-procurement.is-labor .site-progress-grid article,
+  .is-procurement.is-labor .site-guide-tasks article,
+  .is-procurement.is-labor .quality-bin {
+    background: var(--hanji-deep);
+    border-color: var(--hanji-line);
+    color: var(--meok);
+  }
+  .is-procurement.is-labor .site-progress-grid h4 {
+    color: var(--jjok);
+  }
+  .is-procurement.is-labor .site-column progress {
+    accent-color: var(--jjok);
+  }
+}
+
+/* ═══ 조달(목재 고르기): 섬 위에 가운데 창 하나 · 잘림 없이 · 두 단 (2026-11-18 "가운데 띄우라고 했는데") ═══ */
+@media (min-width: 761px) {
+  .is-procurement.is-timber .play-workspace.has-tools {
+    position: static;
+    display: block;
+    inset: auto;
+  }
+  .is-procurement.is-timber .play-scene {
+    position: fixed;
+    inset: 0;
+    height: auto;
+    overflow: visible;
+    background: none;
+    border-radius: 0;
+  }
+  .is-procurement.is-timber .scene-viewport {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+  }
+  .is-procurement.is-timber .scene-heading,
+  .is-procurement.is-timber .scene-footer,
+  .is-procurement.is-timber .play-scene > .selection-actions {
+    display: none;
+  }
+  .is-procurement.is-timber .workspace-tools.timber-tools {
+    position: fixed;
+    z-index: 20;
+    inset: auto;
+    left: 50%;
+    top: calc(76px + (100vh - 88px) / 2);
+    transform: translate(-50%, -50%);
+    width: min(1080px, calc(100vw - 64px));
+    max-height: calc(100vh - 88px);
+    overflow: hidden;
+    padding: 0;
+  }
+  .is-procurement .timber-tools .timber-demo {
+    column-count: auto;
+  }
+  .is-procurement .timber-demo .timber-heading {
+    margin: 0 0 16px;
+    padding: 0 0 12px;
+    border-bottom: 1px solid var(--hanji-line);
+  }
+  .is-procurement .timber-demo .timber-heading .g-knob--close {
+    position: static;
+    width: 44px;
+    height: 44px;
+  }
+}
+.tm-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 0 32px;
+  align-items: start;
+}
+.tm-left {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.tm-right {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+}
+.tm-left > *,
+.tm-right > * {
+  margin: 0;
+}
+.tm-left .hint,
+.tm-goal {
+  font-size: var(--hud-t2, 15px);
+  line-height: 1.6;
+  color: var(--meok-sub);
+}
+/* 상황판: 한 줄에 하나, 시작선 같게 */
+.tm-left .timber-status {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-block: 1px solid var(--hanji-line);
+  font-size: 15px;
+}
+.tm-left .timber-status > * {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tm-left .timber-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* 제안 A·B: 같은 칸 높이 · 같은 줄 · 칸 밖으로 안 나감 */
+.tm-right .timber-offers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+.tm-right .timber-offer {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr auto;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--hanji-line);
+  border-radius: 6px;
+  background: var(--hanji-deep, #e2d5bc);
+}
+.tm-right .timber-offer h3 {
+  margin: 0;
+  font: 700 16px / 1.3 var(--font-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tm-right .offer-trade {
+  display: grid;
+  grid-template-columns: auto auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+}
+.tm-right .offer-trade .offer-time {
+  justify-self: end;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--meok-sub);
+}
+.tm-right .offer-tag {
+  justify-self: start;
+  margin: 0;
+}
+.tm-right .offer-facts {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 14px;
+  align-content: start;
+}
+.tm-right .offer-facts dt {
+  color: var(--meok-sub);
+}
+.tm-right .offer-facts dd {
+  margin: 0;
+  min-width: 0;
+}
+.tm-right .timber-offer > button {
+  width: 100%;
+  margin: 0;
+}
+.tm-right .tm-contract {
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+}
+.tm-right .timber-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tm-right .timber-controls button {
+  margin: 0;
+}
+.tm-right details {
+  font-size: 14px;
+}
+.tm-right details summary {
+  color: var(--meok-sub);
+  cursor: pointer;
+}
+.tm-right [data-testid="timber-save-status"]:empty {
+  display: none;
+}
+
+/* ═══ 일손 배치: 오른쪽 판은 탭으로 한 덩어리씩 ═══ */
+@media (min-width: 761px) {
+  .is-procurement.is-labor .workspace-tools.timber-tools {
+    z-index: 6;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 36px solid transparent;
+    border-image: url(/ui/kit/board_frame.png) 175 fill / 44px / 8px stretch;
+  }
+  .is-procurement.is-labor .workspace-tools .timber-demo {
+    border: 0;
+    border-image: none;
+    padding: 0;
+    background: none;
+  }
+  .g-tabs {
+    display: flex;
+    gap: 4px;
+    margin: -8px 0 12px;
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--hanji-line);
+  }
+  .g-tab {
+    flex: 1;
+    min-height: 36px;
+    padding: 0 8px;
+    border: 1px solid var(--hanji-line);
+    border-radius: 6px 6px 0 0;
+    background: var(--hanji-deep);
+    color: var(--meok-sub);
+    box-shadow: none;
+    font: 600 14px / 1 var(--font-body);
+  }
+  .g-tab[aria-pressed="true"] {
+    background: var(--jjok);
+    border-color: var(--jjok);
+    color: var(--hanji);
+  }
+  /* 탭별로 보이는 덩어리 (머리 줄은 늘) */
+  .is-labor .labor-demo > * {
+    display: none;
+  }
+  .is-labor .labor-demo > .timber-heading {
+    display: flex;
+    margin: 0 0 12px;
+  }
+  .is-labor .labor-demo .timber-heading .eyebrow {
+    display: none;
+  }
+  .labor-tab-work .labor-demo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px 24px;
+    align-content: start;
+  }
+  .labor-tab-work .labor-demo > .timber-heading {
+    grid-column: 1 / -1;
+  }
+  .labor-tab-work .labor-demo > .timber-status,
+  .labor-tab-work .labor-demo > .timber-status + .timber-controls,
+  .labor-tab-work .labor-demo > .labor-tasks {
+    display: grid;
+    grid-column: 1;
+    margin: 0;
+  }
+  .labor-tab-work .labor-demo > .crew-board {
+    display: block;
+    grid-column: 2;
+    grid-row: 2 / span 3;
+    margin: 0;
+  }
+  .labor-tab-request .labor-demo > section[aria-label="확장 체험 목재 요청"] {
+    display: block;
+    column-count: 2;
+    column-gap: 24px;
+  }
+  .labor-tab-request
+    .labor-demo
+    > section[aria-label="확장 체험 목재 요청"]
+    > * {
+    break-inside: avoid;
+  }
+  .labor-tab-report .labor-demo > .quality-report {
+    display: block;
+    column-count: 2;
+    column-gap: 24px;
+  }
+  .labor-tab-save .labor-demo > section + .timber-controls,
+  .labor-tab-save .labor-demo > details,
+  .labor-tab-save .labor-demo > p {
+    display: block;
+    margin: 0 0 12px;
+  }
+  /* 지금 할 일 한 띠 · '현장' 탭이면 현장 진행을 띄움 */
+  .is-labor .site-column > .quality-flow,
+  .is-labor .site-column > .site-progress {
+    display: none;
+  }
+  .is-labor .site-guide > :not(.site-progress-heading, p:not(.hint), progress) {
+    display: none;
+  }
+  .is-labor .site-guide .site-progress-heading button {
+    display: none;
+  }
+  .is-procurement.is-labor.labor-tab-site .site-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-content: start;
+  }
+  .is-labor.labor-tab-site .site-column > .site-guide {
+    display: none;
+  }
+  .is-labor.labor-tab-site .site-column > .quality-flow,
+  .is-labor.labor-tab-site .site-column > .site-progress {
+    display: block;
+    overflow: hidden;
+  }
+}
+/* 목재 창: 위 막대와 콘솔 사이에 쏙 — 아래 접힘 두 줄은 한 줄로 */
+.tm-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+.tm-right > * {
+  width: 100%;
+}
+.tm-right > details {
+  width: auto;
+}
+@media (min-width: 761px) {
+  .is-procurement.is-timber .workspace-tools.timber-tools {
+    top: calc(64px + (100vh - 254px) / 2);
+    max-height: calc(100vh - 254px - 16px);
+  }
+  .is-procurement .timber-demo .timber-heading {
+    margin: 0 0 12px;
+    padding: 0 0 8px;
+  }
+}
+/* 일손 배치 탭 다듬기: 한 사람 한 줄 · 조작 단추 2×2 · 진행 카드는 왼쪽 아래 */
+@media (min-width: 761px) {
+  .is-labor .crew-board {
+    margin: 0;
+    padding: 4px 12px;
+    border-color: var(--hanji-line);
+    border-radius: 6px;
+  }
+  .is-labor .crew-board legend {
+    font: 600 14px / 1.3 var(--font-body);
+    color: var(--meok-sub);
+  }
+  .is-labor .crew-row {
+    grid-template-columns: 52px 44px minmax(0, 1fr) 92px;
+    gap: 8px;
+    padding: 6px 0;
+    border-color: var(--hanji-line);
+  }
+  .is-labor .crew-row strong,
+  .is-labor .crew-row > span {
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .is-labor .crew-choice select {
+    padding: 4px 6px;
+    font-size: 14px;
+  }
+  .is-labor .crew-row button {
+    padding: 6px 4px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .labor-tab-work .labor-demo > .timber-status {
+    gap: 2px 16px;
+    grid-template-columns: auto auto;
+    font-size: 14px;
+  }
+  .labor-tab-work .labor-demo > .timber-status + .timber-controls {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    align-items: center;
+  }
+  .labor-tab-work .labor-demo > .timber-status + .timber-controls button {
+    min-height: 36px;
+    padding: 4px 8px;
+    font-size: 13px;
+    margin: 0;
+  }
+  .labor-tab-work .labor-demo > .labor-tasks {
+    gap: 8px;
+  }
+  .is-labor .labor-task {
+    padding: 8px 12px;
+    border-color: var(--hanji-line);
+    border-radius: 6px;
+    background: var(--hanji-deep);
+  }
+  .is-labor .labor-task h3 {
+    font-size: 14px;
+    margin: 0 0 4px;
+  }
+  .is-labor .labor-task p {
+    font-size: 13px;
+    margin: 2px 0;
+  }
+  .labor-tab-work .labor-demo > .crew-board {
+    grid-row: 2 / span 3;
+    align-self: start;
+  }
+  /* 요청 탭: 불량 처리 선택도 함께 */
+  .labor-tab-request .labor-demo > .exchange-panel {
+    display: block;
+    margin: 0 0 12px;
+  }
+}
+/* 요청 탭: 왼쪽 물량 · 오른쪽 비교표 (표 머리칸이 세로로 꺾이지 않게) */
+@media (min-width: 761px) {
+  .labor-tab-request .labor-demo > section[aria-label="확장 체험 목재 요청"] {
+    display: grid;
+    column-count: auto;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 8px 24px;
+    align-content: start;
+  }
+  .labor-tab-request
+    section[aria-label="확장 체험 목재 요청"]
+    > :not(.quality-offers) {
+    grid-column: 1;
+    margin: 0;
+  }
+  .labor-tab-request
+    section[aria-label="확장 체험 목재 요청"]
+    > .quality-offers {
+    grid-column: 2;
+    grid-row: 1 / span 6;
+    margin: 0;
+  }
+  .labor-tab-request .labor-stock {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    font-size: 13px;
+  }
+  .labor-tab-request .quality-offers h4 {
+    margin: 0 0 4px;
+    font-size: 15px;
+  }
+  .labor-tab-request .quality-offers .hint,
+  .labor-tab-request .quality-table-scroll > :not(table) {
+    display: none;
+  }
+  .labor-tab-request .quality-offers table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .labor-tab-request .quality-offers th:first-child,
+  .labor-tab-request .quality-offers td:first-child {
+    width: 84px;
+  }
+  .labor-tab-request .quality-offers th,
+  .labor-tab-request .quality-offers td {
+    padding: 5px 6px;
+    writing-mode: horizontal-tb;
+    word-break: keep-all;
+    border-bottom: 1px solid var(--hanji-line);
+    vertical-align: middle;
+  }
+  .labor-tab-request .quality-offers td button {
+    width: 100%;
+    padding: 6px 4px;
+    font-size: 13px;
+    margin: 0;
+  }
+  .labor-tab-request .quality-offers > p {
+    margin: 6px 0 0;
+    font-size: 13px;
+  }
+  /* 현장 탭: 품질 흐름 · 작업 진행을 작게 */
+  .is-labor.labor-tab-site .site-column {
+    font-size: 13px;
+    gap: 12px;
+  }
+  .is-labor.labor-tab-site .site-column h3 {
+    font-size: 15px;
+    margin: 0 0 6px;
+  }
+  .is-labor.labor-tab-site .site-column .hint {
+    display: none;
+  }
+  .is-labor.labor-tab-site .site-progress-grid article {
+    padding: 6px 8px;
+  }
+  .is-labor.labor-tab-site .site-progress-grid p {
+    margin: 2px 0;
+  }
+  .is-labor.labor-tab-site .quality-bin {
+    padding: 4px 6px;
+  }
+}
+@media (min-width: 761px) {
+  .is-procurement.is-labor.labor-tab-site .site-column {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .is-labor.labor-tab-site .site-progress-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .is-labor.labor-tab-site .site-column > * {
+    padding: 10px 12px;
+  }
+  .is-labor.labor-tab-site .quality-bins {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .labor-tab-work .labor-demo > .timber-heading {
+    margin: 0 0 8px;
+  }
+}
+/* 현장 정보는 일손 판 안에서 (장면 겹침 순서 때문에 판 뒤로 숨던 문제) */
+@media (min-width: 761px) {
+  .is-labor .workspace-tools > .g-tabs {
+    order: 0;
+  }
+  .is-labor .workspace-tools > .labor-demo {
+    order: 1;
+  }
+  .is-labor .workspace-tools > .site-column {
+    order: 2;
+  }
+
+  .is-labor.labor-tab-site .site-column > * {
+    box-shadow: none;
+  }
+}
+@media (min-width: 761px) {
+  /* 한지 위에서 읽히게: 어두운 판용 연노랑 글자 → 낙관 빨강 */
+  .is-labor .site-column .progress-reason {
+    color: var(--nakgwan);
+  }
+}
+
+/* ═══ 프로스트펑크 톤 (2026-11-18): 차가운 하늘 · 서리 낀 화면 가장자리 · 눈 쌓인 막대 ═══ */
+@media (min-width: 761px) {
+  /* 하늘: 보랏빛 먹 → 푸른 잿빛 */
+  .play-scene::before {
+    filter: brightness(calc(var(--daylight, 1) * 0.82)) saturate(0.45)
+      hue-rotate(-22deg) contrast(1.08);
+  }
+  .g-frost {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: url(/ui/kit/frost_vignette.webp) center / 100% 100% no-repeat;
+    opacity: 0.5;
+    mix-blend-mode: screen;
+  }
+  .g-frost-edge {
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    height: 60px;
+    pointer-events: none;
+    background: url(/ui/kit/frost_edge.webp) 0 0 / auto 60px repeat-x;
+    filter: drop-shadow(0 2px 2px rgb(10 20 40 / 35%));
+  }
+  .g-frost-edge--top {
+    top: 44px;
+  }
+  /* 따뜻한 한지는 그대로 두되 차가운 빛을 한 겹 — 차가운 세상과 따로 놀지 않게 */
+  .g-console__info,
+  .play-header .g-top__frame {
+    filter: saturate(0.85) brightness(0.96);
+  }
+}
+@media (min-width: 761px) {
+  /* 고드름은 짧고 옅게, 콘솔은 쌓인 눈 띠만 (장식 줄처럼 보이지 않게) */
+  .g-frost-edge--top {
+    top: 48px;
+    height: 40px;
+    background-size: auto 40px;
+    opacity: 0.7;
+    background-position: 37% 0;
+  }
+  .g-frost {
+    opacity: 0.42;
+  }
+}
+
+/* ═══ 하단 콘솔 = 고른 것 전용 (2026-11-18): 안 고르면 지도만 · 고르면 초상·이름·역할 + 큰 명령판 ═══ */
+@media (min-width: 761px) {
+  /* 늘 쓰는 저장·설정: 위 막대 아래 왼쪽 */
+  .g-topcmd {
+    position: fixed;
+    z-index: 5;
+    top: 70px;
+    left: 16px;
+    display: flex;
+    gap: 8px;
+  }
+  .g-topcmd .g-cmd {
+    width: 44px;
+    height: 44px;
+    padding: 4px;
+    display: grid;
+    place-items: center;
+    border: 6px solid var(--jjok-deep);
+    border-image: url(/ui/kit/btn.png) 56 fill / 8px / 2px stretch;
+    background: var(--jjok);
+    color: var(--hanji);
+  }
+  .g-topcmd .g-cmd img {
+    width: 26px;
+    height: 26px;
+  }
+  .g-topcmd .g-cmd .g-hotkey {
+    display: none;
+  }
+  .fps-badge,
+  .g-fps {
+    top: 122px;
+  }
+
+  /* 고른 게 없을 때: 지도 상자만 */
+  .g-console.is-idle {
+    right: auto;
+    width: 172px;
+    grid-template-columns: 132px;
+  }
+  .g-console.is-idle .g-console__frame img:not(:first-child) {
+    display: none;
+  }
+
+  /* 고른 게 있을 때: 정보는 가운데, 명령판은 오른쪽에 크게 (콘솔 위로 솟음) */
+  .g-console.is-selected {
+    grid-template-columns: 132px minmax(0, 1fr) 300px;
+  }
+  .g-console.is-selected .g-console__info {
+    display: flex;
+    align-items: stretch;
+    gap: 20px;
+    padding: 2px 8px;
+  }
+  .g-console.is-selected .play-menu.g-console__cmd {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    width: 300px;
+    height: 300px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 6px;
+    padding: 26px;
+    border: 26px solid transparent;
+    border-image: url(/ui/kit/board_frame.png) 175 fill / 32px / 4px stretch;
+    filter: drop-shadow(0 -6px 12px rgb(0 0 0 / 35%));
+    box-sizing: border-box;
+  }
+  .g-console.is-selected .play-menu.g-console__cmd .g-cmd {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    justify-items: center;
+    align-items: center;
+    gap: 2px;
+    width: auto;
+    height: auto;
+    padding: 6px 2px 4px;
+    border-width: 6px;
+    border-image-width: 9px;
+  }
+  .g-console.is-selected .g-cmd img {
+    width: 34px;
+    height: 34px;
+  }
+  /* 이름을 아이콘 아래에 보이게 (전에는 숨김) */
+  .g-console.is-selected .g-cmd span:not(.g-hotkey) {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    font: 600 12px / 1.15 var(--font-body);
+    color: var(--hanji);
+    white-space: nowrap;
+    text-align: center;
+  }
+  .g-console.is-selected .g-cmd:disabled {
+    opacity: 0.45;
+    filter: grayscale(0.7);
+  }
+  .g-cmd--empty {
+    border: 1px dashed rgb(239 230 210 / 18%);
+    border-radius: 4px;
+  }
+}
+@media (min-width: 761px) {
+  /* 9칸은 모두 같은 크기, 빈 칸은 점선 자리만 */
+  .g-console.is-selected .play-menu.g-console__cmd > * {
+    align-self: stretch;
+    justify-self: stretch;
+    min-height: 0;
+    min-width: 0;
+  }
+  .g-console.is-selected .play-menu.g-console__cmd .g-cmd--empty {
+    display: block;
+    padding: 0;
+    background: none;
+    border: 1px dashed rgb(43 38 32 / 25%);
+    border-image: none;
+    border-radius: 6px;
+  }
+}
+
+/* 2026-11-18 사용자: 건물을 누르면 하단은 짧게 — 지도 · 이름+설명 · 명령 9칸(예전 크기, 콘솔 안) */
+@media (min-width: 761px) {
+  .g-console.is-selected {
+    right: auto;
+    width: min(720px, calc(100vw - 32px));
+    grid-template-columns: 132px minmax(0, 1fr) 132px; /* 예전 명령판 칸(132px) 그대로 */
+  }
+  /* 짧은 콘솔: 틀은 왼쪽 끝 · 늘어나는 가운데 · 오른쪽 끝(명령판 자리)만 — 가운데 장식이 9칸 밑으로 들어가지 않게 */
+  .g-console.is-selected .g-console__frame img:nth-child(3),
+  .g-console.is-selected .g-console__frame img:nth-child(4) {
+    display: none;
+  }
+  .g-console.is-selected .g-sel {
+    grid-template-columns: minmax(0, 1fr);
+    display: grid;
+    align-content: center;
+    gap: 6px;
+    padding: 0 4px;
+    min-width: 0;
+  }
+  .g-sel h2 {
+    margin: 0;
+    font: 700 20px / 1.2 var(--font-title);
+    color: var(--meok);
+  }
+  .g-sel > p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--meok-sub);
+    word-break: keep-all;
+    text-wrap: pretty;
+  }
+  .g-sel .g-sel__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    font-size: 12px;
+    color: var(--meok-sub);
+    opacity: 0.8;
+  }
+  /* 명령판: 위로 솟은 큰 판 → 콘솔 오른쪽 칸 안에 예전 크기로 */
+  .g-console.is-selected .play-menu.g-console__cmd {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-image: none;
+    filter: none;
+  }
+  .g-console.is-selected .play-menu.g-console__cmd {
+    gap: 3px;
+    padding: 1px;
+  }
+  .g-console.is-selected .play-menu.g-console__cmd .g-cmd {
+    display: flex;
+    padding: 0;
+    border-width: 5px;
+    border-image-width: 8px;
+  }
+  .g-console.is-selected .g-cmd img {
+    width: 26px;
+    height: 26px;
+  }
+  /* 이름은 마우스를 올리면(title)·화면 낭독기로 — 칸 안에는 아이콘만 */
+  .g-console.is-selected .g-cmd span:not(.g-hotkey) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .g-console.is-selected .play-menu.g-console__cmd .g-cmd--empty {
+    visibility: hidden;
+  }
+}
+
+/* 자동 테스트에서만(App.tsx E2E_ALL): 일손 판 탭·현장 칸을 모두 펼침 */
+.e2e-all .labor-demo > *,
+.e2e-all .site-column > *,
+.e2e-all .site-guide > :not([hidden]),
+.e2e-all .site-guide .site-progress-heading button {
+  display: block !important;
+}
+@media (max-width: 760px) {
+  /* 데스크톱에서는 바깥 작업 메뉴가 스크롤을 맡는다. */
+  .e2e-all .labor-demo,
+  .e2e-all .site-column {
+    overflow: auto !important;
   }
 }

@@ -6,7 +6,8 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 30_000 },
   use: {
-    actionTimeout: 30_000,
+    // 깎은 건물 13종·공용 텍스처로 소프트웨어 렌더러 첫 로딩이 약 20초 → 첫 조작에 여유
+    actionTimeout: 60_000,
     baseURL: "http://127.0.0.1:5173",
     headless: true,
     launchOptions: {

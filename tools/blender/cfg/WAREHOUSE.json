@@ -1,0 +1,9 @@
+{
+  "name": "warehouse",
+  "roof": ["tile", "cap"],
+  "patchy": true,
+  "props": [
+    { "type": "lantern", "x": 0.55, "y": -0.85, "z": 1.95 },
+    { "type": "sacks", "x": -2.7, "y": -2.3, "n": 4 }
+  ]
+}

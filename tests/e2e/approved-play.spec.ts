@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { press } from "./labor-tabs.js";
 import { clickExample } from "./scene-picking.js";
 
 async function ready(page: Page) {
@@ -31,34 +32,30 @@ test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저�
   for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"])
     await expect(stock(page, id)).toHaveText("120");
   await expect(stock(page, "RES_COAL")).toHaveText("60");
-  await page.getByRole("button", { name: "1일 진행", exact: true }).click();
+  await press(page, "1일 진행");
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
   for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"])
     await expect(stock(page, id)).toHaveText("100");
   await saveMenu(page);
-  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
+  await press(page, "게임 저장");
   await expect(page.getByTestId("play-save-status")).toHaveText(
     "게임을 저장했습니다.",
   );
-  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
-  await page.getByRole("button", { name: "1일 진행", exact: true }).click();
+  await press(page, "저장 닫기");
+  await press(page, "1일 진행");
   await expect(stock(page)).toHaveText("80");
   await saveMenu(page);
-  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
+  await press(page, "게임 저장");
   await expect(page.getByTestId("play-save-status")).toHaveText(
     "게임을 저장했습니다.",
   );
-  await page
-    .getByRole("button", { name: "이전 게임 불러오기", exact: true })
-    .click();
+  await press(page, "이전 게임 불러오기");
   await expect(stock(page)).toHaveText("100");
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
   await page.reload();
   await expect(stock(page)).toHaveText("120");
   await saveMenu(page);
-  await page
-    .getByRole("button", { name: "게임 불러오기", exact: true })
-    .click();
+  await press(page, "게임 불러오기");
   await expect(stock(page)).toHaveText("80");
   await expect(page.getByText("3일차", { exact: true })).toBeVisible();
   expect(
@@ -70,7 +67,7 @@ test("실제 Worker 시간이 흐르고 일시정지·탭 비활성 뒤 수동 �
   page,
 }) => {
   await ready(page);
-  await page.getByRole("button", { name: "게임 시작", exact: true }).click();
+  await press(page, "게임 시작");
   await expect(page.getByTestId("play-clock")).not.toHaveText(
     "생존 1일 · 00:00",
   );
@@ -79,11 +76,11 @@ test("실제 Worker 시간이 흐르고 일시정지·탭 비활성 뒤 수동 �
       Number((await stock(page).textContent())?.replaceAll(",", "")),
     )
     .toBeLessThan(120);
-  await page.getByRole("button", { name: "일시정지", exact: true }).click();
+  await press(page, "일시정지");
   const clock = await page.getByTestId("play-clock").textContent();
   await page.waitForTimeout(1200);
   await expect(page.getByTestId("play-clock")).toHaveText(clock ?? "");
-  await page.getByRole("button", { name: "게임 시작", exact: true }).click();
+  await press(page, "게임 시작");
   await page.evaluate(() => {
     Object.defineProperty(document, "hidden", {
       configurable: true,
@@ -111,19 +108,13 @@ test("식량 고갈 경고는 식성별로 한 번 표시하고 1일분 보충 �
 }) => {
   await ready(page);
   await tools(page);
-  await page
-    .getByRole("button", { name: "식량 고갈 검사", exact: true })
-    .click();
+  await press(page, "식량 고갈 검사");
   await expect(page.getByTestId("food-warnings").locator("p")).toHaveCount(3);
   for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"])
     await expect(stock(page, id)).toHaveText("0");
-  await page
-    .getByRole("button", { name: "식량 고갈 검사", exact: true })
-    .click();
+  await press(page, "식량 고갈 검사");
   await expect(page.getByTestId("food-warnings").locator("p")).toHaveCount(3);
-  await page
-    .getByRole("button", { name: "1일분 식량 복구", exact: true })
-    .click();
+  await press(page, "1일분 식량 복구");
   await expect(page.getByTestId("food-warnings")).toBeHidden();
   await expect(stock(page)).toHaveText("20");
   await expect(page.getByText("1일차", { exact: true })).toBeVisible();
@@ -134,15 +125,15 @@ test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존�
 }) => {
   await ready(page);
   await saveMenu(page);
-  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
+  await press(page, "게임 저장");
   await expect(page.getByTestId("play-save-status")).toHaveText(
     "게임을 저장했습니다.",
   );
   const before = await page.evaluate(() =>
     localStorage.getItem("dynosty.play.saves"),
   );
-  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
-  await page.getByRole("button", { name: "1일 진행", exact: true }).click();
+  await press(page, "저장 닫기");
+  await press(page, "1일 진행");
   await saveMenu(page);
   await expect(stock(page)).toHaveText("100");
   await page.evaluate(() => {
@@ -158,7 +149,7 @@ test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존�
       },
     });
   });
-  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
+  await press(page, "게임 저장");
   await expect(
     page.getByRole("region", { name: "생존 게임 저장" }).getByRole("alert"),
   ).toContainText("기존 기록은 유지");
@@ -172,9 +163,7 @@ test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존�
   await page.evaluate(() =>
     localStorage.setItem("dynosty.play.saves", "{broken"),
   );
-  await page
-    .getByRole("button", { name: "게임 불러오기", exact: true })
-    .click();
+  await press(page, "게임 불러오기");
   await expect(
     page.getByRole("region", { name: "생존 게임 저장" }).getByRole("alert"),
   ).toContainText("손상");
@@ -199,17 +188,16 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   await ready(page);
   expect(loaded.some((x) => x.endsWith("triceratops.json"))).toBe(true);
   expect(loaded.some((x) => x.endsWith("ondol-nest.json"))).toBe(true);
-  expect(loaded.some((x) => x.endsWith("BLD_NEST.glb"))).toBe(true);
-  expect(loaded.some((x) => x.endsWith("R02_Triceratops.glb"))).toBe(true);
+  // 블렌더로 깎은 판(_v2)을 먼저 씀
+  expect(loaded.some((x) => /BLD_NEST(_v2)?.glb$/.test(x))).toBe(true);
+  expect(loaded.some((x) => /R02_Triceratops(_v2)?.glb$/.test(x))).toBe(true);
   const canvas = page.locator("canvas");
   const idle = await canvas.screenshot();
   await expect
     .poll(async () => (await canvas.screenshot()).equals(idle))
     .toBe(false);
   await tools(page);
-  await page
-    .getByRole("button", { name: "3D 연결 예제 바꾸기", exact: true })
-    .click();
+  await press(page, "3D 연결 예제 바꾸기");
   await expect(page.getByTestId("scene-example-motion")).toHaveText(
     "걷기 표시",
   );
@@ -217,9 +205,7 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   await expect
     .poll(async () => (await canvas.screenshot()).equals(walk))
     .toBe(false);
-  await page
-    .getByRole("button", { name: "개발 도구 닫기", exact: true })
-    .click();
+  await press(page, "개발 도구 닫기");
   const box = await canvas.boundingBox();
   if (!box) throw new Error("캔버스 없음");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -256,7 +242,7 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
       Number(await page.getByTestId("camera-height").textContent()),
     )
     .toBeGreaterThan(0.8);
-  await page.getByRole("button", { name: "기본 시점", exact: true }).click();
+  await press(page, "기본 시점");
   await expect(page.getByTestId("camera-distance")).toHaveText("56.00");
   await expect(page.getByTestId("camera-angle")).toHaveText("54.00");
   await clickExample(page, "building");
@@ -269,14 +255,25 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
 test("대표 모델 요청 실패는 명확히 안내하고 대체 표시로 게임을 유지한다", async ({
   page,
 }) => {
-  await page.route("**/models/triceratops.json", (route) =>
-    route.fulfill({ status: 404, body: "missing" }),
-  );
+  let blockedWinterResident = false;
+  await page.route("**/models/residents/R02_Triceratops_v2.glb", (route) => {
+    blockedWinterResident = true;
+    return route.fulfill({ status: 404, body: "missing" });
+  });
   await ready(page);
-  await expect(page.getByRole("alert")).toContainText("대표 모델");
+  await expect.poll(() => blockedWinterResident).toBe(true);
+  await expect(page.getByRole("alert")).toHaveText(
+    "모델을 만들지 못해 연결 예제로 표시합니다.",
+  );
+  const resident = page.getByRole("button", {
+    name: "주민 예제 선택",
+    exact: true,
+  });
+  await resident.focus();
   const beforeScroll = await page.evaluate(() => scrollY);
-  await clickExample(page, "resident");
+  await page.keyboard.press("Enter");
   expect(await page.evaluate(() => scrollY)).toBe(beforeScroll);
+  await expect(resident).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByRole("region", { name: "선택 정보", exact: true }),
   ).toContainText("주민 예제");

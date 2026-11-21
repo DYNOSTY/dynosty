@@ -20,14 +20,14 @@ type Part = [
   number?,
 ];
 
-const WOOD = "#6b4f3c",
+const _WOOD = "#6b4f3c",
   DARK = "#3b2d26",
   STONE = "#77737a",
-  SNOW = "#e6e7ee",
-  REED = "#9a8a5a",
+  _SNOW = "#e6e7ee",
+  _REED = "#9a8a5a",
   CLOTH = "#34436a",
-  RED = "#8e3a33",
-  HIDE = "#a58a6a";
+  _RED = "#8e3a33",
+  _HIDE = "#a58a6a";
 // [모양, 크기(폭·높이·깊이), 위치(x·y·z), 색, 회전y]
 const MODELS: Record<string, Part[]> = {
   // 갈대나루·솔그늘·옛 제철터·돌등 사냥막은 건물 도감 GLB로 (village.addLandmark)
