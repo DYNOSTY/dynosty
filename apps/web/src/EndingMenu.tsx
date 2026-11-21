@@ -1,12 +1,12 @@
 import { CHAPTERS, type TimberState } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
-import { endingMusic } from "./campaign-scenes.js";
+import { filmMusic } from "./campaign-scenes.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import { listSlots, loadSlot, replayStage, writeSlot } from "./stage-replay.js";
 import "./main-menu.css";
 
-const films: [string, string][] = [
+const films: [keyof typeof filmMusic, string][] = [
   ["opening", "서막"],
   ["one", "1단계 · 복홀"],
   ["ending-1", "복홀의 성곽"],
@@ -43,11 +43,11 @@ export function EndingMenu({
     "menu" | "save" | "load" | "replay" | "films"
   >(initialView);
   const [slots, setSlots] = useState<Awaited<ReturnType<typeof listSlots>>>([]);
-  const [film, setFilm] = useState("");
+  const [film, setFilm] = useState<keyof typeof filmMusic | "">("");
   const { setGalleryMusic } = useAudio();
   useEffect(() => {
-    if (!Object.hasOwn(endingMusic, film)) return;
-    setGalleryMusic(endingMusic[film as keyof typeof endingMusic]);
+    if (!film) return;
+    setGalleryMusic(filmMusic[film]);
     return () => setGalleryMusic(null);
   }, [film, setGalleryMusic]);
   const [restartLevel, setRestartLevel] = useState<"normal" | "hard">(

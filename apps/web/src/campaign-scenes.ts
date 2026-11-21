@@ -259,7 +259,18 @@ export function villageAdvice(
     : "등불이 하나둘 켜지네. 주민 명단을 펴 봐. 오늘 잘 곳을 찾은 이들부터 같이 짚어 보자.";
 }
 
-export const endingMusic = {
+export const filmMusic = {
+  opening: "00",
+  one: "09",
+  "ending-1": "01",
+  two: "08",
+  "ending-2": "08",
+  three: "12",
+  "ending-3": "10",
+  escort: "13",
+  four: "11",
+  "ending-4": "04",
+  five: "14",
   hope: "A",
   escape: "B",
   "mechanical-late": "B",
@@ -328,7 +339,7 @@ export function campaignPage(s: TimberState): ScenePage {
       page.nextStage = 1;
       page.title = "별이 진 뒤, 복홀";
       page.clip = "opening";
-      page.music = "00";
+      page.music = filmMusic["opening"];
       line(
         "나르미",
         "운석이 떨어지기 전엔 고려 강가에 장이 섰대요. 아버진 그때 들은 소리를 아직도 흉내 내셨어요. 빈 수레가 다리를 건너는 소리요.",
@@ -346,7 +357,7 @@ export function campaignPage(s: TimberState): ScenePage {
     case "departure":
       page.title = "귀족들이 출문을 청했다";
       page.clip = "one";
-      page.music = "09";
+      page.music = filmMusic["one"];
       page.goal = `출문 전 · 주민 ${s.residents.length}명 · 자원별 10,000`;
       line(
         "가솔을 이끄는 귀족",
@@ -432,6 +443,7 @@ export function campaignPage(s: TimberState): ScenePage {
             "나르미",
             "마지막 수레에서 내린 분이 고른 어른의 장부를 알아보셨어요. 귀족들을 따라갔다 돌아온 집이에요. 이번엔 우리가 이야기를 들으러 갈까요?",
           );
+          page.music = filmMusic["ending-1"];
           complete("2단계로 넘어갈까요? · 다섯 마을로");
         } else {
           line(
@@ -545,7 +557,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     }
     case "roads": {
-      page.music = "08";
+      page.music = filmMusic["two"];
       page.goal = `교섭 회복 ${c.treaties.length} / 5`;
       page.key = "roads-" + c.treaties.length;
       const receipt = c.treaties.at(-1);
@@ -586,6 +598,7 @@ export function campaignPage(s: TimberState): ScenePage {
           "두 표를 포개서 보내시오. 잘못 받은 곳도, 못 받은 곳도 같이 보게.",
         );
       } else if (c.treaties.length === 5) {
+        page.music = filmMusic["ending-2"];
         complete("3단계로 넘어갈까요? · 도성으로");
         page.lineIllustration = {
           at: page.lines.length,
@@ -632,7 +645,7 @@ export function campaignPage(s: TimberState): ScenePage {
     }
     case "capital": {
       page.title = "쥬신 왕의 어전 · 도성 남문";
-      page.music = "10";
+      page.music = filmMusic["ending-3"];
       if (c.relief && convoyReady(s)) {
         page.key = "capital-ready";
         page.nextStage = "escort";
@@ -701,7 +714,7 @@ export function campaignPage(s: TimberState): ScenePage {
     }
     case "seal":
       page.clip = "three";
-      page.music = "12";
+      page.music = filmMusic["three"];
       page.title = "두 번 접힌 봉서";
       page.lineIllustration = {
         at: 0,
@@ -722,7 +735,7 @@ export function campaignPage(s: TimberState): ScenePage {
     case "escort":
       page.nextStage = 4;
       page.clip = "escort";
-      page.music = "13";
+      page.music = filmMusic["escort"];
       page.title = "길가에서 기다린 목진";
       line(
         "목진",
@@ -778,7 +791,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     case "winter":
       page.clip = "four";
-      page.music = "11";
+      page.music = filmMusic["four"];
       page.title = "밤새 식지 않은 그릇";
       page.goal = `혹한 ${Math.min(15, days)} / 15일`;
       line(
@@ -795,7 +808,7 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       break;
     case "thaw":
-      page.music = "04";
+      page.music = filmMusic["ending-4"];
       line(
         "장영실",
         "오늘은 얼음이 늘지 않았습니다. 저기 보세요. 나루 밑으로 물이 한 줄 갑니다.",
@@ -804,7 +817,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     case "summit":
       page.clip = "five";
-      page.music = "14";
+      page.music = filmMusic["five"];
       page.title = "두 그릇을 놓고";
       page.goal = "복홀에 들어온 이들의 첫 배급";
       line(
@@ -1081,7 +1094,7 @@ export function campaignPage(s: TimberState): ScenePage {
         page.resultQuote = quote;
       }
       page.key = c.beat + end;
-      page.music = endingMusic[end];
+      page.music = filmMusic[end];
       page.goal = c.beat === "ending" ? "결말 확인" : "캠페인 종료";
       page.title =
         end === "hope"
