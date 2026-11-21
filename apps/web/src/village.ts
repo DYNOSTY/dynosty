@@ -13,8 +13,6 @@ import {
 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
-import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
-import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
 import { CreateTorus } from "@babylonjs/core/Meshes/Builders/torusBuilder";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
@@ -22,6 +20,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
+import { type JigeLoad, wearJige } from "./jige.js";
 import {
   createMaterialLibrary,
   isGlowMaterial,
@@ -182,7 +181,10 @@ export function createVillage(
   type Hauler = {
     work: Vector3;
     store: Vector3;
-    prop: Mesh;
+    /** 등에 늘 지는 지게 (일꾼 노드에 붙임) */
+    rig: TransformNode;
+    /** 지게 위 짐 — 창고로 갈 때만 켬 */
+    prop: { setEnabled(on: boolean): void };
     state: "work" | "toStore" | "drop" | "toWork";
     timer: number;
   };
@@ -343,7 +345,7 @@ export function createVillage(
     if (role === "walk")
       walkers.push({ node, play: v.play, target: null, wait: r() * 2 });
     else if (role) {
-      role.prop.parent = node;
+      role.rig.parent = node;
       walkers.push({
         node,
         play: v.play,
@@ -365,53 +367,11 @@ export function createVillage(
   );
 
   // 등에 지는 짐 (모델 단위: 주민 0.5배 안에서 등 높이)
-  const propMat = (name: string, hex: string) => {
-    const m = new StandardMaterial(name, scene);
-    m.diffuseColor = Color3.FromHexString(hex);
-    m.specularColor = Color3.Black();
-    return m;
-  };
-  const makeProp = (kind: "plant" | "wood" | "fish") => {
-    const root = new Mesh(`carry-${kind}`, scene);
-    if (kind === "wood") {
-      const mat = propMat("carry-wood", "#7a5a40");
-      [-0.28, 0, 0.28].forEach((x, i) => {
-        const log = CreateCylinder(
-          `carry-log-${i}`,
-          { height: 1.6, diameter: 0.34, tessellation: 7 },
-          scene,
-        );
-        log.rotation.x = Math.PI / 2;
-        log.position.set(x, i === 1 ? 0.28 : 0, 0);
-        log.material = mat;
-        log.parent = root;
-      });
-    } else if (kind === "plant") {
-      const bundle = CreateCylinder(
-        "carry-fern",
-        {
-          height: 1.2,
-          diameterBottom: 0.9,
-          diameterTop: 0.15,
-          tessellation: 7,
-        },
-        scene,
-      );
-      bundle.material = propMat("carry-plant", "#5e7a4a");
-      bundle.parent = root;
-    } else {
-      const fish = CreateSphere(
-        "carry-fish",
-        { diameterX: 0.45, diameterY: 0.35, diameterZ: 1.3, segments: 6 },
-        scene,
-      );
-      fish.material = propMat("carry-fish-mat", "#9aa6ad");
-      fish.parent = root;
-    }
-    root.position.set(0, 1.75, -0.45);
-    root.setEnabled(false);
-    for (const m of root.getChildMeshes()) m.isPickable = false;
-    return root;
+  // 지게: 빈 지게는 늘 등에, 짐은 창고로 갈 때만 (jige.ts)
+  const makeProp = (kind: JigeLoad) => {
+    const j = wearJige(scene, kind, lib);
+    disposers.push(j.dispose);
+    return { rig: j.rig, prop: j };
   };
   // 일터 앞 자리(건물에서 마당 쪽으로 3.4m)
   const spot = (i: number) => {
@@ -439,7 +399,7 @@ export function createVillage(
           "Idle",
           1.3,
           2,
-          { work, store: store.clone(), prop: makeProp(haul[1]) },
+          { work, store: store.clone(), ...makeProp(haul[1]) },
         ),
       );
       return;
@@ -483,6 +443,9 @@ export function createVillage(
   };
   // 석탄 연기처럼 짙고 무겁게 (프로스트펑크 톤)
   const smokes: ParticleSystem[] = [];
+  const smokeBase = new Map<ParticleSystem, number>();
+  /** 화력(절약0.6·보통1·긴급1.4) × 연료 유무 → 굴뚝 연기 양 */
+  let smokeScale = 1;
   function addSmoke(at: Vector3, scale = 1) {
     const ps = new ParticleSystem(`smoke-${smokes.length}`, 110, scene);
     ps.particleTexture = puff;
@@ -505,6 +468,8 @@ export function createVillage(
     ps.emitRate = 10;
     ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     smokes.push(ps);
+    smokeBase.set(ps, ps.emitRate);
+    ps.emitRate = ps.emitRate * smokeScale;
     if (running) ps.start();
   }
 
@@ -662,6 +627,11 @@ export function createVillage(
     }
   }
 
+  function setHeat(scale: number) {
+    if (Math.abs(scale - smokeScale) < 0.01) return;
+    smokeScale = scale;
+    for (const ps of smokes) ps.emitRate = (smokeBase.get(ps) ?? 10) * scale;
+  }
   let running = false;
   function setRunning(value: boolean) {
     if (value === running) return;
@@ -802,6 +772,7 @@ export function createVillage(
 
   return {
     ready,
+    setHeat,
     entityVisual,
     /** 누른 조각이 마을 건물이면 LAYOUT 번호 */
     buildingForMesh(mesh: Node | null): number | null {

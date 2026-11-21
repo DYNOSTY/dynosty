@@ -15,6 +15,7 @@ import {
   parseExampleSave,
   parsePlaySave,
   setPlayPaused,
+  setZoneHeat,
   supplyFood,
   tickPlay,
 } from "@dynosty/game-core";
@@ -72,6 +73,11 @@ self.onmessage = (event: MessageEvent<GameCommand>) => {
           play = advancePlayMinutes(play, 1440);
         else if (command.type === "test-food")
           play = supplyFood(play, command.days);
+        else if (command.type === "set-heat")
+          play = {
+            ...play,
+            winter: setZoneHeat(play.winter, command.zone, command.heat),
+          };
         manualScene = false;
         lastTick = performance.now();
         publishPlay();

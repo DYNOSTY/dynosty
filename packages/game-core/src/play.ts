@@ -1,6 +1,12 @@
 import raw from "./game-data.json" with { type: "json" };
 import { isRecord } from "./save.js";
 import type { SceneEntity, SceneSnapshot } from "./scene.js";
+import {
+  createWinterState,
+  parseWinterState,
+  stepWinter,
+  type WinterState,
+} from "./winter.js";
 
 export type RuleSet = typeof raw;
 export type ResourceId = keyof RuleSet["resources"];
@@ -218,7 +224,13 @@ export interface PlayState {
   readonly unmet: Readonly<Record<FoodId, number>>;
   readonly optimism: number;
   readonly pessimism: number;
+  /** 절기·온돌·체온 (winter.ts) — 옛 저장에는 없어서 불러올 때 기본값으로 채움 */
+  readonly winter: WinterState;
+  /** 생산 분자 이월 (벌목 목재, food와 같은 고정 소수점) */
+  readonly work: { readonly woodCarry: number };
 }
+// 벌목장 B02 (온돌 UI v0.4 표): 정원6 · 목재18/일 → 1단계 초기 배치 4명 = 하루 12, 낮 9~18시에만
+export const LOGGING = { woodPerDay: 12, from: 9, to: 18 } as const;
 export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
   const r = parseRules(rules);
   const citizens: Citizen[] = [];
@@ -258,6 +270,8 @@ export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
     unmet: { RES_PLANT: 0, RES_MEAT: 0, RES_FISH: 0 },
     optimism: r.initial.optimism,
     pessimism: r.initial.pessimism,
+    winter: createWinterState(citizens.map((c) => c.id)),
+    work: { woodCarry: 0 },
   };
 }
 export function parsePlayState(
@@ -349,6 +363,21 @@ export function parsePlayState(
     unmet,
     optimism: value.optimism,
     pessimism: value.pessimism,
+    winter: (() => {
+      try {
+        return parseWinterState(
+          value.winter,
+          citizens.map((c) => c.id),
+        );
+      } catch {
+        fail();
+      }
+    })(),
+    work: (() => {
+      const w = isRecord(value.work) ? value.work : { woodCarry: 0 };
+      number(w.woodCarry, 0, Number.MAX_SAFE_INTEGER, true);
+      return { woodCarry: w.woodCarry };
+    })(),
   };
 }
 export function dailyFoodDemand(
@@ -383,6 +412,58 @@ export function advancePlayMinutes(
     unmet[id] += needed - used;
     if (!Number.isSafeInteger(unmet[id])) fail();
   }
+  // 절기·온돌·체온: 정시 경계에서 끊어 1시간 이하씩 (불때기 시간표가 시각마다 맞게)
+  let winter = state.winter;
+  let citizens = state.citizens;
+  let optimism = state.optimism;
+  let pessimism = state.pessimism;
+  let wDay = state.day;
+  let wMinute = state.minute;
+  let woodCarry = state.work.woodCarry;
+  const workMinutes = (LOGGING.to - LOGGING.from) * 60;
+  let left = minutes;
+  while (left > 0) {
+    const hour = Math.floor(wMinute / 60);
+    const logging = hour >= LOGGING.from && hour < LOGGING.to;
+    // 벌목 중에는 매분 난방 후 생산: 그 목재는 다음 분부터 연료로 쓸 수 있다.
+    const chunk = logging ? 1 : Math.min(left, 60 - (wMinute % 60));
+    const r = stepWinter({
+      winter,
+      day: wDay,
+      minute: wMinute,
+      minutes: chunk,
+      coal: resources.RES_COAL,
+      wood: resources.RES_WOOD,
+      // ponytail: 공사·연구 예약 목재 연결 전이라 0 — 예약 장부가 생기면 여기로 넘김
+      reservedWood: 0,
+      scale: AMOUNT_SCALE,
+      citizens,
+    });
+    winter = r.winter;
+    resources.RES_COAL -= r.coalUsed;
+    resources.RES_WOOD -= r.woodUsed;
+    if (r.deaths.length) {
+      const dead = new Set(r.deaths);
+      citizens = citizens.map((c) =>
+        dead.has(c.id) ? { ...c, alive: false } : c,
+      );
+    }
+    // 벌목: 일하는 시각에만 목재가 쌓임
+    if (logging) {
+      // ponytail: 벌목꾼 4명이 늘 일한다고 봄 — 일손 배치·부상과 연결되면 인원 비례로
+      const n = LOGGING.woodPerDay * AMOUNT_SCALE * chunk + woodCarry;
+      resources.RES_WOOD += Math.floor(n / workMinutes);
+      woodCarry = n % workMinutes;
+    }
+    pessimism = Math.min(100, Math.max(0, pessimism + r.pessimismDelta));
+    optimism = Math.min(100, Math.max(0, optimism + r.optimismDelta));
+    wMinute += chunk;
+    if (wMinute >= rules.time.minutesPerDay) {
+      wMinute -= rules.time.minutesPerDay;
+      wDay += 1;
+    }
+    left -= chunk;
+  }
   const elapsed = state.minute + minutes;
   const day = state.day + Math.floor(elapsed / rules.time.minutesPerDay);
   number(day, 1, 100_000, true);
@@ -393,6 +474,11 @@ export function advancePlayMinutes(
     resources,
     foodCarry: carry,
     unmet,
+    citizens,
+    optimism,
+    pessimism,
+    winter,
+    work: { woodCarry },
   };
 }
 export function tickPlay(

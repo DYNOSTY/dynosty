@@ -12,7 +12,10 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
+import { WOOD_AT } from "./fuelyard.js";
+import { wearJige } from "./jige.js";
 import { LOGGING_SITES } from "./layout.js";
+import { createMaterialLibrary } from "./materials.js";
 import { loadSceneAsset } from "./scene-assets.js";
 import {
   instantiate,
@@ -41,13 +44,27 @@ type Tree = {
   stump: number;
   logs: number[];
 };
-type Phase = "walk" | "chop" | "fall" | "settle" | "lie" | "rest" | "regrow";
+type Phase =
+  | "walk"
+  | "chop"
+  | "fall"
+  | "settle"
+  | "lie"
+  | "pickup"
+  | "haul"
+  | "unload"
+  | "rest"
+  | "regrow";
 type Site = {
   trees: Tree[];
   next: number;
   phase: Phase;
   t: number;
-  worker?: { node: TransformNode; play: (clip: string) => void };
+  worker?: {
+    node: TransformNode;
+    play: (clip: string) => void;
+    jige: { setEnabled(on: boolean): void };
+  };
   chips: ParticleSystem;
   puff: ParticleSystem;
 };
@@ -61,6 +78,7 @@ export function createLogging(opts: {
   worldRoot?: TransformNode;
 }) {
   const { scene, shadow, worldRoot } = opts;
+  const lib = createMaterialLibrary(scene);
   const r = rng(77);
   const pine = opts.makePine("logging-pine");
   const stump = opts.makeStump("logging-stump");
@@ -236,9 +254,10 @@ export function createLogging(opts: {
         const v = instantiate(asset, node, residentScale(file), shadow, 1.3, 2);
         for (const m of v.meshes) m.isPickable = false;
         giveAxe(node);
+        const jige = wearJige(scene, "wood", lib, node);
         v.play("Idle");
-        site.worker = { node, play: v.play };
-        disposers.push(v.dispose);
+        site.worker = { node, play: v.play, jige };
+        disposers.push(v.dispose, jige.dispose);
       },
     );
   });
@@ -250,6 +269,26 @@ export function createLogging(opts: {
     return p;
   }
 
+  // 장작 더미 앞 (더미 바깥쪽 1.2m)
+  const yardDrop = new Vector3(WOOD_AT.x + 1.2, 0, WOOD_AT.z);
+  yardDrop.y = elevation(yardDrop.x, yardDrop.z);
+  /** 목표까지 걷고 도착하면 true (도착 순간 site.t를 0으로) */
+  function walkTo(w: NonNullable<Site["worker"]>, goal: Vector3, dt: number) {
+    const to = goal.subtract(w.node.position);
+    to.y = 0;
+    const dist = to.length();
+    if (dist < 0.3) {
+      w.play("Idle");
+      return true;
+    }
+    w.play("Walk");
+    w.node.position.addInPlace(
+      to.normalize().scale(Math.min(dist, WALK_SPEED * 1.4 * dt)),
+    );
+    w.node.position.y = elevation(w.node.position.x, w.node.position.z);
+    w.node.rotation.y = Math.atan2(to.x, to.z);
+    return false;
+  }
   const FALL_MAX = Math.PI / 2 - 0.05;
   let running = false;
   function step(site: Site, dt: number) {
@@ -350,11 +389,37 @@ export function createLogging(opts: {
             t.pos.add(t.fall.scale(1.8 * t.s)).add(new Vector3(0, 0.3, 0)),
             20,
           );
-          site.next += 1;
           site.t = 0;
-          site.phase = site.next >= site.trees.length ? "rest" : "walk";
-          if (site.phase === "rest") w.play("Idle");
+          site.phase = "pickup";
         }
+        break;
+      }
+      case "pickup": {
+        // 통나무 가운데로 걸어가 지게에 얹음
+        const mid = t.pos.add(t.fall.scale(2 * t.s));
+        if (!walkTo(w, mid, dt)) break;
+        if (site.t < 1) break;
+        for (const li of t.logs) set(log, li, HIDE);
+        w.jige.setEnabled(true);
+        site.phase = "haul";
+        site.t = 0;
+        break;
+      }
+      case "haul": {
+        // 온돌 옆 장작 더미 앞까지 지고 감
+        if (!walkTo(w, yardDrop, dt)) break;
+        site.phase = "unload";
+        site.t = 0;
+        w.play("Idle");
+        break;
+      }
+      case "unload": {
+        if (site.t < 1.2) break;
+        w.jige.setEnabled(false);
+        emit(site.chips, yardDrop.add(new Vector3(0, 0.6, 0)), 10);
+        site.next += 1;
+        site.t = 0;
+        site.phase = site.next >= site.trees.length ? "rest" : "walk";
         break;
       }
       case "rest": {

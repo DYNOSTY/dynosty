@@ -50,6 +50,8 @@ export function ConsoleFrame() {
           className={i % 2 ? "grow" : ""}
         />
       ))}
+      {/* 짧은 콘솔(건물 선택)의 오른쪽 마감 — console_4 바깥 테두리만 잘라 냄 */}
+      <img src="/ui/kit/console_end.png" alt="" className="end" />
     </div>
   );
 }
@@ -61,6 +63,8 @@ type CmdProps = {
   onClick?: () => void;
   disabled?: boolean;
   pressed?: boolean;
+  /** 켜고 끄는 명령(화력 등)의 지금 상태 — aria-pressed */
+  toggled?: boolean | undefined;
   buttonRef?: React.Ref<HTMLButtonElement>;
   controls?: string;
 };
@@ -72,6 +76,7 @@ export function CmdButton({
   onClick,
   disabled,
   pressed,
+  toggled,
   buttonRef,
   controls,
 }: CmdProps) {
@@ -84,6 +89,7 @@ export function CmdButton({
       onClick={onClick}
       disabled={disabled}
       aria-expanded={pressed}
+      aria-pressed={toggled}
       aria-controls={controls}
       title={disabled ? `${label} · 규칙 준비 중` : `${label} (${hotkey})`}
     >
@@ -104,7 +110,11 @@ export function CmdFace({
     <>
       <img
         src={
-          icon === "close" ? "/ui/kit/knob_close.png" : `/ui/cmd/${icon}.png`
+          icon === "close"
+            ? "/ui/kit/knob_close.png"
+            : icon.startsWith("heat_")
+              ? `/ui/season/${icon}.png` // 화력 3단계: 아궁이 불 크기
+              : `/ui/cmd/${icon}.png`
         }
         alt=""
       />

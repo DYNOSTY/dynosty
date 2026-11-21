@@ -7,11 +7,15 @@ import type {
   SceneSnapshot,
 } from "@dynosty/game-core";
 import {
+  AMOUNT_SCALE,
+  type HeatLevel,
   type LaborState,
   laborScene,
   laborStock,
   type TimberState,
   timberScene,
+  winterReport,
+  ZONES,
 } from "@dynosty/game-core";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { BUILDINGS, type BuildingAction, commandGrid } from "./buildings.js";
@@ -31,11 +35,14 @@ import {
   saveLocalExample,
 } from "./local-save.js";
 import { MediaPanel } from "./MediaPanel.js";
+import { OndolStatus } from "./OndolStatus.js";
 import { PlayPanel } from "./PlayPanel.js";
 import { PlaySavePanel } from "./PlaySavePanel.js";
 import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { QualityFlow } from "./QualityFlow.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
+import { SeasonDial } from "./SeasonDial.js";
+import { type PanelVariant, SelectionCard } from "./SelectionCard.js";
 import { SelectionMeta } from "./SelectionPanel.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import { SiteGuide } from "./SiteGuide.js";
@@ -60,6 +67,12 @@ import { elevation, MAP_SPAN } from "./world.js";
 // 사람이 보는 화면에는 영향 없음 (탭 화면은 캡처로 따로 확인)
 const E2E_ALL =
   typeof navigator !== "undefined" && navigator.webdriver === true;
+// 건물 선택 창 시안 (?panel=a|b|c) — 없으면 지금의 지도+설명 / 오른쪽 아래 명령판
+const PANEL = ((v) => (v === "a" || v === "b" || v === "c" ? v : null))(
+  typeof location !== "undefined"
+    ? new URLSearchParams(location.search).get("panel")
+    : null,
+) as PanelVariant | null;
 
 export function App() {
   const [laborOpen, setLaborOpen] = useState(false);
@@ -449,6 +462,43 @@ export function App() {
 
   // 게임 시작 → 주민이 걷고 연기가 남, 시각에 맞춰 낮밤
   const running = playState ? !playState.paused && !timberOpen : false;
+  // 절기·혹한 → 3D(눈발·시야·연기)와 서리 테두리 두께
+  const winterNow = playState
+    ? winterReport(
+        playState.winter,
+        playState.day,
+        playState.minute,
+        playState.citizens,
+      )
+    : null;
+  const nestZone = winterNow?.zones.find((z) => z.id === "nest");
+  const heatScale = nestZone
+    ? { 절약: 0.6, 보통: 1, 긴급: 1.4 }[nestZone.heat]
+    : 1;
+  const coalNow = playState
+    ? Math.floor(playState.resources.RES_COAL / AMOUNT_SCALE)
+    : null;
+  const woodNow = playState
+    ? Math.floor(playState.resources.RES_WOOD / AMOUNT_SCALE)
+    : null;
+  useEffect(() => {
+    if (coalNow !== null && woodNow !== null)
+      sceneRef.current?.setFuel(coalNow, woodNow);
+  }, [coalNow, woodNow]);
+  const weatherNow = winterNow?.weather;
+  const storageNow = nestZone?.storage;
+  useEffect(() => {
+    if (weatherNow === undefined || storageNow === undefined) return;
+    sceneRef.current?.setWinter({
+      weather: weatherNow,
+      heat: heatScale,
+      storage: storageNow,
+    });
+  }, [weatherNow, heatScale, storageNow]);
+  // 영하 10°부터 서리가 짙어져 영하 35°에 가장 두껍게
+  const frost = winterNow
+    ? Math.min(1, Math.max(0, (-winterNow.temp - 10) / 25))
+    : 0.5;
   useEffect(() => {
     if (sceneStatus === "준비 완료") sceneRef.current?.setRunning(running);
   }, [running, sceneStatus]);
@@ -493,15 +543,32 @@ export function App() {
     if (sceneStatus === "준비 완료")
       sceneRef.current?.setGameMinutes(gameMinutes);
   }, [gameMinutes, sceneStatus]);
+  // 시안 c: 고른 건물의 화면 위치를 따라가는 카드
+  const selAnchor = useRef<HTMLDivElement>(null);
+  const selPoint = (() => {
+    if (PANEL !== "c" || !selectedId) return null;
+    if (selectedId.startsWith("bld:")) {
+      const l = LAYOUT[Number(selectedId.slice(4))];
+      return l ? { x: l[1], z: l[2] } : null;
+    }
+    return { x: 0, z: -1 }; // 가운데 온돌
+  })();
+  const selKey = selPoint ? `${selPoint.x},${selPoint.z}` : "";
   useEffect(() => {
     if (sceneStatus !== "준비 완료") return;
+    const [sx, sz] = selKey ? selKey.split(",").map(Number) : [];
     sceneRef.current?.trackPoints(
-      SCOUT_SITES.map((site) => ({
-        id: site.id,
-        x: site.x,
-        y: elevation(site.x, site.z) + 9.5,
-        z: site.z,
-      })),
+      [
+        ...SCOUT_SITES.map((site) => ({
+          id: site.id,
+          x: site.x,
+          y: elevation(site.x, site.z) + 9.5,
+          z: site.z,
+        })),
+        ...(sx !== undefined && sz !== undefined
+          ? [{ id: "sel", x: sx, y: elevation(sx, sz) + 2.5, z: sz }]
+          : []),
+      ],
       (pos: Record<string, ScreenPoint>) => {
         // 3D 화면 칸 (위 막대·아래 콘솔 사이)
         const W = window.innerWidth,
@@ -510,6 +577,14 @@ export function App() {
           .querySelector(".g-quests")
           ?.getBoundingClientRect();
         for (const [id, pt] of Object.entries(pos)) {
+          if (id === "sel") {
+            const card = selAnchor.current;
+            if (card) {
+              card.style.left = `${pt.visible ? pt.x : -9999}px`;
+              card.style.top = `${pt.visible ? pt.y : -9999}px`;
+            }
+            continue;
+          }
           const el = pinRefs.current[id];
           if (!el) continue;
           if (id.startsWith("party:")) {
@@ -553,7 +628,7 @@ export function App() {
         }
       },
     );
-  }, [sceneStatus]);
+  }, [sceneStatus, selKey]);
   const timberReady = sceneStatus === "준비 완료";
   // 뜨는 창은 한 번에 하나: 새 창을 열면 나머지는 닫힘
   function closePopups() {
@@ -611,7 +686,11 @@ export function App() {
     if (action === "procure") openTimber();
     else if (action === "focus") sceneRef.current?.focusSelected();
     else if (action === "clear") clearSelection();
-    else if (action === "scout") {
+    else if (action.startsWith("heat-")) {
+      // 온돌 화력: 마을 모든 구역(둥지·재배소·쉼터·연구동·치료소)에 한 번에
+      const heat = action.slice(5) as HeatLevel;
+      for (const zone of ZONES) commandPlay({ type: "set-heat", zone, heat });
+    } else if (action === "scout") {
       // 아직 안 가 본 첫 거점의 정찰 창
       const next = SCOUT_SITES.find((site) => !scouts[site.id]);
       if (next) openOnly(() => setScoutOpen(next.id));
@@ -1162,9 +1241,14 @@ export function App() {
         <div className="g-backdrop" aria-hidden="true" onClick={closePopups} />
       ) : null}
       {/* 혹한 톤: 화면 가장자리 서리 · 위 막대 고드름 */}
-      <div className="g-frost" aria-hidden="true" />
+      <div
+        className="g-frost"
+        aria-hidden="true"
+        style={{ opacity: 0.25 + frost * 0.6 }}
+      />
       <div className="g-frost-edge g-frost-edge--top" aria-hidden="true" />
       <FpsBadge />
+      <SeasonDial state={playState} />
       {/* 늘 쓰는 저장·설정은 위쪽 왼편 (하단은 건물을 고를 때만) */}
       <nav className="g-topcmd" aria-label="게임 메뉴">
         <CmdButton
@@ -1181,7 +1265,7 @@ export function App() {
         </SettingsMenu>
       </nav>
       <section
-        className={`g-console${selection ? " is-selected" : " is-idle"}`}
+        className={`g-console${selection && !PANEL ? " is-selected" : " is-idle"}`}
         aria-label="명령 콘솔"
       >
         <ConsoleFrame />
@@ -1230,7 +1314,7 @@ export function App() {
           </button>
         </div>
         {/* 고른 것이 있을 때만: 왼쪽 초상·이름·역할 · 오른쪽 건물별 명령 9칸 */}
-        {selection ? (
+        {selection && !PANEL ? (
           <>
             <section className="g-console__info g-sel" aria-label="선택 정보">
               <h2>
@@ -1243,6 +1327,9 @@ export function App() {
                   ? BUILDINGS[selection.building]?.role
                   : "마을 주민. 일터와 둥지를 오가며 일합니다."}
               </p>
+              {selection.building === "BLD_ONDOL" && playState ? (
+                <OndolStatus state={playState} />
+              ) : null}
               <SelectionMeta entity={selectedEntity} />
             </section>
             <nav className="play-menu g-console__cmd" aria-label="건물 명령">
@@ -1258,6 +1345,12 @@ export function App() {
                       (cmd.action === "procure" && (!timberReady || timberOpen))
                     }
                     onClick={() => cmd.action && runAction(cmd.action)}
+                    toggled={
+                      cmd.action?.startsWith("heat-")
+                        ? playState?.winter.zones.nest.heat ===
+                          cmd.action.slice(5)
+                        : undefined
+                    }
                   />
                 ) : (
                   <span
@@ -1271,6 +1364,35 @@ export function App() {
           </>
         ) : null}
       </section>
+      {selection && PANEL ? (
+        <SelectionCard
+          variant={PANEL}
+          id={selection.building ?? "BLD_ONDOL"}
+          name={
+            selection.building
+              ? (BUILDINGS[selection.building]?.name ?? "건물")
+              : "트리케라톱스"
+          }
+          role={
+            selection.building
+              ? (BUILDINGS[selection.building]?.role ?? "")
+              : "마을 주민. 일터와 둥지를 오가며 일합니다."
+          }
+          commands={selection.grid}
+          state={playState}
+          onAction={runAction}
+          toggled={(action) =>
+            action?.startsWith("heat-")
+              ? playState?.winter.zones.nest.heat === action.slice(5)
+              : undefined
+          }
+          disabled={(cmd) =>
+            !cmd.action ||
+            (cmd.action === "procure" && (!timberReady || timberOpen))
+          }
+          anchorRef={selAnchor}
+        />
+      ) : null}
     </main>
   );
 }

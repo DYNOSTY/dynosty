@@ -5,6 +5,7 @@ import {
   type PlayCommand,
   type PlayState,
   RESOURCE_IDS,
+  winterReport,
 } from "@dynosty/game-core";
 import { useState } from "react";
 
@@ -110,6 +111,7 @@ export function PlayPanel({ state, error, busy, onCommand }: Props) {
             </strong>
           </div>
         ))}
+        <WarmthCard state={state} />
       </section>
       <p className="play-baseline-note">
         승인 개발 기준 v1 · {state.paused ? "일시정지" : "시간 진행 중"} · 1초 =
@@ -129,5 +131,47 @@ export function PlayPanel({ state, error, busy, onCommand }: Props) {
       ) : null}
       {error ? <p role="alert">{error}</p> : null}
     </section>
+  );
+}
+
+// 기획 화면정의 보조행 「보온」: 따뜻한 주민 수가 기본, 냉기·부상은 아이콘+숫자로 (색만으로 경고하지 않음)
+function WarmthCard({ state }: { state: PlayState }) {
+  const r = winterReport(state.winter, state.day, state.minute, state.citizens);
+  const p = r.people;
+  const alive = p.warm + p.exposed + p.injured + p.critical;
+  return (
+    <div
+      className="resource-card warmth-card"
+      title={`보온 · 따뜻 ${p.warm} · 냉기 노출 ${p.exposed} · 피난 ${p.sheltering} · 부상 ${p.injured} · 중상 ${p.critical} · 동사 ${p.dead}`}
+    >
+      <img
+        className="resource-icon"
+        src="/ui/season/warmth.png"
+        alt=""
+        width={32}
+        height={32}
+      />
+      <span className="resource-label">보온</span>
+      <strong data-testid="warmth-warm">
+        {p.warm}/{alive}
+      </strong>
+      {p.exposed + p.sheltering > 0 ? (
+        <span className="warmth-extra" data-testid="warmth-exposed">
+          <img
+            src="/ui/season/exposure.png"
+            alt="냉기"
+            width={22}
+            height={22}
+          />
+          {p.exposed}
+        </span>
+      ) : null}
+      {p.injured + p.critical > 0 ? (
+        <span className="warmth-extra" data-testid="warmth-injured">
+          <img src="/ui/season/injury.png" alt="부상" width={22} height={22} />
+          {p.injured + p.critical}
+        </span>
+      ) : null}
+    </div>
   );
 }

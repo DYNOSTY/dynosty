@@ -4424,3 +4424,465 @@ body,
     overflow: auto !important;
   }
 }
+
+/* ── 절기 시계 (위쪽 왼편 메달) · 기온·날씨 — 2026-11-19 절기·혹한 ── */
+.g-season {
+  position: fixed;
+  z-index: 5;
+  top: 62px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.g-season__dial {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  flex: none;
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / 45%));
+}
+.g-season__paint {
+  position: absolute;
+  inset: 22%;
+  width: 56%;
+  height: 56%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.g-season__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* 지금 절기 칸을 가리키는 바늘 (가운데 → 테두리 칸) */
+.g-season__hand {
+  position: absolute;
+  left: 50%;
+  top: 4%;
+  width: 4px;
+  height: 46%;
+  margin-left: -2px;
+  transform-origin: 50% 100%;
+  border-radius: 2px;
+  background: linear-gradient(var(--nakgwan, #b3322a) 0 34%, transparent 34%);
+  transition: transform 0.6s;
+}
+.g-season__hand::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid var(--nakgwan, #b3322a);
+  box-sizing: border-box;
+  background: rgb(179 50 42 / 18%);
+}
+.g-season__text {
+  display: grid;
+  gap: 2px;
+  padding: 8px 14px 8px 12px;
+  border-radius: 6px;
+  background: rgb(239 230 210 / 92%);
+  box-shadow:
+    0 0 0 1px var(--hanji-line),
+    0 3px 8px rgb(0 0 0 / 30%);
+  color: var(--meok);
+  min-width: 190px;
+}
+.g-season__text p {
+  margin: 0;
+  white-space: nowrap;
+}
+.g-season__term {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.g-season__term b {
+  font: 700 22px / 1.1 var(--font-title);
+}
+.g-season__term span {
+  font-size: 15px;
+  color: var(--meok-sub);
+}
+.g-season__term small {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--meok-sub);
+}
+.g-season__now {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+}
+.g-season__now strong {
+  margin-left: auto;
+  font: 700 22px / 1 var(--font-title);
+  font-variant-numeric: tabular-nums;
+}
+.g-season__next {
+  font-size: 13px;
+  color: var(--meok-sub);
+}
+/* 저장·설정·fps는 절기 시계 아래로 */
+@media (min-width: 761px) {
+  .g-topcmd {
+    top: 202px;
+  }
+  .fps-badge,
+  .g-fps {
+    top: 254px;
+  }
+}
+/* 보온 칸 */
+.warmth-card .warmth-extra {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* 온돌 상태 줄 */
+.g-sel .g-sel__ondol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--meok);
+}
+.g-sel__ondol b {
+  font-variant-numeric: tabular-nums;
+}
+/* 켜진 화력 */
+.g-cmd[aria-pressed="true"] {
+  outline: 3px solid var(--nakgwan, #b3322a);
+  outline-offset: -3px;
+}
+/* 좁은 화면: 절기 시계만 작게 (글 상자는 접음) */
+@media (max-width: 760px) {
+  .g-season {
+    top: 56px;
+    left: 8px;
+  }
+  .g-season__dial {
+    width: 64px;
+    height: 64px;
+  }
+  .g-season__text {
+    display: none;
+  }
+}
+
+/* 2026-11-19 사용자: 건물을 누르면 지도+이름·설명은 왼쪽에 붙고, 명령 9칸 상자는 화면 오른쪽 아래에 따로 */
+.g-console__frame img.end {
+  display: none;
+}
+@media (min-width: 761px) {
+  /* 글 길이만큼만 (최소 420 · 최대 640) — 빈 한지가 넓게 남지 않게 */
+  .g-console.is-selected {
+    width: max-content;
+    min-width: 420px;
+    max-width: min(640px, calc(100vw - 220px));
+    grid-template-columns: 132px minmax(240px, 420px);
+  }
+  .g-console.is-selected .g-console__frame img:nth-child(n + 3) {
+    display: none;
+  }
+  .g-console.is-selected .g-console__frame img.end {
+    display: block;
+    flex: none;
+    height: 100%;
+    width: auto;
+  }
+  /* 명령판: 오른쪽 끝 조각(기둥+상자)을 그대로 쓴 독립 상자, 화면 오른쪽 아래 */
+  .g-console.is-selected .play-menu.g-console__cmd {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    width: 171px;
+    height: 190px;
+    padding: 36px 19px 20px 20px;
+    box-sizing: border-box;
+    background: url(/ui/kit/console_4.png) right bottom / auto 100% no-repeat;
+    filter: drop-shadow(0 -4px 8px rgb(0 0 0 / 25%));
+  }
+}
+
+/* ═══ 건물 선택 창 시안 (2026-11-19, ?panel=a|b|c) ═══ */
+.sc {
+  position: fixed;
+  z-index: 6;
+  color: var(--meok);
+  word-break: keep-all;
+}
+.sc h2 {
+  margin: 0;
+  font: 700 22px / 1.2 var(--font-title);
+}
+.sc .sc-btn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 4px;
+  border: 6px solid var(--jjok-deep);
+  border-image: url(/ui/kit/btn.png) 56 fill / 10px / 2px stretch;
+  background: var(--jjok);
+  color: var(--hanji);
+  box-sizing: border-box;
+}
+.sc .sc-btn img {
+  width: 30px;
+  height: 30px;
+}
+.sc .sc-btn > span:not(.sc-btn__text):not(.g-hotkey) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.sc .sc-btn .g-hotkey {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 11px;
+}
+.sc .sc-btn:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+}
+.sc .sc-btn[aria-pressed="true"] {
+  outline: 3px solid var(--nakgwan, #b3322a);
+  outline-offset: -2px;
+}
+.sc-gauges {
+  display: grid;
+  gap: 6px;
+}
+.sc-gauge {
+  display: grid;
+  grid-template-columns: 64px 1fr 52px;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.sc-gauge b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sc-gauge__bar {
+  height: 10px;
+  border-radius: 5px;
+  background: rgb(43 38 32 / 15%);
+  box-shadow: inset 0 0 0 1px var(--hanji-line);
+  overflow: hidden;
+}
+.sc-gauge__bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #b5532a, #e8a04a);
+}
+.sc-gauge__bar.is-coal i {
+  background: linear-gradient(90deg, #2c2a2e, #5a5660);
+}
+.sc-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--meok-sub);
+}
+
+/* a 오른쪽 세로 카드 — 프로스트펑크·어게인스트 더 스톰 */
+.sc--card {
+  right: 16px;
+  top: 220px;
+  width: 360px;
+  padding: 0 22px 22px;
+  border: 28px solid transparent;
+  border-image: url(/ui/kit/panel_frame.png) 180 fill / 28px / 0 stretch;
+  box-sizing: border-box;
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 40%));
+}
+.sc-card__head {
+  position: relative;
+  margin: -6px -10px 12px;
+}
+.sc-card__head img {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--hanji-line);
+}
+.sc-card__head h2 {
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  color: var(--hanji);
+  text-shadow: 0 2px 6px rgb(0 0 0 / 80%);
+  font-size: 26px;
+}
+.sc-card__corner {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 6px;
+}
+.sc-card__corner .sc-btn {
+  width: 40px;
+  height: 40px;
+}
+.sc-card__corner .sc-btn img {
+  width: 22px;
+  height: 22px;
+}
+.sc-card__role {
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--meok-sub);
+  text-wrap: pretty;
+}
+.sc-sub {
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--hanji-line);
+  font: 600 14px / 1 var(--font-body);
+  color: var(--meok-sub);
+}
+.sc-card__actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.sc-card__actions .sc-btn.has-label {
+  width: 100%;
+  height: 76px;
+  grid-template-rows: 1fr auto;
+  gap: 2px;
+  padding: 6px 2px 4px;
+}
+.sc-btn__text {
+  font: 600 13px / 1.1 var(--font-body);
+  white-space: nowrap;
+}
+
+/* b 오른쪽 아래 초상 메달 — 문명 6 */
+.sc--medal {
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+.sc-medal__actions {
+  display: flex;
+  gap: 6px;
+  padding-right: 150px;
+}
+.sc-medal__body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 132px;
+  padding: 12px 150px 12px 20px;
+  border-radius: 66px 8px 8px 66px;
+  background: rgb(239 230 210 / 95%);
+  box-shadow:
+    0 0 0 2px var(--jjok-deep),
+    0 0 0 5px #c79a3a,
+    0 6px 14px rgb(0 0 0 / 40%);
+  min-width: 300px;
+  max-width: 460px;
+}
+.sc-medal__portrait {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 140px;
+  height: 140px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow:
+    0 0 0 4px #c79a3a,
+    0 0 0 8px var(--jjok-deep),
+    0 0 0 10px #b3322a,
+    0 6px 14px rgb(0 0 0 / 45%);
+}
+.sc-medal__text {
+  display: grid;
+  gap: 6px;
+}
+.sc-medal__text p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--meok-sub);
+}
+.sc-medal__close {
+  position: absolute;
+  top: -18px;
+  right: -6px;
+}
+.sc-medal__close .sc-btn {
+  width: 38px;
+  height: 38px;
+}
+
+/* c 건물 옆 카드 — 실록 */
+.sc--float {
+  left: -9999px;
+  top: -9999px;
+  width: 280px;
+  padding: 12px 14px 14px;
+  transform: translate(-50%, calc(-100% - 22px));
+  border-radius: 8px;
+  background: rgb(239 230 210 / 96%);
+  box-shadow:
+    0 0 0 1px var(--hanji-line),
+    0 0 0 3px rgb(43 38 32 / 55%),
+    0 8px 18px rgb(0 0 0 / 45%);
+}
+.sc--float::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  margin-left: -12px;
+  border: 12px solid transparent;
+  border-bottom: 0;
+  border-top-color: rgb(239 230 210 / 96%);
+}
+.sc-float__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sc-float__head .sc-btn {
+  width: 34px;
+  height: 34px;
+}
+.sc-float__role {
+  margin: 4px 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--meok-sub);
+}
+.sc-float__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}

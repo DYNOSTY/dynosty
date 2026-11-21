@@ -28,7 +28,12 @@ export type PlayCommand =
   | { readonly type: "pause"; readonly paused: boolean }
   | { readonly type: "advance-day" }
   | { readonly type: "new-game" }
-  | { readonly type: "test-food"; readonly days: number };
+  | { readonly type: "test-food"; readonly days: number }
+  | {
+      readonly type: "set-heat";
+      readonly zone: import("./winter.js").Zone;
+      readonly heat: import("./winter.js").HeatLevel;
+    };
 export type GameCommand =
   | { readonly type: "play-command"; readonly command: PlayCommand }
   | { readonly type: "request-play-save"; readonly requestId: number }
@@ -104,6 +109,7 @@ export {
   type FoodId,
   foodWarnings,
   GAME_RULES,
+  LOGGING,
   type OutcomeFacts,
   PlayDataError,
   type PlaySave,
@@ -119,3 +125,4 @@ export {
   tickPlay,
 } from "./play.js";
 export * from "./timber.js";
+export * from "./winter.js";
