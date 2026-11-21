@@ -444,7 +444,10 @@ export function advancePlayMinutes(
   const workMinutes = (LOGGING.to - LOGGING.from) * 60;
   let left = minutes;
   while (left > 0) {
-    const chunk = Math.min(left, 60 - (wMinute % 60));
+    const hour = Math.floor(wMinute / 60);
+    const logging = hour >= LOGGING.from && hour < LOGGING.to;
+    // 벌목 중에는 매분 난방 후 생산: 그 목재는 다음 분부터 연료로 쓸 수 있다.
+    const chunk = logging ? 1 : Math.min(left, 60 - (wMinute % 60));
     const r = stepWinter({
       winter,
       day: wDay,
@@ -466,9 +469,8 @@ export function advancePlayMinutes(
         dead.has(c.id) ? { ...c, alive: false } : c,
       );
     }
-    // 벌목: 일하는 시각에만 목재가 쌓임 (정시 경계로 잘린 chunk라 시각이 한 시간 안에서 같음)
-    const hour = Math.floor(wMinute / 60);
-    if (hour >= LOGGING.from && hour < LOGGING.to) {
+    // 벌목: 일하는 시각에만 목재가 쌓임
+    if (logging) {
       // ponytail: 벌목꾼 4명이 늘 일한다고 봄 — 일손 배치·부상과 연결되면 인원 비례로
       const n = LOGGING.woodPerDay * AMOUNT_SCALE * chunk + woodCarry;
       resources.RES_WOOD += Math.floor(n / workMinutes);

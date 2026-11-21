@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { SITE_POINTS } from "../../apps/web/src/site-targets.js";
 import { press, reveal, startTimber } from "./labor-tabs.js";
@@ -6,11 +7,16 @@ import {
   enterProgress,
   receiveProgress,
 } from "./progress-helpers.js";
-import { clickFloor, outlinePixels, worldPoint } from "./scene-picking.js";
+import {
+  clickUnoccupiedGround,
+  cyanEdgePixels,
+  sceneOutlineCapture,
+  worldPoint,
+} from "./scene-picking.js";
 
 test("빈 구역의 표식·글자 안내는 유지하고 실제 목재 클릭·테두리·바닥 해제를 보존한다", async ({
   page: p,
-}) => {
+}, info) => {
   await enterProgress(p);
   for (const id of [
     "site-inspection",
@@ -30,15 +36,41 @@ test("빈 구역의 표식·글자 안내는 유지하고 실제 목재 클릭·
   await press(p, "다음 일손 사건까지");
   await press(p, "확장 전량 검사 시작");
   await press(p, "다음 일손 사건까지");
-  const canvas = p.locator("canvas");
-  await canvas.scrollIntoViewIfNeeded();
-  const before = outlinePixels(await canvas.screenshot());
   const pt = await worldPoint(p, SITE_POINTS["site-quarantine"]);
+  const captureCrop = await sceneOutlineCapture(p, pt);
+  const capture = async (phase: string) => {
+    const image = await captureCrop();
+    await writeFile(info.outputPath(`quarantine-${phase}.png`), image);
+    return image;
+  };
+  const before = await capture("before");
   await p.mouse.click(pt.x, pt.y);
   await expect(p.getByTestId("site-name")).toHaveText("격리품");
-  expect(outlinePixels(await canvas.screenshot())).toBeGreaterThan(before + 10);
-  await clickFloor(p);
+  let selectedEdges: number[] = [];
+  await expect
+    .poll(
+      async () => {
+        selectedEdges = cyanEdgePixels(before, await capture("selected"));
+        return selectedEdges.length;
+      },
+      { message: "실제 격리품 클릭 후 목재 윤곽선 표시" },
+    )
+    .toBeGreaterThanOrEqual(8);
+
+  // Keep the viewport fixed for the comparison while clicking real ground.
+  await clickUnoccupiedGround(p);
   await expect(p.getByTestId("site-name")).toHaveCount(0);
+  await expect
+    .poll(
+      async () => {
+        const remaining = new Set(
+          cyanEdgePixels(before, await capture("cleared")),
+        );
+        return selectedEdges.filter((i) => remaining.has(i)).length;
+      },
+      { message: "실제 빈 바닥 클릭 후 같은 목재 윤곽선 제거" },
+    )
+    .toBe(0);
   await expect(p.getByTestId("flow-quarantine")).toContainText("4개");
 });
 test("묶음 표시의 저장 복원·사용 후 빈 구역·모드 종료를 확인한다", async ({

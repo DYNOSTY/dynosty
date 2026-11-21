@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import { press } from "./labor-tabs.js";
 import {
   clickExample,
-  clickFloor,
+  clickUnoccupiedGround,
+  clickVisibleResident,
   examplePoint,
   outlinePixels,
 } from "./scene-picking.js";
@@ -73,7 +74,7 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   ).toHaveAttribute("aria-pressed", "true");
   // 건물은 바닥 고리 없이 선택 창으로만 알림 (2026-11-19 사용자 요청)
   expect(outlinePixels(await canvas.screenshot())).toBe(0);
-  await clickExample(page, "resident");
+  await clickVisibleResident(page);
   await expect(
     info.getByRole("heading", { name: "트리케라톱스" }),
   ).toBeVisible();
@@ -81,7 +82,9 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   await expect(
     page.getByRole("button", { name: "건물 예제 선택", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
-  await clickFloor(page);
+  await press(page, "기본 시점");
+  await examplePoint(page, "building"); // Wait for the default camera to render.
+  await clickUnoccupiedGround(page);
   await expect(info).toBeHidden();
   await expect.poll(() => residentOutlined(page)).toBe(false);
   expect(outlinePixels(await canvas.screenshot())).toBe(0);
@@ -116,7 +119,7 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
   page,
 }) => {
   await ready(page);
-  await clickExample(page, "resident");
+  await press(page, "주민 예제 선택");
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
   // 예제 상태(대기·걷기)는 개발 도구 칸에서 확인 — 선택 창은 이름·설명만 (2026-11-19)
   await expect(info).toContainText("트리케라톱스");

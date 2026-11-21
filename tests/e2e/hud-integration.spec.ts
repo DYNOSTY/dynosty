@@ -145,6 +145,7 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  // The representative building uses the ondol hub, not a village nest.
   await page.route("**/models/buildings/BLD_ONDOL_v2.glb", (r) =>
     r.fulfill({ status: 404, body: "missing" }),
   );

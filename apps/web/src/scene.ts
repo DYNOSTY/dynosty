@@ -6,11 +6,9 @@ import { SceneInstrumentation } from "@babylonjs/core/Instrumentation/sceneInstr
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
-import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { CreateScreenshotUsingRenderTarget } from "@babylonjs/core/Misc/screenshotTools";
-import type { Node } from "@babylonjs/core/node";
 import { Scene } from "@babylonjs/core/scene";
 import type {
   LaborState,
@@ -230,6 +228,10 @@ export function mountScene(
   const laborVisual = createLaborVisual(scene);
   const qualityVisual = createQualityVisual(scene);
   const zoneVisual = createZoneVisual(scene);
+  const quarantineRoot = scene.getMeshByName("timber-quarantine");
+  const quarantineParts = quarantineRoot
+    ? [quarantineRoot, ...quarantineRoot.getChildMeshes(false)]
+    : [];
   const sites = createSiteSelection(scene, (id) => {
     if (id === null && !isSiteId(selected)) return;
     if (id !== null) entities.select(null);
@@ -305,17 +307,8 @@ export function mountScene(
       assetsReady = !disposed;
     });
   const stopPicking = observeSceneClicks(canvas, (x, y) => {
-    // 주민과 건물이 겹치면 주민이 먼저 (작은 주민이 큰 지붕에 가려 못 고르는 일 없게)
-    const hits = scene.multiPick(x, y) ?? [];
-    const isResident = (m: AbstractMesh | null) => {
-      for (let n: Node | null = m; n; n = n.parent)
-        if (/resident/i.test(n.name)) return true;
-      return false;
-    };
-    const mesh =
-        hits.find((h) => isResident(h.pickedMesh))?.pickedMesh ??
-        scene.pick(x, y)?.pickedMesh ??
-        null,
+    // 가려진 주민 대신 화면에서 앞에 보이는 대상을 선택한다.
+    const mesh = scene.pick(x, y)?.pickedMesh ?? null,
       site = sites.idForMesh(mesh),
       bld = village.buildingForMesh(mesh);
     if (site) select(site);
@@ -339,6 +332,7 @@ export function mountScene(
     measured?: { key: string; width: number; height: number };
   }[] = [];
   const markerIdentity = Matrix.Identity();
+  const markerProjection = Vector3.Zero();
   const held = new Set<string>();
   const typing = (t: EventTarget | null) =>
     t instanceof HTMLElement && !!t.closest("input, select, textarea, dialog");
@@ -474,6 +468,40 @@ export function mountScene(
         height = canvas.clientHeight;
       const viewport = camera.viewport.toGlobal(width, height);
       const occupied: MarkerRect[] = [];
+      const transformMatrix = scene.getTransformMatrix();
+      // 표지가 포인터는 통과시켜도 목재와 선택 윤곽선을 가릴 수 있다.
+      // 선택 전후 같은 위치에 표지를 두도록 실제 격리 묶음의 투영 영역을 비워 둔다.
+      if (markerState) {
+        let left = width,
+          top = height,
+          right = 0,
+          bottom = 0;
+        for (const mesh of quarantineParts) {
+          if (!mesh.isEnabled() || !mesh.isVisible) continue;
+          for (const corner of mesh.getBoundingInfo().boundingBox
+            .vectorsWorld) {
+            const p = Vector3.ProjectToRef(
+              corner,
+              markerIdentity,
+              transformMatrix,
+              viewport,
+              markerProjection,
+            );
+            if (p.z < 0 || p.z > 1) continue;
+            left = Math.min(left, p.x);
+            top = Math.min(top, p.y);
+            right = Math.max(right, p.x);
+            bottom = Math.max(bottom, p.y);
+          }
+        }
+        if (left < right && top < bottom)
+          occupied.push({
+            left,
+            top,
+            width: right - left,
+            height: bottom - top,
+          });
+      }
       for (const marker of markerNodes) {
         const { node, point, track, height: offset } = marker;
         const tracked = track ? scene.getMeshById(track) : null;
@@ -492,7 +520,7 @@ export function mountScene(
         const p = Vector3.Project(
           point,
           markerIdentity,
-          scene.getTransformMatrix(),
+          transformMatrix,
           viewport,
         );
         const visible =

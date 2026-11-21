@@ -255,14 +255,25 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
 test("대표 모델 요청 실패는 명확히 안내하고 대체 표시로 게임을 유지한다", async ({
   page,
 }) => {
-  await page.route("**/models/triceratops.json", (route) =>
-    route.fulfill({ status: 404, body: "missing" }),
-  );
+  let blockedWinterResident = false;
+  await page.route("**/models/residents/R02_Triceratops_v2.glb", (route) => {
+    blockedWinterResident = true;
+    return route.fulfill({ status: 404, body: "missing" });
+  });
   await ready(page);
-  await expect(page.getByRole("alert")).toContainText("대표 모델");
+  await expect.poll(() => blockedWinterResident).toBe(true);
+  await expect(page.getByRole("alert")).toHaveText(
+    "모델을 만들지 못해 연결 예제로 표시합니다.",
+  );
+  const resident = page.getByRole("button", {
+    name: "주민 예제 선택",
+    exact: true,
+  });
+  await resident.focus();
   const beforeScroll = await page.evaluate(() => scrollY);
-  await clickExample(page, "resident");
+  await page.keyboard.press("Enter");
   expect(await page.evaluate(() => scrollY)).toBe(beforeScroll);
+  await expect(resident).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByRole("region", { name: "선택 정보", exact: true }),
   ).toContainText("트리케라톱스");

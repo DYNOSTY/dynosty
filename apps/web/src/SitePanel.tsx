@@ -37,6 +37,7 @@ export function SitePanel({
       aside.scrollTop +=
         heading.getBoundingClientRect().top -
         aside.getBoundingClientRect().top -
+        aside.clientTop -
         12;
   }, []);
   if (!siteAvailable(state, selected)) return null;
