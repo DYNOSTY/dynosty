@@ -332,13 +332,28 @@ test("좁은 화면의 5단계 컷씬과 성안 변종 없는 반란을 이어 �
   await expect(dialog).toContainText("그날은 나도 아버지처럼 홀로 남겠다.");
   const rect = await dialog.boundingBox();
   expect(rect?.width).toBeLessThanOrEqual(390);
+  const worker = page
+    .workers()
+    .find((worker) =>
+      new URL(worker.url()).pathname.endsWith("/timber.worker.ts"),
+    );
+  if (!worker) throw new Error("Village simulation worker not found");
+  // Keep this no-mutant route deterministic from the first night onward.
+  await worker.evaluate(() => {
+    Math.random = () => 0.99;
+  });
   await readScene(page, "양녕 · 지휘권을 합치고 징발 허용");
-  for (let day = 0; day < 5; day++) {
-    if (day === 4)
-      await page.evaluate(() => {
-        Math.random = () => 0.99;
-      });
-    await page.getByRole("button", { name: "마을 하루 진행" }).click();
+  const advanceDay = page.getByRole("button", { name: "마을 하루 진행" });
+  const clock = page.getByTestId("play-clock");
+  for (const [day, expectedClock] of [
+    "2일차 · 09:00",
+    "3일차 · 09:00",
+    "4일차 · 09:00",
+    "5일차 · 06:00",
+    "5일차 · 21:00",
+  ].entries()) {
+    await advanceDay.click();
+    await expect(clock).toHaveText(expectedClock);
     if (day === 1 || day === 2)
       await expect(
         page.getByText(
