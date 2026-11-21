@@ -129,7 +129,7 @@ test("정찰 시안은 발견 표시를 갱신하고 게임 불러오기·새 �
   await press(page, "저장 닫기");
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
-  ).toContainText("0 / 5");
+  ).toContainText("정찰대를 보내 보자"); // 불러오면 정찰이 처음 상태로 돌아감 (몇 곳인지는 화면에 알리지 않음)
   await press(page, "정찰 거점 갈대나루");
   await press(page, "정찰대 보내기");
   await press(page, "새 게임");

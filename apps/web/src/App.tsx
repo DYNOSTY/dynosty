@@ -524,9 +524,9 @@ export function App() {
   const quests: Record<string, Quest> = {
     scout: {
       id: "scout",
-      kind: "1단계 목표 · 정찰",
+      kind: "정찰",
       art: "/ui/quests/scout.jpg",
-      title: "주변 거점 다섯 곳 찾기",
+      title: "정찰대를 보내 둘레를 살핀다",
       why: "정찰대를 보내 주변 땅을 알아낸다.\n찾은 거점과는 교역할 수 있다.",
       // 정찰 길: 마을 → 거점(가까운 순). 정찰대 표식이 간 만큼 나아감
       progress: {
@@ -821,7 +821,8 @@ export function App() {
       </header>
       <section className="g-quests" aria-label="의뢰">
         <h2>의뢰</h2>
-        {/* 1단계 목표: 정찰 5곳 — 다섯 칸 · 누르면 공통 의뢰 카드 */}
+        {/* 정찰: 단계나 몇 곳인지는 알려 주지 않음 (사용자 11/21 "단계를 굳이 게이머한테 알려줘야 함? 스스로 알아가게").
+            기획서의 "정찰 5회"는 속으로만 센다. 누르면 공통 의뢰 카드 */}
         <button
           type="button"
           className="g-quest g-quest--btn"
@@ -830,25 +831,13 @@ export function App() {
         >
           <img src="/ui/cmd/map.png" alt="" />
           <div className="g-quest__body">
-            <span>1단계 목표 · 정찰</span>
-            <span className="g-pips" aria-hidden="true">
-              {SCOUT_SITES.map((site) => (
-                <i
-                  key={site.id}
-                  className={
-                    scouts[site.id]?.status === "found"
-                      ? "on"
-                      : scouts[site.id]
-                        ? "half"
-                        : ""
-                  }
-                />
-              ))}
+            <span>
+              {Object.keys(scouts).length === 0
+                ? "정찰대를 보내 보자"
+                : "둘레를 살펴보는 중"}
             </span>
           </div>
-          <b>
-            {foundCount} / {SCOUT_GOAL}
-          </b>
+          <b>{foundCount > 0 ? `찾은 곳 ${foundCount}` : ""}</b>
         </button>
         {/* 전량 검수 중인 목재: 들어올 때까지 남은 시간 (사건·정책 선택) */}
         {woodLeft !== null ? (
