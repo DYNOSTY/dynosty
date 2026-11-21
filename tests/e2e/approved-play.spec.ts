@@ -246,9 +246,13 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   await expect(page.getByTestId("camera-distance")).toHaveText("56.00");
   await expect(page.getByTestId("camera-angle")).toHaveText("54.00");
   await clickExample(page, "building");
+  const info = page.getByRole("region", { name: "선택 정보", exact: true });
   await expect(
-    page.getByRole("region", { name: "선택 정보", exact: true }),
-  ).toContainText("온돌 둥지");
+    info.getByRole("heading", { name: "온돌", exact: true }),
+  ).toBeVisible();
+  const heat = info.getByRole("button", { name: "화력 보통", exact: true });
+  await expect(heat).toBeVisible();
+  await expect(heat).toBeEnabled();
   expect(errors).toEqual([]);
 });
 
