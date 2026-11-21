@@ -17,7 +17,7 @@ import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { Scene } from "@babylonjs/core/scene";
 import { LOGGING_SITES } from "./layout.js";
 import { loadSceneAsset } from "./scene-assets.js";
-import { SCOUT_SITES } from "./scout-sites.js";
+import { nearResourceSite, SCOUT_SITES } from "./scout-sites.js";
 
 export const ISLAND_RADIUS = 70;
 /** 미니맵 한 변(m) */
@@ -836,6 +836,7 @@ export function buildWorld(
     Math.hypot(x - POND.x, z - POND.z) < POND.r + 1.2 ||
     Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r + 1.5 ||
     SCOUT_SITES.some((s) => Math.hypot(x - s.x, z - s.z) < 8) || // 거점 자리는 비워 둠 (발견 모형)
+    nearResourceSite(x, z) ||
     LOGGING_SITES.some(
       ([lx, lz]) => Math.hypot(x - lx * 1.12, z - lz * 1.12) < 4.2,
     ); // 벌목터 나무는 logging.ts가 따로 심음

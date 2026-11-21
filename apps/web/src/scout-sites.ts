@@ -62,3 +62,29 @@ export const SCOUT_SITES: ScoutSite[] = [
 
 export const SCOUT_CREW = 2;
 export const SCOUT_GOAL = 5;
+
+// 자원 터 (2026-11-21): 정찰로 찾아내 자원을 직접 얻는 곳. 모델은 tools/blender/site3d.py (부품으로 깎아 구운 입체)
+// 지금은 모양을 게임 조명에서 보려고 처음부터 보이는 자리(숲 가장자리)에 고정으로 둠.
+// 정찰로 찾아내기·판마다 무작위 배치는 다음 단계 (안쪽 고리 자원 터, 바깥 고리 교역 마을).
+export const RESOURCE_SITES = [
+  { id: "coal", name: "석탄 노두", file: "SITE3_COAL", x: -30, z: 10 },
+  { id: "iron", name: "철광 노두", file: "SITE3_IRON", x: 27, z: 22 },
+  { id: "spring", name: "얼지 않는 샘", file: "SITE3_SPRING", x: -12, z: 31 },
+  { id: "store", name: "버려진 곳간", file: "SITE3_STORE", x: -14, z: -30 },
+  { id: "fish", name: "얼음 낚시 못", file: "SITE3_FISH", x: 12, z: -33 },
+  { id: "pine", name: "쓰러진 적송", file: "SITE3_PINE", x: 31, z: -10 },
+] as const;
+/** 터 둘레에서 나무를 비워 두는 반지름 */
+const RESOURCE_SITE_CLEAR = 7.5;
+/** 나무를 심지 않는 자리: 터 둘레와, 터 앞(기본 시점의 카메라 쪽 = -z)으로 난 트인 자리 — 처음 보는 각도에서 앞 나무가 터를 가리지 않게 */
+export const nearResourceSite = (x: number, z: number) =>
+  RESOURCE_SITES.some((s) => {
+    const dx = x - s.x,
+      dz = z - s.z;
+    return (
+      Math.hypot(dx, dz) < RESOURCE_SITE_CLEAR ||
+      (Math.abs(dx) < RESOURCE_SITE_CLEAR * 0.8 &&
+        dz < 0 &&
+        dz > -RESOURCE_SITE_CLEAR * 2)
+    );
+  });

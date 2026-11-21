@@ -15,6 +15,7 @@ import type {
   SceneSnapshot,
   TimberState,
 } from "@dynosty/game-core";
+import { TURN_STEP, turnStep } from "./camera-turn.js";
 import { createFog } from "./fog.js";
 import { createFuelYard } from "./fuelyard.js";
 import { createLaborVisual } from "./labor-scene.js";
@@ -23,6 +24,7 @@ import { createLogging } from "./logging.js";
 import { type MarkerRect, placeMarker } from "./marker-layout.js";
 import { loadModelAssets } from "./model-assets.js";
 import { createQualityVisual } from "./quality-scene.js";
+import { createResourceSites } from "./resource-sites.js";
 import { createSceneEntities } from "./scene-entities.js";
 import { observeSceneClicks } from "./scene-input.js";
 import { SCOUT_SITES } from "./scout-sites.js";
@@ -126,7 +128,7 @@ export function mountScene(
     scene,
   );
   camera.attachControl(canvas, true);
-  // 돌리기·기울이기는 막음: 끌기는 어느 단추든 옆으로 이동, 휠 = 확대·축소.
+  // 마우스로는 돌리기·기울이기를 막음: 끌기는 어느 단추든 옆으로 이동, 휠 = 확대·축소. 좌우 회전은 Q·E로만.
   // (Babylon 9의 입력 연결표에서 "돌리기"로 이어진 끌기를 모두 "이동"으로 바꿈)
   for (const entry of camera.movement.input.inputMap)
     if (entry.source === "pointer" && entry.interaction === "rotate")
@@ -180,6 +182,9 @@ export function mountScene(
   });
   const fog = createFog(scene, SCOUT_SITES);
   const landmarks = createLandmarks(scene, SCOUT_SITES, glow, warmMat);
+  createResourceSites(scene, worldRoot, () => {
+    if (!disposed) onAssetWarning("자원 터 모델을 불러오지 못했습니다.");
+  });
   for (const node of [...scene.meshes, ...scene.transformNodes])
     if (node !== worldRoot && !node.parent) node.parent = worldRoot;
   const demoGround = CreateGround(
@@ -272,7 +277,11 @@ export function mountScene(
   const abort = new AbortController();
   let disposed = false;
   let demoActive = false;
+  // 좌우 회전: Q = 왼쪽, E = 오른쪽으로 한 번에 20도 (마우스로는 돌리지 않음, 기울기는 고정). 남은 각을 부드럽게 따라감 (camera-turn.ts)
+  let turnLeft = 0,
+    turnSpeed = 0;
   const resetWorldCamera = () => {
+    turnLeft = turnSpeed = 0;
     camera.alpha = -Math.PI / 2;
     camera.beta = CAMERA_BETA;
     camera.radius = CAMERA_RADIUS;
@@ -347,8 +356,13 @@ export function mountScene(
   const typing = (t: EventTarget | null) =>
     t instanceof HTMLElement && !!t.closest("input, select, textarea, dialog");
   const onKeyDown = (e: KeyboardEvent) => {
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target))
-      held.add(e.key.toLowerCase());
+    if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
+    const key = e.key.toLowerCase();
+    held.add(key);
+    // 누를 때마다 한 걸음 (꾹 눌러 생기는 반복 입력은 세지 않음). 한글 자판(ㅂ·ㄷ)에서도 듣게 자리(code)로도 봄
+    if (e.repeat) return;
+    if (key === "q" || e.code === "KeyQ") turnLeft -= TURN_STEP;
+    if (key === "e" || e.code === "KeyE") turnLeft += TURN_STEP;
   };
   const onKeyUp = (e: KeyboardEvent) => held.delete(e.key.toLowerCase());
   // 화면 가장자리로 마우스를 보내면 그쪽으로 이동 (스타크래프트·롤 방식, 모서리는 대각선). 창 밖으로 나가면 멈춤.
@@ -431,6 +445,12 @@ export function mountScene(
       95 * visibility(),
       camera.radius * (season === "winter" ? 2.4 : 4) * visibility(),
     );
+    if (turnLeft !== 0 || turnSpeed !== 0) {
+      const turn = turnStep(turnLeft, turnSpeed, dt);
+      camera.alpha += turn.step;
+      turnLeft -= turn.step;
+      turnSpeed = turn.speed;
+    }
     // WASD: 화면 기준 앞뒤·좌우로 이동 (멀리 볼수록 빠르게)
     const fwd = camera.target.subtract(camera.position);
     fwd.y = 0;
