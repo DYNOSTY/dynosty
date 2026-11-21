@@ -1,4 +1,4 @@
-import { createVillageGame } from "@dynosty/game-core";
+import { createCapital, createVillageGame } from "@dynosty/game-core";
 import { expect, it } from "vitest";
 import {
   campaignPage,
@@ -176,4 +176,15 @@ it("메카 연구가 남으면 영실이 첫 연구의 이름을 알려 준다",
     "영실",
     expect.stringContaining("유산 기록 대조"),
   ]);
+});
+
+it("도성에서 실패하면 도성 삽화를 보여 주고 고리의 추방 대사는 나오지 않는다", () => {
+  const city = createCapital(createVillageGame());
+  const page = campaignPage({
+    ...city,
+    campaign: { ...city.campaign!, beat: "ending", ending: "collapse" },
+  });
+  expect(page.illustration).toBe("mission-3");
+  expect(page.lines).toEqual([["", ""]]);
+  expect(page.choices.map((choice) => choice.action)).toContain("finish");
 });

@@ -1080,7 +1080,10 @@ export function campaignPage(s: TimberState): ScenePage {
     case "ending":
     case "finished": {
       const end = c.ending ?? "collapse";
-      if (end === "collapse") page.illustration = "gori-exile";
+      if (end === "collapse") {
+        if (chapter !== 3) page.illustration = "gori-exile";
+        else if (s.bokhol) page.illustration = "mission-3";
+      }
       if (end !== "collapse")
         page.clip =
           end === "escape" && c.revivalPrepared === false
@@ -1116,6 +1119,8 @@ export function campaignPage(s: TimberState): ScenePage {
           "고리",
           "명부를 가져오시오. 오늘부터 왕자 마마의 인장이 찍힌 명만 받으시오.",
         );
+      } else if (chapter === 3) {
+        line("", "");
       } else {
         line(
           "달이",
