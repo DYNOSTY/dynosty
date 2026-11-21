@@ -1018,7 +1018,7 @@ export function App() {
                       timberState.reservedWood * AMOUNT_SCALE,
                   },
                 }
-              : playState
+              : null
           }
           error={playError}
           busy={playSaveBusy}
