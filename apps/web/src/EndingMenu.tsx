@@ -1,5 +1,7 @@
 import { CHAPTERS, type TimberState } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
+import { useAudio } from "./AudioProvider.js";
+import { endingMusic } from "./campaign-scenes.js";
 import { SettingsMenu } from "./SettingsMenu.js";
 import { listSlots, loadSlot, replayStage, writeSlot } from "./stage-replay.js";
 import "./main-menu.css";
@@ -42,6 +44,12 @@ export function EndingMenu({
   >(initialView);
   const [slots, setSlots] = useState<Awaited<ReturnType<typeof listSlots>>>([]);
   const [film, setFilm] = useState("");
+  const { setGalleryMusic } = useAudio();
+  useEffect(() => {
+    if (!Object.hasOwn(endingMusic, film)) return;
+    setGalleryMusic(endingMusic[film as keyof typeof endingMusic]);
+    return () => setGalleryMusic(null);
+  }, [film, setGalleryMusic]);
   const [restartLevel, setRestartLevel] = useState<"normal" | "hard">(
     state.campaign?.difficulty ?? "normal",
   );

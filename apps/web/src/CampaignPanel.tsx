@@ -377,7 +377,7 @@ export function CampaignPanel({
     else if (gateSelected) setDefenseOpen?.(true);
   }, [gateSelected, setDefenseOpen, c.beat]);
   const [sound, setSound] = useState(false);
-  const { audioRef } = useAudio();
+  const { audioRef, galleryMusic } = useAudio();
   const canPetition =
     [
       "patrol",
@@ -445,24 +445,27 @@ export function CampaignPanel({
     ],
   };
   const scene = petitionOpen ? petitionPage : p;
-  const track = open
-    ? scene.music
-    : c.ending
-      ? p.music
-      : trade
-        ? "03"
-        : foodWarnings(s.world).length
-          ? "10"
-          : c.beat === "winter"
-            ? "11"
-            : work
-              ? "02"
-              : c.beat === "patrol" &&
-                  Object.keys(s.scoutDepartures ?? {}).length > c.reports.length
-                ? "05"
-                : s.world.minute < 360 || s.world.minute >= 1080
-                  ? "04"
-                  : "01";
+  const track =
+    galleryMusic ??
+    (open
+      ? scene.music
+      : c.ending
+        ? p.music
+        : trade
+          ? "03"
+          : foodWarnings(s.world).length
+            ? "10"
+            : c.beat === "winter"
+              ? "11"
+              : work
+                ? "02"
+                : c.beat === "patrol" &&
+                    Object.keys(s.scoutDepartures ?? {}).length >
+                      c.reports.length
+                  ? "05"
+                  : s.world.minute < 360 || s.world.minute >= 1080
+                    ? "04"
+                    : "01");
   useEffect(() => {
     if (!sound) return;
     const audio = audioRef.current;

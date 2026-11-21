@@ -259,6 +259,14 @@ export function villageAdvice(
     : "등불이 하나둘 켜지네. 주민 명단을 펴 봐. 오늘 잘 곳을 찾은 이들부터 같이 짚어 보자.";
 }
 
+export const endingMusic = {
+  hope: "A",
+  escape: "B",
+  "mechanical-late": "B",
+  order: "C",
+  collapse: "C",
+} as const;
+
 export function campaignPage(s: TimberState): ScenePage {
   const c = campaignOf(s),
     chapter = s.chapter ?? 1,
@@ -1073,7 +1081,7 @@ export function campaignPage(s: TimberState): ScenePage {
         page.resultQuote = quote;
       }
       page.key = c.beat + end;
-      page.music = end === "hope" ? "A" : end === "escape" ? "B" : "C";
+      page.music = endingMusic[end];
       page.goal = c.beat === "ending" ? "결말 확인" : "캠페인 종료";
       page.title =
         end === "hope"
