@@ -23,7 +23,7 @@ export const ISLAND_RADIUS = 70;
 /** 미니맵 한 변(m) */
 export const MAP_SPAN = (ISLAND_RADIUS + 1) * 2;
 export const POND = { x: 17, z: 15, r: 3.6 };
-const LAKE = { x: 40, z: -26, r: 10 };
+export const LAKE = { x: 40, z: -26, r: 10 };
 
 const smooth = (a: number, b: number, v: number) => {
   const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
@@ -1095,6 +1095,14 @@ export function buildWorld(
     const warm = smooth(0, 0.18, daylight) * (1 - smooth(0.18, 0.5, daylight));
     sun.diffuse = c3(mix(P.sun, [1, 0.72, 0.55], warm));
     glow.intensity = 0.85 + 0.7 * (1 - daylight); // 밤일수록 불빛이 번짐
+    // 밤에는 안개·먼 곳 빛깔도 어둡게: 낮 색 그대로 두면 어두운 마을을 흰 테가 두른 것처럼 보임 (11/21)
+    scene.fogColor = c3(
+      mix(
+        P.fog.map((v, k) => v * ([0.3, 0.34, 0.5][k] ?? 1)),
+        P.fog,
+        smooth(0, 0.35, daylight),
+      ),
+    );
     // 배경 밝기는 20단계로만 바꿈 (매 프레임 바꾸면 화면 전체를 다시 그려 느려짐)
     const level = (0.72 + (0.28 * Math.round(daylight * 20)) / 20).toFixed(3);
     if (level !== lastLevel) {
