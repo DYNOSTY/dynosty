@@ -209,7 +209,10 @@ describe("승인된 실패·엔딩 판정", () => {
       research: ["R17", "R18"],
     };
     expect(evaluateOutcome({ ...f, research: [] })).toBe("continue");
-    expect(evaluateOutcome(f)).toBe("ending-a");
+    expect(evaluateOutcome({ ...f, hopeAtCoup: 70 })).toBe("ending-a");
+    expect(evaluateOutcome({ ...f, hopeAtCoup: 69, mech2: true })).toBe(
+      "ending-b",
+    );
     expect(
       evaluateOutcome({
         ...f,
@@ -217,7 +220,7 @@ describe("승인된 실패·엔딩 판정", () => {
         research: ["R17", "R18", "R19"],
         mech2: true,
       }),
-    ).toBe("ending-b");
+    ).toBe("ending-c");
     expect(evaluateOutcome({ ...f, dead: 48 })).toBe("failure");
     expect(evaluateOutcome({ ...f, stage5Minutes: 10 * 1440 - 1 })).toBe(
       "continue",

@@ -34,6 +34,7 @@ import {
 } from "./home-placement.js";
 import { advanceHospital, hospitalValid, type Patient } from "./hospital.js";
 import { loggingSites, productionSites, setLoggingSite } from "./logging.js";
+import { usableHomes } from "./mutants.js";
 import { AMOUNT_SCALE, type FoodId, type ResourceId } from "./play.js";
 import {
   type GroundPoint,
@@ -43,7 +44,7 @@ import {
 import { workplaceOpen } from "./resident-routine.js";
 import { isRecord } from "./save.js";
 import { storageRoom, warehouseDoor } from "./storage.js";
-import type { TimberState } from "./timber.js";
+import { capitalRoad, type TimberState } from "./timber.js";
 import { assignHomes, speciesRule, VILLAGE_RULES } from "./village-services.js";
 
 export const waterAt = (p: GroundPoint, margin = 0) =>
@@ -669,7 +670,7 @@ export function advanceTown(input: TimberState, minutes: number): TimberState {
                 : h,
             ),
           };
-          residents = assignHomes(residents, s.world.citizens, s.homes);
+          residents = assignHomes(residents, s.world.citizens, usableHomes(s));
         } else if (o.kind === "home") {
           const homes = [
             ...s.homes,
@@ -683,9 +684,7 @@ export function advanceTown(input: TimberState, minutes: number): TimberState {
           residents = assignHomes(
             residents,
             s.world.citizens,
-            s.buildingHealth > 0
-              ? homes
-              : homes.filter((h) => h.id !== "example-building-1"),
+            usableHomes(s, homes),
           );
           s = {
             ...s,
@@ -860,7 +859,7 @@ function advanceTownProduction(
   for (const original of s.town.facilities) {
     const f = { ...original };
     const resource = facilityResource(f);
-    if (!resource) continue;
+    if (!resource || s.mutantDamage?.[f.id] === 100) continue;
     const workers = s.residents.filter(
       (r) =>
         r.workplaceId === `facility:${f.id}` &&
@@ -1039,10 +1038,13 @@ export function dispatchFood(
   const f = s.town.facilities.find((f) => f.id === facilityId);
   if (
     !f ||
+    s.mutantDamage?.[f.id] === 100 ||
     !["scout", "trade"].includes(f.kind) ||
     !["RES_PLANT", "RES_MEAT", "RES_FISH"].includes(food)
   )
     throw Error("파견할 거점과 식량을 확인해 주세요.");
+  if (f.kind === "trade" && capitalRoad(s) === "closed")
+    throw Error("눈에 길이 막혀 교역 수레를 보낼 수 없습니다.");
   if (!workplaceOpen(s.world.minute))
     throw Error("파견은 일과시간에 지시해 주세요.");
   if (s.town.trips.some((t) => t.facilityId === f.id))
@@ -1104,6 +1106,8 @@ function advanceTrips(input: TimberState, minutes: number): TimberState {
   let s = input;
   for (const old of s.town.trips) {
     const t = { ...old };
+    const road = t.kind === "trade" ? capitalRoad(s) : "open";
+    if (road === "closed") continue;
     const f =
       s.town.facilities.find((f) => f.id === t.facilityId) ?? invalidTown();
     if (
@@ -1122,7 +1126,7 @@ function advanceTrips(input: TimberState, minutes: number): TimberState {
               position: moveOnGround(
                 r.position,
                 goal,
-                minutes,
+                road === "slow" ? minutes / 2 : minutes,
                 t.kind === "hunt"
                   ? 2 *
                       (hasResearch(s, "TECH_FLIGHT")

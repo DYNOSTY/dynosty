@@ -10,6 +10,7 @@ import {
   AMOUNT_SCALE,
   BUILDING_RULES,
   type BuildingKind,
+  capitalRoad,
   type HomePlacement,
   type LaborState,
   laborScene,
@@ -19,6 +20,7 @@ import {
   TIMBER_RULES,
   type TimberState,
   timberScene,
+  villageDefenseActive,
 } from "@dynosty/game-core";
 import {
   useCallback,
@@ -84,6 +86,7 @@ import { WorkspacePanel } from "./WorkspacePanel.js";
 import { elevation, MAP_SPAN } from "./world.js";
 
 export function App() {
+  const [defenseOpen, setDefenseOpen] = useState(false);
   const [laborOpen, setLaborOpen] = useState(false);
   const [laborState, setLaborState] = useState<LaborState | null>(null);
   const [siteNotices, setSiteNotices] = useState<SiteNotice[]>([]);
@@ -166,7 +169,7 @@ export function App() {
     return () => window.removeEventListener("keydown", changePage);
   }, [consoleOpen, villageSection, placementHint]);
   const [scoutOpen, setScoutOpen] = useState<string | null>(null);
-  const pinRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const pinRefs = useRef<Record<string, HTMLElement | null>>({});
   const saveMenuRef = useRef<HTMLButtonElement>(null);
   const toolsMenuRef = useRef<HTMLButtonElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -585,6 +588,15 @@ export function App() {
       sceneRef.current?.setGameMinutes(gameMinutes);
   }, [gameMinutes, sceneStatus]);
   const villageVisible = !!timberState && !laborOpen;
+  const fallen = timberState?.campaign?.ending === "collapse";
+  useEffect(() => {
+    if (fallen && sceneStatus === "준비 완료") sceneRef.current?.overview(true);
+  }, [fallen, sceneStatus]);
+  const capitalMap =
+    villageVisible &&
+    !!timberState?.bokhol &&
+    timberState.campaign?.beat === "capital";
+  const [southVisits, visitSouth] = useState(0);
   const gatePending =
     villageVisible &&
     (timberState?.mission === "register-policy" ||
@@ -605,6 +617,14 @@ export function App() {
           y: elevation(site.x, site.z) + 9.5,
           z: site.z,
         })),
+        ...(capitalMap
+          ? [
+              { id: "visitor-south", x: 0, z: 23, y: 5 },
+              { id: "visitor-north", x: 0, z: -75, y: 5 },
+              { id: "visitor-east", x: 72, z: 0, y: 5 },
+              { id: "visitor-west", x: -72, z: 0, y: 5 },
+            ]
+          : []),
         ...(gatePending
           ? [{ id: "visitor-gate", ...TIMBER_RULES.cartStart, y: 3 }]
           : []),
@@ -663,7 +683,7 @@ export function App() {
         }
       },
     );
-  }, [sceneStatus, gatePending, postX, postZ]);
+  }, [sceneStatus, capitalMap, gatePending, postX, postZ]);
   const timberReady = sceneStatus === "준비 완료";
   // 뜨는 창은 한 번에 하나: 새 창을 열면 나머지는 닫힘
   function closePopups() {
@@ -851,6 +871,10 @@ export function App() {
           <CampaignPanel
             state={timberState}
             command={(cmd) => villageCommand.current?.(cmd)}
+            defenseOpen={defenseOpen}
+            setDefenseOpen={setDefenseOpen}
+            southVisits={southVisits}
+            gateSelected={!!selectedId?.startsWith("village:BLD_GATE:")}
             officeSelected={!!selectedId?.startsWith("village:BLD_OFFICE:")}
             clearOfficeSelection={clearSelection}
             trade={showTrade}
@@ -978,6 +1002,9 @@ export function App() {
       {workerError ? <p role="alert">{workerError}</p> : null}
       <div>
         <PlayPanel
+          settlement={
+            timberState?.campaign?.beat === "capital" ? "도성" : "복홀"
+          }
           compact={timberOpen}
           day={timberState?.world.day ?? shownDay}
           minute={playMinute}
@@ -1027,12 +1054,65 @@ export function App() {
               {assetWarning}
             </p>
           ) : null}
-          <div className="scene-viewport">
+          <div
+            className={
+              fallen ? "scene-viewport fallen-settlement" : "scene-viewport"
+            }
+          >
+            {fallen && (
+              <div className="fallen-caption">
+                당신이 알던 대로 공룡 문명은 멸망했습니다.
+                <small>과거의 편린</small>
+              </div>
+            )}
             <canvas
               ref={canvasRef}
               aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
               tabIndex={0}
             />
+            {capitalMap &&
+              timberState &&
+              (["south", "north", "east", "west"] as const).map((gate) => {
+                const id = "visitor-" + gate;
+                const road = capitalRoad(timberState);
+                const label =
+                  gate === "south"
+                    ? "남문 · 피난 수레"
+                    : gate === "north"
+                      ? "북문 · 변종 접근"
+                      : (gate === "east" ? "동문" : "서문") +
+                        " · 교역 " +
+                        (road === "closed"
+                          ? "두절"
+                          : road === "slow"
+                            ? "지연"
+                            : "통행 가능");
+                return gate === "south" ? (
+                  <button
+                    key={id}
+                    type="button"
+                    hidden
+                    className="village-visitor-marker capital-gate"
+                    ref={(el) => {
+                      pinRefs.current[id] = el;
+                    }}
+                    onClick={() => visitSouth((n) => n + 1)}
+                  >
+                    {label}
+                  </button>
+                ) : (
+                  <span
+                    key={id}
+                    hidden
+                    className="village-visitor-marker capital-gate"
+                    ref={(el) => {
+                      pinRefs.current[id] = el;
+                    }}
+                  >
+                    {label}
+                  </span>
+                );
+              })}
             {(
               [
                 ["visitor-gate", gatePending, "입촌 요청", "다음 임무"],
@@ -1795,7 +1875,14 @@ export function App() {
             disabled={!timberReady}
             onClick={() => openVillageSection("교역소 방문")}
           />
-          <CmdButton icon="ondol" label="온돌" hotkey="H" disabled />
+          <CmdButton
+            icon="ondol"
+            label="온돌"
+            hotkey="H"
+            disabled={!timberState || !villageDefenseActive(timberState)}
+            pressed={defenseOpen}
+            onClick={() => setDefenseOpen(!defenseOpen)}
+          />
           <CmdButton
             buttonRef={saveMenuRef}
             icon="records"

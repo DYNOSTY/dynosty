@@ -1,15 +1,31 @@
 import {
   CHAPTERS,
+  CONVOY_GOALS,
+  CONVOY_ITEMS,
   campaignOf,
+  canDispatchConvoy,
   canPay,
+  capitalMealsReady,
+  capitalRoad,
+  convoyLoad,
+  convoyTarget,
   foodWarnings,
+  GAME_RULES,
+  mutantNames,
+  mutantRepairCost,
+  mutantStructure,
+  policyWait,
   type TimberCommand,
   type TimberState,
+  verdictRoute,
+  villageDefenseActive,
+  villageTemperature,
 } from "@dynosty/game-core";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
 import {
   campaignPage,
+  gatheringRumor,
   moraleAdvice,
   PATROL_NAMES,
   type ScenePage,
@@ -42,10 +58,29 @@ function SceneDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [cursor, setCursor] = useState(0);
+  const frameIndex = cursor - page.lines.length;
+  const frame = page.frames?.[frameIndex];
+  const flashback = page.key === "summit" && page.lines[cursor]?.[1] === "";
+  const familyScene = page.key === "summit" && cursor > 0 && cursor <= 5;
+  const total = page.lines.length + (page.frames?.length ?? 0);
   const lineIndex = Math.min(cursor, page.lines.length - 1);
+  useEffect(() => {
+    if (!frame || cursor >= total - 1) return;
+    const timer = window.setTimeout(
+      () => setCursor((i) => Math.min(i + 1, total - 1)),
+      7500,
+    );
+    return () => window.clearTimeout(timer);
+  }, [cursor, frame, total]);
   const [name, words] = page.lines[lineIndex]!;
+  const later =
+    page.lineIllustration?.at === cursor
+      ? page.lineIllustration
+      : page.laterIllustration && cursor >= page.laterIllustration.from
+        ? page.laterIllustration
+        : undefined;
   const face = PATROL_NAMES.findIndex((x) => x === name);
-  const last = lineIndex === page.lines.length - 1;
+  const last = cursor === total - 1;
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();
@@ -67,50 +102,102 @@ function SceneDialog({
           접기
         </button>
       </header>
-      {page.illustration && (
+      {frame && (
+        <video
+          key={frame.image}
+          className="campaign-still"
+          aria-label={page.title + " 엔딩 영상"}
+          src={
+            media +
+            "ending-" +
+            frame.image.charAt(4) +
+            ".mp4#t=" +
+            frameIndex * 7.5 +
+            "," +
+            (frameIndex + 1) * 7.5
+          }
+          poster={media + frame.image + ".webp"}
+          playsInline
+          muted
+          autoPlay
+        />
+      )}
+      {flashback && (
         <img
           className="campaign-still"
-          alt={page.title}
-          src={`/story/campaign/${page.illustration}.webp`}
+          src={media + "end-3b.webp"}
+          alt="도성 광장에 홀로 선 왕의 뒷모습"
         />
       )}
-      {page.clip && (
-        <video
-          key={page.clip}
-          src={media + page.clip + ".mp4"}
-          muted
-          playsInline
-          autoPlay
-          controls
-          preload="metadata"
-          aria-label={page.title + " 무성 컷씬"}
+      {!flashback && !frame && (familyScene || later || page.illustration) && (
+        <img
+          className="campaign-still"
+          alt={
+            familyScene
+              ? "복홀 성문 앞의 양녕과 새끼 스피노사우르스 포와 혜"
+              : (later?.alt ?? page.title)
+          }
+          src={`/story/campaign/${familyScene ? "royal-family" : (later?.image ?? page.illustration)}.webp`}
         />
       )}
-      {page.goal && <p className="campaign-goal">{page.goal}</p>}
-      <div className="campaign-speech" aria-live="polite">
-        {face >= 0 ? (
-          <PatrolPortrait index={face} />
-        ) : name === "나르미" || name === "달이" ? (
-          <img
-            alt=""
-            src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.png`}
+      {page.key === "summit" && cursor === 1 && (
+        <section className="prince-greetings" aria-label="두 왕자의 인사">
+          <p>
+            <strong>포</strong> 복홀 어른들, 안녕하세요! 쥬신의 왕자 포예요!
+          </p>
+          <p>
+            <strong>혜</strong> 저도 왕자예요! 혜라고 불러 주세요!
+          </p>
+        </section>
+      )}
+      {page.clip &&
+        !familyScene &&
+        !frame &&
+        (!(
+          page.clip === "hope" ||
+          page.clip === "escape" ||
+          page.clip === "mechanical-late" ||
+          page.clip === "order"
+        ) ||
+          cursor >= 2) && (
+          <video
+            key={page.clip}
+            src={media + page.clip + ".mp4"}
+            muted
+            playsInline
+            autoPlay
+            controls
+            preload="metadata"
+            aria-label={page.title + " 무성 컷씬"}
           />
-        ) : null}
-        <div>
-          <strong>{name}</strong>
-          <p>{words}</p>
+        )}
+      {!flashback && page.goal && <p className="campaign-goal">{page.goal}</p>}
+      {!flashback && (!frame || frame.words) && (
+        <div className="campaign-speech" aria-live="polite">
+          {frame ? null : face >= 0 ? (
+            <PatrolPortrait index={face} />
+          ) : name === "나르미" || name === "달이" ? (
+            <img
+              alt=""
+              src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.png`}
+            />
+          ) : null}
+          <div>
+            <strong>{frame ? "복홀의 기록" : name}</strong>
+            <p>{frame?.words ?? words}</p>
+          </div>
         </div>
-      </div>
-      {advisory}
+      )}
+      {!flashback && (!frame || frame.words) && advisory}
       <footer>
         {cursor > 0 && (
-          <button type="button" onClick={() => setCursor(lineIndex - 1)}>
+          <button type="button" onClick={() => setCursor(cursor - 1)}>
             이전 대사
           </button>
         )}
         {!last ? (
-          <button type="button" onClick={() => setCursor(lineIndex + 1)}>
-            다음 대사 · {lineIndex + 1}/{page.lines.length}
+          <button type="button" onClick={() => setCursor(cursor + 1)}>
+            다음 대사 · {cursor + 1}/{total}
           </button>
         ) : (
           page.choices.map((x) => (
@@ -138,6 +225,10 @@ export function CampaignPanel({
   command,
   trade,
   officeSelected,
+  gateSelected,
+  southVisits,
+  defenseOpen,
+  setDefenseOpen,
   clearOfficeSelection,
   work,
 }: {
@@ -145,16 +236,31 @@ export function CampaignPanel({
   command: (cmd: TimberCommand) => void;
   trade: boolean;
   officeSelected?: boolean;
+  gateSelected?: boolean;
+  southVisits?: number;
+  defenseOpen?: boolean;
+  setDefenseOpen?: (open: boolean) => void;
   clearOfficeSelection: () => void;
   work: boolean;
 }) {
   const c = campaignOf(s);
   const p = campaignPage(s);
   const advice = moraleAdvice(s);
-  const advisory = advice && (
-    <p className="campaign-advisory" role="status">
-      <strong>{advice[0]}</strong> {advice[1]}
-    </p>
+  const rumor = gatheringRumor(s);
+  const advisory = (
+    <>
+      {" "}
+      {rumor && (
+        <p className="campaign-advisory" role="status">
+          <strong>{rumor[0]}</strong> {rumor[1]}
+        </p>
+      )}{" "}
+      {advice && (
+        <p className="campaign-advisory" role="status">
+          <strong>{advice[0]}</strong> {advice[1]}
+        </p>
+      )}
+    </>
   );
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
@@ -162,40 +268,79 @@ export function CampaignPanel({
   const [manualOffice, setManualOffice] = useState(false);
   const canOpenOffice = !["opening", "departure"].includes(c.beat);
   const office = canOpenOffice && (manualOffice || officeSelected);
+  const populatedCapital = c.beat === "capital" && !!s.bokhol;
+  const [south, setSouth] = useState(false);
+  useEffect(() => {
+    if (southVisits) setSouth(true);
+  }, [southVisits]);
+  useEffect(() => {
+    if (gateSelected && populatedCapital) setSouth(true);
+    else if (gateSelected) setDefenseOpen?.(true);
+  }, [gateSelected, setDefenseOpen, populatedCapital]);
   const [sound, setSound] = useState(false);
   const { audioRef } = useAudio();
   const canPetition =
-    ["patrol", "roads", "capital", "arrival", "winter", "vigil"].includes(
-      c.beat,
-    ) && c.petitionDay !== s.world.day;
+    [
+      "patrol",
+      "roads",
+      "capital",
+      "arrival",
+      "winter",
+      "forecast",
+      "vigil",
+    ].includes(c.beat) && policyWait(s) === 0;
   const petitionOpen = petition && canPetition;
+  const [lossShown, setLossShown] = useState(false);
+  useEffect(() => {
+    if (c.ending !== "collapse") {
+      setLossShown(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setLossShown(true), 4500);
+    return () => window.clearTimeout(timer);
+  }, [c.ending]);
   const open =
-    petitionOpen || opened === p.key || (p.auto && dismissed !== p.key);
+    (c.ending !== "collapse" || lossShown) &&
+    (petitionOpen || opened === p.key || (p.auto && dismissed !== p.key));
   const petitionPage: ScenePage = {
     key: "petition-" + s.world.day,
     title: "배식 줄에서 온 청",
     music: "10",
     goal: "오늘 저녁 배식",
     auto: false,
-    lines: [
-      [
-        "덕순이",
-        "고리님, 부상자 넷이 식당 줄에 설 수가 없어요. 오늘 잡은 물고기 넷만 따로 빼 주시면 살을 발라다 먹일 수 있어요.",
-      ],
-      [
-        "길룡",
-        "제 고깃국도 한 그릇 맡아 주세요. 일어나서 못 받는다고 제 몫이 사라지는 건 아니지요?",
-      ],
-      [
-        "나르미",
-        "생선 넷을 풀면 오늘 저녁은 제가 가져다드릴게요. 비축을 지키신다면 그 사정도 제가 가서 전할게요.",
-      ],
-    ],
+    lines:
+      c.beat === "capital"
+        ? [
+            [
+              "의원",
+              "전하, 남문 병상에 누운 넷이 배식을 받으러 나올 수 없습니다. 생선 넷을 따로 내주시면 제가 살을 발라 먹이겠습니다.",
+            ],
+            ["왕", "병상 넷이라 했느냐. 곳간에 남은 몫도 함께 적어 올리라."],
+          ]
+        : [
+            [
+              "덕순이",
+              "고리님, 부상자 넷이 식당 줄에 설 수가 없어요. 오늘 잡은 물고기 넷만 따로 빼 주시면 살을 발라다 먹일 수 있어요.",
+            ],
+            [
+              "길룡",
+              "제 고깃국도 한 그릇 맡아 주세요. 일어나서 못 받는다고 제 몫이 사라지는 건 아니지요?",
+            ],
+            [
+              "나르미",
+              "생선 넷을 풀면 오늘 저녁은 제가 가져다드릴게요. 비축을 지키신다면 그 사정도 제가 가서 전할게요.",
+            ],
+          ],
     choices: [
       {
         action: "share",
-        label: "어류 4를 내어 병상까지 배달",
-        disabled: !canPay(s, "RES_FISH", 4),
+        label:
+          c.beat === "capital"
+            ? "병상 배식 반포 · 어류 4 (개량 연구·2단계 병원·식당 필요)"
+            : "어류 4를 내어 병상까지 배달",
+        disabled:
+          !canPay(s, "RES_FISH", 4) ||
+          (c.beat === "capital" && !capitalMealsReady(s)),
       },
       { action: "reserve", label: "오늘은 창고의 비축 유지" },
     ],
@@ -248,7 +393,14 @@ export function CampaignPanel({
   };
   function act(action: string) {
     command({ type: "campaign", beat: c.beat, action });
-    setOpened(null);
+    setOpened(
+      c.beat === "verdict" &&
+        action === "next" &&
+        verdictRoute(s) === "mechanical" &&
+        s.town.development.story.chungnyeong !== "mechanical"
+        ? "vigil"
+        : null,
+    );
     if (petitionOpen) {
       setPetition(false);
       return;
@@ -268,6 +420,95 @@ export function CampaignPanel({
         {s.chapter ?? 1}단계 · {CHAPTERS[(s.chapter ?? 1) - 1]}
         <small>{p.goal || p.title}</small>
       </button>
+      {populatedCapital && (
+        <>
+          <button
+            type="button"
+            aria-expanded={south}
+            onClick={() => setSouth(!south)}
+          >
+            남문 · 피난 수레
+          </button>
+          {south && (
+            <section className="south-gate-panel" aria-label="남문 피난 수레">
+              <h3>남문 피난 수레</h3>
+              <p>
+                북문 · 변종 접근　동문·서문 · 다섯 마을 교역{" "}
+                {capitalRoad(s) === "closed"
+                  ? "두절"
+                  : capitalRoad(s) === "slow"
+                    ? "지연"
+                    : "통행 가능"}
+              </p>
+              {!c.relief ? (
+                <p>먼저 어전에서 남문의 장부를 받으십시오.</p>
+              ) : (
+                <>
+                  <p>
+                    왕 “내 겨울 몫까지 풀어라. 양녕아, 남쪽 길에 솥을 걸거든
+                    뒤처진 이들도 먹이고 가거라.”
+                  </p>
+                  {(c.storeBatches ?? 0) < 4 && (
+                    <button
+                      type="button"
+                      disabled={
+                        Math.floor((s.elapsed - c.since) / 360) <=
+                        (c.storeBatches ?? 0)
+                      }
+                      onClick={() => act("open-stores")}
+                    >
+                      도성 각처에서 모아온 물자 인수 · 여섯 시간마다
+                    </button>
+                  )}
+                  {CONVOY_ITEMS.map((item) => (
+                    <div key={item}>
+                      {GAME_RULES.resources[item].name} · {c.cargo?.[item] ?? 0}{" "}
+                      / {CONVOY_GOALS[item]} · 이번 출발까지 누적{" "}
+                      {convoyTarget(s, item)}{" "}
+                      <button
+                        type="button"
+                        disabled={!convoyLoad(s, item)}
+                        onClick={() => act("load:" + item)}
+                      >
+                        {GAME_RULES.resources[item].name} {convoyLoad(s, item)}{" "}
+                        수레에 싣기
+                      </button>
+                    </div>
+                  ))}
+                  {c.departures === 2 && (
+                    <figure className="south-gate-farewell">
+                      <img
+                        src="/story/campaign/king-grandsons.webp"
+                        alt="도성 남문에서 왕이 수레 난간에 기댄 두 손자를 바라본다"
+                      />
+                      <figcaption>
+                        양녕의 세 아들이 마지막 행렬에 올랐다. 광장에 선 왕이
+                        수레 쪽을 한 번 보았다.
+                      </figcaption>
+                    </figure>
+                  )}
+                  <p>출발한 행렬 {c.departures ?? 0} / 3</p>
+                  {(c.departures ?? 0) < 3 && (
+                    <button
+                      type="button"
+                      disabled={!canDispatchConvoy(s)}
+                      onClick={() =>
+                        act("dispatch:" + ((c.departures ?? 0) + 1))
+                      }
+                    >
+                      {(c.departures ?? 0) + 1}차 수레 출발
+                    </button>
+                  )}
+                  <p>피난 명부 {c.evacuees ?? 0}명 · 목표 200명</p>
+                  <button type="button" onClick={() => act("muster")}>
+                    백성을 남문에 소집하기 · 50명씩
+                  </button>
+                </>
+              )}
+            </section>
+          )}
+        </>
+      )}
       {canOpenOffice && (
         <button
           type="button"
@@ -281,8 +522,214 @@ export function CampaignPanel({
           관아 · 순라 배치
         </button>
       )}
+      {villageDefenseActive(s) && (
+        <>
+          <button
+            type="button"
+            className="scout-all"
+            aria-expanded={!!defenseOpen}
+            onClick={() => setDefenseOpen?.(!defenseOpen)}
+          >
+            기온 {villageTemperature(s)} °C · 성문과 온돌
+            <meter
+              aria-label="마을 기온"
+              min={-25}
+              max={15}
+              low={0}
+              high={5}
+              optimum={10}
+              value={villageTemperature(s)}
+            />
+          </button>
+          {defenseOpen && (
+            <section className="office-panel" aria-label="성문과 온돌">
+              <strong>
+                성문 수비병{" "}
+                {
+                  s.residents.filter(
+                    (r) => r.workplaceId === "gate" && r.health === "healthy",
+                  ).length
+                }
+                명
+              </strong>
+              <p>수비병이 많으면 습격 때 다치거나 숨지는 주민이 줄어듭니다.</p>
+              {([0, 4, 8, 16] as const).map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => command({ type: "set-gate", count })}
+                >
+                  {count}명 배치
+                </button>
+              ))}
+              <strong>온돌 · 현재 화력 {s.firedHeat ?? 0}단계</strong>
+              <p>
+                {s.campaign?.beat === "capital" ? (
+                  <>
+                    거주 중인 집 한 채를 8 °C 덥히려면 화력 한 단계마다 한
+                    시간에 석탄 1이 필요합니다. 석탄이 모자라면 부족한 석탄 1당
+                    예약되지 않은 목재 {GAME_RULES.fuel.coalToWood}을 대신
+                    씁니다. 땔감이 모자라면 남은 만큼만 땝니다.
+                  </>
+                ) : (
+                  <>
+                    추워지면 집집마다 불을 더 땝니다. 거주 중인 집 한 채가 화력
+                    한 단계마다 한 시간에 목재 1을 써서 8 °C를 덥힙니다. 땔감이
+                    모자라면 남은 만큼만 땝니다.
+                  </>
+                )}
+              </p>
+              {[0, 1, 2, 3].map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  aria-pressed={(s.heating ?? 0) === level}
+                  onClick={() => command({ type: "set-heating", level })}
+                >
+                  {level ? "최소 " + level + "단계" : "자동"}
+                </button>
+              ))}
+            </section>
+          )}
+          {s.sighting && (
+            <section className="office-panel" aria-label="변종 목격 기록">
+              <img
+                src={"/art/mutant-" + s.sighting.species + ".webp"}
+                alt={"붉어진 눈의 " + mutantNames[s.sighting.species]}
+              />
+              <strong>
+                {s.sighting.source === "gate"
+                  ? "성문 야경 보고"
+                  : "정찰대 목격 보고"}{" "}
+                · {mutantNames[s.sighting.species]}
+              </strong>
+              <p>
+                {s.sighting.source === "gate"
+                  ? "문지기: 저놈, 지난겨울엔 내 손에서 여물을 받아먹었습니다. 오늘 밤엔 제 이름을 불러도 문짝만 들이받더군요."
+                  : "정찰대원: 처음엔 횃불인 줄 알았습니다. 불 두 점이 같이 깜박이더니 눈밭을 가로질러 우리한테 달려들었습니다."}
+              </p>
+            </section>
+          )}
+          {s.mutants?.map((m) => {
+            const species = s.world.citizens.find(
+              (r) => r.id === m.id,
+            )!.species;
+            return (
+              <section
+                key={m.id}
+                className="office-panel"
+                aria-label="마을 안 변종"
+              >
+                <img
+                  src={"/art/mutant-" + species + ".webp"}
+                  alt={"눈이 붉어진 " + mutantNames[species]}
+                />
+                <strong>마을 안 변종 · {mutantNames[species]}</strong>
+                <p>
+                  달이: 붕대를 갈아 주던 손을 뿌리쳤어. 저 힘으로 기둥을 밀면
+                  지붕이 내려앉아. 새끼들은 이쪽으로 데려올게!
+                </p>
+                {s.campaign?.beat === "capital" ? (
+                  <p>도성 치안대가 출동했습니다.</p>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={
+                      !s.residents.some(
+                        (r) =>
+                          r.workplaceId === "office" && r.health === "healthy",
+                      )
+                    }
+                    onClick={() =>
+                      command({ type: "contain-mutant", resident: m.id })
+                    }
+                  >
+                    치안대 출동
+                  </button>
+                )}
+              </section>
+            );
+          })}
+          {Object.entries(s.mutantDamage ?? {}).map(([id, damage]) => {
+            const target =
+              s.homes.find((h) => h.id === id) ??
+              s.town.facilities.find((f) => f.id === id);
+            if (!target) return null;
+            const cost = mutantRepairCost(s, id);
+            return (
+              <section className="office-panel" key={id}>
+                <strong>
+                  {mutantStructure(s, id)?.name} · 내구도 {100 - damage}/100
+                </strong>
+                <small>
+                  위치 {Math.round(target.position.x)},{" "}
+                  {Math.round(target.position.z)}
+                </small>
+                <button
+                  type="button"
+                  disabled={
+                    !canPay(s, "RES_WOOD", cost.RES_WOOD) ||
+                    !canPay(s, "RES_STONE", cost.RES_STONE)
+                  }
+                  onClick={() =>
+                    command({ type: "repair-mutant", building: id })
+                  }
+                >
+                  수리 · 목재 {cost.RES_WOOD}, 석재 {cost.RES_STONE}
+                </button>
+              </section>
+            );
+          })}
+          {s.raid && (
+            <section className="office-panel" aria-label="성문 전투 보고">
+              <img
+                src={"/art/raid-" + (s.raid.picture + 1) + ".webp"}
+                alt="복홀 성문의 수비 기록"
+              />
+              <strong>성문 전투 보고</strong>
+              <p>
+                붉은 눈의 변종들이 성문에서 물러났습니다.{" "}
+                {s.raid.dead || s.raid.injured
+                  ? `사망 ${s.raid.dead}명 · 부상 ${s.raid.injured}명`
+                  : "모두 무사합니다."}
+              </p>
+              <button
+                type="button"
+                onClick={() => command({ type: "dismiss-raid" })}
+              >
+                보고 확인
+              </button>
+            </section>
+          )}
+        </>
+      )}
       {office && (
         <section className="office-panel" aria-label="관아">
+          <strong>관아에서 반포할 배급령</strong>
+          {(["needs", "cap"] as const).map((policy) => (
+            <button
+              key={policy}
+              type="button"
+              aria-pressed={s.rationPolicy === policy}
+              disabled={policyWait(s) > 0 || s.rationPolicy === policy}
+              onClick={() => command({ type: "set-ration-policy", policy })}
+            >
+              {policy === "needs" ? "필요량에 따른 배급" : "식단별 배급 상한"}{" "}
+              {s.rationPolicy === policy ? "시행 중" : "반포"}
+            </button>
+          ))}
+          {c.beat === "capital" && (
+            <p>
+              {capitalMealsReady(s)
+                ? "병상 배식을 맡길 병원과 식당이 준비됐습니다."
+                : "병상 배식에는 병원 개량 연구와 운영 가능한 2단계 병원·식당이 필요합니다."}
+            </p>
+          )}
+          {canPetition && (
+            <button type="button" onClick={() => setPetition(true)}>
+              청원을 읽고 반포
+            </button>
+          )}
           <img
             src="/art/village-office.webp"
             alt="마을 북쪽 관아와 방을 붙이는 포졸"
@@ -323,6 +770,12 @@ export function CampaignPanel({
           <small>“{s.decree.reaction}”</small>
         </aside>
       )}
+      {policyWait(s) > 0 && (
+        <small>
+          다음 반포까지 {Math.floor(policyWait(s) / 60)}시간{" "}
+          {policyWait(s) % 60}분
+        </small>
+      )}
       {canPetition && (
         <button
           type="button"
@@ -332,15 +785,26 @@ export function CampaignPanel({
           주민의 청 듣기
         </button>
       )}
-      {["patrol", "roads", "capital", "arrival", "winter", "vigil"].includes(
-        c.beat,
-      ) && (
+      {[
+        "patrol",
+        "roads",
+        "capital",
+        "arrival",
+        "winter",
+        "forecast",
+        "vigil",
+      ].includes(c.beat) && (
         <button
           type="button"
           className="scout-all"
-          onClick={() => command({ type: "advance", minutes: 1440 })}
+          onClick={() =>
+            command({
+              type: "advance",
+              minutes: c.beat === "capital" ? 720 : 1440,
+            })
+          }
         >
-          마을 하루 진행
+          {c.beat === "capital" ? "도성 반나절 경영" : "마을 하루 진행"}
         </button>
       )}
       {open ? (

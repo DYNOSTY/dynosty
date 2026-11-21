@@ -197,3 +197,40 @@
     animation: none;
   }
 }
+
+.play-shell .campaign-quest:has(.office-panel, .south-gate-panel) {
+  max-height: min(56dvh, 36rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fallen-settlement canvas {
+  animation: settlement-fades 4s ease-out forwards;
+}
+@keyframes settlement-fades {
+  to {
+    filter: grayscale(1);
+  }
+}
+.fallen-caption {
+  position: absolute;
+  z-index: 2;
+  top: 40%;
+  width: 100%;
+  text-align: center;
+  color: white;
+  text-shadow: 0 2px 5px black;
+  pointer-events: none;
+}
+.fallen-caption small {
+  display: block;
+  margin-top: 1em;
+}
+
+.south-gate-farewell {
+  margin: 0.5rem 0;
+}
+.south-gate-farewell img {
+  display: block;
+  width: 100%;
+}

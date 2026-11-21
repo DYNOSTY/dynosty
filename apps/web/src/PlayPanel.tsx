@@ -14,6 +14,7 @@ type Props = {
   busy: boolean;
   onCommand: (command: PlayCommand) => void;
   compact?: boolean;
+  settlement?: string;
   day?: number | undefined;
   minute?: number | undefined;
 };
@@ -23,13 +24,17 @@ export function PlayPanel({
   busy,
   onCommand,
   compact = false,
+  settlement = "복홀",
   day,
   minute,
 }: Props) {
   const [confirm, setConfirm] = useState(false);
   if (!state)
     return (
-      <section className="settlement-dashboard" aria-label="복홀 현황">
+      <section
+        className="settlement-dashboard"
+        aria-label={settlement + " 현황"}
+      >
         <p role={error ? "alert" : undefined}>
           {error ?? "게임 기준을 불러오는 중입니다."}
         </p>
@@ -39,10 +44,10 @@ export function PlayPanel({
   const minutes = minute ?? state.minute;
   const clock = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
   return (
-    <section className="settlement-dashboard" aria-label="복홀 현황">
+    <section className="settlement-dashboard" aria-label={settlement + " 현황"}>
       <div className="settlement-heading">
         <div>
-          <h2 className="settlement-title">복홀 현황</h2>
+          <h2 className="settlement-title">{settlement} 현황</h2>
           <p>
             <span data-testid="play-population">
               주민 {state.citizens.filter((c) => c.alive).length}명

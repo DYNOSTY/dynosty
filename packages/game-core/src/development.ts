@@ -158,6 +158,11 @@ export function townShiftOpen(s: TimberState, target: string): boolean {
 }
 export function residentShiftOpen(s: TimberState, id: string): boolean {
   const r = s.residents.find((r) => r.id === id);
+  if (
+    r?.workplaceId?.startsWith("facility:") &&
+    s.mutantDamage?.[r.workplaceId.slice(9)] === 100
+  )
+    return false;
   const order = s.town.orders.find((o) => o.crew.includes(id));
   return (
     isMechanical(s, id) ||

@@ -6,6 +6,8 @@ import type { Scene } from "@babylonjs/core/scene";
 import {
   AMOUNT_SCALE,
   builderWorkPosition,
+  CONVOY_GOALS,
+  CONVOY_ITEMS,
   homeWorkPosition,
   TIMBER_RULES,
   type TimberState,
@@ -63,6 +65,17 @@ export function createTimberVisual(scene: Scene) {
     shaft.material = brown;
     parts.push(shaft);
   }
+  const convoyCarts = CONVOY_ITEMS.map((item, index) => {
+    const cart = base.clone("south-gate-" + item);
+    cart.position.set(-6 + index * 3, 0.42, 25);
+    const load = cart
+      .getChildMeshes()
+      .find((mesh) => mesh.name.endsWith(cargo.name))!;
+    for (const part of [cart, ...cart.getChildMeshes()])
+      part.metadata = { villageTarget: "village:BLD_GATE:0:23" };
+    cart.setEnabled(false);
+    return { cart, load, item };
+  });
   const waiting = CreateBox(
     "timber-waiting-stock",
     { width: 0.7, height: 0.5, depth: 0.7 },
@@ -223,6 +236,21 @@ export function createTimberVisual(scene: Scene) {
     update(s: TimberState | null) {
       loggingVisual.update(s);
       active = s !== null;
+      for (const { cart, load, item } of convoyCarts) {
+        cart.setEnabled(
+          s?.campaign?.beat === "capital" && (s.campaign.departures ?? 0) < 3,
+        );
+        if (s?.campaign?.beat === "capital") {
+          cart.position.y =
+            terrainElevation(s)(cart.position.x, cart.position.z) + 0.42;
+          const sent = Math.floor(
+            (CONVOY_GOALS[item] * (s.campaign.departures ?? 0)) / 3,
+          );
+          const amount = (s.campaign.cargo?.[item] ?? 0) - sent;
+          load.setEnabled(amount > 0);
+          load.scaling.y = 0.25 + (3 * amount) / CONVOY_GOALS[item];
+        }
+      }
       for (const m of parts) m.setEnabled(active);
       buildSite.setEnabled(s !== null && s.construction !== null);
       buildSite.rotation.y = s?.construction?.headingRadians ?? 0;
@@ -403,6 +431,7 @@ export function createTimberVisual(scene: Scene) {
       }
     },
     dispose() {
+      for (const { cart } of convoyCarts) cart.dispose();
       loggingVisual.dispose();
       handles.dispose();
       buildSite.dispose();

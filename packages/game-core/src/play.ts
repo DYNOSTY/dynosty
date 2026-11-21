@@ -283,7 +283,7 @@ export function parsePlayState(
     value.buildings.length > 100 ||
     !Array.isArray(value.citizens) ||
     value.citizens.length === 0 ||
-    value.citizens.length > 600
+    value.citizens.length > 1000
   )
     fail();
   const resourceSource: Record<string, unknown> = {
@@ -503,6 +503,7 @@ export function evictionDelay(
   return difficulty === "hard" ? 0 : rules.endings.evictionMinutes;
 }
 export interface OutcomeFacts {
+  hopeAtCoup?: number;
   difficulty?: Difficulty;
   admitted: number;
   dead: number;
@@ -520,7 +521,7 @@ export interface OutcomeFacts {
 export function evaluateOutcome(
   f: OutcomeFacts,
   rules: RuleSet = GAME_RULES,
-): "failure" | "ending-a" | "ending-b" | "continue" {
+): "failure" | "ending-a" | "ending-b" | "ending-c" | "continue" {
   number(f.admitted, 1, 100_000, true);
   number(f.dead, 0, f.admitted, true);
   number(f.pessimism, 0, 100);
@@ -541,22 +542,15 @@ export function evaluateOutcome(
     f.dead / f.admitted >= rules.endings.deathFraction
   )
     return "failure";
-  if (
-    f.stage5Minutes < rules.campaign.stage5MinimumDays * 1440 ||
-    !rules.campaign.clues.every((c) => f.clues.includes(c)) ||
-    !rules.campaign.researchOrder.every((r) => f.research.includes(r))
-  )
+  if (!f.route || f.stage5Minutes < rules.campaign.stage5MinimumDays * 1440)
     return "continue";
-  if (
-    f.route === "coexist" &&
-    f.pessimism <= rules.endings.endingAPessimism &&
-    f.lowPessimismMinutes >= rules.endings.endingAHoldDays * 1440
-  )
-    return "ending-a";
-  if (f.route === "yangnyeong" && f.research.includes("R19") && f.mech2)
-    return "ending-b";
-  return "continue";
+  if (f.route === "yangnyeong") return "ending-c";
+  const hope = f.hopeAtCoup ?? f.optimism;
+  number(hope, 0, 100);
+  if (hope >= COUP_SURVIVAL_HOPE) return "ending-a";
+  return f.mech2 ? "ending-b" : "continue";
 }
+export const COUP_SURVIVAL_HOPE = 70;
 export interface PlaySave {
   readonly format: "dynosty-play";
   readonly saveVersion: 1;
@@ -627,16 +621,18 @@ export type CitizenEvent =
       citizenIds: readonly string[];
       severity?: "minor" | "major" | "critical";
     };
+export type CitizenEventRecording = boolean | "if-room";
 export function applyCitizenEvent(
   input: PlayState,
   event: CitizenEvent,
-  record = true,
+  record: CitizenEventRecording = true,
 ): PlayState {
   const s = parsePlayState(input);
   text(event.id);
   if (event.id.length > 100) fail();
   if (s.citizenEvents?.includes(event.id)) return s;
-  if (record && (s.citizenEvents?.length ?? 0) >= 2000) fail();
+  const full = (s.citizenEvents?.length ?? 0) >= 2000;
+  if (record === true && full) fail();
   let citizens = [...s.citizens];
   if (event.type === "mechanize") {
     const source = citizens.find((c) => c.id === event.sourceCitizenId);
@@ -670,7 +666,11 @@ export function applyCitizenEvent(
       if (!definition || species.has(group.species)) fail();
       species.add(group.species);
       number(group.count, 1, 600, true);
-      if (citizens.length + group.count > 600) fail();
+      if (
+        citizens.length + group.count >
+        (event.id === "capital-refugees" ? 1000 : 600)
+      )
+        fail();
       for (let i = 0; i < group.count; i++) {
         const id = `arrival:${event.id}:${group.species}:${i}`;
         if (citizens.some((c) => c.id === id)) fail();
@@ -716,7 +716,10 @@ export function applyCitizenEvent(
   return parsePlayState({
     ...s,
     citizens,
-    ...(record && { citizenEvents: [...(s.citizenEvents ?? []), event.id] }),
+    ...(record &&
+      !full && {
+        citizenEvents: [...(s.citizenEvents ?? []), event.id],
+      }),
   });
 }
 export function advancePlayClock(input: PlayState, minutes: number): PlayState {
