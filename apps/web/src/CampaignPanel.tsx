@@ -58,6 +58,7 @@ function SceneDialog({
   close: () => void;
   act: (action: string, difficulty?: "normal" | "hard") => void;
 }) {
+  const palaceFilm = page.illustration === "king-palace-night";
   const dialog = useRef<HTMLDialogElement>(null);
   const [cursor, setCursor] = useState(0);
   const [pending, setPending] = useState("");
@@ -211,7 +212,15 @@ function SceneDialog({
               alt="도성 광장에 홀로 선 왕의 뒷모습"
             />
           )}
-          {!flashback &&
+          {palaceFilm && (
+            <img
+              className="campaign-still"
+              src={media + "king-palace-night-half-speed.gif"}
+              alt="궁궐 침전에서 피습당한 왕"
+            />
+          )}
+          {!palaceFilm &&
+            !flashback &&
             !frame &&
             (familyScene || later || page.illustration) && (
               <img
