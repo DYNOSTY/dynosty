@@ -222,7 +222,7 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   for (const [delta, limit] of [
     [-10000, 4],
-    [100000, 140],
+    [100000, 72], // 축소 한계 (scene.ts CAMERA_MAX_RADIUS — 시야 고정, 임시 값)
   ] as const) {
     // 새 카메라는 휠 한 번의 변화를 제한한다. 실제 입력을 반복해 한계를 확인한다.
     await expect

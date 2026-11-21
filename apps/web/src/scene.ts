@@ -38,6 +38,11 @@ import { createZoneVisual } from "./zone-scene.js";
 // B 레퍼런스(Dorfromantik)처럼 비스듬히 내려다보기: 수평에서 36° (beta는 수직에서 잰 각)
 const CAMERA_BETA = ((90 - 36) * Math.PI) / 180;
 const CAMERA_RADIUS = 56;
+// 시야 고정 (2026-11-21 사용자: "기울기 지금 고정, 확대·축소랑 옆으로 이동만"):
+// 확대는 가까이까지, 축소는 마을 둘레가 화면에 차는 데서 멈춤 — 맵 끝·안 가본 곳이 드러나지 않게.
+// ⚠ 축소 한계와 이동 범위는 임시 값 (사용자가 로컬에서 보고 정함)
+export const CAMERA_MIN_RADIUS = 4;
+export const CAMERA_MAX_RADIUS = 72;
 // 아래 콘솔이 화면 30%를 덮으므로 바라보는 점을 앞으로 당겨 섬을 위 칸 가운데에 둠
 const CAMERA_TARGET = new Vector3(0, 0, -7);
 
@@ -97,7 +102,7 @@ export type CameraInfo = {
   heading: number;
 };
 // 시점을 옮길 수 있는 범위(섬 반지름 안쪽)
-const PAN_LIMIT = 58;
+const PAN_LIMIT = 36; // 시야 고정: 마을 둘레 안에서만 이동 (임시 값, 예전 58)
 
 export function mountScene(
   canvas: HTMLCanvasElement,
@@ -121,13 +126,18 @@ export function mountScene(
     scene,
   );
   camera.attachControl(canvas, true);
-  camera.lowerRadiusLimit = 4;
-  camera.upperRadiusLimit = 140;
+  // 돌리기·기울이기는 막음: 끌기는 어느 단추든 옆으로 이동, 휠 = 확대·축소.
+  // (Babylon 9의 입력 연결표에서 "돌리기"로 이어진 끌기를 모두 "이동"으로 바꿈)
+  for (const entry of camera.movement.input.inputMap)
+    if (entry.source === "pointer" && entry.interaction === "rotate")
+      entry.interaction = "pan";
+  camera.lowerRadiusLimit = CAMERA_MIN_RADIUS;
+  camera.upperRadiusLimit = CAMERA_MAX_RADIUS;
   camera.wheelDeltaPercentage = 0.01; // 휠 확대를 거리에 비례하게
   camera.lowerBetaLimit = 0.2;
   camera.upperBetaLimit = 1.35;
-  // 시점 옮기기: 오른쪽 버튼 끌기(또는 Ctrl+왼쪽) · WASD. 땅과 나란히만 움직임
-  camera.panningSensibility = 60;
+  // 시점 옮기기: 왼쪽 버튼 끌기 · WASD·방향키. 땅과 나란히만 움직임
+  camera.panningSensibility = 75; // 끌기 이동 속도 (클수록 느림). 사용자 11/21 "휙휙 움직인다, 20% 감소" → 60에서 75로
   camera.panningAxis = new Vector3(1, 0, 1);
   camera.mapPanning = true;
   camera.panningInertia = 0.85;
@@ -341,10 +351,42 @@ export function mountScene(
       held.add(e.key.toLowerCase());
   };
   const onKeyUp = (e: KeyboardEvent) => held.delete(e.key.toLowerCase());
-  const onBlur = () => held.clear();
+  // 화면 가장자리로 마우스를 보내면 그쪽으로 이동 (스타크래프트·롤 방식, 모서리는 대각선). 창 밖으로 나가면 멈춤.
+  // 자동 시험에서는 끔 — 구석을 누르는 시험에서 화면이 저절로 흘러가지 않게
+  // 단추·지도 같은 누를 것 위에서는 움직이지 않고, 가장자리에 0.25초 머물러야 움직임 — 단추를 누르러 가다 화면이 흘러가지 않게
+  const EDGE = 24;
+  const EDGE_DWELL = 250;
+  let edge: [number, number] | null = null;
+  let edgeSince = 0;
+  const onEdgeMove = (e: MouseEvent) => {
+    const x = e.clientX < EDGE ? -1 : e.clientX > innerWidth - EDGE ? 1 : 0;
+    const y = e.clientY < EDGE ? 1 : e.clientY > innerHeight - EDGE ? -1 : 0;
+    const onControl =
+      e.target instanceof Element &&
+      !!e.target.closest(
+        "button, a, input, select, textarea, [role=button], [role=dialog], .g-minimap",
+      );
+    if ((!x && !y) || onControl) {
+      edge = null;
+      return;
+    }
+    if (!edge || edge[0] !== x || edge[1] !== y) edgeSince = performance.now();
+    edge = [x, y];
+  };
+  const offEdge = () => {
+    edge = null;
+  };
+  const onBlur = () => {
+    held.clear();
+    edge = null;
+  };
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
   window.addEventListener("blur", onBlur);
+  if (!navigator.webdriver) {
+    window.addEventListener("mousemove", onEdgeMove);
+    document.documentElement.addEventListener("mouseleave", offEdge);
+  }
   let cameraKey = "";
   let lastW = 0;
   let trackTick = 0;
@@ -386,9 +428,17 @@ export function mountScene(
     if (held.has("s") || held.has("arrowdown")) v.subtractInPlace(fwd);
     if (held.has("d") || held.has("arrowright")) v.addInPlace(right);
     if (held.has("a") || held.has("arrowleft")) v.subtractInPlace(right);
+    // 가장자리 이동은 키보드보다 느리게 (1초에 화면 반쯤 — 휙 지나가지 않게)
+    const byKeys = v.lengthSquared() > 0;
+    if (!byKeys && edge && performance.now() - edgeSince >= EDGE_DWELL) {
+      v.addInPlace(right.scale(edge[0]));
+      v.addInPlace(fwd.scale(edge[1]));
+    }
     if (v.lengthSquared() > 0)
-      camera.target.addInPlace(v.normalize().scale(camera.radius * 0.8 * dt));
-    // 섬 밖으로는 못 나감
+      camera.target.addInPlace(
+        v.normalize().scale(camera.radius * (byKeys ? 0.8 : 0.45) * dt),
+      );
+    // 옆으로 이동은 마을 둘레 안에서만 (마우스 끌기·키보드 모두)
     const t = camera.target;
     const d = Math.hypot(t.x, t.z);
     if (d > PAN_LIMIT) {
@@ -618,7 +668,7 @@ export function mountScene(
       if (active !== demoActive) {
         demoActive = active;
         // 조달은 따로 떨어진 판이 아니라 섬 광장(온돌 둥지 둘레)에서 진행 — 세계가 이어지게
-        camera.upperRadiusLimit = active ? 48 : 140;
+        camera.upperRadiusLimit = active ? 48 : CAMERA_MAX_RADIUS;
         resetWorldCamera();
         if (active) {
           camera.radius = 24;
@@ -768,6 +818,8 @@ export function mountScene(
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
+      window.removeEventListener("mousemove", onEdgeMove);
+      document.documentElement.removeEventListener("mouseleave", offEdge);
       abort.abort();
       observer.disconnect();
       stopPicking();
