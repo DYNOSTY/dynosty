@@ -675,6 +675,7 @@ export function App() {
         const quests = document
           .querySelector(".g-quests")
           ?.getBoundingClientRect();
+        const placed: Array<{ x: number; y: number }> = [];
         for (const [id, pt] of Object.entries(pos)) {
           const el = pinRefs.current[id];
           if (!el) continue;
@@ -714,6 +715,15 @@ export function App() {
             y - up < quests.bottom + 8
           )
             y = quests.bottom + 8 + up;
+          // 가장자리에 붙은 표식끼리 포개지면 아래로 밀어 냄
+          // (갈대나루·돌등 사냥막이 같은 자리에 겹쳐 갈대나루를 누를 수 없었음, 11/21)
+          const pw = el.offsetWidth + 6,
+            ph = el.offsetHeight + 6;
+          while (
+            placed.some((o) => Math.abs(o.x - x) < pw && Math.abs(o.y - y) < ph)
+          )
+            y += ph;
+          placed.push({ x, y });
           el.style.left = `${x}px`;
           el.style.top = `${y}px`;
           el.classList.toggle("is-edge", !inside);
