@@ -184,9 +184,23 @@ test("밤에 달이가 배급령 변경을 재촉하고 주민 청을 거절하�
   await expect(warning).toContainText("오늘 밤 배급령부터 바꾸자");
   await page.getByRole("button", { name: "주민의 청 듣기" }).click();
   await readScene(page, "오늘은 창고의 비축 유지");
-  await expect(page.locator(".fallen-caption .result-quote footer")).toHaveText(
-    "고리",
+  await expect(page.locator(".fallen-caption")).toHaveText(
+    "당신이 알던 대로 공룡 문명은 멸망했습니다.과거의 편린",
+    { useInnerText: false },
   );
+  const caption = page.locator(".fallen-caption");
+  const alignedBelow = await caption.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element.firstChild!);
+    const sentence = range.getBoundingClientRect();
+    range.selectNodeContents(element.querySelector("small")!);
+    const credit = range.getBoundingClientRect();
+    return (
+      credit.top >= sentence.bottom &&
+      Math.abs(credit.right - sentence.right) <= 1
+    );
+  });
+  expect(alignedBelow).toBe(true);
   await expect(page.getByRole("dialog")).toHaveAccessibleName(
     "아무도 깨우지 않는 아침",
   );

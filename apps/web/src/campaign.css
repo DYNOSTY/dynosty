@@ -216,7 +216,10 @@
   position: absolute;
   z-index: 2;
   top: 40%;
-  width: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 100%;
   text-align: center;
   color: white;
   text-shadow: 0 2px 5px black;
@@ -224,7 +227,8 @@
 }
 .fallen-caption small {
   display: block;
-  margin-top: 1em;
+  margin-top: 0.35em;
+  text-align: right;
 }
 
 .south-gate-farewell {
@@ -336,11 +340,6 @@ dialog.result-screen {
   object-fit: cover;
   filter: brightness(0.45);
   z-index: -1;
-}
-.fallen-caption .result-quote {
-  position: static;
-  transform: none;
-  margin: 1em auto;
 }
 .mission-entry h2 {
   position: absolute;

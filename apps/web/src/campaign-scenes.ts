@@ -1121,10 +1121,6 @@ export function campaignPage(s: TimberState): ScenePage {
           "달이",
           "성문 열쇠를 받으러 온 건 군졸이 아니었어. 함께 줄을 서던 이웃들이었어. 고리야, 이제 내려놓자.",
         );
-        line(
-          "고리",
-          "장부는 두고 가겠소. 죽은 이들의 이름까지 가져갈 권리는 내게 없소.",
-        );
       }
       if (c.beat === "ending")
         choice(
