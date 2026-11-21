@@ -126,6 +126,10 @@ export function convoyLoad(s: TimberState, item: keyof typeof CONVOY_GOALS) {
     ),
   );
 }
+// Four six-hour store deliveries cover the manifest; allow two more shifts for loading.
+export function capitalMinutesLeft(s: TimberState) {
+  return Math.max(0, 36 * 60 - (s.elapsed - campaignOf(s).since));
+}
 export function convoyReady(s: TimberState) {
   return s.campaign?.departures === 3;
 }
@@ -299,6 +303,8 @@ export function lostPatrol(s: TimberState) {
 }
 export function campaignOutcome(s: TimberState): Campaign["ending"] {
   const c = campaignOf(s);
+  if (c.beat === "capital")
+    return capitalMinutesLeft(s) === 0 && !convoyReady(s) ? "collapse" : null;
   const delay = evictionDelay(c.difficulty);
   if (
     s.world.pessimism >= GAME_RULES.endings.evictionPessimism &&
@@ -354,7 +360,7 @@ export function updateCampaign(s: TimberState): TimberState {
   if (!c || c.ending) return s;
   const rules = GAME_RULES.endings;
   const pessimismExtremeSince =
-    s.world.pessimism >= rules.evictionPessimism
+    c.beat !== "capital" && s.world.pessimism >= rules.evictionPessimism
       ? (c.pessimismExtremeSince ?? s.elapsed)
       : null;
   const optimismZeroSince =
@@ -460,6 +466,8 @@ export function actCampaign(
   const c = campaignOf(s),
     action = command.action;
   if (command.beat !== c.beat) throw Error("이미 지난 장면입니다.");
+  if (c.beat === "capital" && capitalMinutesLeft(s) === 0 && !convoyReady(s))
+    return updateCampaign(s);
   const change = (
     beat: Beat,
     patch: Partial<Campaign> = {},

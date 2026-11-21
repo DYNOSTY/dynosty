@@ -3,6 +3,7 @@ import {
   CHAPTERS,
   campaignOf,
   canPay,
+  capitalMinutesLeft,
   capitalRoad,
   convoyReady,
   emergencyRation,
@@ -107,15 +108,7 @@ export function moraleAdvice(s: TimberState): Line | undefined {
   const limits = GAME_RULES.endings;
   if (s.campaign?.ending || pessimism < limits.concernPessimism) return;
   const day = minute >= 360 && minute < 1080;
-  if (s.campaign?.beat === "capital") {
-    const words =
-      pessimism > limits.urgentPessimism
-        ? "전하, 군량을 나르던 수레까지 멈췄습니다. 지금 배급령을 고쳐 주십시오."
-        : pessimism > limits.warningPessimism
-          ? "전하, 남문 교대에 응한 이가 없습니다. 성안의 청을 들어 주십시오."
-          : "전하, 구호소 앞에 빈 그릇을 놓고 그냥 돌아가는 이들이 늘었습니다.";
-    return [day ? "나르미" : "달이", words];
-  }
+  if (s.campaign?.beat === "capital") return;
   if (pessimism > limits.urgentPessimism)
     return day
       ? [
@@ -680,10 +673,11 @@ export function campaignPage(s: TimberState): ScenePage {
           "평소의 배급은 그대로 시행하라. 각 관아는 지금 손에 있는 것으로 어느 일까지 맡을 수 있는지 아뢰라.",
         );
       }
-      page.goal = `남문 피난 명부 ${c.evacuees ?? 0}/200명 · 교역로 ${road === "closed" ? "두절" : road === "slow" ? "지연" : "통행 가능"} · 앓거나 다친 주민 ${s.residents.filter((r) => r.health !== "healthy" && r.health !== "dead").length}명 · 성안 변종 습격 부상 ${(s.world.citizenEvents ?? []).filter((id) => id.startsWith("mutant-") && Number(id.split("-").at(-1)) >= c.since).length}명`;
+      const left = capitalMinutesLeft(s);
+      page.goal = `북문이 버틸 시간 ${Math.floor(left / 60)}시간 ${left % 60}분 · 남문 피난 명부 ${c.evacuees ?? 0}/200명 · 교역로 ${road === "closed" ? "두절" : road === "slow" ? "지연" : "통행 가능"} · 앓거나 다친 주민 ${s.residents.filter((r) => r.health !== "healthy" && r.health !== "dead").length}명 · 성안 변종 습격 부상 ${(s.world.citizenEvents ?? []).filter((id) => id.startsWith("mutant-") && Number(id.split("-").at(-1)) >= c.since).length}명`;
       line(
         "수문장",
-        "전하, 북문 밖에서 변종이 성벽을 긁고 있습니다. 안에서도 하나가 눈을 붉히자 순라 돌던 포졸들이 그 골목으로 달려갔습니다.",
+        "전하, 북문 밖에 변종이 자꾸 모여듭니다. 문짝에 버팀목을 덧대도 하루 반이 고작입니다. 그 안에 남문 수레에 짐을 실어 마지막 행렬까지 내보내야 합니다.",
       );
       line(
         "왕",
@@ -1082,7 +1076,7 @@ export function campaignPage(s: TimberState): ScenePage {
       const end = c.ending ?? "collapse";
       if (end === "collapse") {
         if (chapter !== 3) page.illustration = "gori-exile";
-        else if (s.bokhol) page.illustration = "mission-3";
+        else page.illustration = "king-palace-night";
       }
       if (end !== "collapse")
         page.clip =
@@ -1131,7 +1125,9 @@ export function campaignPage(s: TimberState): ScenePage {
         choice(
           "finish",
           end === "collapse"
-            ? "추방 기록 닫기"
+            ? chapter === 3
+              ? "도성의 기록 닫기"
+              : "추방 기록 닫기"
             : "5단계 완료 · 마지막 장을 덮을까요?",
         );
       else page.auto = false;

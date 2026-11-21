@@ -399,7 +399,7 @@ export function CampaignPanel({
     return () => window.clearTimeout(timer);
   }, [c.ending]);
   const open =
-    (c.ending !== "collapse" || lossShown) &&
+    (c.ending !== "collapse" || s.chapter === 3 || lossShown) &&
     (petitionOpen || opened === p.key || (p.auto && dismissed !== p.key));
   const petitionPage: ScenePage = {
     key: "petition-" + s.world.day,

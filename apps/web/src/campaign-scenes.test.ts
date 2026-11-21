@@ -184,7 +184,7 @@ it("도성에서 실패하면 도성 삽화를 보여 주고 고리의 추방 �
     ...city,
     campaign: { ...city.campaign!, beat: "ending", ending: "collapse" },
   });
-  expect(page.illustration).toBe("mission-3");
+  expect(page.illustration).toBe("king-palace-night");
   expect(page.lines).toEqual([["", ""]]);
   expect(page.choices.map((choice) => choice.action)).toContain("finish");
 });

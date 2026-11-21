@@ -383,7 +383,24 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
   }
 }, 120_000);
 
-it.each([1, 2, 3, 4, 5] as const)(
+it("도성은 민심과 관계없이 세 번째 수레를 보내지 못한 채 36시간이 지나면 함락된다", () => {
+  const base = createVillageGame();
+  const city: TimberState = {
+    ...base,
+    chapter: 3,
+    elapsed: 300,
+    campaign: { ...newCampaign("capital", 300), difficulty: "hard" },
+    world: { ...base.world, pessimism: 100 },
+  };
+  const before = restore(later(city, 36 * 60 - 1));
+  expect(before.campaign?.ending).toBeNull();
+  expect(later(before, 1).campaign?.ending).toBe("collapse");
+  expect(
+    later({ ...before, campaign: { ...before.campaign!, departures: 3 } }, 1)
+      .campaign?.ending,
+  ).toBeNull();
+});
+it.each([1, 2, 4, 5] as const)(
   "단계 %i에서 99는 버티고 100에 닿으면 난이도에 따라 추방된다",
   (chapter) => {
     const base = createVillageGame();

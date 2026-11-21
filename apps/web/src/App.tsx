@@ -589,7 +589,8 @@ export function App() {
       sceneRef.current?.setGameMinutes(gameMinutes);
   }, [gameMinutes, sceneStatus]);
   const villageVisible = !!timberState && !laborOpen;
-  const fallen = timberState?.campaign?.ending === "collapse";
+  const fallen =
+    timberState?.chapter !== 3 && timberState?.campaign?.ending === "collapse";
   useEffect(() => {
     if (fallen && sceneStatus === "준비 완료") sceneRef.current?.overview(true);
   }, [fallen, sceneStatus]);
@@ -1794,10 +1795,12 @@ export function App() {
           ) : (
             !showTrade && dialogue
           )}
-          <MoodScale
-            hope={displayedWorld?.optimism ?? null}
-            despair={displayedWorld?.pessimism ?? null}
-          />
+          {timberState?.chapter !== 3 && (
+            <MoodScale
+              hope={displayedWorld?.optimism ?? null}
+              despair={displayedWorld?.pessimism ?? null}
+            />
+          )}
         </div>
         <nav className="play-menu g-console__cmd" aria-label="게임 메뉴">
           <CmdButton
