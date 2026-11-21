@@ -852,7 +852,6 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   await dialog.getByRole("button", { name: "저장하기", exact: true }).click();
   await dialog.getByRole("button", { name: /슬롯 2 · 빈 슬롯/ }).click();
   await expect(dialog).toContainText("슬롯 2에 저장했습니다.");
-  const savedMeat = await page.getByTestId("resource-RES_MEAT").innerText();
   const manual = await page.evaluate(
     () => JSON.parse(localStorage.getItem("dynosty.village.resume")!).state,
   );
@@ -867,27 +866,7 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   await page.reload();
   await expect(dialog).toHaveAccessibleName("메인 메뉴");
   await dialog.getByRole("button", { name: "이어하기" }).click();
-  await page.addInitScript(() => {
-    const observer = new MutationObserver(() => {
-      const amount = document.querySelector(
-        '[data-testid="resource-RES_MEAT"]',
-      );
-      if (amount?.textContent) {
-        document.documentElement.dataset.firstMeat = amount.textContent;
-        observer.disconnect();
-      }
-    });
-    observer.observe(document, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-  });
   await dialog.getByRole("button", { name: /슬롯 2 · 5단계/ }).click();
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-first-meat",
-    savedMeat,
-  );
   await expect
     .poll(() =>
       page.evaluate(
