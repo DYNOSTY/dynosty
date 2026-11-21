@@ -1121,13 +1121,14 @@ export function campaignPage(s: TimberState): ScenePage {
           "성문 열쇠를 받으러 온 건 군졸이 아니었어. 함께 줄을 서던 이웃들이었어. 고리야, 이제 내려놓자.",
         );
       }
-      if (c.beat === "ending")
+      if (c.beat === "ending" && chapter === 3 && end === "collapse") {
+        page.title = "3단계 실패 · 도성 함락";
+        choice("retry-capital", "다시 시작");
+      } else if (c.beat === "ending")
         choice(
           "finish",
           end === "collapse"
-            ? chapter === 3
-              ? "도성의 기록 닫기"
-              : "추방 기록 닫기"
+            ? "추방 기록 닫기"
             : "5단계 완료 · 마지막 장을 덮을까요?",
         );
       else page.auto = false;

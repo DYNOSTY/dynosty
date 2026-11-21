@@ -905,3 +905,35 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   expect(resumed.world.resources).toEqual(checkpoint.state.world.resources);
   expect(resumed.world.citizens).toEqual(checkpoint.state.world.citizens);
 });
+
+test("도성 실패 화면에 무음 피습 장면이 열린다", async ({ page }) => {
+  const village = createVillageGame();
+  const capital = createCapital({
+    ...village,
+    campaign: { ...village.campaign!, beat: "roads" },
+  });
+  const expired = commandTimber(
+    { ...capital, elapsed: capital.campaign!.since + 36 * 60 },
+    { type: "campaign", beat: "capital", action: "report" },
+    "deadline",
+  );
+  expect(expired.campaign?.ending).toBe("collapse");
+  await page.addInitScript((save) => {
+    localStorage.setItem("dynosty.village.resume", JSON.stringify(save));
+  }, createTimberSave(expired));
+  await page.goto("/");
+  const dialog = page.getByRole("dialog");
+  const scene = dialog.getByRole("img", { name: "궁궐 침전에서 피습당한 왕" });
+  await expect(scene).toBeVisible();
+  await expect(scene).toHaveAttribute(
+    "src",
+    "/story/campaign/king-palace-night-half-speed.gif",
+  );
+  await expect
+    .poll(() => scene.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(dialog.locator("audio, video")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "다시 시작" }).click();
+  await expect(dialog).toHaveAccessibleName("쥬신 왕의 어전 · 도성 남문");
+  await expect(page.getByTestId("play-population")).toContainText("1000명");
+});

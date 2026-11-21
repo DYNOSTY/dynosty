@@ -810,6 +810,26 @@ export function actCampaign(
       };
     }
     case "ending":
+      if (s.chapter === 3 && c.ending === "collapse") {
+        if (action === "retry-capital") {
+          const village = s.bokhol ?? {
+            ...createVillageGame(),
+            chapter: 2 as const,
+            campaign: {
+              ...newCampaign("roads"),
+              treaties: SETTLEMENTS.map((_, i) => i),
+            },
+          };
+          return createCapital({
+            ...village,
+            campaign: {
+              ...campaignOf(village),
+              difficulty: c.difficulty ?? "normal",
+            },
+          });
+        }
+        break;
+      }
       if (action === "finish") return change("finished");
       break;
   }
