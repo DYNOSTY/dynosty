@@ -20,7 +20,14 @@ import {
   winterReport,
   ZONES,
 } from "@dynosty/game-core";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { BUILDINGS, type BuildingAction, commandGrid } from "./buildings.js";
 import {
   CmdButton,
@@ -53,6 +60,7 @@ import { SiteProgress } from "./SiteProgress.js";
 import { StoryChoice } from "./StoryChoice.js";
 import { StoryNotice } from "./StoryNotice.js";
 import type { CameraInfo, SceneController, ScreenPoint } from "./scene.js";
+import { layoutScoutMarkers } from "./scout-marker-layout.js";
 import { SCOUT_CREW, SCOUT_GOAL, SCOUT_SITES } from "./scout-sites.js";
 import { type SiteNotice, siteCompletions } from "./site-progress.js";
 import {
@@ -172,6 +180,15 @@ export function App() {
     Record<string, { status: "going" | "found"; start: number }>
   >({});
   const [scoutOpen, setScoutOpen] = useState<string | null>(null);
+  const [scoutMenuOnly, setScoutMenuOnly] = useState(false);
+  const scoutListId = useId();
+  const scoutListTitleId = useId();
+  const scoutListRef = useRef<HTMLDialogElement>(null);
+  const scoutMenuRef = useRef<HTMLButtonElement>(null);
+  const scoutFocusFrom = useRef<Element | null>(null);
+  const scoutCloseRef = useRef<HTMLButtonElement>(null);
+  const scoutFromMenu = useRef<string | null>(null);
+  const scoutLayerRef = useRef<HTMLDivElement>(null);
   const pinRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const saveMenuRef = useRef<HTMLButtonElement>(null);
   const toolsMenuRef = useRef<HTMLButtonElement>(null);
@@ -669,75 +686,132 @@ export function App() {
         z: site.z,
       })),
       (pos: Record<string, ScreenPoint>) => {
-        // 3D 화면 칸 (위 막대·아래 콘솔 사이)
-        const W = window.innerWidth,
-          H = window.innerHeight;
-        const quests = document
-          .querySelector(".g-quests")
-          ?.getBoundingClientRect();
-        const placed: Array<{ x: number; y: number }> = [];
+        const layer = scoutLayerRef.current;
+        if (!layer) return;
+        // Measure every box before mutating styles in this frame.
+        const pins = SCOUT_SITES.flatMap(({ id }) => {
+          const el = pinRefs.current[id];
+          const point = pos[id];
+          if (!el || !point) return [];
+          const { width, height } = el.getBoundingClientRect();
+          return width > 0 && height > 0
+            ? [{ el, ...point, width, height }]
+            : [];
+        });
+        if (!pins.length) {
+          setScoutMenuOnly(false);
+          return;
+        }
+        const hud = Array.from(
+          document.querySelectorAll(
+            ".play-header, .g-topcmd, .g-quests, .g-console, .sc--medal",
+          ),
+          (el) => el.getBoundingClientRect(),
+        ).filter((r) => r.width > 0 && r.height > 0);
+        const layout = layoutScoutMarkers(
+          pins,
+          window.innerWidth,
+          window.innerHeight,
+          hud,
+        );
+
         for (const [id, pt] of Object.entries(pos)) {
+          if (!id.startsWith("party:")) continue;
           const el = pinRefs.current[id];
           if (!el) continue;
-          if (id.startsWith("party:")) {
-            // 화면 밖이면 멀리 치움 (React가 다시 그려도 위치는 이 값 그대로)
-            el.style.left = `${pt.visible ? pt.x : -9999}px`;
-            el.style.top = `${pt.visible ? pt.y : -9999}px`;
-            continue;
+          el.style.left = `${pt.visible ? pt.x : -9999}px`;
+          el.style.top = `${pt.visible ? pt.y : -9999}px`;
+        }
+        // Keep a dock only when there is usable space outside the HUD.
+        const menuOnly = layout.mode === "no-space";
+        if (layer.classList.contains("is-no-space") !== menuOnly) {
+          // Capture before hiding the pins or unmounting the menu trigger.
+          const active = document.activeElement;
+          scoutFocusFrom.current = (
+            menuOnly
+              ? layer.contains(active)
+              : active === scoutMenuRef.current
+          )
+            ? active
+            : null;
+        }
+        layer.classList.toggle("is-docked", layout.mode === "docked");
+        layer.classList.toggle("is-no-space", menuOnly);
+        setScoutMenuOnly(menuOnly);
+        if (layout.mode === "docked") {
+          const { dock } = layout;
+          layer.style.left = `${dock.left}px`;
+          layer.style.top = `${dock.top}px`;
+          layer.style.maxWidth = `${dock.right - dock.left}px`;
+          layer.style.maxHeight = `${dock.bottom - dock.top}px`;
+        } else if (layer.hasAttribute("style")) {
+          layer.removeAttribute("style");
+        }
+        if (layout.mode === "projected") {
+          layout.positions.forEach(({ x, y, edge, direction }, i) => {
+            const pin = pins[i];
+            if (!pin) return;
+            pin.el.style.left = `${x}px`;
+            pin.el.style.top = `${y}px`;
+            pin.el.classList.toggle("is-edge", edge);
+            pin.el.style.setProperty("--dir", `${direction}rad`);
+          });
+        } else {
+          for (const { el } of pins) {
+            el.style.removeProperty("left");
+            el.style.removeProperty("top");
+            el.style.removeProperty("--dir");
+            el.classList.remove("is-edge");
           }
-          // 정찰 거점: 화면 밖이면 그 방향 가장자리에 화살표로 붙임 (RTS 방식)
-          // 표식 상자가 통째로 들어오게 반 폭만큼 안쪽
-          const hw = el.offsetWidth / 2 + 16;
-          const x0 = hw,
-            x1 = W - hw,
-            y0 = 64 + 30,
-            y1 = H - 190 - 24,
-            cx = W / 2,
-            cy = (y0 + y1) / 2;
-          const inside = pt.x > x0 && pt.x < x1 && pt.y > y0 && pt.y < y1;
-          const dx = pt.x - cx,
-            dy = pt.y - cy;
-          const t = inside
-            ? 1
-            : Math.min(
-                dx ? (dx > 0 ? x1 - cx : x0 - cx) / dx : 1e9,
-                dy ? (dy > 0 ? y1 - cy : y0 - cy) / dy : 1e9,
-              );
-          let x = cx + dx * t,
-            y = cy + dy * t;
-          // 오른쪽 위 의뢰 목록과 겹치면 목록 아래로.
-          // 표식은 아래 끝이 기준점(translate -90%)이라 표식 높이만큼 더 내려야 통째로 목록 밖에 놓임
-          const up = el.offsetHeight * 0.9;
-          if (
-            !inside &&
-            quests &&
-            x + hw > quests.left &&
-            y - up < quests.bottom + 8
-          )
-            y = quests.bottom + 8 + up;
-          // 가장자리에 붙은 표식끼리 포개지면 아래로 밀어 냄
-          // (갈대나루·돌등 사냥막이 같은 자리에 겹쳐 갈대나루를 누를 수 없었음, 11/21)
-          const pw = el.offsetWidth + 6,
-            ph = el.offsetHeight + 6;
-          while (
-            placed.some((o) => Math.abs(o.x - x) < pw && Math.abs(o.y - y) < ph)
-          )
-            y += ph;
-          placed.push({ x, y });
-          el.style.left = `${x}px`;
-          el.style.top = `${y}px`;
-          el.classList.toggle("is-edge", !inside);
-          el.style.setProperty("--dir", `${Math.atan2(dy, dx)}rad`);
         }
       },
     );
   }, [sceneStatus]);
+  useLayoutEffect(() => {
+    const from = scoutFocusFrom.current;
+    scoutFocusFrom.current = null;
+    const dialog = scoutListRef.current;
+    const active = document.activeElement;
+    let id: string | undefined;
+    if (!scoutMenuOnly && dialog?.open) {
+      // An open list returns to the selected site's own map marker.
+      id = (active as HTMLElement | null)?.dataset.scoutId;
+      dialog.close();
+    } else {
+      // Leave focus alone if another control received it before React committed.
+      if (!from || (active !== from && active !== document.body)) return;
+      if (scoutMenuOnly) {
+        scoutMenuRef.current?.focus({ preventScroll: true });
+        return;
+      }
+    }
+    const pin = pinRefs.current[id ?? SCOUT_SITES[0]?.id ?? ""];
+    if (pin?.getBoundingClientRect().width) pin.focus({ preventScroll: true });
+    else canvasRef.current?.focus({ preventScroll: true });
+  }, [scoutMenuOnly]);
+  useLayoutEffect(() => {
+    if (scoutOpen && scoutFromMenu.current === scoutOpen) {
+      scoutCloseRef.current?.focus({ preventScroll: true });
+    }
+  }, [scoutOpen]);
+
   const timberReady = sceneStatus === "준비 완료";
+  function closeScout() {
+    const id = scoutFromMenu.current;
+    scoutFromMenu.current = null;
+    setScoutOpen(null);
+    if (!id) return;
+    const pin = pinRefs.current[id];
+    const next =
+      scoutMenuRef.current ??
+      (pin?.getBoundingClientRect().width ? pin : canvasRef.current);
+    next?.focus({ preventScroll: true });
+  }
   // 뜨는 창은 한 번에 하나: 새 창을 열면 나머지는 닫힘
   function closePopups() {
     setSaveOpen(false);
     setToolsOpen(false);
-    setScoutOpen(null);
+    closeScout();
     setTimberOpen(false);
   }
   function openOnly(open: () => void) {
@@ -955,30 +1029,32 @@ export function App() {
             </span>
           ),
         )}
-        {SCOUT_SITES.map((site) => {
-          const st = scouts[site.id]?.status ?? "unknown";
-          return (
-            <button
-              key={site.id}
-              ref={(el) => {
-                pinRefs.current[site.id] = el;
-              }}
-              type="button"
-              className={`g-pin is-${st}`}
-              style={{ left: -9999, top: -9999 }}
-              onClick={() => openOnly(() => setScoutOpen(site.id))}
-              aria-label={`정찰 거점 ${site.name}`}
-            >
-              {/* 수묵 봉수대 표식: 미탐색 = 꺼진 봉수대, 가는 중 = 깃발, 찾음 = 불 켜짐. 이름은 마우스를 올릴 때 */}
-              <img
-                className="g-pin__mark"
-                src={`/ui/kit/pin_${st === "found" || st === "going" ? st : "unknown"}.webp`}
-                alt=""
-              />
-              <span>{st === "unknown" ? "미탐색" : site.name}</span>
-            </button>
-          );
-        })}
+        <div ref={scoutLayerRef} className="g-pins__sites">
+          {SCOUT_SITES.map((site) => {
+            const st = scouts[site.id]?.status ?? "unknown";
+            return (
+              <button
+                key={site.id}
+                ref={(el) => {
+                  pinRefs.current[site.id] = el;
+                }}
+                type="button"
+                className={`g-pin is-${st}`}
+                style={{ left: -9999, top: -9999 }}
+                onClick={() => openOnly(() => setScoutOpen(site.id))}
+                aria-label={`정찰 거점 ${site.name}`}
+              >
+                {/* 수묵 봉수대 표식: 미탐색 = 꺼진 봉수대, 가는 중 = 깃발, 찾음 = 불 켜짐. 이름은 마우스를 올릴 때 */}
+                <img
+                  className="g-pin__mark"
+                  src={`/ui/kit/pin_${st === "found" || st === "going" ? st : "unknown"}.webp`}
+                  alt=""
+                />
+                <span>{st === "unknown" ? "미탐색" : site.name}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
       {workerError ? <p role="alert">{workerError}</p> : null}
       <div>
@@ -1097,7 +1173,7 @@ export function App() {
 
         <aside
           ref={asideRef}
-          className={`workspace-tools${timberOpen ? " timber-tools" : ""}`}
+          className={`workspace-tools${timberOpen ? " timber-tools" : ""}${scoutOpen && scoutFromMenu.current === scoutOpen ? " is-menu-scout" : ""}`}
           aria-label="작업 메뉴"
           hidden={!hasPanels && !timberOpen}
         >
@@ -1154,7 +1230,8 @@ export function App() {
                 : "정찰"
             }
             open={scoutOpen !== null}
-            onClose={() => setScoutOpen(null)}
+            closeButtonRef={scoutCloseRef}
+            onClose={closeScout}
           >
             {scoutSite ? (
               <section className="panel g-scout">
@@ -1201,7 +1278,7 @@ export function App() {
                             start: gameMinutes,
                           },
                         }));
-                        setScoutOpen(null);
+                        closeScout();
                       }}
                     >
                       정찰대 보내기
@@ -1395,7 +1472,67 @@ export function App() {
         <SettingsMenu className="g-cmd">
           <CmdFace icon="settings" label="설정" hotkey="Esc" />
         </SettingsMenu>
+        {scoutMenuOnly ? (
+          <button
+            ref={scoutMenuRef}
+            type="button"
+            className="g-cmd g-scout-menu"
+            aria-label="정찰 거점 목록"
+            title="정찰 거점 목록"
+            aria-haspopup="dialog"
+            aria-controls={scoutListId}
+            onClick={(event) => {
+              closePopups();
+              event.currentTarget.focus({ preventScroll: true });
+              const dialog = scoutListRef.current;
+              dialog?.showModal();
+              dialog
+                ?.querySelector<HTMLButtonElement>("[data-scout-id]")
+                ?.focus();
+            }}
+          >
+            <img src="/ui/kit/pin_unknown.webp" alt="" />
+          </button>
+        ) : null}
       </nav>
+      <dialog
+        ref={scoutListRef}
+        id={scoutListId}
+        className="g-scout-list"
+        aria-labelledby={scoutListTitleId}
+      >
+        <div className="g-scout-list__heading">
+          <h2 id={scoutListTitleId}>정찰 거점 목록</h2>
+          <button type="button" onClick={() => scoutListRef.current?.close()}>
+            닫기
+          </button>
+        </div>
+        <div className="g-scout-list__sites">
+          {SCOUT_SITES.map(({ id, name }) => {
+            const status = scouts[id]?.status;
+            return (
+              <button
+                key={id}
+                type="button"
+                data-scout-id={id}
+                aria-label={`정찰 거점 ${name}`}
+                onClick={() => {
+                  scoutListRef.current?.close();
+                  scoutFromMenu.current = id;
+                  setScoutOpen(id);
+                }}
+              >
+                {name} ·{" "}
+                {status === "found"
+                  ? "발견함"
+                  : status === "going"
+                    ? "정찰 중"
+                    : "미탐색"}
+              </button>
+            );
+          })}
+        </div>
+      </dialog>
       <section className="g-console is-idle" aria-label="명령 콘솔">
         <ConsoleFrame />
         <div className="g-console__map">

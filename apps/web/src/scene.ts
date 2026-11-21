@@ -358,7 +358,13 @@ export function mountScene(
   const EDGE_DWELL = 250;
   let edge: [number, number] | null = null;
   let edgeSince = 0;
+  const hasModal = () => document.querySelector("dialog:modal") !== null;
   const onEdgeMove = (e: MouseEvent) => {
+    // The backdrop can still deliver mousemove to window.
+    if (hasModal()) {
+      edge = null;
+      return;
+    }
     const x = e.clientX < EDGE ? -1 : e.clientX > innerWidth - EDGE ? 1 : 0;
     const y = e.clientY < EDGE ? 1 : e.clientY > innerHeight - EDGE ? -1 : 0;
     const onControl =
@@ -376,19 +382,26 @@ export function mountScene(
   const offEdge = () => {
     edge = null;
   };
-  const onBlur = () => {
+  const clearMovement = () => {
     held.clear();
     edge = null;
   };
+  const onFocusIn = (e: FocusEvent) => {
+    // Reset immediately when showModal moves focus, even between frames.
+    if (e.target instanceof Element && e.target.closest("dialog:modal"))
+      clearMovement();
+  };
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
-  window.addEventListener("blur", onBlur);
+  window.addEventListener("blur", clearMovement);
+  document.addEventListener("focusin", onFocusIn);
   if (!navigator.webdriver) {
     window.addEventListener("mousemove", onEdgeMove);
     document.documentElement.addEventListener("mouseleave", offEdge);
   }
   let cameraKey = "";
   let lastW = 0;
+  let lastH = 0;
   let trackTick = 0;
   let runningNow = false;
   let infoDirty = true,
@@ -424,6 +437,7 @@ export function mountScene(
     fwd.normalize();
     const right = new Vector3(fwd.z, 0, -fwd.x);
     const v = Vector3.Zero();
+    if ((held.size || edge) && hasModal()) clearMovement();
     if (held.has("w") || held.has("arrowup")) v.addInPlace(fwd);
     if (held.has("s") || held.has("arrowdown")) v.subtractInPlace(fwd);
     if (held.has("d") || held.has("arrowright")) v.addInPlace(right);
@@ -449,18 +463,20 @@ export function mountScene(
     const key = `${camera.radius.toFixed(2)}:${camera.beta.toFixed(3)}:${camera.alpha.toFixed(3)}:${t.x.toFixed(1)}:${t.z.toFixed(1)}`;
     trackTick = (trackTick + 1) % 15;
     const partyPts = village.partyPoints();
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
     if (
       onTrack &&
       (key !== cameraKey ||
-        canvas.clientWidth !== lastW ||
+        w !== lastW ||
+        h !== lastH ||
         trackTick === 0 ||
         partyPts.some((p) => p.visible))
     ) {
-      lastW = canvas.clientWidth;
-      const w = canvas.clientWidth,
-        h = canvas.clientHeight,
-        vm = scene.getTransformMatrix(),
-        vp = camera.viewport.toGlobal(w, h);
+      lastW = w;
+      lastH = h;
+      const vm = scene.getTransformMatrix();
+      const vp = camera.viewport.toGlobal(w, h);
       const out: Record<string, ScreenPoint> = {};
       for (const pt of [...tracked, ...partyPts]) {
         const sp = Vector3.Project(
@@ -817,7 +833,8 @@ export function mountScene(
       markerNodes = [];
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("blur", clearMovement);
+      document.removeEventListener("focusin", onFocusIn);
       window.removeEventListener("mousemove", onEdgeMove);
       document.documentElement.removeEventListener("mouseleave", offEdge);
       abort.abort();

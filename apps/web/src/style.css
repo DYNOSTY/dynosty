@@ -76,6 +76,39 @@ canvas {
 .settings-dialog::backdrop {
   background: rgb(0 0 0 / 65%);
 }
+.g-scout-list {
+  box-sizing: border-box;
+  width: min(560px, calc(100vw - 16px));
+  max-height: calc(100dvh - 8px);
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--meok);
+}
+.g-scout-list::backdrop {
+  background: rgb(24 18 14 / 45%);
+}
+.g-scout-list__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.g-scout-list__heading h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.g-scout-list__sites {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px;
+}
+.g-scout-list__sites button {
+  flex: none;
+}
 .settings-heading {
   display: flex;
   align-items: center;
@@ -6019,6 +6052,43 @@ body,
     background: none;
     box-shadow: none;
     transform: translate(-50%, -90%);
+  }
+  .g-pins__sites.is-docked {
+    position: absolute;
+    display: flex;
+    align-items: flex-start;
+    box-sizing: border-box;
+    width: max-content;
+    height: max-content;
+    gap: 8px;
+    padding: 4px;
+    overflow: auto;
+    pointer-events: auto;
+    background: rgb(239 230 210 / 90%);
+  }
+  /* Hidden pins still have dimensions for the next placement pass. */
+  .g-pins__sites.is-no-space {
+    visibility: hidden;
+  }
+  /* Keep the fallback out of the measured HUD bounds. */
+  .g-topcmd .g-scout-menu {
+    position: absolute;
+    left: calc(100% + 8px);
+    bottom: max(0px, calc(114px - 100dvh));
+  }
+
+  .workspace-tools.is-menu-scout {
+    top: 50%;
+    max-height: calc(100dvh - 8px);
+    overflow: auto;
+  }
+  .g-pins__sites.is-docked .g-pin {
+    position: static;
+    flex: none;
+    transform: none;
+  }
+  .g-pins__sites.is-docked .g-pin > span {
+    opacity: 1;
   }
   .g-pin__mark {
     width: 52px;
