@@ -58,12 +58,14 @@ const STORIES: Record<string, Story> = {
     sides: [
       {
         title: "호위대를 보낸다",
+        img: "/ui/gori/face6.png",
         gain: `유품과 보고서를 되찾는다 · 비관 ${EV.lost.a.pessimism}`,
         loss: `다녀오는 데 ${days(EV.lost.a.hold)}이 걸린다`,
         pick: "찾아오게 한다",
       },
       {
         title: "추모 기록만 남긴다",
+        img: "/ui/gori/face4.png",
         gain: "더 잃는 이가 없다",
         loss: `남은 가족이 등을 돌린다 · 비관 +${EV.lost.b.pessimism}`,
         pick: "이름을 적어 둔다",
@@ -77,12 +79,14 @@ const STORIES: Record<string, Story> = {
     sides: [
       {
         title: "먼저 보낸다",
+        img: "/ui/gori/face2.png",
         gain: `믿음이 돌아온다 · 낙관 +${EV.village.a.optimism}`,
         loss: `풀 ${-EV.village.a.resources.RES_PLANT}을 내준다`,
         pick: "식량을 실어 보낸다",
       },
       {
         title: "거래를 미룬다",
+        img: "/ui/gori/face3.png",
         gain: "곳간을 지킨다",
         loss: `인심을 잃는다 · 비관 +${EV.village.b.pessimism}`,
         pick: "지켜본다",
@@ -102,12 +106,14 @@ const STORIES: Record<string, Story> = {
     sides: [
       {
         title: "함께 간다",
+        img: "/ui/gori/face6.png",
         gain: `일손과 의원을 얻는다 · 낙관 +${EV.refugee.a.optimism}`,
         loss: `풀·고기·어류를 ${-EV.refugee.a.resources.RES_PLANT}씩 나눈다`,
         pick: "행렬에 받아들인다",
       },
       {
         title: "나눠 주고 떠난다",
+        img: "/ui/gori/face1.png",
         gain: "식량 부담이 적다",
         loss: `풀 ${-EV.refugee.b.resources.RES_PLANT} · 비관 +${EV.refugee.b.pessimism}`,
         pick: "조금 나눠 주고 간다",
@@ -121,12 +127,14 @@ const STORIES: Record<string, Story> = {
     sides: [
       {
         title: "공주임을 밝힌다",
+        img: "/ui/story/chungnyeong.jpg",
         gain: "곧바로 지나간다",
         loss: `쫓는 눈이 붙는다 · 비관 +${EV.identity.a.pessimism}`,
         pick: "이름을 댄다",
       },
       {
         title: "숨기고 돌아간다",
+        img: "/ui/gori/face3.png",
         gain: "뒤를 밟히지 않는다",
         loss: `돌아가느라 ${days(EV.identity.b.hold)}이 늦는다`,
         pick: "다른 길로 간다",

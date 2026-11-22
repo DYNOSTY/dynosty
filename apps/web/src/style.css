@@ -6360,3 +6360,127 @@ body,
     border-top: 1px solid rgb(239 230 210 / 40%);
   }
 }
+
+/* ── 11/22 제출 직전 손질: X 단추 가운데 · 의뢰 카드 가운데 띄우기 · 되묻기/알림 · 조작 설명 ── */
+.sc-medal__close .sc-btn {
+  padding: 0;
+}
+.sc-medal__close .sc-btn img {
+  width: 22px;
+  height: 22px;
+}
+/* 의뢰 카드: 오른쪽 줄에 끼워 넣으면 아래 선택 창과 겹쳐 안 보였음 → 화면 가운데 */
+.qc {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 60;
+  width: min(440px, calc(100vw - 32px));
+  margin: 0;
+  transform: translate(-50%, -50%);
+}
+.story-side img[src^="/ui/gori/"] {
+  object-position: 50% 12%;
+}
+.g-pop {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 70;
+  width: min(420px, calc(100vw - 32px));
+  padding: 18px 20px;
+  transform: translate(-50%, -50%);
+  border-radius: 14px;
+  background: var(--hanji);
+  color: var(--meok);
+  text-shadow: none;
+  box-shadow:
+    0 0 0 2px var(--jjok-deep),
+    0 10px 24px rgb(0 0 0 / 50%);
+  word-break: keep-all;
+}
+.g-pop p,
+.g-pop h3 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  line-height: 1.5;
+  text-align: center;
+}
+.g-pop button {
+  min-width: 96px;
+  min-height: 40px;
+  padding: 6px 16px;
+  border: 2px solid var(--jjok-deep);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--meok);
+  font: inherit;
+  cursor: pointer;
+}
+.g-pop button.is-yes {
+  background: var(--jjok);
+  color: var(--hanji);
+}
+.g-ask > div {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.g-keys dl {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 14px;
+}
+.g-keys dl > div {
+  display: grid;
+  grid-template-columns: 11em 1fr;
+  gap: 10px;
+  align-items: baseline;
+}
+.g-keys dt {
+  font-weight: 700;
+}
+.g-keys dd {
+  margin: 0;
+}
+.g-keys > button {
+  display: block;
+  margin: 0 auto;
+}
+.g-keys-btn {
+  position: fixed;
+  left: 16px;
+  top: 150px;
+  z-index: 20;
+  padding: 4px 10px;
+  border: 2px solid var(--jjok-deep);
+  border-radius: 8px;
+  background: rgb(20 24 34 / 78%);
+  color: var(--hanji);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.g-keys-btn kbd {
+  margin-left: 4px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 12px;
+}
+.g-toast {
+  position: fixed;
+  left: 50%;
+  top: 96px;
+  z-index: 80;
+  margin: 0;
+  padding: 10px 22px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgb(20 24 34 / 90%);
+  color: var(--hanji);
+  font-size: 17px;
+  box-shadow: 0 0 0 2px var(--gold, #b48a3c);
+  white-space: nowrap;
+}

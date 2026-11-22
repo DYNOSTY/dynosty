@@ -125,6 +125,21 @@ const STORY =
     : null;
 
 // 주민 종의 장단점 — 기획서에 적힌 것만 (개발인계서 2.1: 4족 짐 수송대 시속 6km, 2족 정찰병 12km)
+/** 조작 설명 (H) — 실제로 듣는 키만 적음 */
+const KEY_HELP: ReadonlyArray<[string, string]> = [
+  ["마우스 왼쪽", "건물·주민·터 고르기"],
+  ["끌기 · W A S D · 방향키", "화면 옮기기"],
+  ["휠", "가까이 · 멀리"],
+  ["Q · E", "화면 돌리기"],
+  ["B", "짓기 목록"],
+  ["T", "조달 창"],
+  ["R", "정찰 보내기 (조달소를 고른 뒤)"],
+  ["F", "고른 것으로 화면 옮기기"],
+  ["1 · 2 · 3", "온돌 화력 (온돌을 고른 뒤)"],
+  ["J", "저장"],
+  ["Esc", "창 닫기"],
+  ["H", "이 설명"],
+];
 const RESIDENT_TRAITS = {
   GORI: {
     gain: "조달과 배급을 이끈다 · 복홀의 지휘관",
@@ -268,6 +283,19 @@ export function App() {
   const [scoutOpen, setScoutOpen] = useState<string | null>(null);
   // 건축 목록 (새로 지을 건물 고르기)
   const [buildOpen, setBuildOpen] = useState(false);
+  // 명령 전 되묻기 → 한 뒤 알림 (사용자 11/22: "보낼까요? 보냈습니다 팝업")
+  const [ask, setAsk] = useState<{
+    text: string;
+    done: string;
+    run: () => void;
+  } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [keysOpen, setKeysOpen] = useState(false);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(t);
+  }, [toast]);
   const buildPanelId = useId();
   const [scoutMenuOnly, setScoutMenuOnly] = useState(false);
   const scoutListId = useId();
@@ -1069,6 +1097,8 @@ export function App() {
       if (document.querySelector("dialog[open]")) return;
       const target = event.target;
       if (event.key === "Escape") {
+        setAsk(null);
+        setKeysOpen(false);
         closeRef.current();
         return;
       }
@@ -1084,6 +1114,7 @@ export function App() {
         closeRef.current();
         setBuildOpen(!wasOpen);
       }
+      if (key === "h") setKeysOpen((v) => !v);
       if (key === "j") {
         const wasOpen = saveOpenRef.current;
         closeRef.current();
@@ -1102,15 +1133,27 @@ export function App() {
     else if (action === "focus") sceneRef.current?.focusSelected();
     else if (action === "clear") clearSelection();
     else if (action === "build") {
-      if (plotCard && !plotCard.blocked)
-        commandPlay({ type: "build", plot: plotCard.plot });
-    } else if (action === "crew-on" || action === "crew-off") {
-      if (resCard)
-        commandPlay({
-          type: "site-crew",
-          site: resCard.id,
-          on: action === "crew-on",
+      if (plotCard && !plotCard.blocked) {
+        const plot = plotCard.plot;
+        setAsk({
+          text: `${plotCard.name}에 짓기를 시작할까요?`,
+          done: "짓기 시작했습니다",
+          run: () => commandPlay({ type: "build", plot }),
         });
+      }
+    } else if (action === "crew-on" || action === "crew-off") {
+      if (resCard) {
+        const site = resCard.id,
+          on = action === "crew-on",
+          name = SITE_INFO[site]?.name ?? "터";
+        setAsk({
+          text: on
+            ? `${name}에 일꾼 한 조(${CREW_SIZE}명)를 보낼까요?`
+            : `${name}의 일꾼을 불러들일까요?`,
+          done: on ? "일꾼을 보냈습니다" : "일꾼을 불러들였습니다",
+          run: () => commandPlay({ type: "site-crew", site, on }),
+        });
+      }
     } else if (action.startsWith("heat-")) {
       // 온돌 화력: 마을 모든 구역(둥지·재배소·쉼터·연구동·치료소)에 한 번에
       const heat = action.slice(5) as HeatLevel;
@@ -1367,6 +1410,56 @@ export function App() {
           />
         ) : null}
       </section>
+      <button
+        type="button"
+        className="g-keys-btn"
+        aria-expanded={keysOpen}
+        onClick={() => setKeysOpen((v) => !v)}
+      >
+        조작 설명 <kbd>H</kbd>
+      </button>
+      {keysOpen ? (
+        <section className="g-pop g-keys" aria-label="조작 설명">
+          <h3>조작 설명</h3>
+          <dl>
+            {KEY_HELP.map(([k, v]) => (
+              <div key={k}>
+                <dt>{k}</dt>
+                <dd>{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <button type="button" onClick={() => setKeysOpen(false)}>
+            닫기
+          </button>
+        </section>
+      ) : null}
+      {ask ? (
+        <section className="g-pop g-ask" role="alertdialog" aria-label="확인">
+          <p>{ask.text}</p>
+          <div>
+            <button
+              type="button"
+              className="is-yes"
+              onClick={() => {
+                ask.run();
+                setToast(ask.done);
+                setAsk(null);
+              }}
+            >
+              예
+            </button>
+            <button type="button" onClick={() => setAsk(null)}>
+              아니요
+            </button>
+          </div>
+        </section>
+      ) : null}
+      {toast ? (
+        <p className="g-toast" role="status">
+          {toast}
+        </p>
+      ) : null}
       {/* 정찰 거점 표식 (3D 위치를 따라감) */}
       <div className="g-pins">
         {SCOUT_SITES.filter((site) => scouts[site.id]?.status === "going").map(
