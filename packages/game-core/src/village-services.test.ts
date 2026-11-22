@@ -197,7 +197,7 @@ it("합류로 거주 공간이 부족하면 요구하고 둥지 증설 뒤 자�
   expect(s.homes).toHaveLength(7);
   expect(s.world.buildings).toHaveLength(7);
   expect(s.residents.every((r) => r.homeId !== null)).toBe(true);
-  expect(s.world.resources.RES_WOOD).toBe(1000000);
+  expect(s.world.resources.RES_WOOD).toBe(200000);
   expect(s.residents.find((r) => r.id === builder)?.task).toBeNull();
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });

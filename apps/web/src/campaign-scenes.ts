@@ -1,4 +1,5 @@
 import {
+  AMOUNT_SCALE,
   BUILDING_RULES,
   CHAPTERS,
   campaignOf,
@@ -270,6 +271,7 @@ export const filmMusic = {
   "mechanical-late": "B",
   order: "C",
   collapse: "C",
+  "king-palace-night": "C",
 } as const;
 
 export function campaignPage(s: TimberState): ScenePage {
@@ -353,10 +355,10 @@ export function campaignPage(s: TimberState): ScenePage {
       page.title = "귀족들이 출문을 청했다";
       page.clip = "one";
       page.music = filmMusic["one"];
-      page.goal = `출문 전 · 주민 ${s.residents.length}명 · 자원별 10,000`;
+      page.goal = `출문 전 · 주민 ${s.residents.length}명 · 물 ${(s.world.resources.RES_WATER / AMOUNT_SCALE).toLocaleString("ko-KR")} · 나머지 자원별 10,000`;
       line(
         "가솔을 이끄는 귀족",
-        "상중에 하직을 고하오니 면목이 없소이다. 허나 고른 공을 시해한 자가 그 처소 문턱을 어찌 넘었는지, 아직 아무도 모르지 않소. 오늘 밤 우리 집 아이들의 문 앞에는 누가 서 주겠소?",
+        "상중에 하직을 고하니 면목 없소이다.\n허나 고른 공을 시해한 자가 그 처소 문턱을 어찌 넘었는지, 아직 아무도 모르지 않소.\n오늘 밤 우리 집 아이들의 문 앞에는 누가 서 주겠소?",
       );
       line(
         "고리",
@@ -391,7 +393,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     case "after":
       page.title = "마지막 수레가 나간 자리";
-      page.goal = "출문 뒤 · 주민 60명 · 자원별 1,000";
+      page.goal = `출문 뒤 · 주민 60명 · 물 ${(s.world.resources.RES_WATER / AMOUNT_SCALE).toLocaleString("ko-KR")} · 나머지 자원별 1,000`;
       line(
         "나르미",
         "장부 끝까지 이름을 불렀어요. 예순 분이 대답했어요. 곳간도 칸마다 천씩 남았고요. 고리야, 그만 물동이 놓으세요. 손이 다 까졌어요.",
@@ -423,6 +425,10 @@ export function campaignPage(s: TimberState): ScenePage {
       line(
         "달이",
         "온돌에 불이 드는 둥지도 둘뿐이야. 오늘 밤 지붕 아래서 잘 자리도 같이 마련하자.",
+      );
+      line(
+        "달이",
+        "고리야, 해 떨어지기 전에 성문에 보초를 세워 줘. 성문을 누르면 몇을 보낼지 정할 수 있어.",
       );
       choice("next", "남은 예순 명과 시작");
       break;

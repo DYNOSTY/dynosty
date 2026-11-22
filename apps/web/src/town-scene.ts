@@ -112,6 +112,7 @@ export function createTownVisual(scene: Scene) {
         const pending = !!s?.town.orders.some((q) => q.id === f.id);
         if (!o) {
           const root = CreateBox(`town:${f.id}`, { size: 1 }, scene);
+          root.metadata = { townTarget: root.id };
           root.material = mat;
           root.isVisible = false;
           o = { root, visual: null, level: 0 };

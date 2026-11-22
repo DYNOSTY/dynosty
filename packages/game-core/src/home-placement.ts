@@ -13,6 +13,7 @@ import {
 } from "./resident-path.js";
 import { warehouseDoor } from "./storage.js";
 import type { TimberState } from "./timber.js";
+import { VILLAGE_RULES } from "./village-services.js";
 
 export interface HomePlacement {
   readonly position: GroundPoint;
@@ -256,9 +257,9 @@ export function homePlacementIssue(
     return "광맥과 채굴 구역에는 둥지를 지을 수 없어요.";
   if (
     s.world.resources.RES_WOOD - s.reservedWood * AMOUNT_SCALE <
-    20 * AMOUNT_SCALE
+    VILLAGE_RULES.constructionWood * AMOUNT_SCALE
   )
-    return "건설에 필요한 공동 목재20이 부족해요.";
+    return "건설에 필요한 공동 목재100이 부족해요.";
   return null;
 }
 export const homeObstacle = (h: {

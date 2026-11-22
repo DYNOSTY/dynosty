@@ -9,7 +9,7 @@ import {
   type TimberState,
   tradeRank,
 } from "@dynosty/game-core";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 export const OvertimeControl = ({
   state,
   target,
@@ -47,24 +47,27 @@ export function DevelopmentPanel({
   command: (c: TimberCommand) => void;
   showDevTools?: boolean;
 }) {
-  const [tech, setTech] = useState("TECH_TRAIL"),
+  const [tech, setTech] = useState("UPGRADE_HOME_2"),
     d = state.town.development;
   const visibleResearch = RESEARCH_CATALOG.filter(
     (entry) =>
-      entry.category !== "story" ||
-      (entry.id === "R17" && (state.chapter ?? 1) >= 4) ||
-      showDevTools ||
-      d.story.rebellion ||
-      d.completed.includes(entry.id),
+      (showDevTools || RESEARCH_CONNECTED.includes(entry.id)) &&
+      (entry.category !== "story" ||
+        (entry.id === "R17" && (state.chapter ?? 1) >= 4) ||
+        showDevTools ||
+        d.story.rebellion ||
+        d.completed.includes(entry.id)),
   );
+  const [branch, setBranch] = useState("building");
+  const group = visibleResearch.filter((entry) => entry.category === branch);
   const incomplete = visibleResearch.filter(
     (entry) => !d.completed.includes(entry.id),
   );
-  const selected = incomplete.some((entry) => entry.id === tech)
-    ? tech
-    : (incomplete.find((entry) => RESEARCH_CONNECTED.includes(entry.id))?.id ??
-      incomplete[0]?.id ??
-      "");
+  const selected =
+    group.find((entry) => entry.id === tech)?.id ??
+    group.find((entry) => !d.completed.includes(entry.id))?.id ??
+    group[0]?.id ??
+    "";
 
   const r = visibleResearch.find((entry) => entry.id === selected),
     issue = selected
@@ -78,26 +81,51 @@ export function DevelopmentPanel({
     story: "후반 이야기",
     legacy: "기존 자료 · 연결 전",
   };
-  const motifs: Record<string, string> = {
-    TECH_SEED: "싹",
-    TECH_INSPECTION: "검",
-    TECH_TRAIL: "길",
-    TECH_INSULATION: "솜",
-    TECH_PUMP: "샘",
-    TECH_CULTURE: "밭",
-    TECH_SMOKE: "불",
-    TECH_WATCH: "망",
-    TECH_ROUTES: "로",
-    TECH_SHELTER: "집",
-    TECH_REPAIR: "틀",
-    TECH_BEHAVIOR: "발",
-    TECH_MECHA: "뼈",
-    TECH_AQUACULTURE: "못",
-    TECH_FEDERATION: "맹",
-    TECH_FORT: "성",
-    TECH_FLIGHT: "날",
-    TECH_ELECTRICAL: "전",
-  };
+  function twig(entry: (typeof group)[number]): ReactNode {
+    const children = group.filter(
+      (child) =>
+        child.requires.find((id) => group.some((node) => node.id === id)) ===
+        entry.id,
+    );
+    const done = d.completed.includes(entry.id);
+    const reason = done ? "연구 완료" : researchIssue(state, entry.id);
+    const prerequisites = entry.requires.map(
+      (id) => RESEARCH_CATALOG.find((node) => node.id === id)?.name ?? id,
+    );
+    const price = Object.entries(entry.cost)
+      .map(([id, n]) => GAME_RULES.resources[id as ResourceId].name + " " + n)
+      .join(" · ");
+    const image =
+      entry.category === "building" && entry.level > 0
+        ? `/art/facilities/${entry.target}-${entry.level}.webp`
+        : `/ui/cmd/${branch === "movement" ? "map" : "research"}.png`;
+    const detail = [
+      entry.effect,
+      price,
+      prerequisites.length ? "선행 연구 · " + prerequisites.join(", ") : "",
+      reason,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    return (
+      <li key={entry.id}>
+        <button
+          type="button"
+          title={detail}
+          data-available={!reason}
+          aria-pressed={entry.id === selected}
+          onClick={() => {
+            setTech(entry.id);
+          }}
+        >
+          <img alt="" src={image} />
+          <span>{entry.name.replace(/ (개량 )?연구$/, "")}</span>
+          {done && <small>완료</small>}
+        </button>
+        {children.length > 0 && <ul>{children.map(twig)}</ul>}
+      </li>
+    );
+  }
   const dead = state.world.citizens.filter(
     (c) =>
       !c.alive &&
@@ -115,104 +143,134 @@ export function DevelopmentPanel({
         정찰 연구 배율×{scoutSpeedRate(state)} · 현재 정찰대에 적용되는
         속도입니다. 교역 이동 시간은 별도로 계산합니다.
       </p>
-      <section className="research-icons" aria-label="연구 도감">
-        {visibleResearch.map((entry) => {
-          const resource = entry.target.startsWith("RES_") ? entry.target : "";
-          const img =
-            resource && !["RES_STONE", "RES_IRON_ORE"].includes(resource)
-              ? "/ui/resources-3d/" + resource + ".png"
-              : "/ui/cmd/" +
-                ({
-                  building: "build",
-                  collection: "economy",
-                  movement: "map",
-                  storage: "records",
-                  story: "research",
-                  legacy: "research",
-                }[entry.category as keyof typeof categories] ?? "research") +
-                ".png";
-          return (
-            <button
-              key={entry.id}
-              type="button"
-              aria-pressed={entry.id === selected}
-              disabled={d.completed.includes(entry.id)}
-              onClick={() => setTech(entry.id)}
-            >
-              <img src={img} alt="" />
-              <b aria-hidden="true">
-                {motifs[entry.id] ?? entry.name.slice(0, 2)}
-              </b>
-              <span>{entry.name}</span>
-              <small>
-                {d.completed.includes(entry.id) ? "완료" : entry.tier + "단계"}
-              </small>
-            </button>
-          );
-        })}
-      </section>
-      <label>
-        연구 기술{" "}
-        <select
-          aria-label="연구 기술"
-          value={selected}
-          onChange={(e) => setTech(e.target.value)}
-        >
+      <section className="research-tree" aria-label="연구 도감">
+        <nav aria-label="연구 분야">
           {Object.entries(categories)
-            .filter(([key]) =>
-              visibleResearch.some((entry) => entry.category === key),
+            .filter(([id]) =>
+              visibleResearch.some((entry) => entry.category === id),
             )
-            .map(([category, label]) => (
-              <optgroup key={category} label={label}>
-                {visibleResearch
-                  .filter((r) => r.category === category)
-                  .map((r) => (
-                    <option
-                      key={r.id}
-                      value={r.id}
-                      disabled={d.completed.includes(r.id)}
-                    >
-                      {r.name}
-                      {d.completed.includes(r.id)
-                        ? " · 완료"
-                        : !RESEARCH_CONNECTED.includes(r.id)
-                          ? " · 연결 전"
-                          : ""}
-                    </option>
-                  ))}
-              </optgroup>
+            .map(([id, name]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={branch === id}
+                onClick={() => {
+                  setBranch(id);
+                  const first = incomplete.find((e) => e.category === id);
+                  if (first) setTech(first.id);
+                }}
+              >
+                {name}
+              </button>
             ))}
-        </select>
-      </label>
-      <p>
-        {r
-          ? Object.entries(r.cost)
-              .map(([id, n]) => GAME_RULES.resources[id as ResourceId].name + n)
-              .join(" · ")
-          : ""}{" "}
-        · 연구원 배치 필요 · 연구소마다 동시1건
-      </p>
-      <p>{r?.effect}</p>
-      {r?.id === "UPGRADE_HOSPITAL_2" && (
+        </nav>
+        <ul aria-label={categories[branch as keyof typeof categories]}>
+          {group
+            .filter(
+              (entry) =>
+                !entry.requires.some((id) =>
+                  group.some((node) => node.id === id),
+                ),
+            )
+            .map(twig)}
+        </ul>
+      </section>
+      <article className="research-folio" aria-label="선택한 기술">
+        {r && (
+          <>
+            <small>{categories[r.category as keyof typeof categories]}</small>
+            <h4>{r.name}</h4>
+            <p>
+              선행 기술 ·{" "}
+              {r.requires
+                .map(
+                  (id) =>
+                    RESEARCH_CATALOG.find((node) => node.id === id)?.name ?? id,
+                )
+                .join(", ") || "첫 연구"}
+            </p>
+            <p>소요 · 연구원 3명 기준 {r.workdays}일</p>
+            <p>
+              이어지는 기술 ·{" "}
+              {visibleResearch
+                .filter((node) => node.requires.includes(r.id))
+                .map((node) => node.name)
+                .join(", ") || "최종 연구"}
+            </p>
+          </>
+        )}
+        <label>
+          연구 기술{" "}
+          <select
+            aria-label="연구 기술"
+            value={selected}
+            onChange={(e) => {
+              setTech(e.target.value);
+              setBranch(
+                visibleResearch.find((node) => node.id === e.target.value)!
+                  .category,
+              );
+            }}
+          >
+            {Object.entries(categories)
+              .filter(([key]) =>
+                visibleResearch.some((entry) => entry.category === key),
+              )
+              .map(([category, label]) => (
+                <optgroup key={category} label={label}>
+                  {visibleResearch
+                    .filter((r) => r.category === category)
+                    .map((r) => (
+                      <option
+                        key={r.id}
+                        value={r.id}
+                        disabled={d.completed.includes(r.id)}
+                      >
+                        {r.name}
+                        {d.completed.includes(r.id)
+                          ? " · 완료"
+                          : !RESEARCH_CONNECTED.includes(r.id)
+                            ? " · 연결 전"
+                            : ""}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+          </select>
+        </label>
         <p>
-          병원을 개량하면 경상 회복 시간이 12시간에서 8시간으로 줄어듭니다. 도성
-          관아에서는 운영 가능한 2단계 병원과 식당이 있으면 병상 배식을 반포할
-          수 있습니다.
+          {r
+            ? Object.entries(r.cost)
+                .map(
+                  ([id, n]) => GAME_RULES.resources[id as ResourceId].name + n,
+                )
+                .join(" · ")
+            : ""}{" "}
+          · 연구원 배치 필요 · 연구소마다 동시1건
         </p>
-      )}
-      <p className="hint">
-        연구원은 건설 메뉴의 ‘완공 시설’을 펼쳐 연구소별로 배치합니다.
-      </p>
-      <button
-        type="button"
-        disabled={!!issue}
-        onClick={() => command({ type: "start-research", tech: selected })}
-      >
-        연구 시작
-      </button>
-      <p>
-        {issue ?? "연구 시작 시 자재 확보 · 완료 후 개량은 별도로 지시합니다."}
-      </p>
+        <p>{r?.effect}</p>
+        {r?.id === "UPGRADE_HOSPITAL_2" && (
+          <p>
+            병원을 개량하면 경상 회복 시간이 12시간에서 8시간으로 줄어듭니다.
+            도성 관아에서는 운영 가능한 2단계 병원과 식당이 있으면 병상 배식을
+            반포할 수 있습니다.
+          </p>
+        )}
+        <p className="hint">
+          연구원은 건설 메뉴의 ‘완공 시설’을 펼쳐 연구소별로 배치합니다.
+        </p>
+        <button
+          type="button"
+          disabled={!!issue}
+          onClick={() => command({ type: "start-research", tech: selected })}
+        >
+          연구 시작
+        </button>
+        <p>
+          {issue ??
+            "연구 시작 시 자재 확보 · 완료 후 개량은 별도로 지시합니다."}
+        </p>
+      </article>
       <div data-testid="research-status">
         {d.research.length
           ? d.research.map((job) => {

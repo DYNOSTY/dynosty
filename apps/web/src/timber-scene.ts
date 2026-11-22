@@ -68,7 +68,7 @@ export function createTimberVisual(scene: Scene) {
       .getChildMeshes()
       .find((mesh) => mesh.name.endsWith(cargo.name))!;
     for (const part of [cart, ...cart.getChildMeshes()])
-      part.metadata = { villageTarget: "village:BLD_GATE:0:23" };
+      part.metadata = { villageTarget: "village:BLD_GATE:0:24" };
     cart.setEnabled(false);
     return { cart, load, item };
   });

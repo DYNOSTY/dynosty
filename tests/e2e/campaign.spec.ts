@@ -5,6 +5,7 @@ import {
   createCapital,
   createTimberSave,
   createVillageGame,
+  deposit,
   payTown,
   RESEARCH_CATALOG,
   SCOUT_SITES,
@@ -16,8 +17,19 @@ async function readScene(page: Page, label: string) {
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   const next = dialog.getByRole("button", { name: /^다음 대사/ });
-  while (await next.count()) await next.click();
-  await dialog.getByRole("button", { name: label, exact: true }).click();
+  const choice = dialog.getByRole("button", { name: label, exact: true });
+  const action = next.or(choice).first();
+  for (;;) {
+    await expect(action).toBeVisible();
+    const previous = await action.innerText();
+    if (previous.trim() === label) {
+      await choice.click();
+      break;
+    }
+    await next.click();
+    await expect.poll(() => next.allTextContents()).not.toContain(previous);
+  }
+  await expect(choice).toBeHidden();
   const start = page
     .getByRole("dialog", { name: "미션 시작 준비" })
     .getByRole("button", { name: "시작하기" });
@@ -28,6 +40,8 @@ async function readScene(page: Page, label: string) {
     await dialog.getByRole("button", { name: "난이도 설정" }).click();
     await expect(dialog.getByRole("combobox")).toBeVisible();
     await start.click();
+    const skip = page.locator("dialog.film-screen .film-skip");
+    if (await skip.isVisible()) await skip.click();
   }
 }
 for (const [level, label] of [
@@ -42,14 +56,82 @@ for (const [level, label] of [
       test.setTimeout(240_000);
       await page.goto("/");
       const dialog = page.getByRole("dialog");
-      await expect(dialog).toHaveAccessibleName("별이 진 뒤, 복홀");
+      await expect(dialog).toHaveAccessibleName("서막");
+      await expect(dialog.locator("video")).toHaveJSProperty("muted", false);
+      const opening = dialog.locator("video");
+      await expect
+        .poll(async () => {
+          const play = dialog.getByRole("button", { name: "영상 재생" });
+          if (await play.isVisible()) await play.click();
+          return opening.evaluate(
+            (v) =>
+              (v as HTMLVideoElement).videoWidth > 0 &&
+              (v as HTMLVideoElement).currentTime > 0.2,
+          );
+        })
+        .toBe(true);
+      await dialog.getByRole("button", { name: "건너뛰기" }).click();
+      await expect(
+        dialog.getByRole("button", { name: "이어하기" }),
+      ).toHaveCount(0);
+      await expect(
+        dialog.getByRole("button", { name: "마을 보기" }),
+      ).toHaveCount(0);
+      await dialog.getByRole("button", { name: "돌아보기" }).click();
+      await expect(dialog.getByRole("heading", { name: "서막" })).toBeVisible();
+      await expect(
+        dialog.getByRole("button", { name: "다음 장면" }),
+      ).toBeDisabled();
+      await expect(dialog).not.toContainText("양녕의 질서");
+      await dialog.getByRole("button", { name: "뒤로" }).click();
+      await dialog.getByRole("button", { name: "새로 시작" }).click();
       await expect(page.getByTestId("play-population")).toContainText("600");
       await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("10,000");
-      await readScene(page, label + " · 복홀 성문으로");
+      await expect(dialog.getByRole("heading")).toHaveText("복홀의 첫 명령");
+      await dialog.getByRole("button", { name: "난이도 설정" }).click();
+      await dialog.getByRole("combobox").selectOption(level);
+      await dialog.getByRole("button", { name: "시작하기" }).click();
       await expect(dialog).toHaveAccessibleName("귀족들이 출문을 청했다");
+      await dialog.getByRole("button", { name: "건너뛰기" }).click();
+      await expect(
+        page.locator("#campaign-dialogue-dock .campaign-speech"),
+      ).toBeVisible();
+      const firstSpeech = page.locator(
+        "#campaign-dialogue-dock .campaign-speech",
+      );
+      await expect(firstSpeech.locator("strong")).toHaveText(
+        "가솔을 이끄는 귀족",
+      );
+      const portrait = await firstSpeech.locator(".story-face").boundingBox(),
+        speaker = await firstSpeech.locator("strong").boundingBox(),
+        words = await firstSpeech.locator("p").boundingBox();
+      expect(portrait!.x + portrait!.width).toBeLessThanOrEqual(speaker!.x);
+      expect(Math.abs(speaker!.x - words!.x)).toBeLessThan(2);
       await page.reload();
       await expect(dialog).toHaveAccessibleName("귀족들이 출문을 청했다");
-      await readScene(page, "성문을 열고 남은 장부 확인");
+      await expect(dialog.locator("video")).toHaveCount(0);
+      await expect(page.locator("dialog:modal")).toHaveCount(0);
+      await dialog.locator(".campaign-speech").click();
+      await expect(dialog.locator(".campaign-speech strong")).toHaveText(
+        "고리",
+      );
+      for (let i = 0; i < 3; i++)
+        await dialog.locator(".campaign-speech").click();
+      await expect(dialog).toHaveClass(/scene-cinema/);
+      const still = await dialog.locator(".campaign-still").boundingBox();
+      expect(still!.height).toBeGreaterThan(page.viewportSize()!.height * 0.95);
+      await expect(dialog.locator(".campaign-still")).toHaveAttribute(
+        "src",
+        /mokjin-exodus.webp$/,
+      );
+      expect(
+        await dialog.evaluate((el) => el.clientWidth >= innerWidth - 2),
+      ).toBe(true);
+      await dialog.locator(".campaign-speech").click();
+      await expect(
+        page.locator("#campaign-dialogue-dock .campaign-speech"),
+      ).toBeVisible();
+      await dialog.getByRole("button", { name: "대화 건너뛰기" }).click();
       await expect(page.getByTestId("play-population")).toContainText("60");
       await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,000");
       expect(
@@ -162,6 +244,7 @@ for (const [level, label] of [
         ).toBeVisible();
       }
       await page.getByRole("button", { name: "장면 접기" }).click();
+      await page.keyboard.press("Escape");
       await page.getByRole("button", { name: "나가기", exact: true }).click();
       await expect(page.getByRole("dialog")).toHaveAccessibleName("메인 메뉴");
       await page.getByRole("button", { name: "다시하기" }).click();
@@ -405,14 +488,17 @@ test("성문 수비와 온돌을 배치하고 삽화가 있는 전투 보고를 
     }),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: /기온.*성문과 온돌/ }).click();
+  await expect(page.getByText("성문 수비병 0명", { exact: true })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "성문", exact: true }).click();
   const panel = page.getByRole("region", { name: "성문과 온돌", exact: true });
-  await panel.getByRole("button", { name: "4명 배치", exact: true }).click();
+  await panel.getByRole("slider", { name: /성문 병력/ }).press("ArrowRight");
   await expect(panel).toContainText("성문 수비병 4명");
-  await panel.getByRole("button", { name: "최소 2단계", exact: true }).click();
-  await expect(
-    panel.getByRole("button", { name: "최소 2단계", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  const heat = panel.getByRole("slider", { name: /온돌 화력/ });
+  await heat.press("ArrowRight");
+  await heat.press("ArrowRight");
+  await expect(heat).toHaveValue("2");
   const report = page.getByRole("region", { name: "성문 전투 보고" });
   await expect(report).toContainText("부상 1명");
   await expect
@@ -503,7 +589,12 @@ test("쥬신 왕으로 도성 구호를 명하고 설정에서 변종 야습 기
   await expect(
     page.getByRole("button", { name: "도성 반나절 경영" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "명령 열기", exact: true }).click();
+  if (
+    await page
+      .getByRole("button", { name: "명령 열기", exact: true })
+      .isVisible()
+  )
+    await page.getByRole("button", { name: "명령 열기", exact: true }).click();
   await page.getByRole("button", { name: "설정", exact: true }).click();
   await page.getByText("세계관 · 밤에 벌어지는 일", { exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText(
@@ -725,15 +816,17 @@ test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 �
   await expect(prep).toBeVisible();
   expect(await counts()).toEqual(before);
   await prep.getByRole("button", { name: "시작하기" }).click();
+  await expect(dialog.locator("video")).toHaveAttribute("src", /five\.mp4$/);
+  await dialog.getByRole("button", { name: "건너뛰기" }).click();
   await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
   const delta = (await counts()).map((n, i) => n - before[i]);
   expect(delta).toEqual([120, 3000, 1500, 1500, 1800]);
   const advance = dialog.getByRole("button", { name: /^다음 대사/ });
-  while (
-    !(await dialog.getByText(/남문 명부 여기 있습니다/).count()) &&
-    (await advance.count())
-  )
+  for (let i = 0; i < 6; i++) {
+    const label = await advance.innerText();
     await advance.click();
+    await expect(advance).not.toHaveText(label);
+  }
   await expect(dialog).toContainText(
     `오늘 이 문 안에 든 식구는 모두 ${delta[0]}명입니다.`,
   );
@@ -788,7 +881,8 @@ for (const [hope, allegiance, film] of [
 ] as const) {
   test("반란 선택부터 결말 재생까지 · " + film, async ({ page }) => {
     test.setTimeout(240_000);
-    let village = createVillageGame();
+    // The rebellion takes place in an established settlement with winter fuel.
+    let village = deposit(createVillageGame(), "RES_WOOD", 3500);
     const send = (cmd: Parameters<typeof commandTimber>[1]) => {
       village = commandTimber(
         village,
@@ -802,11 +896,19 @@ for (const [hope, allegiance, film] of [
       position: { x: 12, z: 12 },
       headingRadians: Math.PI,
     });
+    send({
+      type: "plan-building",
+      kind: "restaurant",
+      position: { x: 0, z: 16 },
+      headingRadians: Math.PI,
+    });
     send({ type: "advance", minutes: 1440 });
-    const workshop = village.town.facilities.find(
-      (f) => f.kind === "workshop",
-    )!;
-    send({ type: "facility-staff", id: workshop.id, count: 2 });
+    for (const facility of village.town.facilities) {
+      send({ type: "facility-staff", id: facility.id, count: 2 });
+    }
+    send({ type: "set-gate", count: 16 });
+    send({ type: "set-guards", count: 8 });
+    send({ type: "set-heating", level: 2 });
     const save = createTimberSave({
       ...village,
       chapter: 5,
@@ -846,8 +948,21 @@ for (const [hope, allegiance, film] of [
           ending: s.campaign.ending as string | null,
         };
       });
+    const dismissNotices = async () => {
+      const confirm = page
+        .getByRole("region", { name: /^(마을 사건|추위 경고)$/ })
+        .getByRole("button", { name: "확인", exact: true });
+      while (await confirm.isVisible()) {
+        const current = await confirm.elementHandle();
+        await current.click();
+        await current.waitForElementState("hidden");
+        await current.dispose();
+      }
+    };
     const day = async () => {
+      await dismissNotices();
       const before = await readProgress();
+      if (before.ending) return;
       await page
         .getByRole("button", { name: "마을 하루 진행", exact: true })
         .click();
@@ -859,11 +974,13 @@ for (const [hope, allegiance, film] of [
       await expect(dialog).toContainText("유산 기록 대조");
       await dialog.getByRole("button", { name: "장면 접기" }).click();
       for (const tech of ["R17", "R18", "TECH_MECHA2"]) {
+        await dismissNotices();
         const report = page.getByRole("button", { name: /영실 · 연구 완료/ });
         if (await report.isVisible()) await report.click();
-        await page
-          .getByRole("button", { name: /^(명령 열기|거래 제안 열기)$/ })
-          .click();
+        const opener = page.getByRole("button", {
+          name: /^(명령 열기|거래 제안 열기)$/,
+        });
+        if (await opener.isVisible()) await opener.click();
         await page.getByRole("button", { name: "연구", exact: true }).click();
         await page.getByLabel("연구 기술", { exact: true }).selectOption(tech);
         await page
@@ -926,18 +1043,25 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
   await readScene(page, "충녕 · 먹는 것과 필요한 양에 맞춰 배급한다");
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "나가기", exact: true }).click();
+  await page.evaluate(() =>
+    localStorage.setItem("dynosty.film.opening", "seen"),
+  );
   await dialog.getByRole("button", { name: "돌아보기" }).click();
-  await dialog.getByRole("button", { name: "서막" }).click();
+  await dialog.getByRole("button", { name: "영상 보기" }).click();
   await expect(dialog.locator("video")).toHaveAttribute(
     "src",
     "/story/campaign/opening.mp4",
   );
   await dialog.getByRole("button", { name: "뒤로" }).click();
   await dialog.getByRole("button", { name: "이어하기" }).click();
+  await dialog.getByRole("button", { name: "현재 진행 이어하기" }).click();
+  await page.keyboard.press("Escape");
   await dialog.getByRole("button", { name: "저장하기", exact: true }).click();
-  await dialog.getByRole("button", { name: /슬롯 2 · 빈 슬롯/ }).click();
-  await expect(dialog).toContainText("슬롯 2에 저장했습니다.");
+  await expect(dialog.getByRole("button", { name: /^슬롯 / })).toHaveCount(10);
+  await dialog.getByRole("button", { name: /슬롯 10 · 빈 슬롯/ }).click();
+  await expect(dialog).toContainText("슬롯 10에 저장했습니다.");
   const manual = await page.evaluate(
     () => JSON.parse(localStorage.getItem("dynosty.village.resume")!).state,
   );
@@ -952,7 +1076,7 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   await page.reload();
   await expect(dialog).toHaveAccessibleName("메인 메뉴");
   await dialog.getByRole("button", { name: "이어하기" }).click();
-  await dialog.getByRole("button", { name: /슬롯 2 · 5단계/ }).click();
+  await dialog.getByRole("button", { name: /슬롯 10 · 5단계/ }).click();
   await expect
     .poll(() =>
       page.evaluate(
@@ -967,9 +1091,15 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   );
   expect(loaded.world).toEqual(manual.world);
   expect(loaded.town).toEqual(manual.town);
+  await expect(
+    page.getByRole("button", { name: /5단계 · 누굴 위한 복홀인가/ }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "나가기", exact: true }).click();
   await dialog.getByRole("button", { name: "다시하기" }).click();
   await dialog.getByRole("button", { name: /^5단계 ·/ }).click();
+  await expect(dialog.locator("video")).toHaveAttribute("src", /five\.mp4$/);
+  await dialog.getByRole("button", { name: "건너뛰기" }).click();
   await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
   const resumed = await page.evaluate(
     () => JSON.parse(localStorage.getItem("dynosty.village.resume")!).state,

@@ -14,6 +14,7 @@ import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
+import { CreateLineSystem } from "@babylonjs/core/Meshes/Builders/linesBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { CreateScreenshotUsingRenderTarget } from "@babylonjs/core/Misc/screenshotTools";
 import { Scene } from "@babylonjs/core/scene";
@@ -90,6 +91,7 @@ export interface SceneController {
       z: number;
       start: number;
       hours: number;
+      due: number;
     }>,
   ): void;
   /** 게임 누적 시각(분) */
@@ -105,10 +107,12 @@ export interface SceneController {
     confirm: (pose: HomePlacement) => void,
     feedback: (message: string, active: boolean) => void,
     kind?: BuildingKind,
+    site?: HomePlacement["position"],
   ): void;
   setConstructionGrid(visible: boolean): void;
   cancelHomePlacement(): void;
   setSelectionEnabled(enabled: boolean): void;
+  showPatrolMap(visible: boolean): void;
 }
 export type ScreenPoint = { x: number; y: number; visible: boolean };
 export type CameraInfo = {
@@ -136,7 +140,7 @@ export function mountScene(
   onAssetWarning: (message: string | null) => void = () => {},
   onCameraInfo: (info: CameraInfo) => void = () => {},
   onBuildingHover: (value: BuildingHover | null) => void = () => {},
-  onHospitalSelect: (id: string | null) => void = () => {},
+  onFacilitySelect: (id: string | null) => void = () => {},
 ): SceneController {
   const engine = new Engine(canvas, true);
   const softwareRenderer = /swiftshader|llvmpipe|software/i.test(
@@ -152,13 +156,18 @@ export function mountScene(
     CAMERA_TARGET.clone(),
     scene,
   );
-  camera.attachControl(canvas, true);
+  camera.attachControl(false, true, 1);
+  camera.movement.input.inputMap.push({
+    source: "pointer",
+    button: 2,
+    interaction: "rotate",
+  });
   camera.lowerRadiusLimit = 4;
   camera.upperRadiusLimit = 140;
   camera.wheelDeltaPercentage = 0.01; // 휠 확대를 거리에 비례하게
   camera.lowerBetaLimit = 0.2;
   camera.upperBetaLimit = 1.35;
-  // 시점 옮기기: 오른쪽 버튼 끌기(또는 Ctrl+왼쪽) · WASD. 땅과 나란히만 움직임
+  // 시점 옮기기: 가운데 버튼 끌기(또는 Ctrl+왼쪽) · WASD. 땅과 나란히만 움직임
   camera.panningSensibility = 60;
   camera.panningAxis = new Vector3(1, 0, 1);
   camera.mapPanning = true;
@@ -337,7 +346,12 @@ export function mountScene(
     sites = createSiteSelection(scene, onSiteSelection);
   }
   const select = (id: string | null) => {
-    if (id === null || village.targets.has(id)) {
+    if (
+      id === null ||
+      id.startsWith("town:") ||
+      id.startsWith("production:") ||
+      village.targets.has(id)
+    ) {
       entities.select(null);
       sites.select(null);
       publishSelection(id);
@@ -410,29 +424,57 @@ export function mountScene(
   let selectionEnabled = true;
   let animationSpeed = 1;
   const stopPicking = observeSceneClicks(canvas, (x, y) => {
+    if (!selectionEnabled) return;
+    const picked = scene.pick(x, y)?.pickedMesh ?? null;
+    let hit = picked;
+    while (hit) {
+      const townId = hit.metadata?.townTarget as string | undefined;
+      const villageId = hit.metadata?.villageTarget as string | undefined;
+      const homeId = villageState?.homes.find(
+        (home) => home.id === hit?.id,
+      )?.id;
+      if (townId || villageId || homeId) {
+        if (homePreview.active) homePreview.cancel();
+        select(townId ?? villageId ?? homeId!);
+        const facility = villageState?.town.facilities.find(
+          (f) => "town:" + f.id === townId,
+        );
+        onFacilitySelect(
+          facility?.id ?? villageId?.match(/^production:(.+)$/)?.[1] ?? null,
+        );
+        return;
+      }
+      hit = hit.parent as typeof hit;
+    }
+    // An unfinished foundation is flush with the terrain. Resolve clicks on its footprint as well.
+    const groundPoint = scene.pick(x, y, (m) => m === ground)?.pickedPoint;
+    const foundation =
+      groundPoint &&
+      villageState?.town.orders.find((o) => {
+        const dx = groundPoint.x - o.position.x,
+          dz = groundPoint.z - o.position.z;
+        const cos = Math.cos(o.headingRadians),
+          sin = Math.sin(o.headingRadians);
+        return (
+          Math.abs(dx * cos - dz * sin) <= 2 &&
+          Math.abs(dx * sin + dz * cos) <= 2
+        );
+      });
+    onFacilitySelect(null);
+    if (foundation) {
+      if (homePreview.active) homePreview.cancel();
+      select("town:" + foundation.id);
+      return;
+    }
     if (homePreview.active) {
       homePreview.commit(x, y);
       return;
     }
-    const picked = scene.pick(x, y)?.pickedMesh ?? null;
-    let hospitalMesh = picked;
-    while (hospitalMesh) {
-      const hospital = villageState?.town.facilities.find(
-        (f) => f.kind === "hospital" && `town:${f.id}` === hospitalMesh?.id,
-      );
-      if (hospital) {
-        onHospitalSelect(hospital.id);
-        return;
-      }
-      hospitalMesh = hospitalMesh.parent as typeof hospitalMesh;
-    }
-    onHospitalSelect(null);
-    if (!selectionEnabled) return;
     const site = sites.idForMesh(picked);
-    if (picked?.metadata?.villageTarget) select(picked.metadata.villageTarget);
-    else if (site) select(site);
+    if (site) select(site);
     else {
-      if (selected?.startsWith("village:")) select(null);
+      if (selected?.startsWith("village:") || selected?.startsWith("town:"))
+        select(null);
       sites.select(null);
       entities.selectMesh(picked);
     }
@@ -445,8 +487,8 @@ export function mountScene(
       return;
     }
     let mesh = scene.pick(
-      ((event.clientX - rect.left) * canvas.width) / rect.width,
-      ((event.clientY - rect.top) * canvas.height) / rect.height,
+      event.clientX - rect.left,
+      event.clientY - rect.top,
     )?.pickedMesh;
     let name: string | null = null,
       health: number | undefined,
@@ -486,6 +528,14 @@ export function mountScene(
           name === "자원 작업장"
             ? "도착한 작업 인원만 자원을 생산합니다."
             : "화물을 내려놓으면 공동 재고에 반영합니다.";
+        break;
+      }
+      const order = villageState?.town.orders.find(
+        (o) => "town:" + o.id === mesh?.id,
+      );
+      if (order) {
+        name = BUILDING_RULES[order.kind].name;
+        details = "건설 현장 · 인부 " + order.crew.length + "명";
         break;
       }
       const facility = villageState?.town.facilities.find(
@@ -551,13 +601,7 @@ export function mountScene(
   const typing = (t: EventTarget | null) =>
     t instanceof HTMLElement && !!t.closest("input, select, textarea, dialog");
   const onKeyDown = (e: KeyboardEvent) => {
-    if (
-      !homePreview.active &&
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey &&
-      !typing(e.target)
-    )
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target))
       held.add(e.key.toLowerCase());
   };
   const onKeyUp = (e: KeyboardEvent) => held.delete(e.key.toLowerCase());
@@ -574,7 +618,13 @@ export function mountScene(
   let clockTarget = 9 * 60,
     clockShown = 9 * 60;
   engine.runRenderLoop(() => {
-    if (!assetsReady) return;
+    if (
+      !assetsReady ||
+      document.querySelector(
+        ".film-screen:modal, .bokhol-title:modal, .mission-entry:modal",
+      )
+    )
+      return;
     const dt = Math.min(engine.getDeltaTime() / 1000, 0.1);
     // 낮밤은 게임 시각을 부드럽게 따라감 (자정 넘김 처리)
     let diff = clockTarget - clockShown;
@@ -679,7 +729,10 @@ export function mountScene(
         heading: Math.atan2(fwd.x, fwd.z),
       });
     }
-    entities.animate((engine.getDeltaTime() / 1000) * animationSpeed);
+    entities.animate(
+      (engine.getDeltaTime() / 1000) * animationSpeed,
+      villageState?.campaign?.beat === "departure",
+    );
     if (legacyVisual) legacyVisual.animate(engine.getDeltaTime() / 1000);
     else timberVisual.animate((engine.getDeltaTime() / 1000) * animationSpeed);
     laborVisual.animate(engine.getDeltaTime() / 1000);
@@ -757,8 +810,43 @@ export function mountScene(
       }
     }
   });
+  let patrolMap: ReturnType<typeof CreateLineSystem> | undefined;
+  function showPatrolMap(visible: boolean) {
+    patrolMap?.dispose();
+    patrolMap = undefined;
+    if (!visible || !villageState) return;
+    const points = [
+      ...villageState.homes,
+      ...villageState.town.facilities,
+      ...villageState.town.orders,
+    ].map((f) => f.position);
+    const extent = Math.max(28, ...points.map((p) => Math.hypot(p.x, p.z) + 4));
+    const point = (x: number, z: number) =>
+      new Vector3(x, elevation(x, z) + 0.18, z);
+    const lines = [
+      Array.from({ length: 129 }, (_, i) =>
+        point(
+          extent * Math.cos((i * Math.PI) / 64),
+          extent * Math.sin((i * Math.PI) / 64),
+        ),
+      ),
+    ];
+    for (let z = -extent + 2; z < extent; z += 2.5) {
+      const half = Math.sqrt(extent * extent - z * z);
+      lines.push(
+        Array.from({ length: 45 }, (_, i) =>
+          point(-half + (2 * half * i) / 44, z),
+        ),
+      );
+    }
+    patrolMap = CreateLineSystem("관아 순라 구역", { lines }, scene);
+    patrolMap.color = new Color3(0.95, 0.68, 0.28);
+    patrolMap.alpha = 0.64;
+    patrolMap.isPickable = false;
+  }
   return {
     ready,
+    showPatrolMap,
     setConstructionGrid(visible) {
       demoMaterial.diffuseTexture = visible ? plotTexture : null;
     },
@@ -777,7 +865,8 @@ export function mountScene(
       camera.upperRadiusLimit = active ? 720 : 140;
       if (active !== demoActive) {
         demoActive = active;
-        if (selected?.startsWith("village:")) select(null);
+        if (selected?.startsWith("village:") || selected?.startsWith("town:"))
+          select(null);
         worldRoot.setEnabled(true);
         previewVillage.setEnabled(true);
         village.setPreviewResidentsVisible(!active);
@@ -1022,8 +1111,35 @@ export function mountScene(
         k = d > PAN_LIMIT ? PAN_LIMIT / d : 1;
       camera.target.set(x * k, 0, z * k); // 각도·거리는 그대로 두고 바라보는 점만 옮김
     },
-    villageInfo: (id) => village.targets.get(id),
-    update: entities.update,
+    villageInfo(id) {
+      const order = villageState?.town.orders.find(
+        (o) => "town:" + o.id === id,
+      );
+      if (order)
+        return {
+          name: BUILDING_RULES[order.kind].name,
+          detail: "건설 현장 · 인부 " + order.crew.length + "명",
+        };
+      const facility = villageState?.town.facilities.find(
+        (f) => "town:" + f.id === id,
+      );
+      if (facility)
+        return {
+          name: BUILDING_RULES[facility.kind].name,
+          detail: "완공 시설 · " + facility.level + "단계",
+        };
+      return village.targets.get(id);
+    },
+    update(snapshot, showBoard) {
+      const exodus = snapshot.entities.some((e) => e.id === "departing-0");
+      const visible = exodus
+        ? snapshot.entities.filter(
+            (e) =>
+              !e.id.startsWith("departing-") || Number(e.id.slice(10)) < 32,
+          )
+        : snapshot.entities;
+      entities.update({ ...snapshot, entities: visible }, showBoard);
+    },
     select,
     dispose() {
       disposed = true;

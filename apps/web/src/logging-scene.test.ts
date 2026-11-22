@@ -4,6 +4,7 @@ import {
   advanceTimber,
   BOKHOL_MINERALS,
   commandTimber,
+  createPlayState,
   createTimberState,
   LOGGING_RULES,
   loggingSiteRules,
@@ -14,12 +15,19 @@ import { createLoggingVisual } from "./logging-scene.js";
 import { createSceneEntities } from "./scene-entities.js";
 import { terrainElevation } from "./terrain.js";
 
+function fundedTown() {
+  const world = createPlayState();
+  return createTimberState({
+    ...world,
+    resources: { ...world.resources, RES_WOOD: 4500000 },
+  });
+}
 it("숲·작업장·적재·수레가 실제 상태를 표시하고 운반 공룡과 수레가 같은 방향을 향한다", () => {
   const engine = new NullEngine(),
     scene = new Scene(engine),
     entities = createSceneEntities(scene),
     visual = createLoggingVisual(scene);
-  let s = advanceTimber(createTimberState(), 120);
+  let s = advanceTimber(fundedTown(), 120);
   const update = () => {
     entities.update(timberScene(s));
     visual.update(s);

@@ -4,6 +4,7 @@ import {
   BOKHOL_MAP,
   BOKHOL_MINERALS,
   BOKHOL_PRODUCTION_SITES,
+  BUILDING_RULES,
   type BuildingKind,
   createLogging,
   dailyFoodDemand,
@@ -74,7 +75,7 @@ type Props = {
   onLaborModeChange: (mode: boolean) => void;
   selectedSite: SiteId | null;
   onClearSelection: () => void;
-  selectedHospital?: string | null;
+  selectedWorkplace?: string | null;
   showDevTools?: boolean;
   saveOpen?: boolean;
   onState: (state: TimberState) => void;
@@ -97,7 +98,7 @@ export function TimberDemo({
   onLaborModeChange,
   selectedSite: selectedLaborSite,
   onClearSelection,
-  selectedHospital = null,
+  selectedWorkplace = null,
   onState,
   onExit,
   onView,
@@ -369,10 +370,18 @@ export function TimberDemo({
     (stock.RES_PLANT < demand.RES_PLANT ||
       stock.RES_MEAT + stock.RES_FISH < demand.RES_MEAT + demand.RES_FISH);
   const metal = (state?.world.resources.RES_METAL ?? 0) / AMOUNT_SCALE;
+  const chosenFacility = state?.town.facilities.find(
+    (f) => f.id === selectedWorkplace,
+  );
+  const chosenSource = BOKHOL_PRODUCTION_SITES.find(
+    (site) => site.id === selectedWorkplace,
+  );
+  const service = focusSection?.label ?? "교역소 방문";
   const classic = (
     <section
       hidden={!active || laborMode}
       className="timber-demo"
+      data-service={showDevTools ? undefined : service}
       aria-label="목재 조달"
     >
       <button
@@ -385,7 +394,15 @@ export function TimberDemo({
       <div className="timber-heading">
         <div>
           <p className="eyebrow">복홀 · 업무 지휘</p>
-          <h2 className="timber-title">복홀 마을 운영</h2>
+          <h2 className="timber-title">
+            {showDevTools
+              ? "복홀 마을 운영"
+              : chosenFacility && service === "일터 배치"
+                ? BUILDING_RULES[chosenFacility.kind].name
+                : chosenSource && service === "일터 배치"
+                  ? chosenSource.name
+                  : service}
+          </h2>
         </div>
         <button
           type="button"
@@ -470,9 +487,36 @@ export function TimberDemo({
               처리가 필요합니다.
             </p>
           ) : null}
+          {service === "일터 배치" && chosenSource && (
+            <section aria-label="생산지 일손 배치">
+              <label>
+                운영 인원{" "}
+                <select
+                  value={loggingSite(state, chosenSource.id).target}
+                  onChange={(e) =>
+                    command({
+                      type: "set-logging-workers",
+                      siteId: chosenSource.id,
+                      count: Number(e.target.value),
+                    })
+                  }
+                >
+                  {[0, 1, 2, 3, 4].map((n) => (
+                    <option key={n} value={n}>
+                      {n}명
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+          )}
           <TownPanel
+            mode={showDevTools ? undefined : service}
+            facilityId={chosenFacility?.id}
             state={state}
-            selectedHospital={selectedHospital}
+            selectedHospital={
+              chosenFacility?.kind === "hospital" ? chosenFacility.id : null
+            }
             showDevTools={showDevTools}
             command={command}
             place={placeBuilding}
@@ -727,7 +771,7 @@ export function TimberDemo({
               }
               onClick={() => placeBuilding("home")}
             >
-              온돌 둥지 증설 · 목재20
+              온돌 둥지 증설 · 목재100
             </button>
             {placingHome ? (
               <div role="status" data-testid="home-placement-status">
@@ -747,7 +791,12 @@ export function TimberDemo({
                 {state.construction.crew
                   ?.filter((w) => w.phase === "build")
                   .reduce((sum, w) => sum + w.amount, 0) ?? 20}
-                /20 ·{" "}
+                /
+                {state.construction.crew?.reduce(
+                  (sum, w) => sum + w.amount,
+                  0,
+                ) ?? 20}{" "}
+                ·{" "}
                 {!workplaceOpen(state.world.minute)
                   ? "퇴근 · 09:00에 공사를 재개합니다"
                   : state.construction.finishAt === null

@@ -8,6 +8,7 @@ import type {
 } from "@dynosty/game-core";
 import {
   AMOUNT_SCALE,
+  BOKHOL_MINERALS,
   BUILDING_RULES,
   type BuildingKind,
   capitalRoad,
@@ -36,6 +37,7 @@ import {
   PATROL_REQUESTS,
   villageAdvice,
 } from "./campaign-scenes.js";
+import { facilityArt } from "./facility-art.js";
 import {
   CmdButton,
   CmdFace,
@@ -57,6 +59,7 @@ import { PlayPanel } from "./PlayPanel.js";
 import { PlaySavePanel } from "./PlaySavePanel.js";
 import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { QualityFlow } from "./QualityFlow.js";
+import { RegionMap } from "./RegionMap.js";
 import { residentName } from "./resident-names.js";
 import { SaveFilePanel } from "./SaveFilePanel.js";
 import { SelectionPanel } from "./SelectionPanel.js";
@@ -79,7 +82,7 @@ import {
 } from "./site-targets.js";
 import { SCENE_SIGNS } from "./site-zones.js";
 import { TimberDemo } from "./TimberDemo.js";
-import { buildingCost, facilityReferences } from "./TownPanel.js";
+import { buildingCost } from "./TownPanel.js";
 import { VideoPanel } from "./VideoPanel.js";
 import { CREW_BADGES, cartBadge } from "./visual-badges.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
@@ -103,7 +106,9 @@ export function App() {
   const [buildingHover, setBuildingHover] = useState<BuildingHover | null>(
     null,
   );
-  const [selectedHospital, setSelectedHospital] = useState<string | null>(null);
+  const [selectedWorkplace, setSelectedWorkplace] = useState<string | null>(
+    null,
+  );
   const villageCommand = useRef<
     ((command: import("@dynosty/game-core").TimberCommand) => void) | null
   >(null);
@@ -126,7 +131,7 @@ export function App() {
   const savePanelId = useId();
   const toolsPanelId = useId();
   const scoutPanelId = useId();
-  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [consoleOpen, setConsoleOpen] = useState(true);
   const inCapital = timberState?.campaign?.beat === "capital";
   const [reports, setReports] = useState<string[]>([]);
   const lastResearch = useRef<string[] | null>(null);
@@ -169,6 +174,7 @@ export function App() {
     window.addEventListener("keydown", changePage);
     return () => window.removeEventListener("keydown", changePage);
   }, [consoleOpen, villageSection, placementHint]);
+  const [regionOpen, setRegionOpen] = useState(false);
   const [scoutOpen, setScoutOpen] = useState<string | null>(null);
   const pinRefs = useRef<Record<string, HTMLElement | null>>({});
   const saveMenuRef = useRef<HTMLButtonElement>(null);
@@ -177,6 +183,10 @@ export function App() {
   const asideRef = useRef<HTMLElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const sceneRef = useRef<SceneController | null>(null);
+  const showPatrolMap = useCallback(
+    (visible: boolean) => sceneRef.current?.showPatrolMap(visible),
+    [],
+  );
   const pendingSaveRef = useRef<number | null>(null);
   const nextRequestRef = useRef(0);
   const [saveBusy, setSaveBusy] = useState(false);
@@ -301,11 +311,30 @@ export function App() {
         if (cancelled) return;
         sceneRef.current = mountScene(
           canvas,
-          setSelectedId,
+          (id) => {
+            setSelectedId(id);
+            if (
+              id &&
+              (id.startsWith("town:") ||
+                id.startsWith("village:BLD_") ||
+                id === "example-building-1" ||
+                id.startsWith("dwelling-"))
+            ) {
+              setConsoleOpen(true);
+              setTimberOpen(false);
+              setVillageSection(null);
+            }
+          },
           setAssetWarning,
           setCameraInfo,
           setBuildingHover,
-          setSelectedHospital,
+          (id) => {
+            setSelectedWorkplace(id);
+            if (id) {
+              setTimberOpen(true);
+              setVillageSection({ label: "일터 배치" });
+            }
+          },
         );
         const controller = sceneRef.current;
         await controller.ready;
@@ -404,9 +433,10 @@ export function App() {
       confirm: (pose: HomePlacement) => void,
       feedback: (message: string, active: boolean) => void,
       kind?: BuildingKind,
+      site?: HomePlacement["position"],
     ) =>
       sceneRef.current
-        ? sceneRef.current.beginHomePlacement(confirm, feedback, kind)
+        ? sceneRef.current.beginHomePlacement(confirm, feedback, kind, site)
         : feedback("3D 장면을 준비하고 있습니다.", false),
     [],
   );
@@ -414,6 +444,18 @@ export function App() {
     () => sceneRef.current?.cancelHomePlacement(),
     [],
   );
+  function placeFacility(kind: BuildingKind, site?: HomePlacement["position"]) {
+    beginHomePlacement(
+      (pose) => {
+        villageCommand.current?.({ type: "plan-building", kind, ...pose });
+        cancelHomePlacement();
+        setPlacementHint("");
+      },
+      setPlacementHint,
+      kind,
+      site,
+    );
+  }
   function advance() {
     setExampleClock(true);
     if (pendingSaveRef.current !== null) return;
@@ -549,9 +591,15 @@ export function App() {
   const foundCount = SCOUT_SITES.filter(
     (site) => scouts[site.id]?.status === "found",
   ).length;
-  const leftHours = (id: string) => {
+  const scoutStatus = (id: string) => {
     const run = scouts[id];
-    return run ? Math.max(0, Math.ceil((run.due - gameMinutes) / 60)) : 0;
+    const find = timberState?.scoutFinds?.[id];
+    if (find?.decision === "waiting" && find.due <= gameMinutes)
+      return "발견 지점에서 지시 대기";
+    const due = find?.decision === "waiting" ? find.due : run?.due;
+    return due === undefined
+      ? "출발 전"
+      : Math.max(0, Math.ceil((due - gameMinutes) / 60)) + "시간 남음";
   };
 
   // 게임 시작 → 주민이 걷고 연기가 남, 시각에 맞춰 낮밤
@@ -585,7 +633,16 @@ export function App() {
       SCOUT_SITES.flatMap(({ id, x, z }) => {
         const run = scouts[id];
         return run?.status === "going"
-          ? [{ id, x, z, start: run.start, hours: run.minutes / 60 }]
+          ? [
+              {
+                id,
+                x,
+                z,
+                start: run.start,
+                hours: run.minutes / 60,
+                due: run.due,
+              },
+            ]
           : [];
       }),
     );
@@ -617,15 +674,22 @@ export function App() {
     if (sceneStatus !== "준비 완료") return;
     sceneRef.current?.trackPoints(
       [
+        ...BOKHOL_MINERALS.map((m) => ({
+          id: "visitor-mineral-" + m.id,
+          x: m.x,
+          z: m.z,
+          y: 6,
+        })),
         ...SCOUT_SITES.map((site) => ({
           id: site.id,
           x: site.x,
           y: elevation(site.x, site.z) + 9.5,
           z: site.z,
         })),
+        { id: "visitor-bokhol-gate", x: 0, z: 24, y: 3 },
         ...(capitalMap
           ? [
-              { id: "visitor-south", x: 0, z: 23, y: 5 },
+              { id: "visitor-south", x: 0, z: 24, y: 5 },
               { id: "visitor-north", x: 0, z: -75, y: 5 },
               { id: "visitor-east", x: 72, z: 0, y: 5 },
               { id: "visitor-west", x: -72, z: 0, y: 5 },
@@ -693,6 +757,7 @@ export function App() {
   const timberReady = sceneStatus === "준비 완료";
   // 뜨는 창은 한 번에 하나: 새 창을 열면 나머지는 닫힘
   function closePopups() {
+    setRegionOpen(false);
     setSaveOpen(false);
     setToolsOpen(false);
     setScoutOpen(null);
@@ -710,7 +775,7 @@ export function App() {
     openOnly(() => setTimberOpen(true));
   }
   function scoutFace(site: (typeof SCOUT_SITES)[number]) {
-    const detail = `${site.name} 정찰 중 · ${leftHours(site.id)}시간 남음`;
+    const detail = `${site.name} 정찰 중 · ${scoutStatus(site.id)}`;
     return (
       <>
         <PatrolPortrait
@@ -737,12 +802,20 @@ export function App() {
   const daylight = (playMinute ?? 540) >= 360 && (playMinute ?? 540) < 1080;
   const showTrade =
     !!visitor && consoleOpen && villageSection?.label === "교역소 방문";
+  const prologue =
+    !timberState ||
+    ["opening", "after", "departure"].includes(
+      timberState.campaign?.beat ?? "",
+    );
   function openVillageSection(section: string) {
+    setSelectedWorkplace(null);
+    if (prologue) return;
     setConsoleOpen(true);
     if (!timberOpen) openTimber();
     setVillageSection({ label: section });
   }
   function toggleAuxiliary(panel: "save" | "tools") {
+    if (prologue) return;
     if (panel === "save" && !timberOpen) {
       openOnly(() => setSaveOpen(!saveOpen));
       return;
@@ -770,7 +843,12 @@ export function App() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-      if (document.querySelector("dialog[open]")) return;
+      if (document.querySelector("dialog:modal")) return;
+      if (
+        event.key !== "Escape" &&
+        document.querySelector(".play-shell[data-prologue=true]")
+      )
+        return;
       const target = event.target;
       if (event.key === "Escape") {
         if (document.querySelector('[data-testid="home-placement-status"]'))
@@ -781,10 +859,11 @@ export function App() {
       }
       if (
         target instanceof HTMLElement &&
-        target.closest("input, select, textarea, dialog")
+        target.closest("input, select, textarea, dialog:modal")
       )
         return;
       const key = event.key.toLowerCase();
+      if (key === "m") setRegionOpen((v) => !v);
       if (key === "e") openTimberRef.current();
       if (key === "b") openVillageRef.current("건설과 식량 수급");
       if (key === "u") openVillageRef.current("거주지");
@@ -861,6 +940,8 @@ export function App() {
   );
   return (
     <main
+      data-loading={!timberState && !workerError && !playError}
+      data-prologue={prologue}
       data-section={saveOpen || toolsOpen ? undefined : villageSection?.label}
       className={`play-shell${timberOpen ? " is-procurement" : ""}`}
     >
@@ -881,6 +962,7 @@ export function App() {
             setDefenseOpen={setDefenseOpen}
             southVisits={southVisits}
             gateSelected={!!selectedId?.startsWith("village:BLD_GATE:")}
+            onPatrolMap={showPatrolMap}
             officeSelected={!!selectedId?.startsWith("village:BLD_OFFICE:")}
             trade={showTrade}
             work={
@@ -928,7 +1010,10 @@ export function App() {
                   onClick={() =>
                     villageCommand.current?.({
                       type: "scout-sites",
-                      ids: SCOUT_SITES.map((s) => s.id),
+                      ids: SCOUT_SITES.filter((site) => !scouts[site.id]).map(
+                        (site) => site.id,
+                      ),
+                      explore: true,
                     })
                   }
                 >
@@ -967,9 +1052,7 @@ export function App() {
               type="button"
               className="timber-entry-link"
               disabled={sceneStatus !== "준비 완료"}
-              onClick={() => {
-                openTimber();
-              }}
+              onClick={() => openVillageSection("교역소 방문")}
             >
               마른 목재 20 조달
             </button>
@@ -1049,7 +1132,7 @@ export function App() {
       <div
         className={`play-workspace${hasPanels || timberOpen ? " has-tools" : ""}`}
       >
-        <section aria-label="마을 전경" className="play-scene">
+        <section inert={prologue} aria-label="마을 전경" className="play-scene">
           <div className="scene-heading">
             <h2>{timberOpen ? "복홀 구릉지" : "3D 장면"}</h2>
             <span className="prototype-label">복홀</span>
@@ -1071,10 +1154,68 @@ export function App() {
               </div>
             )}
             <canvas
+              onWheel={(event) => {
+                if (
+                  !prologue &&
+                  !inCapital &&
+                  event.deltaY > 0 &&
+                  (cameraInfo?.distance ?? 0) >= 110
+                )
+                  setRegionOpen(true);
+              }}
               ref={canvasRef}
-              aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
+              aria-label="마을 전경. 건물을 선택하거나 WASD로 이동할 수 있습니다."
               tabIndex={0}
             />
+            {!capitalMap &&
+              !prologue &&
+              timberState &&
+              villageDefenseActive(timberState) && (
+                <button
+                  type="button"
+                  className="village-visitor-marker gate-pin"
+                  hidden
+                  ref={(el) => {
+                    pinRefs.current["visitor-bokhol-gate"] = el;
+                  }}
+                  onClick={() => {
+                    sceneRef.current?.select("village:BLD_GATE:0:24");
+                    setDefenseOpen(true);
+                  }}
+                >
+                  성문
+                </button>
+              )}
+            {!prologue &&
+              !capitalMap &&
+              BOKHOL_MINERALS.map((m) => (
+                <button
+                  type="button"
+                  className="village-visitor-marker mineral-pin"
+                  key={m.id}
+                  hidden
+                  ref={(el) => {
+                    pinRefs.current["visitor-mineral-" + m.id] = el;
+                  }}
+                  title={m.name + " · 인근 부지 보기"}
+                  onClick={() => {
+                    const kind = m.kind === "stone" ? "quarry" : m.kind;
+                    openVillageSection("건설과 식량 수급");
+                    setBuildPage(
+                      Math.floor(Object.keys(BUILDING_RULES).indexOf(kind) / 5),
+                    );
+                    const site = { x: m.x + 15, z: m.z };
+                    sceneRef.current?.focus(site, 45);
+                    placeFacility(kind, site);
+                  }}
+                >
+                  {m.kind === "iron"
+                    ? "철광맥"
+                    : m.kind === "stone"
+                      ? "채석장 암반"
+                      : "석탄층"}
+                </button>
+              ))}
             {capitalMap &&
               timberState &&
               (["south", "north", "east", "west"] as const).map((gate) => {
@@ -1212,7 +1353,7 @@ export function App() {
             </div>
           ) : null}
           <div className="scene-footer">
-            <p>클릭으로 선택 · 마우스로 회전 · 휠로 확대</p>
+            <p>클릭 선택 · 드래그 회전 · 휠 확대·축소</p>
             <span>
               {timberOpen && laborOpen
                 ? "검수대 · 격리품 · 배급소"
@@ -1283,6 +1424,7 @@ export function App() {
         </section>
 
         <aside
+          inert={prologue}
           ref={asideRef}
           className={`workspace-tools${timberOpen ? " timber-tools" : ""}`}
           aria-label="작업 메뉴"
@@ -1292,7 +1434,7 @@ export function App() {
             active={timberOpen}
             commandRef={villageCommand}
             focusSection={villageSection}
-            selectedHospital={selectedHospital}
+            selectedWorkplace={selectedWorkplace}
             world={playState}
             showDevTools={toolsOpen}
             saveOpen={saveOpen}
@@ -1332,20 +1474,18 @@ export function App() {
                 <dl className="g-scout__facts">
                   <dt>인원</dt>
                   <dd>일손 {SCOUT_CREW}명</dd>
-                  <dt>식량</dt>
-                  <dd>시안 · 식량 재고에 미반영</dd>
+
                   <dt>왕복 시간</dt>
                   <dd>
                     {Math.floor(scoutMinutes / 60)}시간
                     {scoutMinutes % 60 ? ` ${scoutMinutes % 60}분` : ""}
-                    {scoutSite.fromPlan ? "" : " (시안 값)"}
                   </dd>
                   <dt>상태</dt>
                   <dd>
                     {scouts[scoutSite.id]?.status === "found"
                       ? "발견함"
                       : scouts[scoutSite.id]?.status === "going"
-                        ? `정찰 중 · ${leftHours(scoutSite.id)}시간 남음`
+                        ? `정찰 중 · ${scoutStatus(scoutSite.id)}`
                         : "아직 가 보지 않음"}
                   </dd>
                 </dl>
@@ -1355,7 +1495,12 @@ export function App() {
                   </p>
                 ) : null}
                 <div className="g-scout__actions">
-                  {scouts[scoutSite.id] ? null : (
+                  {(!scouts[scoutSite.id] ||
+                    (scouts[scoutSite.id]?.status === "found" &&
+                      (timberState?.chapter ||
+                        timberState?.campaign?.reports.includes(
+                          scoutSite.id,
+                        )))) && (
                     <button
                       type="button"
                       disabled={!playState}
@@ -1363,11 +1508,14 @@ export function App() {
                         villageCommand.current?.({
                           type: "scout-sites",
                           ids: [scoutSite.id],
+                          explore: true,
                         });
                         setScoutOpen(null);
                       }}
                     >
-                      정찰대 보내기
+                      {scouts[scoutSite.id]
+                        ? "다시 정찰 보내기"
+                        : "정찰대 보내기"}
                     </button>
                   )}
                   {scouts[scoutSite.id]?.status === "going" ? (
@@ -1575,6 +1723,15 @@ export function App() {
           </button>
         )}
       </div>
+      {regionOpen && !prologue && !inCapital && timberState && (
+        <RegionMap
+          state={timberState}
+          close={() => {
+            setRegionOpen(false);
+            sceneRef.current?.focus({ x: 0, z: 0 }, 68);
+          }}
+        />
+      )}
       <FpsBadge />
       {reports.length > 0 && !visitor && (
         <button
@@ -1589,7 +1746,7 @@ export function App() {
               {inCapital ? "전하" : "공자님"}, ‘{reports[0]}’ 연구를 마쳤습니다.
             </small>
           </span>{" "}
-          ✓
+          보고 닫기
         </button>
       )}
       <section className="g-scout-faces" aria-label="파견 중인 정찰대">
@@ -1599,7 +1756,7 @@ export function App() {
               key={site.id}
               type="button"
               className="g-scout-face"
-              aria-label={`${site.name} 정찰 중 · ${leftHours(site.id)}시간 남음`}
+              aria-label={`${site.name} 정찰 중 · ${scoutStatus(site.id)}`}
               onClick={() => openOnly(() => setScoutOpen(site.id))}
             >
               {scoutFace(site)}
@@ -1640,6 +1797,13 @@ export function App() {
         aria-label="명령 콘솔"
       >
         <ConsoleFrame />
+        <div id="campaign-dialogue-dock" />
+        {timberOpen && villageSection?.label === "건설과 식량 수급" && (
+          <aside className="shelf-guide">
+            {portrait}
+            {dialogue}
+          </aside>
+        )}
         {consoleOpen && (
           <>
             <div className="docked-portrait">{portrait}</div>
@@ -1697,28 +1861,13 @@ export function App() {
                   <button
                     type="button"
                     key={kind}
-                    onClick={() =>
-                      beginHomePlacement(
-                        (pose) => {
-                          villageCommand.current?.({
-                            type: "plan-building",
-                            kind,
-                            ...pose,
-                          });
-                          cancelHomePlacement();
-                          setPlacementHint("");
-                        },
-                        (message) => setPlacementHint(message),
-                        kind,
-                      )
-                    }
+                    aria-description={buildingCost(kind)}
+                    data-cost={buildingCost(kind)}
+                    aria-label={BUILDING_RULES[kind].name}
+                    onClick={() => placeFacility(kind)}
                   >
-                    <img
-                      src={`/art/facilities/${facilityReferences[kind]}-levels-v1.png`}
-                      alt=""
-                    />
+                    <img src={facilityArt(kind, timberState)} alt="" />
                     <b>{BUILDING_RULES[kind].name}</b>
-                    <small>{buildingCost(kind)}</small>
                   </button>
                 ))}
               <button
@@ -1793,8 +1942,7 @@ export function App() {
                           "정찰 파견 · " +
                           site.name +
                           " · " +
-                          leftHours(site.id) +
-                          "시간 남음",
+                          scoutStatus(site.id),
                       ),
                     ]
                   : undefined
@@ -1838,7 +1986,13 @@ export function App() {
             hotkey="P"
             onClick={() => openVillageSection("배급 정책")}
           />
-          <CmdButton icon="map" label="지도" hotkey="M" disabled />
+          <CmdButton
+            icon="map"
+            label="지도"
+            hotkey="M"
+            disabled={prologue || inCapital}
+            onClick={() => setRegionOpen(true)}
+          />
           <CmdButton
             icon="economy"
             label="조달"

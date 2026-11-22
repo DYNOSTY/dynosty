@@ -93,7 +93,7 @@ describe("변종 야습", () => {
     expect(hit.mutantDamage?.[id]).toBe(100);
     expect(hit.residents.some((r) => r.homeId === id)).toBe(false);
     const cost = mutantRepairCost(hit, id);
-    expect(cost.RES_WOOD + cost.RES_STONE).toBe(20);
+    expect(cost.RES_WOOD + cost.RES_STONE).toBe(100);
     const repaired = commandTimber(
       hit,
       { type: "repair-mutant", building: id },

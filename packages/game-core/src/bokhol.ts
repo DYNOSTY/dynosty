@@ -117,6 +117,42 @@ export const BOKHOL_MINERALS = [
     z: -40,
     initial: 240,
   },
+  {
+    id: "coal-bokhol",
+    name: "복홀 서쪽 석탄층",
+    kind: "coal",
+    resource: "RES_COAL",
+    x: -76,
+    z: 17,
+    initial: 180,
+  },
+  {
+    id: "iron-bokhol",
+    name: "복홀 북쪽 철광맥",
+    kind: "iron",
+    resource: "RES_IRON_ORE",
+    x: 46,
+    z: -44,
+    initial: 160,
+  },
+  {
+    id: "stone-bokhol-west",
+    name: "복홀 서북쪽 암반",
+    kind: "stone",
+    resource: "RES_STONE",
+    x: -53,
+    z: -46,
+    initial: 240,
+  },
+  {
+    id: "stone-bokhol-south",
+    name: "복홀 남쪽 암반",
+    kind: "stone",
+    resource: "RES_STONE",
+    x: 9,
+    z: 48,
+    initial: 240,
+  },
 ] as const;
 export const BOKHOL_PRODUCTION_SITES = [
   ...BOKHOL_FORESTS.map((f) => ({
@@ -186,12 +222,18 @@ function landscape(x: number, z: number, forest: ForestAmounts): number {
   for (const site of BOKHOL_MINERALS) {
     const distance = Math.hypot(x - site.x, z - site.z);
     height -=
-      (site.kind === "stone" ? 4 : 7) * (1 - smooth((distance - 7) / 13));
+      (site.kind === "stone" && !site.id.includes("bokhol") ? 4 : 7) *
+      (1 - smooth((distance - 7) / 13));
   }
   for (const w of BOKHOL_WATERS) {
     const distance = Math.hypot(x - w.x, z - w.z);
     if (distance < w.radius + 7)
       height = -1 + (height + 1) * smooth((distance - w.radius) / 7);
+  }
+  for (const site of BOKHOL_MINERALS) {
+    if (!site.id.includes("bokhol")) continue;
+    const distance = Math.hypot(x - (site.x + 15), z - site.z);
+    if (distance < 10) height *= smooth((distance - 6) / 4);
   }
   return height;
 }

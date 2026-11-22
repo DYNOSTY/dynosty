@@ -19,6 +19,7 @@ import {
   type Facility,
   facilityDoor,
   facilityResource,
+  originalBuildingCost,
   payTown,
   reconcileTownHealth,
 } from "./town.js";
@@ -219,7 +220,7 @@ export function upgradeCost(f: {
   level: number;
 }) {
   return Object.fromEntries(
-    Object.entries(BUILDING_RULES[f.kind].cost).map(([r, n]) => [
+    Object.entries(originalBuildingCost(f.kind)).map(([r, n]) => [
       r,
       Math.ceil(n * (f.level === 1 ? 0.5 : 0.75)),
     ]),

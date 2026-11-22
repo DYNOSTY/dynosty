@@ -261,9 +261,13 @@ export function createVillage(
         haul: { ...role, state: "work", timer: 2 + r() * 3 },
       });
     }
+    return node;
   };
   const face = (x: number, z: number) => Math.atan2(-x, -z); // +Z가 마당 쪽
-  const jobs: Array<Promise<void>> = LAYOUT.filter(
+  const lostQuarter = new Set<TransformNode>();
+  let exodusVisible = false;
+  let previewResidentsVisible = true;
+  const jobs: Array<Promise<unknown>> = LAYOUT.filter(
     ([id]) => id !== "BLD_NEST",
   ).map(([id, x, z]) =>
     place(
@@ -275,6 +279,27 @@ export function createVillage(
     ),
   );
 
+  for (const [row, z] of [-28, -14, 0, 14, 28].entries()) {
+    for (const [col, x] of [-30, 30].entries()) {
+      const model = ["BLD_NEST", "BLD_WAREHOUSE", "BLD_WORKSHOP"][
+        (row + col) % 3
+      ];
+      jobs.push(
+        place(
+          `/models/buildings/${model}.glb`,
+          x,
+          z,
+          face(x, z),
+          BUILDING_SCALE,
+        ).then((node) => {
+          if (node) {
+            lostQuarter.add(node);
+            node.setEnabled(exodusVisible);
+          }
+        }),
+      );
+    }
+  }
   // 등에 지는 짐 (모델 단위: 주민 0.5배 안에서 등 높이)
   const propMat = (name: string, hex: string) => {
     const m = new StandardMaterial(name, scene);
@@ -386,12 +411,17 @@ export function createVillage(
   puff.update();
   puff.hasAlpha = true;
   const fires = [
-    [-7, -20],
-    [15, 0],
-    [-11, -9],
+    [-30, 0],
+    [30, -14],
+    [-8, -20],
+    [16, 0],
+    [-10, -8],
   ].map(([x = 0, z = 0], i) => {
     const fire = new ParticleSystem("처마 불길-" + i, 90, scene);
     fire.particleTexture = puff;
+    fire.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    fire.minScaleY = 1.2;
+    fire.maxScaleY = 1.9;
     fire.emitter = new Vector3(x, elevation(x, z) + 1.8, z);
     fire.minEmitBox = new Vector3(-1, 0, -0.5);
     fire.maxEmitBox = new Vector3(1, 0, 0.5);
@@ -402,9 +432,10 @@ export function createVillage(
     fire.minSize = 0.4;
     fire.maxSize = 1.2;
     fire.emitRate = 55;
-    fire.color1 = new Color4(1, 0.65, 0.08, 1);
-    fire.color2 = new Color4(0.9, 0.22, 0.02, 1);
-    fire.colorDead = new Color4(0.2, 0.12, 0.09, 0);
+    fire.addColorGradient(0, new Color4(1, 0.72, 0.13, 1));
+    fire.addColorGradient(0.36, new Color4(0.94, 0.26, 0.04, 0.9));
+    fire.addColorGradient(0.72, new Color4(0.24, 0.17, 0.14, 0.64));
+    fire.addColorGradient(1, new Color4(0.18, 0.17, 0.16, 0));
     return fire;
   });
   const CHIMNEY: Record<string, number> = {
@@ -500,6 +531,7 @@ export function createVillage(
     z: number;
     start: number;
     hours: number;
+    due: number;
   };
   type Party = {
     m: Mission;
@@ -524,7 +556,11 @@ export function createVillage(
         parties.delete(id);
       }
     for (const m of list) {
-      if (parties.has(m.id)) continue;
+      const underway = parties.get(m.id);
+      if (underway) {
+        underway.m = m;
+        continue;
+      }
       const dir = new Vector3(m.x, 0, m.z).normalize();
       const party: Party = {
         m,
@@ -568,8 +604,8 @@ export function createVillage(
       let t = -1,
         out = true;
       if (e >= 0 && e < travel) t = e / travel;
-      else if (e >= total - travel && e < total) {
-        t = 1 - (e - (total - travel)) / travel;
+      else if (gameMin >= p.m.due - travel && gameMin < p.m.due) {
+        t = (p.m.due - gameMin) / travel;
         out = false;
       }
       const dx = p.to.x - p.from.x,
@@ -676,7 +712,7 @@ export function createVillage(
       if (delivery === 1) delivery = -1;
     }
     animateRisers(dt);
-    if (!running) return;
+    if (!running && !exodusVisible) return;
     for (const w of walkers) {
       const h = w.haul;
       if (h) {
@@ -798,16 +834,25 @@ export function createVillage(
       writ.setEnabled(false);
     },
     setFireDamage(burned: boolean, burning: boolean) {
+      exodusVisible = burning;
+      for (const w of walkers)
+        if (w.haul) w.node.setEnabled(burning || previewResidentsVisible);
+      for (const node of lostQuarter) node.setEnabled(burning);
       for (const fire of fires) {
         if (burning && !fire.isStarted()) fire.start();
         if (!burning && fire.isStarted()) fire.stop();
       }
       for (const node of nodes)
-        if (["BLD_CLINIC.glb", "BLD_WORKSHOP.glb"].includes(node.name))
+        if (
+          !lostQuarter.has(node) &&
+          ["BLD_CLINIC.glb", "BLD_WORKSHOP.glb"].includes(node.name)
+        )
           node.setEnabled(!burned);
     },
     setPreviewResidentsVisible(visible: boolean) {
-      for (const walker of walkers) walker.node.setEnabled(visible);
+      previewResidentsVisible = visible;
+      for (const walker of walkers)
+        walker.node.setEnabled(visible || (exodusVisible && !!walker.haul));
     },
     targets,
     mark,

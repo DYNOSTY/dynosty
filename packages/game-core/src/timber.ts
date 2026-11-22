@@ -99,8 +99,12 @@ import {
 import { isRecord } from "./save.js";
 import type { SceneSnapshot } from "./scene.js";
 import {
+  encounterReady,
   SCOUT_CREW,
+  SCOUT_FINDS,
   SCOUT_SITES,
+  type ScoutFind,
+  scoutFinding,
   scoutRun,
   scoutTripMinutes,
 } from "./scout-sites.js";
@@ -123,6 +127,7 @@ import {
   facilityResource,
   facilityStaffLimit,
   orderResting,
+  originalBuildingCost,
   payTown,
   planBuilding,
   reconcileTownHealth,
@@ -231,6 +236,12 @@ export interface VillageResident extends ResidentRoutine {
   readonly lastMeal: MealPlan["foods"] | null;
 }
 export interface TimberState {
+  readonly bulletins?: readonly {
+    key: string;
+    title: string;
+    detail: string;
+    kind: "loss" | "decree" | "scout";
+  }[];
   readonly sighting?: { species: string; source: "gate" | "scout" };
   readonly mutants?: readonly { id: string; due: number }[];
   readonly mutantDamage?: Readonly<Record<string, number>>;
@@ -254,6 +265,8 @@ export interface TimberState {
   readonly initialIron: number;
   readonly chapter?: 2 | 3 | 4 | 5;
   readonly campaign?: Campaign;
+  readonly scoutClues?: readonly ScoutFind["kind"][];
+  readonly scoutFinds?: Record<string, ScoutFind>;
   readonly scoutDepartures?: Record<string, number>;
   readonly scoutTripDurations?: Record<string, number>;
   readonly yardFoodSince?: Partial<Record<FoodId, number>>;
@@ -345,7 +358,9 @@ export type TimberCommand =
   | { type: "facility-staff"; id: string; count: number }
   | { type: "dispatch-food"; id: string; food: FoodId; rank?: 1 | 2 | 3 }
   | { type: "begin-chapter-two" }
-  | { type: "scout-sites"; ids: string[]; recall?: boolean }
+  | { type: "scout-sites"; ids: string[]; recall?: boolean; explore?: boolean }
+  | { type: "read-bulletin"; key: string }
+  | { type: "scout-choice"; site: string; take: boolean }
   | { type: "cold-weather"; cold: boolean }
   | {
       type: "queue-work";
@@ -362,6 +377,7 @@ export type TimberCommand =
   | { type: "set-heating"; level: number }
   | { type: "contain-mutant"; resident: string }
   | { type: "repair-mutant"; building: string }
+  | { type: "dismiss-sighting" }
   | { type: "dismiss-raid" }
   | { type: "set-gate"; count: number }
   | { type: "set-guards"; count: 0 | 4 | 8 | 16 }
@@ -488,10 +504,23 @@ export function createVillageGame(
   beforeDeparture = false,
   afterFire = false,
 ): TimberState {
-  const world = createPlayState();
+  const initial = createPlayState();
+  const world = {
+    ...initial,
+    citizens: initial.citizens.map((c, i) =>
+      i % 4 === 3 ? { ...c, age: "child" as const } : c,
+    ),
+  };
   const resources = { ...world.resources };
   for (const id of Object.keys(resources) as (keyof typeof resources)[])
-    resources[id] = (beforeDeparture ? 10000 : 1000) * AMOUNT_SCALE;
+    resources[id] =
+      (id === "RES_WATER"
+        ? beforeDeparture
+          ? 200
+          : 20
+        : beforeDeparture
+          ? 10000
+          : 1000) * AMOUNT_SCALE;
   const citizens = beforeDeparture
     ? [
         ...world.citizens,
@@ -554,7 +583,12 @@ export function createCapital(s: TimberState): TimberState {
       outerStreetX += 16;
     }
   }
-  let city = createTimberState({ ...seed.world, citizens, buildings });
+  let city = createTimberState({
+    ...seed.world,
+    resources: { ...seed.world.resources, RES_WATER: 1000 * AMOUNT_SCALE },
+    citizens,
+    buildings,
+  });
   const kinds: Facility["kind"][] = [
     "restaurant",
     "hospital",
@@ -593,7 +627,8 @@ export function createCapital(s: TimberState): TimberState {
   city = payTown(city, upgradeCost(hospital));
   hospital.level = 2;
   const completed = ["TECH_SEED", "TECH_TRAIL", "UPGRADE_HOSPITAL_2"];
-  for (const f of facilities) city = payTown(city, BUILDING_RULES[f.kind].cost);
+  for (const f of facilities)
+    city = payTown(city, originalBuildingCost(f.kind));
   for (const tech of completed)
     city = payTown(city, RESEARCH_CATALOG.find((r) => r.id === tech)!.cost);
   const posts = facilities.flatMap((facility, index) =>
@@ -1364,12 +1399,16 @@ function stop(s: TimberState, phase: TimberPhase): TimberState {
   );
 }
 function eligible(s: TimberState, site: GroundPoint, count: number): string[] {
+  const children = new Set(
+    s.world.citizens.filter((c) => c.age === "child").map((c) => c.id),
+  );
   const found: string[] = [];
   for (let i = 0; i < count; i++) {
     const id = nearestRepairResident(
       s.residents.map((r) => ({
         ...r,
         task:
+          children.has(r.id) ||
           found.includes(r.id) ||
           r.nextWork !== null ||
           r.routine === "eating" ||
@@ -1665,6 +1704,22 @@ function completeStep(s: TimberState): TimberState {
   }
 }
 export function parseTimberState(value: unknown): TimberState {
+  if (
+    isRecord(value) &&
+    Array.isArray(value.mineralSites) &&
+    value.mineralSites.length === 6 &&
+    value.mineralSites.every(
+      (site, i) => isRecord(site) && site.siteId === BOKHOL_MINERALS[i]?.id,
+    )
+  ) {
+    value = {
+      ...value,
+      mineralSites: [
+        ...value.mineralSites,
+        ...BOKHOL_MINERALS.slice(6).map((site) => createLogging(site.id)),
+      ],
+    };
+  }
   if (
     isRecord(value) &&
     (value.version === 10 || value.version === 11) &&
@@ -2057,7 +2112,8 @@ export function parseTimberState(value: unknown): TimberState {
           builders.add(w.id as string);
         }
       }
-      if (amount !== 20) fail("건설 자재 합계가 일치하지 않습니다.");
+      if (amount !== 20 && amount !== VILLAGE_RULES.constructionWood)
+        fail("건설 자재 합계가 일치하지 않습니다.");
       if (
         build.finishAt !== null &&
         (build.crew as Record<string, unknown>[]).some(
@@ -2127,6 +2183,46 @@ export function parseTimberState(value: unknown): TimberState {
     for (const [id, start] of Object.entries(value.scoutDepartures)) {
       if (!SCOUT_SITES.some((site) => site.id === id)) fail("정찰 거점 오류");
       num(start);
+    }
+  }
+  if (
+    value.bulletins !== undefined &&
+    (!Array.isArray(value.bulletins) ||
+      value.bulletins.length > 100 ||
+      !value.bulletins.every(
+        (b) =>
+          isRecord(b) &&
+          ["loss", "decree", "scout"].includes(String(b.kind)) &&
+          [b.title, b.key, b.detail].every(
+            (v) => typeof v === "string" && v.length <= 500,
+          ),
+      ))
+  )
+    fail("마을 사건 기록 오류");
+  if (
+    value.scoutClues !== undefined &&
+    (!Array.isArray(value.scoutClues) ||
+      value.scoutClues.length > 6 ||
+      new Set(value.scoutClues).size !== value.scoutClues.length ||
+      !value.scoutClues.every((k) =>
+        SCOUT_FINDS.some(
+          (f) => f === k && (f === "record" || f.startsWith("contact")),
+        ),
+      ))
+  )
+    fail("정찰 단서 기록 오류");
+  if (value.scoutFinds !== undefined) {
+    if (!isRecord(value.scoutFinds) || !isRecord(value.scoutDepartures))
+      fail("정찰 발견 기록 오류");
+    for (const [id, e] of Object.entries(value.scoutFinds)) {
+      if (
+        !Object.hasOwn(value.scoutDepartures, id) ||
+        !isRecord(e) ||
+        !SCOUT_FINDS.some((k) => k === e.kind) ||
+        !["waiting", "take", "pass", "home"].includes(String(e.decision))
+      )
+        fail("정찰 발견 기록 오류");
+      num(e.due);
     }
   }
   if (value.scoutTripDurations !== undefined) {
@@ -2339,8 +2435,10 @@ export function parseTimberState(value: unknown): TimberState {
       !s.paused ||
       s.chapter ||
       ![300, 600].includes(s.residents.length) ||
-      !Object.values(s.world.resources).every(
-        (n) => n === 10000 * AMOUNT_SCALE,
+      !Object.entries(s.world.resources).every(
+        ([id, n]) =>
+          n === 10000 * AMOUNT_SCALE ||
+          (id === "RES_WATER" && n === 200 * AMOUNT_SCALE),
       ))
   )
     fail("출문 전 장부가 일치하지 않습니다.");
@@ -2724,10 +2822,9 @@ function fireOndol(s: TimberState): TimberState {
   const homes = usableHomes(s).filter((h) =>
     s.residents.some((r) => r.homeId === h.id && r.health !== "dead"),
   );
-  const demand = Math.max(
-    s.heating ?? 0,
-    Math.min(3, Math.ceil(-villageTemperature(s) / 8)),
-  );
+  const demand =
+    s.heating ||
+    Math.max(0, Math.min(3, Math.ceil(-villageTemperature(s) / 8)));
   const needed = demand * homes.length;
   const coalHeat = GAME_RULES.fuel.coalToWood;
   const coal =
@@ -2925,7 +3022,7 @@ export function villageFatalIncident(
   const id = "village-fatality-" + s.elapsed;
   if (s.world.citizenEvents?.includes(id)) return s;
   const wounded = casualty.injury && random() >= 0.25;
-  const result = note(
+  let result = note(
     commandTimber(
       s,
       {
@@ -2943,6 +3040,13 @@ export function villageFatalIncident(
     ),
     `주민 ${s.residents.findIndex((r) => r.id === casualty.id) + 1} · ${wounded ? casualty.injury : casualty.cause}`,
   );
+  if (!wounded && result.bulletins)
+    result = {
+      ...result,
+      bulletins: result.bulletins.map((b) =>
+        b.key === id ? { ...b, detail: casualty.cause } : b,
+      ),
+    };
   if (!casualty.mutant) return result;
   const seen: TimberState = {
     ...result,
@@ -3024,6 +3128,84 @@ export function advanceTimber(
       elapsed: nextTime,
       world: advancePlayClock(s.world, elapsed),
     };
+    for (const [site, e] of Object.entries(s.scoutFinds ?? {})) {
+      if (
+        e.decision === "waiting" &&
+        !s.residents.some(
+          (r) => r.task === "scout:" + site && r.health !== "dead",
+        )
+      ) {
+        const departures = { ...s.scoutDepartures },
+          durations = { ...s.scoutTripDurations },
+          finds = { ...s.scoutFinds };
+        delete departures[site];
+        delete durations[site];
+        delete finds[site];
+        s = note(
+          {
+            ...s,
+            scoutDepartures: departures,
+            scoutTripDurations: durations,
+            scoutFinds: finds,
+          },
+          "정찰대와 연락이 끊겼습니다.",
+        );
+        continue;
+      }
+      if (
+        (e.decision !== "take" && e.decision !== "pass") ||
+        (s.world.day - 1) * 1440 + s.world.minute < e.due
+      )
+        continue;
+      const escorts = s.residents.some(
+        (r) => r.task === "scout:" + site && r.health !== "dead",
+      );
+      s = {
+        ...s,
+        scoutFinds: { ...s.scoutFinds, [site]: { ...e, decision: "home" } },
+      };
+      if (!escorts || e.decision !== "take") continue;
+      if (e.kind === "survivors") {
+        const id = "field-" + site + "-" + s.scoutDepartures![site];
+        s = commandTimber(
+          s,
+          {
+            type: "citizen-event",
+            event: {
+              type: "arrival",
+              id,
+              groups: [
+                { species: "R02", count: 1 },
+                { species: "SPINO", count: 1 },
+              ],
+            },
+          },
+          id,
+        );
+      } else if (e.kind === "wood") s = deposit(s, "RES_WOOD", 12);
+      else if (e.kind === "fish") s = deposit(s, "RES_FISH", 8);
+      else if (e.kind === "coal") s = deposit(s, "RES_COAL", 10);
+      const [title, , delivery] = scoutFinding(e.kind);
+      const clue = e.kind === "record" || e.kind.startsWith("contact");
+      s = note(
+        {
+          ...s,
+          ...(clue
+            ? { scoutClues: [...new Set([...(s.scoutClues ?? []), e.kind])] }
+            : {}),
+          bulletins: [
+            ...(s.bulletins ?? []).slice(-99),
+            {
+              kind: "scout",
+              key: "return-" + site + "-" + e.due,
+              title: "정찰대가 복홀에 돌아왔습니다",
+              detail: title + " · " + delivery,
+            },
+          ],
+        },
+        "정찰대 귀환 · " + title + " · " + delivery,
+      );
+    }
     s = ageYardFood(s, nextTime - elapsed);
     if (s.yardDryAt && s.elapsed >= s.yardDryAt) {
       s = note(
@@ -3232,6 +3414,11 @@ export function commandTimber(
       num(command.level, 3);
       n = { ...s, heating: command.level };
       break;
+    case "dismiss-sighting": {
+      const { sighting: _read, ...remaining } = s;
+      n = remaining;
+      break;
+    }
     case "dismiss-raid": {
       const { raid, ...rest } = s;
       n = rest;
@@ -3320,7 +3507,37 @@ export function commandTimber(
       );
       break;
     }
+    case "read-bulletin":
+      n = {
+        ...s,
+        bulletins: (s.bulletins ?? []).filter((b) => b.key !== command.key),
+      };
+      break;
+    case "scout-choice": {
+      const event = s.scoutFinds?.[command.site];
+      if (
+        !event ||
+        !encounterReady(s, command.site) ||
+        typeof command.take !== "boolean"
+      )
+        fail("정찰대의 전갈을 기다려 주세요.");
+      const now = (s.world.day - 1) * 1440 + s.world.minute;
+      n = {
+        ...s,
+        scoutFinds: {
+          ...s.scoutFinds,
+          [command.site]: {
+            ...event,
+            decision: command.take ? "take" : "pass",
+            due:
+              now + Math.ceil((s.scoutTripDurations?.[command.site] ?? 60) / 2),
+          },
+        },
+      };
+      break;
+    }
     case "scout-sites": {
+      const finds = { ...s.scoutFinds };
       let residents = s.residents;
       const departures = { ...s.scoutDepartures };
       const durations = { ...s.scoutTripDurations };
@@ -3336,12 +3553,18 @@ export function commandTimber(
           ) {
             delete departures[id];
             delete durations[id];
+            delete finds[id];
             residents = residents.map((r) =>
               r.task === "scout:" + id ? { ...r, task: null } : r,
             );
           }
-        } else if (start === undefined) {
-          if (villageDefenseActive(s)) {
+        } else if (
+          start === undefined ||
+          (command.explore &&
+            now >= (scoutRun(s, site)?.due ?? Infinity) &&
+            (s.chapter || s.campaign?.reports.includes(id)))
+        ) {
+          if (command.explore || villageDefenseActive(s)) {
             const crew = eligible(
               { ...s, residents },
               { x: 0, z: 21 },
@@ -3364,11 +3587,21 @@ export function commandTimber(
           }
           departures[id] = now;
           durations[id] = scoutTripMinutes(site, s);
+          if (command.explore) {
+            finds[id] = {
+              kind: SCOUT_FINDS[
+                Math.floor(Math.random() * SCOUT_FINDS.length)
+              ]!,
+              decision: "waiting",
+              due: now + Math.ceil(durations[id] / 2),
+            };
+          }
         }
       }
       n = {
         ...s,
         residents,
+        ...(command.explore || s.scoutFinds ? { scoutFinds: finds } : {}),
         scoutDepartures: departures,
         scoutTripDurations: durations,
         ...(s.campaign
@@ -3531,12 +3764,14 @@ export function commandTimber(
         {
           ...s,
           paused: false,
-          woodSpent: s.woodSpent + 20,
+          woodSpent: s.woodSpent + VILLAGE_RULES.constructionWood,
           world: {
             ...s.world,
             resources: {
               ...s.world.resources,
-              RES_WOOD: s.world.resources.RES_WOOD - 20 * AMOUNT_SCALE,
+              RES_WOOD:
+                s.world.resources.RES_WOOD -
+                VILLAGE_RULES.constructionWood * AMOUNT_SCALE,
             },
           },
           residents: available.residents.map((r) =>
@@ -3561,7 +3796,7 @@ export function commandTimber(
             finishAt: null,
           },
         },
-        "온돌 둥지 배치 확정. 목재20을 확보하고 가까운 유휴 주민이 자재를 운반합니다.",
+        "온돌 둥지 배치 확정. 목재100을 확보하고 가까운 유휴 주민이 자재를 운반합니다.",
       );
       break;
     }
@@ -3601,18 +3836,20 @@ export function commandTimber(
         s.world.resources.RES_WOOD - s.reservedWood * AMOUNT_SCALE <
         VILLAGE_RULES.constructionWood * AMOUNT_SCALE
       )
-        fail("공동 목재20이 필요합니다.");
+        fail("공동 목재100이 필요합니다.");
       const workerId = eligible(s, constructionSite(kind, position), 1)[0];
       if (!workerId) fail("건설할 유휴 주민이 없습니다.");
       n = note(
         {
           ...s,
-          woodSpent: s.woodSpent + 20,
+          woodSpent: s.woodSpent + VILLAGE_RULES.constructionWood,
           world: {
             ...s.world,
             resources: {
               ...s.world.resources,
-              RES_WOOD: s.world.resources.RES_WOOD - 20 * AMOUNT_SCALE,
+              RES_WOOD:
+                s.world.resources.RES_WOOD -
+                VILLAGE_RULES.constructionWood * AMOUNT_SCALE,
             },
           },
           construction: {
@@ -4039,6 +4276,58 @@ export function commandTimber(
       },
       reaction,
     );
+  }
+  if (
+    command.type === "citizen-event" &&
+    command.event.type === "death" &&
+    !s.world.citizenEvents?.includes(command.event.id)
+  ) {
+    const lost = command.event.citizenIds.filter((id) =>
+      s.world.citizens.some((c) => c.id === id && c.alive),
+    );
+    if (lost.length) {
+      const cause = command.event.id.startsWith("gate-raid")
+        ? "성문을 지키던 중 습격을 받았습니다."
+        : command.event.id.startsWith("ration:")
+          ? "비상 배급령이 집행됐습니다."
+          : "마을에 부고가 전해졌습니다.";
+      n = {
+        ...n,
+        bulletins: [
+          ...(n.bulletins ?? []).slice(-99),
+          {
+            key: command.event.id,
+            kind: "loss",
+            title: `주민 ${lost.length}명이 숨졌습니다`,
+            detail: cause,
+          },
+        ],
+      };
+    }
+  }
+  if (
+    decision &&
+    [
+      "공동 배식과 교류",
+      "배급 통제",
+      "교역으로 식량 조달",
+      "비상 식량 징발",
+      "창고 출입 통제",
+      "비축분 봉인",
+    ].includes(decision)
+  ) {
+    n = {
+      ...n,
+      bulletins: [
+        ...(n.bulletins ?? []).slice(-99),
+        {
+          key: "decree-" + n.decree!.serial,
+          kind: "decree",
+          title: decision,
+          detail: "관아 앞에 방이 붙었습니다. “" + n.decree!.reaction + "”",
+        },
+      ],
+    };
   }
   if (command.type === "mechanize")
     n = reconcilePatients(reconcileTownHealth(n));

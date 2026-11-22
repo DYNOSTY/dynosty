@@ -194,7 +194,7 @@ export interface Citizen {
   readonly id: string;
   readonly species: string;
   readonly diet: FoodId;
-  readonly age: "adult";
+  readonly age: "adult" | "child";
   readonly alive: boolean;
   readonly mechanicalFrom?: string;
   readonly health?: "healthy" | "sick" | "dead";
@@ -324,7 +324,11 @@ export function parsePlayState(
     fail();
   const ids = new Set<string>();
   const citizens = value.citizens.map((p): Citizen => {
-    if (!isRecord(p) || p.age !== "adult" || typeof p.alive !== "boolean")
+    if (
+      !isRecord(p) ||
+      (p.age !== "adult" && p.age !== "child") ||
+      typeof p.alive !== "boolean"
+    )
       fail();
     text(p.id);
     text(p.species);
@@ -341,7 +345,7 @@ export function parsePlayState(
       id: p.id,
       species: p.species,
       diet: p.diet as FoodId,
-      age: "adult",
+      age: p.age,
       alive: p.alive,
       ...(p.mechanicalFrom !== undefined
         ? { mechanicalFrom: String(p.mechanicalFrom) }

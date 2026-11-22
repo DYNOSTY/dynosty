@@ -8,6 +8,7 @@ import {
   productionSiteDefinition,
 } from "./bokhol.js";
 import { loggingSite, loggingSites, productionSites } from "./logging.js";
+import { createPlayState } from "./play.js";
 import {
   advanceTimber,
   commandTimber,
@@ -18,12 +19,20 @@ import {
   type TimberCommand,
   type TimberState,
 } from "./timber.js";
+import { buildingIssue } from "./town.js";
 
 let sequence = 0;
+function fundedTown() {
+  const world = createPlayState();
+  return createTimberState({
+    ...world,
+    resources: { ...world.resources, RES_WOOD: 4500000 },
+  });
+}
 const command = (s: TimberState, c: TimberCommand) =>
   commandTimber(s, c, `mine-${++sequence}`);
 function build(id: ProductionSiteId) {
-  let s = command(advanceTimber(createTimberState(), 120), {
+  let s = command(advanceTimber(fundedTown(), 120), {
     type: "build-logging",
     siteId: id,
   });
@@ -34,11 +43,13 @@ function build(id: ProductionSiteId) {
   expect(loggingSite(s, id).storageBuilt).toBe(true);
   return command(s, { type: "set-logging-workers", siteId: id, count: 2 });
 }
-it("넓은 지도에 거주지 둘레 숲과 석탄광·철광산·채석장 각2곳을 둔다", () => {
+it("넓은 지도에 거주지 둘레 숲과 석탄광·철광산·채석장 및 마을 가까운 추가 광맥을 둔다", () => {
   expect(BOKHOL_MAP.size).toBe(512);
   expect(BOKHOL_FORESTS).toHaveLength(13);
   for (const kind of ["coal", "iron", "stone"])
-    expect(BOKHOL_MINERALS.filter((m) => m.kind === kind)).toHaveLength(2);
+    expect(BOKHOL_MINERALS.filter((m) => m.kind === kind)).toHaveLength(
+      kind === "stone" ? 4 : 3,
+    );
   for (const m of BOKHOL_MINERALS) {
     const rim =
       [
@@ -129,7 +140,7 @@ it("v11 이전 숲·재고·진행을 보존하고 새 숲·광물 권역과 초
   expect(loaded.version).toBe(18);
   expect(loaded.logging.remaining).toBe(120);
   expect(loaded.loggingSites).toHaveLength(12);
-  expect(loaded.mineralSites).toHaveLength(6);
+  expect(loaded.mineralSites).toHaveLength(BOKHOL_MINERALS.length);
   expect(loaded.world.resources.RES_IRON_ORE).toBe(0);
   expect(loaded.world.resources.RES_STONE).toBe(0);
   expect(loaded.world.resources.RES_COAL).toBe(
@@ -138,4 +149,20 @@ it("v11 이전 숲·재고·진행을 보존하고 새 숲·광물 권역과 초
   expect(() =>
     parseTimberState({ ...old, loggingSites: old.loggingSites.slice(1) }),
   ).toThrow();
+});
+
+it("새 광맥 옆에는 건설할 자리가 있고 예전 광산 재고가 보존된다", () => {
+  const s = fundedTown();
+  for (const site of BOKHOL_MINERALS.slice(6)) {
+    const pose = { position: { x: site.x + 15, z: site.z }, headingRadians: 0 };
+    expect(
+      buildingIssue(s, site.kind === "stone" ? "quarry" : site.kind, pose),
+      site.name,
+    ).toBeNull();
+    expect(buildingIssue(s, "home", pose), site.name).toBeNull();
+  }
+  const legacy = { ...s, mineralSites: s.mineralSites.slice(0, 6) };
+  const restored = parseTimberState(legacy);
+  expect(restored.mineralSites.slice(0, 6)).toEqual(legacy.mineralSites);
+  expect(restored.mineralSites).toHaveLength(BOKHOL_MINERALS.length);
 });

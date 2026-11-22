@@ -118,8 +118,10 @@ test("지도에 연구가 적용된 정찰 왕복 시간과 귀환을 표시한�
   await expect(panel).toContainText("24시간", { timeout: 5000 });
   await button(page, "정찰대 보내기").click();
   await expect(
-    page.getByRole("button", { name: "갈대나루 정찰 중 · 24시간 남음" }),
+    page.getByRole("button", { name: "갈대나루 정찰 중 · 12시간 남음" }),
   ).toBeVisible();
+  await button(page, "1일 진행").click();
+  await page.getByRole("button", { name: "남겨 두고 정찰을 마친다" }).click();
   await button(page, "1일 진행").click();
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
@@ -165,6 +167,7 @@ test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에�
   await ready(page);
   await expect(face).toBeVisible();
   await button(page, "1일 진행").click();
+  await page.getByRole("button", { name: "남겨 두고 정찰을 마친다" }).click();
   await button(page, "1일 진행").click();
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
@@ -180,7 +183,7 @@ test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에�
   await button(page, "새 게임").click();
   await button(page, "새 게임 시작").click();
   await expect(
-    page.getByRole("dialog", { name: "별이 진 뒤, 복홀" }),
+    page.getByRole("dialog", { name: "미션 시작 준비" }),
   ).toBeVisible();
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),

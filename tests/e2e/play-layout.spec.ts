@@ -140,7 +140,12 @@ test("좁은 화면도 가로 넘침 없이 표시하고 키보드로 메뉴를 
     "3D 준비 완료",
   );
   await expect(page.locator("canvas")).toBeInViewport({ ratio: 1 });
-  await page.getByRole("button", { name: "명령 열기", exact: true }).click();
+  if (
+    await page
+      .getByRole("button", { name: "명령 열기", exact: true })
+      .isVisible()
+  )
+    await page.getByRole("button", { name: "명령 열기", exact: true }).click();
   await page.getByRole("button", { name: "저장", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(

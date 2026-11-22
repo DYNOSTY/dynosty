@@ -64,6 +64,7 @@ export function createSceneEntities(
     void z;
     return 0;
   };
+  let processionTime = 0;
   let extraObstacles: readonly GroundObstacle[] = [];
   function replan() {
     const buildings = [...objects.values()]
@@ -72,13 +73,20 @@ export function createSceneEntities(
         ...o.entity.position,
         headingRadians: o.entity.headingRadians,
       }));
-    for (const object of objects.values())
-      if (object.kind === "resident")
-        object.path = residentPath(
-          object.mesh.position,
-          object.entity.position,
-          [...buildings, ...extraObstacles],
-        );
+    const obstacles = [...buildings, ...extraObstacles];
+    for (const object of objects.values()) {
+      if (object.kind !== "resident") continue;
+      const start = object.mesh.position,
+        end = object.entity.position;
+      object.path = residentPath(start, end, obstacles);
+      // A new footprint can cover the interpolated position between ticks.
+      if (
+        !object.path.length &&
+        !residentPath(start, start, obstacles).length &&
+        residentPath(end, end, obstacles).length
+      )
+        object.path = [end];
+    }
   }
 
   function select(id: string | null) {
@@ -184,11 +192,32 @@ export function createSceneEntities(
         object.mesh.isVisible = true;
       }
     },
-    animate(delta: number) {
+    animate(delta: number, departure = false) {
+      processionTime = departure ? processionTime + Math.min(delta, 0.15) : 0;
+      let crowdIndex = 0;
       for (const object of objects.values()) {
         if (!object.mesh.isEnabled()) continue;
         const e = object.entity;
         if (e.kind === "resident") {
+          if (departure) {
+            // Six lanes between the workshops and houses. Each household walks, unloads and turns independently.
+            const i = crowdIndex++;
+            const lane = [-23, -17, -6, 5, 17, 24][i % 6]!;
+            const phase =
+              (processionTime * (0.09 + (i % 7) * 0.009) + i * 2.39996) %
+              (2 * Math.PI);
+            const moving = Math.abs(Math.cos(phase)) > 0.18;
+            const x = lane + 0.9 * Math.sin(phase + i);
+            const z = 18 * Math.sin(phase) + ((i % 5) - 2) * 1.3;
+            object.mesh.position.set(x, elevation(x, z) + 0.5, z);
+            object.mesh.rotation.y = Math.atan2(
+              0.9 * Math.cos(phase + i),
+              18 * Math.cos(phase),
+            );
+            object.visual?.setMotion(moving ? "walking" : "idle");
+            object.visual?.animate(delta);
+            continue;
+          }
           let budget = Math.max(0, delta) * 2;
           let moved = false;
           while (object.path.length && budget > 0) {

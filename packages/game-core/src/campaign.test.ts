@@ -158,7 +158,7 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
   let s = restore(createVillageGame(true));
   expect(s.residents).toHaveLength(600);
   expect(new Set(Object.values(s.world.resources))).toEqual(
-    new Set([10000 * AMOUNT_SCALE]),
+    new Set([10000 * AMOUNT_SCALE, 200 * AMOUNT_SCALE]),
   );
   s = restore(act(s, "next"));
   s = act(s, "leave");
@@ -166,7 +166,7 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
   expect(s.homes).toHaveLength(2);
   expect(s.residents).toHaveLength(60);
   expect(new Set(Object.values(s.world.resources))).toEqual(
-    new Set([1000 * AMOUNT_SCALE]),
+    new Set([1000 * AMOUNT_SCALE, 20 * AMOUNT_SCALE]),
   );
   s = act(s, "next");
   s = commandTimber(

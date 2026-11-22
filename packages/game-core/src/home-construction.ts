@@ -23,7 +23,7 @@ export function createHomeCrew(
   ids: readonly string[],
   slots: readonly number[] = [1, 0, 2],
 ): HomeBuilder[] {
-  let remaining = 20;
+  let remaining: number = VILLAGE_RULES.constructionWood;
   return ids.map((id, i) => {
     const amount = Math.ceil(remaining / (ids.length - i));
     remaining -= amount;
@@ -117,6 +117,7 @@ export function advanceHomeConstruction(
     );
     return { ...w, phase: nextPhase } satisfies HomeBuilder;
   });
+  const total = crew.reduce((n, w) => n + w.amount, 0);
   const delivered = crew
     .filter((w) => w.phase === "build")
     .reduce((n, w) => n + w.amount, 0);
@@ -134,7 +135,7 @@ export function advanceHomeConstruction(
   });
   let next: TimberState = { ...s, residents, construction: { ...b, crew } };
   if (
-    delivered === 20 &&
+    delivered === total &&
     !working &&
     b.finishAt !== null &&
     b.crew.some((w) =>
@@ -150,7 +151,7 @@ export function advanceHomeConstruction(
         finishAt: b.finishAt + minutes,
       },
     };
-  if (delivered < 20 || !working)
+  if (delivered < total || !working)
     return {
       ...next,
       construction: { ...b, crew, startedAt: null, finishAt: null },

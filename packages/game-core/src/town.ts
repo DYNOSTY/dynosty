@@ -43,6 +43,7 @@ import { usableHomes } from "./mutants.js";
 import {
   AMOUNT_SCALE,
   type FoodId,
+  GAME_RULES,
   productionMultiplier,
   type ResourceId,
 } from "./play.js";
@@ -84,104 +85,116 @@ export const BUILDING_RULES: Record<
 > = {
   hospital: {
     name: "병원",
-    cost: { RES_WOOD: 30, RES_METAL: 4 },
+    cost: { RES_WOOD: 150, RES_METAL: 20 },
     work: 240,
     staff: 2,
-    site: "평탄한 빈 땅 · 의료 인원 배치 · 병상5/15/25개",
+    site: "빈 육지 · 의료 인원 배치 · 병상5/15/25개",
   },
   workshop: {
     name: "연구소",
-    cost: { RES_WOOD: 16, RES_METAL: 6 },
+    cost: { RES_WOOD: 80, RES_METAL: 30 },
     work: 240,
     staff: 2,
-    site: "평탄한 빈 땅 · 연구원 배치 · 연구소마다 동시1건",
+    site: "빈 육지 · 연구원 배치 · 연구소마다 동시1건",
   },
   home: {
     name: "온돌 둥지",
-    cost: { RES_WOOD: 20 },
+    cost: { RES_WOOD: 100 },
     work: 180,
     staff: 0,
-    site: "평탄한 빈 땅",
+    site: "빈 육지",
   },
   restaurant: {
     name: "공동 식당",
-    cost: { RES_WOOD: 30, RES_METAL: 2 },
+    cost: { RES_WOOD: 150, RES_METAL: 10 },
     work: 240,
     staff: 2,
-    site: "평탄한 빈 땅 · 여러 곳 건설 가능 · 좌석10/20/40",
+    site: "빈 육지 · 여러 곳 건설 가능 · 좌석10/20/40",
   },
   logging: {
     name: "제재소",
-    cost: { RES_WOOD: 15, RES_METAL: 2 },
+    cost: { RES_WOOD: 75, RES_METAL: 10 },
     work: 180,
     staff: 4,
     site: "잔량이 있는 숲 반경26 안의 빈 땅",
   },
   storage: {
     name: "공동 저장소",
-    cost: { RES_WOOD: 12 },
+    cost: { RES_WOOD: 60 },
     work: 180,
     staff: 0,
-    site: "평탄한 빈 땅 · 가까운 하역 거점",
+    site: "빈 육지 · 가까운 하역 거점",
   },
   coal: {
     name: "석탄광",
-    cost: { RES_WOOD: 25, RES_METAL: 4 },
+    cost: { RES_WOOD: 125, RES_METAL: 20 },
     work: 300,
     staff: 4,
     site: "석탄 광맥 주변",
   },
   iron: {
     name: "철광산",
-    cost: { RES_WOOD: 30, RES_METAL: 6 },
+    cost: { RES_WOOD: 150, RES_METAL: 30 },
     work: 300,
     staff: 4,
     site: "철광석 광맥 주변 · 제련 전 원료",
   },
   quarry: {
     name: "채석장",
-    cost: { RES_WOOD: 18, RES_METAL: 3 },
+    cost: { RES_WOOD: 90, RES_METAL: 15 },
     work: 240,
     staff: 4,
     site: "돌이 많은 암반 주변",
   },
   fishery: {
     name: "어획막",
-    cost: { RES_WOOD: 18, RES_METAL: 2 },
+    cost: { RES_WOOD: 90, RES_METAL: 10 },
     work: 180,
     staff: 5,
     site: "물고기 못의 육지 쪽 물가 · 결빙 낚시 가능",
   },
   farm: {
     name: "온상 재배소",
-    cost: { RES_WOOD: 25, RES_METAL: 2 },
+    cost: { RES_WATER: 1, RES_WOOD: 125, RES_METAL: 10 },
     work: 240,
     staff: 4,
     site: "빈 육지 · 구릉에도 배치 · 물 필요 · 결빙기 석탄 필요",
   },
   ranch: {
     name: "목축장",
-    cost: { RES_WOOD: 25, RES_STONE: 4 },
+    cost: { RES_WATER: 1, RES_WOOD: 125, RES_STONE: 20 },
     work: 240,
     staff: 4,
     site: "빈 육지 · 구릉에도 배치 · 풀·물로 가축 사육",
   },
   scout: {
     name: "정찰 거점",
-    cost: { RES_WOOD: 15 },
+    cost: { RES_WOOD: 75 },
     work: 180,
     staff: 2,
-    site: "평탄한 빈 땅 · 배치 인력2명 파견 · 맵에 한 곳",
+    site: "빈 육지 · 배치 인력2명 파견 · 맵에 한 곳",
   },
   trade: {
     name: "교역소",
-    cost: { RES_WOOD: 25, RES_METAL: 2 },
+    cost: { RES_WOOD: 125, RES_METAL: 10 },
     work: 240,
     staff: 1,
-    site: "평탄한 빈 땅 · 교역 인력1명 배치 · 맵에 한 곳",
+    site: "빈 육지 · 교역 인력1명 배치 · 맵에 한 곳",
   },
 };
+// Existing capital buildings and older saves were funded at their original prices.
+export function originalBuildingCost(kind: BuildingKind): Cost {
+  return historicalBuildingCost(kind, 1);
+}
+function historicalBuildingCost(kind: BuildingKind, version: 1 | 2): Cost {
+  return Object.fromEntries(
+    Object.entries(BUILDING_RULES[kind].cost)
+      .filter(([id]) => id !== "RES_WATER")
+      .map(([id, amount]) => [id, version === 1 ? amount / 5 : amount]),
+  );
+}
 export interface BuildingOrder extends HomePlacement {
+  priceVersion?: 2 | 3;
   id: string;
   kind: BuildingKind;
   sourceId: ProductionSiteId | null;
@@ -192,6 +205,7 @@ export interface BuildingOrder extends HomePlacement {
   upgradeLevel?: 2 | 3;
 }
 export interface Facility extends HomePlacement {
+  priceVersion?: 2 | 3;
   id: string;
   kind: Exclude<BuildingKind, "home">;
   sourceId: ProductionSiteId | null;
@@ -423,13 +437,14 @@ export function buildingIssue(
     return "출입구와 접근 공간을 비워 주세요.";
   if (fixedBuildingAt(p.position, !!s.rebuilding))
     return "기존 시설이 차지한 구획이에요.";
-  for (const [resource, amount] of Object.entries(BUILDING_RULES[kind].cost))
-    if (
-      s.world.resources[resource as ResourceId] -
-        (resource === "RES_WOOD" ? s.reservedWood * AMOUNT_SCALE : 0) <
-      amount * AMOUNT_SCALE
-    )
-      return "자원이 부족하면 건설 대기를 접수할 수 없어요.";
+  for (const [resource, amount] of Object.entries(BUILDING_RULES[kind].cost)) {
+    const id = resource as ResourceId;
+    const available =
+      Math.floor(s.world.resources[id] / AMOUNT_SCALE) -
+      (id === "RES_WOOD" ? s.reservedWood : 0);
+    if (available < amount)
+      return `${GAME_RULES.resources[id].name} 부족 · 필요 ${amount}, 사용 가능 ${available}`;
+  }
   return null;
 }
 export function payTown(s: TimberState, cost: Cost): TimberState {
@@ -475,13 +490,14 @@ export function planBuilding(
   const order: BuildingOrder = {
     ...pose,
     id: `build-${n.town.nextId}`,
+    priceVersion: 3,
     kind,
     sourceId: buildingSource(s, kind, pose.position),
     crew: [],
     stage: "waiting",
     workDone: 0,
   };
-  if (!n.construction && townShiftOpen(n, order.id)) {
+  if (townShiftOpen(n, order.id)) {
     order.crew = freeTownResidents(n, facilityDoor(order), 4);
     if (order.crew.length) order.stage = "collect";
   }
@@ -514,10 +530,14 @@ export function freeTownResidents(
   count: number,
 ): string[] {
   if (count <= 0) return [];
+  const children = new Set(
+    s.world.citizens.filter((c) => c.age === "child").map((c) => c.id),
+  );
   return s.residents
     .filter(
       (r) =>
         r.health === "healthy" &&
+        !children.has(r.id) &&
         !r.workplaceId &&
         !r.task &&
         !r.nextWork &&
@@ -554,7 +574,6 @@ export function advanceTown(input: TimberState, minutes: number): TimberState {
     const open = first ? townShiftOpen(s, first.id) : false;
     if (
       first &&
-      !s.construction &&
       (open ||
         s.residents.some(
           (r) => r.health === "healthy" && isMechanical(s, r.id),
@@ -1276,6 +1295,9 @@ export function townValid(s: TimberState): boolean {
         typeof q.id !== "string" ||
         !/^build-\d+$/.test(q.id) ||
         !Object.hasOwn(BUILDING_RULES, q.kind) ||
+        (q.priceVersion !== undefined &&
+          q.priceVersion !== 2 &&
+          q.priceVersion !== 3) ||
         !pose(q) ||
         !sourceValid(q),
     )
@@ -1333,7 +1355,9 @@ export function townValid(s: TimberState): boolean {
     for (const [r, n] of Object.entries(
       "upgradeTarget" in q && q.upgradeTarget
         ? upgradeCost(upgradeTarget(s, q.upgradeTarget) ?? invalidTown())
-        : BUILDING_RULES[q.kind].cost,
+        : q.priceVersion === 3
+          ? BUILDING_RULES[q.kind].cost
+          : historicalBuildingCost(q.kind, q.priceVersion ?? 1),
     ))
       minimum[r as ResourceId] = (minimum[r as ResourceId] ?? 0) + n;
   if (

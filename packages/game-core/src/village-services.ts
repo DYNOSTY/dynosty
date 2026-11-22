@@ -16,7 +16,7 @@ export type RationPolicy = "needs" | "cap";
 export const VILLAGE_RULES = {
   maxRestaurantStaff: 6,
   homeSpace: 20,
-  constructionWood: 20,
+  constructionWood: 100,
   constructionMinutes: 30,
   species: {
     R02: { food: "RES_PLANT", portion: 5000, space: 2 },

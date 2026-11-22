@@ -22,8 +22,21 @@ import {
   villageDefenseActive,
   villageTemperature,
 } from "@dynosty/game-core";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { useAudio } from "./AudioProvider.js";
+import {
+  CampaignFilm,
+  fadeOut,
+  filmSeen,
+  rememberFilm,
+} from "./CampaignFilm.js";
 import {
   campaignPage,
   gatheringRumor,
@@ -32,10 +45,12 @@ import {
   type ScenePage,
 } from "./campaign-scenes.js";
 import { EndingMenu } from "./EndingMenu.js";
+import { completedChapters } from "./stage-replay.js";
+import { VillageBulletin } from "./VillageBulletin.js";
 
 import "./campaign.css";
 
-const levelMarks = ["□□□", "■□□", "□■□", "□□■"] as const;
+const gateLevels = [0, 4, 8, 16] as const;
 const media = "/story/campaign/";
 export function PatrolPortrait({ index }: { index: number }) {
   return (
@@ -64,7 +79,12 @@ function SceneDialog({
   const palaceFilm = page.illustration === "king-palace-night";
   const dialog = useRef<HTMLDialogElement>(null);
   const [cursor, setCursor] = useState(0);
-  const [pending, setPending] = useState("");
+  const [pending, setPending] = useState(page.key === "opening" ? "next" : "");
+  const [filmDone, setFilmDone] = useState(
+    () => page.clip === "one" && filmSeen("one"),
+  );
+  const [entryFilm, setEntryFilm] = useState("");
+  const [replayIntro, setReplayIntro] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [level, setLevel] = useState(difficulty);
   const stage = page.nextStage;
@@ -77,14 +97,12 @@ function SceneDialog({
   const result = cursor === storyLength ? page.resultQuote : undefined;
   const backdrop = page.frames?.at(-1)?.image;
   const lineIndex = Math.min(cursor, page.lines.length - 1);
+  const frameImage = frame?.image;
   useEffect(() => {
-    if (!frame || cursor >= total - 1) return;
-    const timer = window.setTimeout(
-      () => setCursor((i) => Math.min(i + 1, total - 1)),
-      7500,
-    );
+    if (!frameImage || cursor >= total - 1) return;
+    const timer = window.setTimeout(() => setCursor(cursor + 1), 7500);
     return () => window.clearTimeout(timer);
-  }, [cursor, frame, total]);
+  }, [cursor, frameImage, total]);
   const [name, words] = page.lines[lineIndex]!;
   const later =
     page.lineImages?.[cursor] ??
@@ -95,15 +113,104 @@ function SceneDialog({
         : undefined);
   const face = PATROL_NAMES.findIndex((x) => x === name);
   const last = cursor === total - 1;
+  const film = page.clip === "one" && !filmDone ? page.clip : undefined;
+  const filmLine = page.resultQuote
+    ? 1
+    : page.lines.findIndex(
+        (_, index) =>
+          !page.lineImages?.[index] && index !== page.lineIllustration?.at,
+      );
+  const inlineFilm =
+    page.clip &&
+    !["opening", "one", "two", "three", "escort", "four", "five"].includes(
+      page.clip,
+    ) &&
+    !pending &&
+    cursor === filmLine &&
+    !later &&
+    !frame
+      ? page.clip
+      : undefined;
+  const bubble =
+    !pending &&
+    !film &&
+    !inlineFilm &&
+    !page.resultQuote &&
+    !page.nextStage &&
+    !page.illustration &&
+    !frame &&
+    !familyScene &&
+    !flashback &&
+    !later;
+  const cinematic = !!(
+    inlineFilm ||
+    frame ||
+    flashback ||
+    later ||
+    page.illustration ||
+    familyScene
+  );
+  const dock = bubble
+    ? document.getElementById("campaign-dialogue-dock")
+    : null;
+  function step(next: number) {
+    if (cinematic) fadeOut(dialog.current, () => setCursor(next));
+    else setCursor(next);
+  }
   useEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    return () => element?.close();
-  }, []);
+    if (page.illustration === "gori-exile") rememberFilm("collapse");
+    if (palaceFilm) rememberFilm("king-palace-night");
+    if (inlineFilm) rememberFilm(inlineFilm);
+    if (frame) rememberFilm("ending-" + frame.image.charAt(4));
+  }, [frame, inlineFilm, page.illustration, palaceFilm]);
+  const openDialog = useCallback(
+    (element: HTMLDialogElement | null) => {
+      dialog.current = element;
+      if (!element) return;
+      if (bubble) element.setAttribute("open", "");
+      else element.showModal();
+      return () => element.close();
+    },
+    [bubble],
+  );
+  const stageFilm =
+    stage === "escort"
+      ? stage
+      : stage
+        ? ["one", "two", "three", "four", "five"][stage - 1]
+        : undefined;
+  const playing = entryFilm || film;
+  if (playing) {
+    const finish = () =>
+      fadeOut(dialog.current, () => {
+        rememberFilm(playing);
+        if (entryFilm) act(pending, level);
+        else setFilmDone(true);
+      });
+    return (
+      <dialog
+        key={playing}
+        ref={openDialog}
+        className="film-screen"
+        aria-label={page.title}
+        onCancel={(e) => {
+          e.preventDefault();
+          finish();
+        }}
+      >
+        <CampaignFilm
+          key={playing}
+          id={playing}
+          title={page.title}
+          finish={finish}
+        />
+      </dialog>
+    );
+  }
   if (pending && stage)
     return (
       <dialog
-        ref={dialog}
+        ref={openDialog}
         className="campaign-dialog result-screen mission-entry"
         aria-label="미션 시작 준비"
         style={{
@@ -114,11 +221,7 @@ function SceneDialog({
           close();
         }}
       >
-        <h2>
-          {stage === "escort"
-            ? "사이드 미션 · 충녕의 남하"
-            : stage + "단계 · " + CHAPTERS[stage - 1]}
-        </h2>
+        <h2>{stage === "escort" ? "충녕의 남하" : CHAPTERS[stage - 1]}</h2>
         {selecting && (
           <label>
             난이도{" "}
@@ -136,11 +239,29 @@ function SceneDialog({
             </select>
           </label>
         )}
+        {selecting && stageFilm && filmSeen(stageFilm) && (
+          <label className="entry-replay-choice">
+            <input
+              type="checkbox"
+              checked={replayIntro}
+              onChange={(e) => setReplayIntro(e.target.checked)}
+            />{" "}
+            도입 영상 다시 보기
+          </label>
+        )}
         <footer>
           <button type="button" onClick={() => setSelecting(!selecting)}>
             난이도 설정
           </button>
-          <button type="button" onClick={() => act(pending, level)}>
+          <button
+            type="button"
+            onClick={() =>
+              stageFilm &&
+              (replayIntro || (stage !== 1 && !filmSeen(stageFilm)))
+                ? setEntryFilm(stageFilm)
+                : act(pending, level)
+            }
+          >
             시작하기
           </button>
           <button type="button" onClick={close}>
@@ -149,10 +270,18 @@ function SceneDialog({
         </footer>
       </dialog>
     );
-  return (
+  const content = (
     <dialog
-      ref={dialog}
-      className={result ? "campaign-dialog result-screen" : "campaign-dialog"}
+      ref={openDialog}
+      className={
+        result
+          ? "campaign-dialog result-screen"
+          : bubble
+            ? "campaign-dialog scene-bubble"
+            : cinematic
+              ? "campaign-dialog scene-cinema"
+              : "campaign-dialog"
+      }
       style={
         result && backdrop
           ? {
@@ -161,9 +290,34 @@ function SceneDialog({
           : undefined
       }
       aria-label={page.title}
+      onKeyDown={(event) => {
+        if (
+          event.target === event.currentTarget &&
+          (event.key === "Enter" || event.key === " ")
+        ) {
+          event.preventDefault();
+          event.currentTarget.click();
+        }
+      }}
+      onClick={(event) => {
+        if (
+          !(bubble || cinematic) ||
+          (event.target as HTMLElement).closest("button,video,select")
+        )
+          return;
+        if (!last) step(cursor + 1);
+        else if (
+          bubble &&
+          !stage &&
+          page.choices.length === 1 &&
+          !page.choices[0]!.disabled
+        )
+          act(page.choices[0]!.action);
+      }}
       onCancel={(e) => {
         e.preventDefault();
-        close();
+        if (cinematic) fadeOut(dialog.current, close);
+        else close();
       }}
     >
       {result ? (
@@ -188,10 +342,17 @@ function SceneDialog({
         <>
           <header>
             <h2>{page.title}</h2>
-            <button type="button" onClick={close} aria-label="장면 접기">
+            <button
+              type="button"
+              onClick={() =>
+                cinematic ? fadeOut(dialog.current, close) : close()
+              }
+              aria-label="장면 접기"
+            >
               접기
             </button>
           </header>
+          {inlineFilm && <CampaignFilm id={inlineFilm} title={page.title} />}
           {frame && (
             <video
               key={frame.image}
@@ -231,6 +392,7 @@ function SceneDialog({
             !frame &&
             (familyScene || later || page.illustration) && (
               <img
+                key={later?.image ?? page.illustration ?? "family"}
                 className="campaign-still"
                 alt={
                   familyScene
@@ -250,32 +412,12 @@ function SceneDialog({
               </p>
             </section>
           )}
-          {page.clip &&
-            !page.lineImages?.[cursor] &&
-            page.lineIllustration?.at !== cursor &&
-            !familyScene &&
-            !frame &&
-            (!(
-              page.clip === "hope" ||
-              page.clip === "escape" ||
-              page.clip === "mechanical-late" ||
-              page.clip === "order"
-            ) ||
-              cursor >= 1) && (
-              <video
-                key={page.clip}
-                src={media + page.clip + ".mp4"}
-                muted
-                playsInline
-                autoPlay
-                controls
-                preload="metadata"
-                aria-label={page.title + " 무성 컷씬"}
-              />
+          {!flashback &&
+            !bubble &&
+            page.goal &&
+            !["departure", "after"].includes(page.key) && (
+              <p className="campaign-goal">{page.goal}</p>
             )}
-          {!flashback && page.goal && (
-            <p className="campaign-goal">{page.goal}</p>
-          )}
           {!flashback && (frame ? frame.words : words) && (
             <div className="campaign-speech" aria-live="polite">
               {frame ? null : face >= 0 ? (
@@ -285,6 +427,18 @@ function SceneDialog({
                   alt=""
                   src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.png`}
                 />
+              ) : ["고리", "가솔을 이끄는 귀족", "노귀족"].includes(name) ? (
+                <span
+                  aria-hidden="true"
+                  className={
+                    "story-face " +
+                    (name === "고리"
+                      ? "gori"
+                      : name === "노귀족"
+                        ? "elder"
+                        : "noble")
+                  }
+                />
               ) : null}
               <div>
                 <strong>{frame ? "복홀의 기록" : name}</strong>
@@ -292,17 +446,35 @@ function SceneDialog({
               </div>
             </div>
           )}
-          {!flashback && (!frame || frame.words) && advisory}
+          {bubble && advisory}
         </>
       )}
       <footer>
+        {["departure", "after"].includes(page.key) && !last && (
+          <button
+            type="button"
+            onClick={() => {
+              if (
+                page.key === "departure" &&
+                page.lineIllustration &&
+                cursor < page.lineIllustration.at
+              )
+                step(page.lineIllustration.at);
+              else if (cinematic)
+                fadeOut(dialog.current, () => act(page.choices[0]!.action));
+              else act(page.choices[0]!.action);
+            }}
+          >
+            대화 건너뛰기
+          </button>
+        )}
         {cursor > 0 && (
-          <button type="button" onClick={() => setCursor(cursor - 1)}>
+          <button type="button" onClick={() => step(cursor - 1)}>
             이전 대사
           </button>
         )}
         {!last ? (
-          <button type="button" onClick={() => setCursor(cursor + 1)}>
+          <button type="button" onClick={() => step(cursor + 1)}>
             다음 대사 · {cursor + 1}/{total}
           </button>
         ) : (
@@ -321,14 +493,16 @@ function SceneDialog({
                       : difficulty,
                   );
                   setPending(x.action);
-                } else act(x.action);
+                } else if (cinematic)
+                  fadeOut(dialog.current, () => act(x.action));
+                else act(x.action);
               }}
             >
               {x.label}
             </button>
           ))
         )}
-        {last && (
+        {last && !["departure", "after"].includes(page.key) && (
           <button type="button" onClick={close}>
             {page.title.includes("완료") ? "지금 단계에 머물기" : "마을 보기"}
           </button>
@@ -336,12 +510,14 @@ function SceneDialog({
       </footer>
     </dialog>
   );
+  return dock ? createPortal(content, dock) : content;
 }
 export function CampaignPanel({
   state: s,
   command,
   trade,
   officeSelected,
+  onPatrolMap,
   gateSelected,
   southVisits,
   defenseOpen,
@@ -352,6 +528,7 @@ export function CampaignPanel({
   command: (cmd: TimberCommand) => void;
   trade: boolean;
   officeSelected?: boolean;
+  onPatrolMap?: (visible: boolean) => void;
   gateSelected?: boolean;
   southVisits?: number;
   defenseOpen?: boolean;
@@ -366,7 +543,7 @@ export function CampaignPanel({
   const advice = moraleAdvice(s);
   const rumor = gatheringRumor(s);
   const advisory = (
-    <>
+    <aside className="village-advice">
       {" "}
       {rumor && (
         <p className="campaign-advisory" role="status">
@@ -378,10 +555,49 @@ export function CampaignPanel({
           <strong>{advice[0]}</strong> {advice[1]}
         </p>
       )}
-    </>
+    </aside>
   );
   const [dismissed, setDismissed] = useState<string | null>(null);
-  const [mainMenu, setMainMenu] = useState(false);
+  const [mainMenu, setMainMenu] = useState(c.beat === "opening");
+  const [intro, setIntro] = useState(
+    c.beat === "opening" && !filmSeen("opening"),
+  );
+  const [preparingNewGame, setPreparingNewGame] = useState(false);
+  const [pauseMenu, setPauseMenu] = useState(false);
+  const wasRunning = useRef(false);
+  const introDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (intro) introDialog.current?.showModal();
+  }, [intro]);
+  function finishIntro() {
+    fadeOut(introDialog.current, () => {
+      rememberFilm("opening");
+      setIntro(false);
+    });
+  }
+  useEffect(() => {
+    function pause(event: KeyboardEvent) {
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        intro ||
+        mainMenu ||
+        pauseMenu ||
+        c.beat === "finished" ||
+        document.querySelector(
+          "dialog:modal, [data-testid=home-placement-status]",
+        )
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      wasRunning.current = !s.paused;
+      if (!s.paused) command({ type: "pause", paused: true });
+      setPauseMenu(true);
+    }
+    document.addEventListener("keydown", pause, true);
+    return () => document.removeEventListener("keydown", pause, true);
+  }, [intro, mainMenu, pauseMenu, s.paused, command, c.beat]);
   const [opened, setOpened] = useState<string | null>(null);
   const [petition, setPetition] = useState(false);
   const [south, setSouth] = useState(false);
@@ -390,14 +606,17 @@ export function CampaignPanel({
   }, [southVisits]);
   const [office, setOffice] = useState(false);
   useEffect(() => {
+    onPatrolMap?.(office && !mainMenu && !pauseMenu);
+    return () => onPatrolMap?.(false);
+  }, [office, mainMenu, pauseMenu, onPatrolMap]);
+  useEffect(() => {
     if (officeSelected) setOffice(true);
   }, [officeSelected]);
   useEffect(() => {
     if (gateSelected && c.beat === "capital") setSouth(true);
     else if (gateSelected) setDefenseOpen?.(true);
   }, [gateSelected, setDefenseOpen, c.beat]);
-  const [sound, setSound] = useState(false);
-  const { audioRef, galleryMusic } = useAudio();
+  const { audioRef, galleryMusic, filmHasAudio } = useAudio();
   const canPetition =
     [
       "patrol",
@@ -465,49 +684,68 @@ export function CampaignPanel({
     ],
   };
   const scene = petitionOpen ? petitionPage : p;
-  const track =
-    galleryMusic ??
-    (open
-      ? scene.music
-      : c.ending
-        ? p.music
-        : trade
-          ? "03"
-          : foodWarnings(s.world).length
-            ? "10"
-            : c.beat === "winter"
-              ? "11"
-              : work
-                ? "02"
-                : c.beat === "patrol" &&
-                    Object.keys(s.scoutDepartures ?? {}).length >
-                      c.reports.length
-                  ? "05"
-                  : s.world.minute < 360 || s.world.minute >= 1080
-                    ? "04"
-                    : "01");
+  const chapterLimit =
+    c.beat === "finished" && c.ending !== "collapse"
+      ? CHAPTERS.length
+      : (s.chapter ?? 1) - 1;
+  const titleScreen = mainMenu || c.beat === "finished";
+  const sceneTrack = open
+    ? scene.music
+    : c.ending
+      ? p.music
+      : trade
+        ? "03"
+        : foodWarnings(s.world).length
+          ? "10"
+          : c.beat === "winter"
+            ? "11"
+            : work
+              ? "02"
+              : c.beat === "patrol" &&
+                  Object.keys(s.scoutDepartures ?? {}).length > c.reports.length
+                ? "05"
+                : s.world.minute < 360 || s.world.minute >= 1080
+                  ? "04"
+                  : "01";
+  const trackUrl = galleryMusic
+    ? media + galleryMusic + ".ogg"
+    : titleScreen
+      ? media +
+        (completedChapters(chapterLimit) === CHAPTERS.length
+          ? "Steps_Upon_the_Permafrost.mp3"
+          : "Steps_Through_The_Frost.mp3")
+      : media + sceneTrack + ".ogg";
   useEffect(() => {
-    if (!sound) return;
-    const audio = audioRef.current;
-    void audio
-      ?.playMedia(
-        "bgm",
-        media + track + ".ogg",
-        () => {},
-        () => setSound(false),
-      )
-      .catch(() => setSound(false));
-    return () => audio?.stopMedia("bgm");
-  }, [track, sound, audioRef]);
-  useEffect(() => {
-    const start = () => setSound(true);
-    document.addEventListener("pointerdown", start, { once: true });
-    document.addEventListener("keydown", start, { once: true });
+    if (filmHasAudio || intro) return;
+    let live = true;
+    function stopRetry() {
+      document.removeEventListener("pointerdown", play);
+      document.removeEventListener("keydown", play);
+    }
+    function play() {
+      void audioRef.current
+        ?.playMedia(
+          "bgm",
+          trackUrl,
+          () => {},
+          () => {},
+        )
+        .then((started) => {
+          if (live && started) stopRetry();
+        })
+        .catch(() => {
+          /* Browsers may require a gesture to start audio. */
+        });
+    }
+    document.addEventListener("pointerdown", play);
+    document.addEventListener("keydown", play);
+    play();
     return () => {
-      document.removeEventListener("pointerdown", start);
-      document.removeEventListener("keydown", start);
+      live = false;
+      stopRetry();
+      audioRef.current?.stopMedia("bgm");
     };
-  }, []);
+  }, [trackUrl, audioRef, intro, filmHasAudio]);
   const close = () => {
     setOpened(null);
     setDismissed(p.key);
@@ -533,41 +771,89 @@ export function CampaignPanel({
     }
     setDismissed(p.key);
   }
-  if (c.beat === "finished" || mainMenu) {
-    return !mainMenu && dismissed === p.key ? (
+  if (intro)
+    return createPortal(
+      <dialog
+        className="film-screen"
+        aria-label="서막"
+        ref={introDialog}
+        onCancel={(e) => {
+          e.preventDefault();
+          finishIntro();
+        }}
+      >
+        <CampaignFilm id="opening" title="서막" finish={finishIntro} />
+      </dialog>,
+      document.body,
+    );
+  if (preparingNewGame)
+    return createPortal(
+      <SceneDialog
+        page={campaignPage({ ...s, campaign: { ...c, beat: "opening" } })}
+        difficulty={c.difficulty ?? "normal"}
+        advisory={null}
+        close={() => setPreparingNewGame(false)}
+        act={(action, difficulty) => {
+          command({ type: "restart" });
+          command({
+            type: "campaign",
+            beat: "opening",
+            action,
+            difficulty: difficulty ?? "normal",
+          });
+          setDismissed(null);
+          setOpened(null);
+          setMainMenu(false);
+          setPreparingNewGame(false);
+          wasRunning.current = false;
+        }}
+      />,
+      document.body,
+    );
+  if (c.beat === "finished" || mainMenu || pauseMenu) {
+    return !mainMenu && !pauseMenu && dismissed === p.key ? (
       <button type="button" onClick={() => setMainMenu(true)}>
         메인 메뉴
       </button>
     ) : (
-      <EndingMenu
-        state={s}
-        limit={
-          c.beat === "finished" && c.ending !== "collapse"
-            ? 5
-            : (s.chapter ?? 1) - 1
-        }
-        resume={() => {
-          setMainMenu(false);
-          if (c.beat === "finished") close();
-        }}
-        restart={() => {
-          setMainMenu(false);
-          command({ type: "restart" });
-        }}
-      />
+      createPortal(
+        <EndingMenu
+          key={pauseMenu ? "pause" : "title"}
+          initialView={pauseMenu ? "pause" : "menu"}
+          exit={() => {
+            setPauseMenu(false);
+            setMainMenu(true);
+          }}
+          state={s}
+          limit={chapterLimit}
+          resume={() => {
+            setPauseMenu(false);
+            if (wasRunning.current) {
+              command({ type: "pause", paused: false });
+              wasRunning.current = false;
+            }
+            setMainMenu(false);
+            if (c.beat === "finished") close();
+          }}
+          replayIntro={() => setIntro(true)}
+          restart={() => setPreparingNewGame(true)}
+        />,
+        document.body,
+      )
     );
   }
   return (
     <div className="campaign-quest">
-      <button
-        type="button"
-        onClick={() => {
-          close();
-          setMainMenu(true);
-        }}
-      >
-        나가기
-      </button>
+      {!["opening", "departure", "after", "finished", "ending"].includes(
+        c.beat,
+      ) && (
+        <VillageBulletin
+          state={s}
+          command={command}
+          showEvents={!open}
+          heat={() => setDefenseOpen?.(true)}
+        />
+      )}
       <button
         type="button"
         className="scout-all"
@@ -668,7 +954,7 @@ export function CampaignPanel({
           )}
         </>
       )}
-      {!["opening", "departure"].includes(c.beat) && (
+      {!["opening", "departure", "after"].includes(c.beat) && (
         <button
           type="button"
           className="scout-all"
@@ -678,15 +964,10 @@ export function CampaignPanel({
           관아 · 순라 배치
         </button>
       )}
-      {villageDefenseActive(s) && (
+      {c.beat !== "after" && villageDefenseActive(s) && (
         <>
-          <button
-            type="button"
-            className="scout-all"
-            aria-expanded={!!defenseOpen}
-            onClick={() => setDefenseOpen?.(!defenseOpen)}
-          >
-            기온 {villageTemperature(s)} °C · 성문과 온돌
+          <div className="village-temperature">
+            기온 {villageTemperature(s)} °C
             <meter
               aria-label="마을 기온"
               min={-25}
@@ -696,43 +977,77 @@ export function CampaignPanel({
               optimum={10}
               value={villageTemperature(s)}
             />
-          </button>
+          </div>
           {defenseOpen && (
             <section className="office-panel" aria-label="성문과 온돌">
-              <strong>성문 수비병 {gateCrew}명</strong>
-              <p>수비병이 많으면 습격 때 다치거나 숨지는 주민이 줄어듭니다.</p>
-              {([0, 4, 8, 16] as const).map((count, level) => (
-                <button
-                  key={count}
-                  type="button"
-                  aria-pressed={gateCrew === count}
-                  onClick={() => command({ type: "set-gate", count })}
-                >
-                  <span aria-hidden="true">{levelMarks[level]} </span>
-                  {count}명 배치
-                </button>
-              ))}
+              {gateSelected && (
+                <>
+                  <strong>성문 수비병 {gateCrew}명</strong>
+                  <p>
+                    수비병이 많으면 습격 때 다치거나 숨지는 주민이 줄어듭니다.
+                  </p>
+                  <label className="village-slider">
+                    성문 병력
+                    <input
+                      type="range"
+                      min="0"
+                      max="3"
+                      step="1"
+                      value={gateLevels.filter((n) => n <= gateCrew).length - 1}
+                      aria-valuetext={gateCrew + "명 배치"}
+                      onChange={(e) =>
+                        command({
+                          type: "set-gate",
+                          count: gateLevels[Number(e.target.value)]!,
+                        })
+                      }
+                    />
+                    <span aria-hidden="true">
+                      {gateLevels.map((n) => (
+                        <i key={n}>{n}명</i>
+                      ))}
+                    </span>
+                  </label>
+                </>
+              )}
               <strong>온돌 · 현재 화력 {s.firedHeat ?? 0}단계</strong>
               <p>
                 추워지면 집집마다 불을 더 땝니다. 거주 중인 집 한 채가 화력 한
                 단계마다 한 시간에 목재 1을 써서 8 °C를 덥힙니다. 땔감이
                 모자라면 남은 만큼만 땝니다.
               </p>
-              {[0, 1, 2, 3].map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  aria-pressed={(s.heating ?? 0) === level}
-                  onClick={() => command({ type: "set-heating", level })}
-                >
-                  <span aria-hidden="true">{levelMarks[level]} </span>
-                  {level ? "최소 " + level + "단계" : "자동"}
-                </button>
-              ))}
+              <label className="village-slider">
+                온돌 화력
+                <input
+                  type="range"
+                  min="0"
+                  max="3"
+                  step="1"
+                  value={s.heating ?? 0}
+                  aria-valuetext={s.heating ? s.heating + "단계" : "자동"}
+                  onChange={(e) =>
+                    command({
+                      type: "set-heating",
+                      level: Number(e.target.value),
+                    })
+                  }
+                />
+                <span aria-hidden="true">
+                  {["자동", "1단계", "2단계", "3단계"].map((t) => (
+                    <i key={t}>{t}</i>
+                  ))}
+                </span>
+              </label>
             </section>
           )}
           {s.sighting && (
             <section className="office-panel" aria-label="변종 목격 기록">
+              <button
+                type="button"
+                onClick={() => command({ type: "dismiss-sighting" })}
+              >
+                보고 닫기
+              </button>
               <img
                 src={"/art/mutant-" + s.sighting.species + ".webp"}
                 alt={"붉어진 눈의 " + mutantNames[s.sighting.species]}
@@ -952,7 +1267,10 @@ export function CampaignPanel({
           key={scene.key}
           page={scene}
           difficulty={c.difficulty ?? "normal"}
-          close={close}
+          close={() => {
+            if (c.beat === "opening") setMainMenu(true);
+            else close();
+          }}
           act={act}
           advisory={advisory}
         />

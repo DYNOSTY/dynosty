@@ -13,6 +13,17 @@ import {
 } from "@dynosty/game-core";
 import { loadTimber } from "./timber-save.js";
 
+export function completedChapters(limit: number) {
+  try {
+    const saved = Number(localStorage.getItem("dynosty.completedChapter"));
+    if (Number.isInteger(saved) && saved >= 0 && saved <= CHAPTERS.length)
+      return Math.max(saved, limit);
+  } catch {
+    /* Session progress remains available. */
+  }
+  return limit;
+}
+
 async function archive<T>(
   store: "starts" | "slots",
   mode: IDBTransactionMode,
@@ -111,7 +122,10 @@ export async function replayStage(stage: number, difficulty: Difficulty) {
   );
 }
 
+export const SAVE_SLOT_COUNT = 10;
 export function writeSlot(id: number, state: TimberState) {
+  if (!Number.isInteger(id) || id < 1 || id > SAVE_SLOT_COUNT)
+    throw Error("저장 슬롯은 1번부터 10번까지입니다.");
   return archive("slots", "readwrite", (table) =>
     table.put({ id, savedAt: Date.now(), save: createTimberSave(state) }, id),
   );

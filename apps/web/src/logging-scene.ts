@@ -76,6 +76,7 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
   };
   const workshop = new TransformNode(unique("logging-workshop"), scene);
   workshop.position.set(rules.workshopPlot.x, 0, rules.workshopPlot.z);
+  workshop.metadata = { villageTarget: "production:" + siteId };
   box("logging-workshop-floor", [8.4, 0.2, 6], [0, 0.1, 0], wood, workshop);
   for (const x of [-3.8, 3.8])
     for (const z of [-2.8, 2.8])
@@ -118,9 +119,9 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
   const forest = Array.from({ length: isForest ? 32 : 0 }, (_, i) => {
     const tree = new TransformNode(unique(`logging-tree-${i}`), scene);
     tree.position.set(
-      patch.x - 7 + (i % 8) * 2,
+      patch.x - 7 + (i % 8) * 2 + Math.sin(i * 13 + patch.x) * 0.8,
       0,
-      patch.z - 9 + Math.floor(i / 8) * 6,
+      patch.z - 9 + Math.floor(i / 8) * 6 + Math.cos(i * 7 + patch.z) * 1.1,
     );
     box("logging-trunk", [0.35, 1.4, 0.35], [0, 0.7, 0], wood, tree);
     const crown = CreateCylinder(
@@ -128,6 +129,8 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
       { height: 3, diameterBottom: 2, diameterTop: 0, tessellation: 6 },
       scene,
     );
+    tree.scaling.setAll(0.8 + (1 + Math.sin(i * 4.9 + patch.z)) * 0.24);
+    tree.rotation.y = i * 1.61;
     crown.parent = tree;
     crown.position.y = 2.5;
     crown.material = leaves;
@@ -139,7 +142,11 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
     for (let i = 0; i < 8; i++) {
       const rock = box(
         "deposit-rock",
-        [2.5 + (i % 3), 1.6, 2.1],
+        patch.kind === "stone"
+          ? [3.8, 1.4, 2.8]
+          : patch.kind === "coal"
+            ? [3.7, 0.95 + (i % 2) * 0.4, 1.8]
+            : [1.9, 2.2 + (i % 3) * 0.45, 1.6],
         [Math.cos(i) * 7, 0.4, Math.sin(i) * 7],
         logs,
         deposit,
@@ -154,6 +161,9 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
       box("mine-entry-crossbar", [4.8, 0.4, 0.5], [8, 3, 0], wood, deposit);
     }
   }
+  const depositPieces = deposit
+    .getChildMeshes()
+    .map((mesh) => ({ mesh, base: mesh.position.y }));
   const cart = new TransformNode(unique("logging-cart"), scene);
   const cartBase = box(
     "logging-cart-base",
@@ -194,6 +204,13 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
       const height = terrainElevation(s);
       deposit.setEnabled(!!s && !isForest);
       deposit.position.y = height(patch.x, patch.z);
+      for (const { mesh, base } of depositPieces) {
+        const local = mesh.position;
+        local.y =
+          base +
+          height(patch.x + local.x, patch.z + local.z) -
+          deposit.position.y;
+      }
       for (const node of [workshop, storage])
         node.position.y = height(node.position.x, node.position.z);
       buffer.position.y = 0.5 + height(buffer.position.x, buffer.position.z);

@@ -91,8 +91,8 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상�
   ).toHaveValue("1");
   await expect(page.getByText(/좌석10 · 직원/)).toHaveCount(2);
   await page.getByLabel("지을 건물", { exact: true }).selectOption("fishery");
-  await page.getByText("단계별 시설 설계 보기", { exact: true }).click();
-  const art = page.getByAltText("어획막 1~3단계 설계 삽화");
+  await page.getByText("건물 설계 보기", { exact: true }).click();
+  const art = page.getByAltText("어획막 설계 삽화");
   await expect(art).toBeVisible();
   await expect
     .poll(() => art.evaluate((img) => (img as HTMLImageElement).naturalWidth))

@@ -1,3 +1,4 @@
+import { SETTLEMENTS } from "./campaign.js";
 import { scoutSpeedRate } from "./development.js";
 import type { TimberState } from "./timber.js";
 
@@ -70,10 +71,83 @@ export function scoutTripMinutes(site: ScoutSite, s?: TimberState) {
   return Math.ceil((site.hours * 60) / (s ? scoutSpeedRate(s) : 1));
 }
 
+export const SCOUT_FINDS = [
+  "survivors",
+  "wood",
+  "fish",
+  "coal",
+  "record",
+  "contact0",
+  "contact1",
+  "contact2",
+  "contact3",
+  "contact4",
+] as const;
+export type ScoutFind = {
+  kind: (typeof SCOUT_FINDS)[number];
+  decision: "waiting" | "take" | "pass" | "home";
+  due: number;
+};
+export function scoutFinding(kind: ScoutFind["kind"]) {
+  if (kind.startsWith("contact")) {
+    const village = SETTLEMENTS[Number(kind.slice(-1))]!.name;
+    return [
+      village + "의 길잡이",
+      village +
+        "에서 왔다는 짐꾼이 눈에 덮인 샛길을 짚어 줍니다. 길을 그려 복홀에 전할까요?",
+      "교역로 약도",
+    ];
+  }
+  switch (kind) {
+    case "survivors":
+      return [
+        "바람을 등진 가족",
+        "수레 그늘에 웅크린 두 이가 먼저 어린 나뭇가지를 내밉니다. 함께 복홀로 가겠느냐고 물을까요?",
+        "유민 2명",
+      ];
+    case "record":
+      return [
+        "눈 속의 고려 인장",
+        "허물어진 곳간 문설주에서 고려의 창고 인장이 찍힌 목간을 찾았습니다.",
+        "고려의 목간",
+      ];
+    case "wood":
+      return [
+        "눈 밑에 묻힌 통나무",
+        "떠난 벌목꾼들이 마른 재목을 묶어 두었습니다.",
+        "목재 12",
+      ];
+    case "fish":
+      return [
+        "나루의 마른 생선",
+        "얼어붙은 나루에서 기름종이에 싸인 어물을 찾았습니다.",
+        "어류 8",
+      ];
+    default:
+      return [
+        "꺼진 화덕의 석탄",
+        "무너진 화덕 뒤에 마른 석탄 자루가 남았습니다.",
+        "석탄 10",
+      ];
+  }
+}
+export function encounterReady(s: TimberState, id: string) {
+  const run = s.scoutFinds?.[id];
+  return (
+    run?.decision === "waiting" &&
+    (s.world.day - 1) * 1440 + s.world.minute >= run.due
+  );
+}
 export function scoutRun(s: TimberState, site: ScoutSite) {
   const start = s.scoutDepartures?.[site.id];
   if (start === undefined) return undefined;
   // 이전 저장의 정찰대는 기존 왕복 일정을 유지한다.
   const minutes = s.scoutTripDurations?.[site.id] ?? scoutTripMinutes(site);
-  return { start, minutes, due: start + minutes };
+  const encounter = s.scoutFinds?.[site.id];
+  const due = encounter
+    ? encounter.decision === "waiting"
+      ? Infinity
+      : encounter.due
+    : start + minutes;
+  return { start, minutes, due };
 }

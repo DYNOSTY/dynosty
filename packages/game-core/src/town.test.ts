@@ -56,7 +56,7 @@ it("무자원은 접수 거부, 자재 확보 후 무인력은 대기하고 1명
   const before = s.world.resources.RES_WOOD;
   s = plan(s, "home");
   s = advanceTimber(s, 10);
-  expect(s.world.resources.RES_WOOD).toBe(before - 200000);
+  expect(s.world.resources.RES_WOOD).toBe(before - 1000000);
   expect(s.town.orders[0]?.crew).toHaveLength(0);
   const worker = s.residents.find(
     (r) => s.world.citizens.find((c) => c.id === r.id)?.species === "R03",
@@ -73,14 +73,14 @@ it("무자원은 접수 거부, 자재 확보 후 무인력은 대기하고 1명
   expect(s.town.orders[0]?.crew).toHaveLength(1);
   s = finish(s);
   expect(s.homes).toHaveLength(7);
-  expect(s.world.resources.RES_WOOD).toBe(before - 200000);
+  expect(s.world.resources.RES_WOOD).toBe(before - 1000000);
 });
 it("여러 부지는 즉시 자재 확보하며 겹침 거부, 순차 완공, 저장 복원도 동일하다", () => {
   let s = plan(start(), "home");
   expect(() => plan(s, "farm")).toThrow();
   s = plan(s, "storage", { ...pose, position: { x: 0, z: 16 } });
   expect(s.town.orders).toHaveLength(2);
-  expect(s.world.resources.RES_WOOD).toBe(2680000);
+  expect(s.world.resources.RES_WOOD).toBe(1400000);
   s = advanceTimber(s, 20);
   const loaded = parseTimberSave(createTimberSave(s)).state;
   expect(advanceTimber(loaded, 120)).toEqual(advanceTimber(s, 120));
@@ -304,4 +304,55 @@ it("새 마을의 첫 식당은 공사 인부가 배식을 맡고 주민이 식�
         r.workplaceId === null && r.lastMeal !== null && r.routine !== "eating",
     ),
   ).toBe(true);
+});
+
+it("기존 가격으로 접수한 현장에 이어 새 공사는 새 건설비로 한 번만 정산한다", () => {
+  const saved = plan(start(), "home");
+  delete saved.town.orders[0]!.priceVersion;
+  const refund = 80;
+  const legacy = {
+    ...saved,
+    woodSpent: saved.woodSpent - refund,
+    world: {
+      ...saved.world,
+      resources: {
+        ...saved.world.resources,
+        RES_WOOD: saved.world.resources.RES_WOOD + refund * 10000,
+      },
+    },
+    town: { ...saved.town, spent: { ...saved.town.spent, RES_WOOD: 20 } },
+  };
+  const resumed = parseTimberSave(createTimberSave(legacy)).state;
+  const next = plan(resumed, "storage", { ...pose, position: { x: 0, z: 16 } });
+  expect(next.town.spent.RES_WOOD).toBe(80);
+  expect(parseTimberSave(createTimberSave(next)).state).toEqual(next);
+});
+
+it("물 보유량으로 농장 착공을 제한하고 물을 받기 전의 옛 건설 기록도 복원한다", () => {
+  const village = createVillageGame();
+  const dry = {
+    ...village,
+    world: {
+      ...village.world,
+      resources: { ...village.world.resources, RES_WATER: 0 },
+    },
+  };
+  for (const kind of ["farm", "ranch"] as const)
+    expect(buildingIssue(dry, kind, pose)).toMatch(/물/);
+  const farm = plan(village, "farm");
+  const current = farm.world.resources.RES_WATER;
+  expect(current).toBe(19 * 10000);
+  const old = parseTimberSave(createTimberSave(farm)).state;
+  old.town.orders[0]!.priceVersion = 2;
+  delete old.town.spent.RES_WATER;
+  const previous = {
+    ...old,
+    world: {
+      ...old.world,
+      resources: { ...old.world.resources, RES_WATER: current + 10000 },
+    },
+  };
+  expect(
+    parseTimberSave(createTimberSave(previous)).state.world.resources.RES_WATER,
+  ).toBe(20 * 10000);
 });

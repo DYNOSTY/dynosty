@@ -38,7 +38,7 @@ it("식당 건설만 지시하면 인력이 이동·건설하고 배고픈 주�
   let s = commandTimber(initial, { type: "build-restaurant" }, "build");
   expect(s.restaurantBuilt).toBe(false);
   expect(s.construction).not.toBeNull();
-  expect(s.world.resources.RES_WOOD).toBe(1000000);
+  expect(s.world.resources.RES_WOOD).toBe(200000);
   s = advanceTimber(s, 40);
   expect(s.restaurantBuilt).toBe(true);
   expect(s.construction).toBeNull();
@@ -271,7 +271,7 @@ it("식당 건설 시간 변조는 거부하고 건설 인력이 아프면 유�
   expect(s.construction?.workerId).not.toBe(old);
   s = advanceTimber(s, 40);
   expect(s.restaurantBuilt).toBe(true);
-  expect(s.world.resources.RES_WOOD).toBe(1000000);
+  expect(s.world.resources.RES_WOOD).toBe(200000);
 });
 
 it("교대 인력이 없으면 작업만 대기하고 다른 주민의 허기·생활은 계속된다", () => {
