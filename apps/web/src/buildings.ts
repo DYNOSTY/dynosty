@@ -77,7 +77,7 @@ export const BUILDINGS: Record<string, BuildingInfo> = {
       ["진행", "마른 목재20"],
     ],
     commands: [
-      { icon: "economy", label: "조달", hotkey: "E", action: "procure" },
+      { icon: "economy", label: "조달", hotkey: "T", action: "procure" },
       locked("records", "조달 기록"),
     ],
   },

@@ -823,7 +823,8 @@ export function App() {
     if (!playState?.paused) commandPlay({ type: "pause", paused: true });
     openOnly(() => setTimberOpen(true));
   }
-  // 명령 단축키: E 조달, J 저장, Esc 닫기 (입력 칸·대화상자 안에서는 무시)
+  // 명령 단축키: T 조달, J 저장, Esc 닫기 (입력 칸·대화상자 안에서는 무시).
+  // 조달은 E였는데 Q·E가 화면 회전이 되어 T로 옮김 (2026-11-22). R은 건물 단추의 '정찰 보내기' 표시와 겹쳐 피함
   const openTimberRef = useRef(openTimber);
   openTimberRef.current = openTimber;
   const closeRef = useRef(closePopups);
@@ -845,7 +846,7 @@ export function App() {
       )
         return;
       const key = event.key.toLowerCase();
-      if (key === "e") openTimberRef.current();
+      if (key === "t" || event.code === "KeyT") openTimberRef.current();
       if (key === "j") {
         const wasOpen = saveOpenRef.current;
         closeRef.current();
@@ -1081,7 +1082,7 @@ export function App() {
           <div className="scene-viewport">
             <canvas
               ref={canvasRef}
-              aria-label="바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다."
+              aria-label="바닥과 건물이 있는 3D 예제. 끌어서 옮기고, Q·E 키로 돌리고, 휠로 확대할 수 있습니다."
               tabIndex={0}
             />
             {timberOpen && laborOpen ? (
@@ -1118,7 +1119,7 @@ export function App() {
           </div>
           {/* 개발용 안내·예제 단추: 플레이어 화면에선 숨김 (?dev=1 또는 자동 시험에서만) */}
           <div className="scene-footer" hidden={!DEV_UI}>
-            <p>클릭으로 선택 · 마우스로 회전 · 휠로 확대</p>
+            <p>클릭으로 선택 · Q·E로 회전 · 휠로 확대</p>
             <span>
               {timberOpen && laborOpen
                 ? "검수대 · 격리품 · 배급소"
