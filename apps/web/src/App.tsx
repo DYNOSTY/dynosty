@@ -393,6 +393,12 @@ export function App() {
     return () => sceneRef.current?.setSiteMarkers(null);
   }, [timberOpen, laborOpen, sceneStatus]);
 
+  const showConstructionGrid =
+    timberOpen && consoleOpen && villageSection?.label === "건설과 식량 수급";
+  useEffect(() => {
+    if (sceneStatus === "준비 완료")
+      sceneRef.current?.setConstructionGrid(showConstructionGrid);
+  }, [showConstructionGrid, sceneStatus]);
   const beginHomePlacement = useCallback(
     (
       confirm: (pose: HomePlacement) => void,

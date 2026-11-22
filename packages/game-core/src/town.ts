@@ -3,7 +3,7 @@ import {
   BOKHOL_MAP,
   BOKHOL_MINERALS,
   BOKHOL_WATERS,
-  bokholElevation,
+  fixedBuildingAt,
   type ProductionSiteId,
 } from "./bokhol.js";
 import {
@@ -26,6 +26,7 @@ import {
   upgradeTarget,
 } from "./development.js";
 import {
+  clearBuildingFootprint,
   type HomePlacement,
   homeEntrance,
   homeObstacle,
@@ -33,7 +34,11 @@ import {
   rotatedPoint,
 } from "./home-placement.js";
 import { advanceHospital, hospitalValid, type Patient } from "./hospital.js";
-import { loggingSites, productionSites, setLoggingSite } from "./logging.js";
+import {
+  loggingSiteRules,
+  productionSites,
+  setLoggingSite,
+} from "./logging.js";
 import { usableHomes } from "./mutants.js";
 import {
   AMOUNT_SCALE,
@@ -365,17 +370,16 @@ export function buildingIssue(
   )
     return "공동 식당과 겹쳐요.";
   for (const l of productionSites(s)) {
-    const d =
-      [...BOKHOL_FORESTS, ...BOKHOL_MINERALS].find((d) => d.id === l.siteId) ??
-      invalidTown();
+    const { workshopPlot, storagePlot } = loggingSiteRules(l.siteId);
     if (
       l.built &&
-      Math.hypot(p.position.x - (d.x + 13), p.position.z - d.z) < 7
+      Math.hypot(p.position.x - workshopPlot.x, p.position.z - workshopPlot.z) <
+        7
     )
       return "기존 작업장과 겹쳐요.";
     if (
       l.storageBuilt &&
-      Math.hypot(p.position.x - (d.x + 13), p.position.z - (d.z + 10)) < 5
+      Math.hypot(p.position.x - storagePlot.x, p.position.z - storagePlot.z) < 5
     )
       return "기존 저장소와 겹쳐요.";
   }
@@ -402,17 +406,6 @@ export function buildingIssue(
     )
   )
     return "채굴할 암반·광맥 자체를 건물로 덮을 수 없어요.";
-  const amounts = Object.fromEntries(
-    loggingSites(s).map((l) => [l.siteId, l.remaining]),
-  );
-  const heights = samples.map((q) => bokholElevation(q.x, q.z, amounts));
-  if (
-    !["coal", "iron", "quarry", "fishery", "logging", "farm", "ranch"].includes(
-      kind,
-    ) &&
-    Math.max(...heights) - Math.min(...heights) > 0.12
-  )
-    return "건물 바닥 전체가 평탄한 땅을 골라 주세요.";
   const door = facilityDoor(p);
   if (
     !residentPath(door, door, townObstacles(s)).length ||
@@ -428,20 +421,8 @@ export function buildingIssue(
     )
   )
     return "출입구와 접근 공간을 비워 주세요.";
-  if (
-    s.residents.some(
-      (r) =>
-        r.health !== "dead" &&
-        !r.insideHome &&
-        rectanglesOverlap(rect, {
-          position: r.position,
-          headingRadians: 0,
-          halfWidth: 0.35,
-          halfDepth: 0.35,
-        }),
-    )
-  )
-    return "주민이 서 있는 자리예요. 이동한 뒤 배치해 주세요.";
+  if (fixedBuildingAt(p.position, !!s.rebuilding))
+    return "기존 시설이 차지한 구획이에요.";
   for (const [resource, amount] of Object.entries(BUILDING_RULES[kind].cost))
     if (
       s.world.resources[resource as ResourceId] -
@@ -484,7 +465,13 @@ export function planBuilding(
 ): TimberState {
   const issue = buildingIssue(s, kind, pose);
   if (issue) throw Error(issue);
-  const n = payTown(s, BUILDING_RULES[kind].cost);
+  const n = clearBuildingFootprint(
+    payTown(s, BUILDING_RULES[kind].cost),
+    pose,
+    2.25,
+    facilityDoor(pose),
+    townObstacles(s),
+  );
   const order: BuildingOrder = {
     ...pose,
     id: `build-${n.town.nextId}`,

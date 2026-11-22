@@ -9,6 +9,8 @@ import { Camera } from "@babylonjs/core/Cameras/camera";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { SceneInstrumentation } from "@babylonjs/core/Instrumentation/sceneInstrumentation";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
@@ -25,6 +27,7 @@ import {
   homeUsage,
   type LaborState,
   laborStock,
+  PLOT_STEP,
   productionSites,
   RESIDENT_REQUEST_TEXT,
   type SceneSnapshot,
@@ -103,6 +106,7 @@ export interface SceneController {
     feedback: (message: string, active: boolean) => void,
     kind?: BuildingKind,
   ): void;
+  setConstructionGrid(visible: boolean): void;
   cancelHomePlacement(): void;
   setSelectionEnabled(enabled: boolean): void;
 }
@@ -168,7 +172,15 @@ export function mountScene(
     new URLSearchParams(location.search).get("season") === "summer"
       ? "summer"
       : "winter";
-  const { shadow, setTime, glow, warmMat, followSnow } = buildWorld(
+  const {
+    shadow,
+    setTime,
+    glow,
+    warmMat,
+    followSnow,
+    showPreviewTerrain,
+    groundColor,
+  } = buildWorld(
     scene,
     LAYOUT.map(([, x, z]) => [x, z] as [number, number]),
     season,
@@ -201,10 +213,22 @@ export function mountScene(
     "procurement-ground-material",
     scene,
   );
-  demoMaterial.diffuseColor =
-    season === "winter"
-      ? new Color3(0.82, 0.83, 0.88)
-      : new Color3(0.48, 0.57, 0.5);
+  const vertices = demoGround.getVerticesData(VertexBuffer.PositionKind)!;
+  const groundColors = [];
+  for (let i = 0; i < vertices.length; i += 3) {
+    groundColors.push(...groundColor(vertices[i]!, vertices[i + 2]!), 1);
+  }
+  demoGround.setVerticesData(VertexBuffer.ColorKind, groundColors);
+  const plotTexture = new DynamicTexture("construction-plots", 64, scene, true);
+  const ink = plotTexture.getContext();
+  ink.fillStyle = "#ffffff";
+  ink.fillRect(0, 0, 64, 64);
+  ink.fillStyle = "#715d43";
+  ink.fillRect(30, 0, 4, 64);
+  ink.fillRect(0, 30, 64, 4);
+  plotTexture.wrapU = plotTexture.wrapV = Texture.WRAP_ADDRESSMODE;
+  plotTexture.uScale = plotTexture.vScale = BOKHOL_MAP.size / PLOT_STEP;
+  plotTexture.update();
   demoGround.material = demoMaterial;
   demoGround.isPickable = true;
   demoGround.setEnabled(false);
@@ -266,8 +290,7 @@ export function mountScene(
       for (let i = 0; i < positions.length; i += 3) {
         const x = positions[i] ?? 0,
           z = positions[i + 2] ?? 0;
-        positions[i + 1] =
-          elevation(x, z) - (s && Math.hypot(x, z) < ISLAND_RADIUS ? 0.65 : 0);
+        positions[i + 1] = elevation(x, z);
       }
       const normals: number[] = [];
       VertexData.ComputeNormals(positions, indices, normals);
@@ -356,7 +379,6 @@ export function mountScene(
       cachedAssets = assets;
       entities.setModels(assets);
       laborVisual.setModels(assets);
-      if (assets.building) homePreview.setModel(assets.building);
       onAssetWarning(
         failed.length
           ? "대표 모델을 불러오지 못해 해당 대상을 연결 예제로 표시합니다."
@@ -641,6 +663,7 @@ export function mountScene(
     // 카메라 정보(미니맵 화살표·개발 도구)는 초당 10번만 넘김 → 이동 중 화면 전체 다시 그리기 방지
     const now = performance.now();
     if (key !== cameraKey) {
+      if (homePreview.active) homePreview.cameraMoved();
       cameraKey = key;
       infoDirty = true;
     }
@@ -736,6 +759,9 @@ export function mountScene(
   });
   return {
     ready,
+    setConstructionGrid(visible) {
+      demoMaterial.diffuseTexture = visible ? plotTexture : null;
+    },
     beginHomePlacement: homePreview.begin,
     cancelHomePlacement: homePreview.cancel,
     updateTimber(state) {
@@ -756,6 +782,7 @@ export function mountScene(
         previewVillage.setEnabled(true);
         village.setPreviewResidentsVisible(!active);
         demoGround.setEnabled(active);
+        showPreviewTerrain(!active);
         camera.upperRadiusLimit = active ? 720 : 140;
         if (softwareRenderer) engine.setHardwareScalingLevel(active ? 1 : 2);
         if (!active) resetWorldCamera();

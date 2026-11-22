@@ -2,7 +2,7 @@ import {
   BOKHOL_FORESTS,
   BOKHOL_MAP,
   BOKHOL_MINERALS,
-  bokholElevation,
+  fixedBuildingAt,
 } from "./bokhol.js";
 import { loggingSiteRules, loggingSites, productionSites } from "./logging.js";
 import { AMOUNT_SCALE } from "./play.js";
@@ -99,6 +99,52 @@ export function pointInHome(
       HOME_PLACEMENT_RULES.halfDepth + margin
   );
 }
+// The entrance is validated before accepting a site, so it is also the last
+// available exit when the other three sides are blocked.
+export function clearBuildingFootprint(
+  s: TimberState,
+  pose: HomePlacement,
+  radius: number,
+  entrance: GroundPoint,
+  obstacles: readonly GroundObstacle[],
+): TimberState {
+  const edges = [
+    rotatedPoint(pose, radius + 0.8, 0),
+    rotatedPoint(pose, -radius - 0.8, 0),
+    rotatedPoint(pose, 0, -radius - 0.8),
+    entrance,
+  ];
+  const exits = edges.filter(
+    (q) =>
+      Math.abs(q.x) <= 250 &&
+      Math.abs(q.z) <= 250 &&
+      residentPath(q, q, obstacles).length,
+  );
+  const rect = { ...pose, halfWidth: radius, halfDepth: radius };
+  return {
+    ...s,
+    residents: s.residents.map((r) => {
+      if (
+        r.health === "dead" ||
+        r.insideHome ||
+        !rectanglesOverlap(rect, {
+          position: r.position,
+          headingRadians: 0,
+          halfWidth: 0.35,
+          halfDepth: 0.35,
+        })
+      )
+        return r;
+      const distance = (q: GroundPoint) =>
+        Math.hypot(q.x - r.position.x, q.z - r.position.z);
+      const position = exits.reduce(
+        (best, q) => (distance(q) < distance(best) ? q : best),
+        entrance,
+      );
+      return { ...r, position: { ...position } };
+    }),
+  };
+}
 export function homePlacementIssue(
   s: TimberState,
   p: HomePlacement,
@@ -110,6 +156,8 @@ export function homePlacementIssue(
     p.headingRadians >= Math.PI * 2
   )
     return "건물 위치와 방향을 확인해 주세요.";
+  if (fixedBuildingAt(p.position, !!s.rebuilding))
+    return "기존 시설이 차지한 구획이에요.";
   const rect = {
     ...p,
     halfWidth: HOME_PLACEMENT_RULES.halfWidth + 0.2,
@@ -158,6 +206,16 @@ export function homePlacementIssue(
     )
   )
     return "이웃 둥지의 출입구를 막는 자리예요.";
+  if (
+    [...s.town.facilities, ...s.town.orders].some((f) =>
+      rectanglesOverlap(rect, {
+        ...f,
+        halfWidth: 2.25,
+        halfDepth: 2.25,
+      }),
+    )
+  )
+    return "건물 또는 건설 대기 부지와 겹쳐요.";
   const entrance = homeEntrance(p);
   if (
     !residentPath(entrance, entrance, s.homes.map(homeObstacle)).length ||
@@ -179,9 +237,8 @@ export function homePlacementIssue(
   for (const l of productionSites(s)) {
     const r = loggingSiteRules(l.siteId);
     if (
-      (l.built && overlaps(r.workshop, 4.5, 3.5)) ||
-      (l.storageBuilt &&
-        overlaps({ x: r.storage.x - 3, z: r.storage.z }, 2.5, 3))
+      (l.built && overlaps(r.workshopPlot, 4.5, 3.5)) ||
+      (l.storageBuilt && overlaps(r.storagePlot, 2.5, 3))
     )
       return "작업장이나 저장소와 겹쳐요.";
   }
@@ -197,22 +254,6 @@ export function homePlacementIssue(
     )
   )
     return "광맥과 채굴 구역에는 둥지를 지을 수 없어요.";
-  const amounts = Object.fromEntries(
-    loggingSites(s).map((l) => [l.siteId, l.remaining]),
-  );
-  const heights = samples.map((q) => bokholElevation(q.x, q.z, amounts));
-  if (
-    Math.max(...heights) - Math.min(...heights) >
-    HOME_PLACEMENT_RULES.flatTolerance
-  )
-    return "건물 바닥 전체가 평평한 자리를 골라 주세요.";
-  if (
-    s.residents.some(
-      (r) =>
-        r.health !== "dead" && !r.insideHome && pointInHome(r.position, p, 0.6),
-    )
-  )
-    return "주민이 있는 자리예요. 이동한 뒤 배치해 주세요.";
   if (
     s.world.resources.RES_WOOD - s.reservedWood * AMOUNT_SCALE <
     20 * AMOUNT_SCALE

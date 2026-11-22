@@ -85,14 +85,13 @@ it("기존 주민의 고정 잠자리는 유지하고 빈 둥지에 합류 주�
   const saved = parseTimberSave(createTimberSave(s)).state;
   expect(saved).toEqual(s);
 });
-it("건물 겹침·숲·광맥·경사·지도 밖·자원 부족을 거부하고 재고를 차감하지 않는다", () => {
+it("건물 겹침·숲·광맥·지도 밖·자원 부족을 거부하고 재고를 차감하지 않는다", () => {
   const s = idle();
   for (const position of [
     { x: 0, z: -1 },
     { x: -40, z: -8 },
     { x: -150, z: -40 },
     { x: 251, z: 250 },
-    { x: 50, z: 20 },
   ]) {
     expect(homePlacementIssue(s, { ...pose, position })).not.toBeNull();
     expect(() =>
@@ -100,6 +99,9 @@ it("건물 겹침·숲·광맥·경사·지도 밖·자원 부족을 거부하�
     ).toThrow();
     expect(s.world.resources.RES_WOOD).toBe(1200000);
   }
+  expect(
+    homePlacementIssue(s, { ...pose, position: { x: 50, z: 20 } }),
+  ).toBeNull();
   const world = createPlayState();
   const poor = advanceTimber(
     createTimberState({

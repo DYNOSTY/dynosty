@@ -75,7 +75,7 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
     return mesh;
   };
   const workshop = new TransformNode(unique("logging-workshop"), scene);
-  workshop.position.set(rules.workshop.x, 0, rules.workshop.z);
+  workshop.position.set(rules.workshopPlot.x, 0, rules.workshopPlot.z);
   box("logging-workshop-floor", [8.4, 0.2, 6], [0, 0.1, 0], wood, workshop);
   for (const x of [-3.8, 3.8])
     for (const z of [-2.8, 2.8])
@@ -91,7 +91,7 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
     roof.rotation.z = x > 0 ? -0.25 : 0.25;
   }
   const storage = new TransformNode(unique("logging-storage"), scene);
-  storage.position.set(rules.storage.x - 3, 0, rules.storage.z);
+  storage.position.set(rules.storagePlot.x, 0, rules.storagePlot.z);
   box("logging-storage-floor", [3.5, 0.15, 4], [0, 0.08, 0], wood, storage);
   for (const x of [-1.5, 1.5])
     box("logging-storage-post", [0.15, 2, 0.15], [x, 1, 1.7], wood, storage);

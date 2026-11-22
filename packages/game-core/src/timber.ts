@@ -3,6 +3,8 @@ import {
   BOKHOL_MAP,
   BOKHOL_MINERALS,
   BOKHOL_PRODUCTION_SITES,
+  constructionPlot,
+  fixedBuildingAt,
   type ProductionSiteId,
   productionSiteDefinition,
   sawmillHasForest,
@@ -35,6 +37,7 @@ import {
   type HomeBuilder,
 } from "./home-construction.js";
 import {
+  clearBuildingFootprint,
   type HomePlacement,
   homeEntrance,
   homeObstacle,
@@ -165,7 +168,7 @@ export const TIMBER_RULES = {
   yard: { x: 4.5, z: 2.8 },
   pullOffset: 3,
   house: { x: 0, z: -1 },
-  repairSite: { x: 0, z: -3 },
+  repairSite: { x: 0, z: -4.2 },
   walkSpeed: 2,
 } as const;
 export type TimberOffer = keyof typeof TIMBER_RULES.offers;
@@ -543,6 +546,14 @@ export function createCapital(s: TimberState): TimberState {
       z: (Math.floor(i / 10) - 4.5) * 16,
     },
   }));
+  // Keep the palace quarter and gate clear. Displaced homes line the outer street.
+  let outerStreetX = -72;
+  for (const home of buildings) {
+    if (fixedBuildingAt(home.position, false)) {
+      home.position = { x: outerStreetX, y: 0, z: -88 };
+      outerStreetX += 16;
+    }
+  }
   let city = createTimberState({ ...seed.world, citizens, buildings });
   const kinds: Facility["kind"][] = [
     "restaurant",
@@ -558,11 +569,15 @@ export function createCapital(s: TimberState): TimberState {
     "restaurant",
     "restaurant",
   ];
+  function capitalWorkPlot(i: number) {
+    const p = { x: ((i % 6) - 3) * 16, z: i < 6 ? -16 : 16 };
+    return fixedBuildingAt(p, false) ? { ...p, z: 2 * p.z } : p;
+  }
   const facilities = kinds.map(
     (kind, i): Facility => ({
       id: `build-${i + 1}`,
       kind,
-      position: { x: ((i % 6) - 3) * 16, z: i < 6 ? -16 : 16 },
+      position: capitalWorkPlot(i),
       headingRadians: 0,
       level: 1,
       sourceId: null,
@@ -3263,7 +3278,7 @@ export function commandTimber(
       break;
     case "plan-building":
       n = planBuilding(s, command.kind, {
-        position: command.position,
+        position: constructionPlot(command.position),
         headingRadians: command.headingRadians,
       });
       break;
@@ -3486,14 +3501,20 @@ export function commandTimber(
     }
     case "build-home": {
       const pose: HomePlacement = {
-        position: command.position,
+        position: constructionPlot(command.position),
         headingRadians: command.headingRadians,
       };
       const issue = homePlacementIssue(s, pose);
       if (issue) fail(issue);
       const ids: string[] = [];
       const slots = homeWorkSlots(s, pose);
-      let available = s;
+      let available = clearBuildingFootprint(
+        s,
+        pose,
+        1.85,
+        homeEntrance(pose),
+        villageObstacles(s),
+      );
       for (let i = 0; i < slots.length; i++) {
         const id = eligible(available, homeEntrance(pose), 1)[0];
         if (!id) break;

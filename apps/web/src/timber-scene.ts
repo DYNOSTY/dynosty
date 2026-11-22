@@ -8,7 +8,9 @@ import {
   builderWorkPosition,
   CONVOY_GOALS,
   CONVOY_ITEMS,
+  constructionPlot,
   homeWorkPosition,
+  loggingSiteRules,
   TIMBER_RULES,
   type TimberState,
   timberCartPosition,
@@ -91,11 +93,11 @@ export function createTimberVisual(scene: Scene) {
     { width: 4.5, height: 0.18, depth: 4.5 },
     scene,
   );
-  restaurant.position.set(
-    TIMBER_RULES.restaurant.x + 1.2,
-    0.15,
-    TIMBER_RULES.restaurant.z + 1.2,
-  );
+  const diningPlot = constructionPlot({
+    x: TIMBER_RULES.restaurant.x + 1.2,
+    z: TIMBER_RULES.restaurant.z + 1.2,
+  });
+  restaurant.position.set(diningPlot.x, 0.15, diningPlot.z);
   restaurant.material = brown;
   parts.push(restaurant);
   const mealTable = CreateBox(
@@ -103,11 +105,7 @@ export function createTimberVisual(scene: Scene) {
     { width: 3.6, height: 0.6, depth: 0.6 },
     scene,
   );
-  mealTable.position.set(
-    TIMBER_RULES.restaurant.x + 1.2,
-    0.55,
-    TIMBER_RULES.restaurant.z + 1.2,
-  );
+  mealTable.position.set(diningPlot.x, 0.55, diningPlot.z);
   mealTable.material = dry;
   parts.push(mealTable);
   const buildSite = new TransformNode("village-construction", scene);
@@ -303,15 +301,23 @@ export function createTimberVisual(scene: Scene) {
           );
         }
       }
-      if (s?.construction)
+      if (s?.construction) {
+        const build = s.construction;
+        const rules = loggingSiteRules(build.siteId);
+        const plot =
+          build.kind === "restaurant"
+            ? diningPlot
+            : build.kind === "logging"
+              ? rules.workshopPlot
+              : build.kind === "storage"
+                ? rules.storagePlot
+                : build.position;
         buildSite.position.set(
-          s.construction.position.x,
-          terrainElevation(s)(
-            s.construction.position.x,
-            s.construction.position.z,
-          ),
-          s.construction.position.z,
+          plot.x,
+          terrainElevation(s)(plot.x, plot.z),
+          plot.z,
         );
+      }
       if (!s) return;
       restaurant.setEnabled(
         (s.restaurantBuilt &&

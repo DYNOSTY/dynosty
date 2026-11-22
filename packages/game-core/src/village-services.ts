@@ -2,6 +2,7 @@ import {
   BOKHOL_FORESTS,
   BOKHOL_MAP,
   BOKHOL_MINERALS,
+  constructionPlot,
   inBokholForest,
 } from "./bokhol.js";
 import {
@@ -24,32 +25,32 @@ export const VILLAGE_RULES = {
   },
 } as const;
 const startingPlots: GroundPoint[] = [
-  { x: 0, z: -1 },
-  { x: -9, z: -7 },
-  { x: -3, z: -9 },
-  { x: 4, z: -9 },
+  { x: 0, z: -2 },
+  { x: -10, z: -8 },
+  { x: -4, z: -10 },
+  { x: 4, z: -10 },
   { x: 10, z: -4 },
-  { x: 10, z: 5 },
-  { x: -11, z: 12 },
+  { x: 10, z: 6 },
+  { x: -12, z: 12 },
   { x: -4, z: 14 },
   { x: 4, z: 14 },
-  { x: 12, z: 13 },
+  { x: 12, z: 14 },
   { x: -16, z: -4 },
-  { x: 17, z: -5 },
-  { x: -17, z: 6 },
-  { x: -15, z: -13 },
-  { x: -8, z: -15 },
+  { x: 18, z: -6 },
+  { x: -18, z: 6 },
+  { x: -16, z: -14 },
+  { x: -8, z: -16 },
   { x: 0, z: -16 },
   { x: 8, z: -16 },
-  { x: 17, z: 3 },
+  { x: 18, z: 4 },
 ];
-// shortcut: 자유 배치 전까지 확장용 지정 부지100곳을 사용한다.
+// 주거 후보지와 초기 주민 배치에 쓰는 목록. 건설 격자는 지도 전체에 이어진다.
 export const HOME_PLOTS: readonly GroundPoint[] = (() => {
   const plots = [
     ...startingPlots,
-    { x: -39, z: -8 },
-    { x: -39, z: 0 },
-    ...BOKHOL_FORESTS.slice(1).map((f) => ({ x: f.x, z: f.z })),
+    { x: -40, z: -8 },
+    { x: -40, z: 0 },
+    ...BOKHOL_FORESTS.slice(1).map(constructionPlot),
   ];
   const candidates: GroundPoint[] = [];
   for (let x = -64; x <= 64; x += 8)

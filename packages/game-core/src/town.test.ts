@@ -233,7 +233,7 @@ it("건설 인력의 질병은 교대하고 정찰대 사망·회복 사건도 �
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
 
-it("대기 부지의 입구나 주민이 서 있는 곳을 덮는 배치를 거부한다", () => {
+it("주민은 공터에서 비켜서고 이웃 건물의 출입구는 보호한다", () => {
   let s = start();
   s = {
     ...s,
@@ -241,7 +241,10 @@ it("대기 부지의 입구나 주민이 서 있는 곳을 덮는 배치를 거�
       i === 0 ? { ...r, position: pose.position, insideHome: false } : r,
     ),
   };
-  expect(buildingIssue(s, "home", pose)).toContain("주민");
+  expect(buildingIssue(s, "home", pose)).toBeNull();
+  const ordered = plan(s, "home", pose);
+  expect(ordered.residents[0]?.position).not.toEqual(pose.position);
+  expect(ordered.town.orders[0]?.crew.length).toBeGreaterThan(0);
   s = plan(start(), "storage", {
     position: { x: -16, z: 8 },
     headingRadians: 0,

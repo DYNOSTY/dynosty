@@ -1,5 +1,42 @@
 import type { GroundPoint } from "./resident-path.js";
 
+// Land survey in metres. The origin is the centre of a plot on every playable map.
+export const PLOT_STEP = 2;
+export function constructionPlot(p: GroundPoint): GroundPoint {
+  if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) return p;
+  return {
+    x: Math.floor(p.x / PLOT_STEP + 0.5) * PLOT_STEP,
+    z: Math.floor(p.z / PLOT_STEP + 0.5) * PLOT_STEP,
+  };
+}
+
+export const VILLAGE_LAYOUT: ReadonlyArray<readonly [string, number, number]> =
+  [
+    ["BLD_OFFICE", 0, -16],
+    ["BLD_NEST", -12, -10],
+    ["BLD_NEST", 12, -10],
+    ["BLD_WAREHOUSE", -16, 2],
+    ["BLD_WORKSHOP", 16, 0],
+    ["BLD_FORAGE", -12, 14],
+    ["BLD_GREENHOUSE", -6, 22],
+    ["BLD_WATER", 10, 18],
+    ["BLD_FISHERY", 20, 8],
+    ["BLD_WATCH", -22, -16],
+    ["BLD_CLINIC", -8, -20],
+    ["BLD_SALVAGE", 10, -20],
+    ["BLD_GATE", 0, 24],
+  ];
+
+export function fixedBuildingAt(p: GroundPoint, rebuilding: boolean) {
+  return VILLAGE_LAYOUT.some(
+    ([id, x, z]) =>
+      id !== "BLD_NEST" &&
+      !(rebuilding && (id === "BLD_WORKSHOP" || id === "BLD_CLINIC")) &&
+      Math.abs(x - p.x) < 4.5 &&
+      Math.abs(z - p.z) < 4.5,
+  );
+}
+
 export const BOKHOL_WATERS = [
   { id: "east-pond", name: "동쪽 물고기 못", x: 60, z: 32, radius: 10 },
   { id: "south-pond", name: "남쪽 물고기 못", x: 30, z: 65, radius: 12 },
@@ -170,7 +207,7 @@ export function bokholElevation(
     levels = 0;
   for (const p of foundations) {
     const distance = Math.hypot(x - p.x, z - p.z);
-    const weight = 1 - smooth((distance - 3.5) / 1.5);
+    const weight = 1 - smooth((distance - 5) / 2);
     if (weight === 0) continue;
     total += weight;
     levels += landscape(p.x, p.z, forest) * weight;

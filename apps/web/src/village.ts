@@ -16,6 +16,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
+import { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
 import { loadSceneAsset as load } from "./scene-assets.js";
 import { elevation, rng } from "./world.js";
 
@@ -24,22 +25,8 @@ export const BUILDING_SCALE = 0.75; // 둥지 지붕 1.85m = 목재 체험 보�
 export const RESIDENT_SCALE = 0.5;
 const OUTLINE = new Color3(0.3, 0.9, 1); // 현장과 대표 모델의 공통 선택색
 
-// [건물, x, z] — 입구(+Z)가 마당을 향함. 가운데 반경 9m는 체험 소품 자리로 비워 둠
-export const LAYOUT: Array<[string, number, number]> = [
-  ["BLD_OFFICE", 0, -14],
-  ["BLD_NEST", -11, -9],
-  ["BLD_NEST", 11, -9],
-  ["BLD_WAREHOUSE", -15, 1],
-  ["BLD_WORKSHOP", 15, 0],
-  ["BLD_FORAGE", -11, 11],
-  ["BLD_GREENHOUSE", -3, 16],
-  ["BLD_WATER", 9, 16],
-  ["BLD_FISHERY", 20, 7],
-  ["BLD_WATCH", -20, -8],
-  ["BLD_CLINIC", -7, -20],
-  ["BLD_SALVAGE", 9, -20],
-  ["BLD_GATE", 0, 23],
-];
+export { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
+
 const RESIDENTS = [
   "R01_Pachycephalosaurus",
   "R02_Triceratops",

@@ -3,6 +3,7 @@ import {
   BOKHOL_MAP,
   BOKHOL_MINERALS,
   BOKHOL_PRODUCTION_SITES,
+  constructionPlot,
   type ProductionSiteId,
   productionSiteDefinition,
   sawmillHasForest,
@@ -110,6 +111,8 @@ export function loggingSiteRules(id: ProductionSiteId = "west") {
   if (!f) throw new RangeError("알 수 없는 숲 권역입니다.");
   return {
     ...LOGGING_RULES,
+    workshopPlot: constructionPlot({ x: f.x + 13, z: f.z }),
+    storagePlot: constructionPlot({ x: f.x + 13, z: f.z + 10 }),
     workshop: { x: f.x + 13, z: f.z },
     storage: { x: f.x + 16, z: f.z + 10 },
     pickup: { x: f.x + 16, z: f.z + 1 },
@@ -501,8 +504,8 @@ function oneLoggingValid(s: TimberState): boolean {
     !integer(l.remaining, definition.initial) ||
     !integer(l.buffer, 20) ||
     typeof l.progress !== "number" ||
-      !Number.isFinite(l.progress) ||
-      l.progress < 0 ||
+    !Number.isFinite(l.progress) ||
+    l.progress < 0 ||
     l.progress >= LOGGING_RULES.minutesPerWood ||
     !integer(l.delivered, definition.initial)
   )

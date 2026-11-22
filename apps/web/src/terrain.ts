@@ -12,9 +12,8 @@ export function terrainElevation(s: TimberState | null) {
     for (const l of productionSites(s)) {
       forests[l.siteId] = l.remaining;
       const rules = loggingSiteRules(l.siteId);
-      if (l.built) sites.push(rules.workshop);
-      if (l.storageBuilt)
-        sites.push({ x: rules.storage.x - 3, z: rules.storage.z });
+      if (l.built) sites.push(rules.workshopPlot);
+      if (l.storageBuilt) sites.push(rules.storagePlot);
     }
   if (s)
     sites.push(
