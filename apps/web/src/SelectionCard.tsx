@@ -1,4 +1,9 @@
-import { AMOUNT_SCALE, type PlayState, winterReport } from "@dynosty/game-core";
+import {
+  AMOUNT_SCALE,
+  inColdSnap,
+  type PlayState,
+  winterReport,
+} from "@dynosty/game-core";
 import type { CSSProperties } from "react";
 import type { BuildingAction, BuildingCommand } from "./buildings.js";
 import { CmdFace } from "./GameHud.js";
@@ -31,7 +36,13 @@ type Props = {
 // 석탄 = 덩이 7개(한 덩이 = 하루치), 남은 만큼 채워짐.
 const COAL_SLOTS = 7;
 function OndolGauge({ state }: { state: PlayState }) {
-  const r = winterReport(state.winter, state.day, state.minute, state.citizens);
+  const r = winterReport(
+    state.winter,
+    state.day,
+    state.minute,
+    state.citizens,
+    inColdSnap(state),
+  );
   const nest = r.zones.find((z) => z.id === "nest");
   const coal = state.resources.RES_COAL / AMOUNT_SCALE;
   const days = r.coalPerDay > 0 ? coal / r.coalPerDay : 0;

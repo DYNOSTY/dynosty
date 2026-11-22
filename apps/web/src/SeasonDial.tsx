@@ -1,4 +1,9 @@
-import { type PlayState, type Weather, winterReport } from "@dynosty/game-core";
+import {
+  inColdSnap,
+  type PlayState,
+  type Weather,
+  winterReport,
+} from "@dynosty/game-core";
 import type { CSSProperties } from "react";
 
 // 시계(사용자 11/19 2차): 원은 하늘만 — 해·달이 지평선 위 호를 따라 원 안에서만 움직이고(지나온 길은 밝게),
@@ -58,7 +63,13 @@ const ARC = { cx: 50, cy: 72, r: 32 };
 
 export function SeasonDial({ state }: { state: PlayState | null }) {
   if (!state) return null;
-  const r = winterReport(state.winter, state.day, state.minute, state.citizens);
+  const r = winterReport(
+    state.winter,
+    state.day,
+    state.minute,
+    state.citizens,
+    inColdSnap(state),
+  );
   const t = sichenOf(state.minute);
   const hour = state.minute / 60;
   // 해는 6시 왼쪽 지평선 → 12시 꼭대기 → 18시 오른쪽, 밤엔 달이 같은 길 (원 안 좌표 0~100)

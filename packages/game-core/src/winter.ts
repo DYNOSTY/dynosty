@@ -213,22 +213,35 @@ export function weatherOf(seed: number, day: number): Weather {
   return "맑음";
 }
 /** 바깥 기온(°C): 절기 기준 → 다음 절기로 하루 동안 이어짐 + 밤낮(04시 최저·14시 최고) + 날씨 */
-export function outdoorTemp(seed: number, day: number, minute: number) {
+/** 가장 추운 절기(대한)의 기온 — 4단계 혹한 동안은 절기와 상관없이 이 추위 (snap, campaign.ts) */
+const COLDEST: number = Math.min(...SOLAR_TERMS.map((t) => t[3]));
+export function outdoorTemp(
+  seed: number,
+  day: number,
+  minute: number,
+  snap = false,
+) {
   const t = termOf(day);
   const next = termOf(day + DAYS_PER_TERM);
   const f = minute / 1440;
-  const base = t.base + (next.base - t.base) * f;
+  const season = t.base + (next.base - t.base) * f;
+  const base = snap ? Math.min(season, COLDEST) : season;
   const hour = minute / 60;
   const diurnal = -0.5 + 3.5 * Math.cos((2 * Math.PI * (hour - 14)) / 24);
   return base + diurnal + WEATHER_FX[weatherOf(seed, day)].temp;
 }
-export function climateAt(seed: number, day: number, minute: number) {
+export function climateAt(
+  seed: number,
+  day: number,
+  minute: number,
+  snap = false,
+) {
   const w = weatherOf(seed, day);
   const fx = WEATHER_FX[w];
   return {
     term: termOf(day),
     weather: w,
-    temp: outdoorTemp(seed, day, minute),
+    temp: outdoorTemp(seed, day, minute, snap),
     wind: fx.wind,
     humidity: fx.humidity,
   };
@@ -337,6 +350,8 @@ export function stepWinter(input: {
   reservedWood: number;
   scale: number;
   citizens: ReadonlyArray<{ id: string; alive: boolean }>;
+  /** 4단계 혹한 중인지 (play.ts inColdSnap) */
+  snap?: boolean;
 }): WinterStep {
   const { day, minute, minutes, scale } = input;
   const w = input.winter;
@@ -372,7 +387,7 @@ export function stepWinter(input: {
     };
 
   // 2) 정시: 지난 한 시간의 연료 충족으로 구들 축열·보호 계산
-  const c = climateAt(w.seed, day, hour * 60 + 30);
+  const c = climateAt(w.seed, day, hour * 60 + 30, input.snap);
   const supply = hourWant > 0 ? hourCovered / hourWant : 1;
   const zones = {} as Record<Zone, ZoneHeat>;
   for (const z of ZONES) {
@@ -478,8 +493,9 @@ export function winterReport(
   day: number,
   minute: number,
   citizens: ReadonlyArray<{ id: string; alive: boolean }>,
+  snap = false,
 ) {
-  const c = climateAt(w.seed, day, minute);
+  const c = climateAt(w.seed, day, minute, snap);
   let warm = 0,
     exposed = 0,
     injured = 0,

@@ -2,6 +2,7 @@ import {
   AMOUNT_SCALE,
   foodWarnings,
   GAME_RULES,
+  inColdSnap,
   type PlayCommand,
   type PlayState,
   RESOURCE_IDS,
@@ -154,7 +155,13 @@ export function shortAmount(n: number) {
 }
 // 기획 화면정의 보조행 「보온」: 따뜻한 주민 수가 기본, 냉기·부상은 아이콘+숫자로 (색만으로 경고하지 않음)
 function WarmthCard({ state }: { state: PlayState }) {
-  const r = winterReport(state.winter, state.day, state.minute, state.citizens);
+  const r = winterReport(
+    state.winter,
+    state.day,
+    state.minute,
+    state.citizens,
+    inColdSnap(state),
+  );
   const p = r.people;
   const alive = p.warm + p.exposed + p.injured + p.critical;
   return (

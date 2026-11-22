@@ -2,6 +2,7 @@ import {
   CAMPAIGN_RULES,
   type CampaignEventId,
   type CampaignState,
+  coldForecast,
   createCampaign,
   nextResearch,
   parseCampaign,
@@ -260,7 +261,10 @@ export interface PlayState {
   readonly buildings: readonly PlayBuilding[];
   readonly resources: Readonly<Record<ResourceId, number>>;
   readonly foodCarry: Readonly<Record<FoodId, number>>;
+  /** 오늘 모자랐던 식량 (자정에 부족한 날인지 따진 뒤 0으로) */
   readonly unmet: Readonly<Record<FoodId, number>>;
+  /** 식성마다 이어진 부족한 날 수 (SHORTAGE) — 옛 저장에는 없어서 0으로 채움 */
+  readonly shortDays: Readonly<Record<FoodId, number>>;
   readonly optimism: number;
   readonly pessimism: number;
   /** 절기·온돌·체온 (winter.ts) — 옛 저장에는 없어서 불러올 때 기본값으로 채움 */
@@ -278,6 +282,25 @@ export interface PlayState {
 const WORKSHOP_PLOT = PLOTS.indexOf("BLD_WORKSHOP");
 // 벌목장 B02 (온돌 UI v0.4 표): 정원6 · 목재18/일 → 1단계 초기 배치 4명 = 하루 12, 낮 9~18시에만
 export const LOGGING = { woodPerDay: 12, from: 9, to: 18 } as const;
+// 기획서 Dev Lite 06_data economy.shortage · 자원경제.md 「부족과 회복」: 하루 배급 80% 미만이면 부족한 날.
+// 이어서 2일째 그 식성 무리의 5% 부상, 3일째부터 날마다 2% 사망. 신뢰 -4/부족일은 비관 +4로 옮김.
+// 살아 있는 주민 18명 미만이면 바로 실패.
+// ponytail: 물·보온 부족, 부상자 노동 제외, 회복 조건은 아직 — 물 자원·일손 배치가 생기면 같은 판정에 넣음
+export const SHORTAGE = {
+  warnRatio: 0.8,
+  injuryDay: 2,
+  deathDay: 3,
+  injuryShare: 0.05,
+  deathShare: 0.02,
+  pessimismPerDay: 4,
+  minAlive: 18,
+} as const;
+/** 4단계 혹한 중인지 — 그동안은 대한 추위 (winter.ts outdoorTemp) */
+export function inColdSnap(
+  s: Pick<PlayState, "campaign" | "day" | "minute">,
+): boolean {
+  return coldForecast(s.campaign, absMinute(s.day, s.minute))?.phase === "cold";
+}
 export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
   const r = parseRules(rules);
   const citizens: Citizen[] = [];
@@ -315,6 +338,7 @@ export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
     ) as Record<ResourceId, number>,
     foodCarry: { RES_PLANT: 0, RES_MEAT: 0, RES_FISH: 0 },
     unmet: { RES_PLANT: 0, RES_MEAT: 0, RES_FISH: 0 },
+    shortDays: { RES_PLANT: 0, RES_MEAT: 0, RES_FISH: 0 },
     optimism: r.initial.optimism,
     pessimism: r.initial.pessimism,
     winter: createWinterState(citizens.map((c) => c.id)),
@@ -356,7 +380,11 @@ export function parsePlayState(
   }
   const carry = {} as Record<FoodId, number>;
   const unmet = {} as Record<FoodId, number>;
+  const shortDays = {} as Record<FoodId, number>;
   for (const id of FOOD_IDS) {
+    const d = isRecord(value.shortDays) ? value.shortDays[id] : 0;
+    number(d, 0, 100_000, true);
+    shortDays[id] = d;
     const c = value.foodCarry[id];
     const u = value.unmet[id];
     number(c, 0, 1439, true);
@@ -411,6 +439,7 @@ export function parsePlayState(
     resources,
     foodCarry: carry,
     unmet,
+    shortDays,
     optimism: value.optimism,
     pessimism: value.pessimism,
     winter: (() => {
@@ -474,15 +503,7 @@ export function advancePlayMinutes(
   const resources = { ...state.resources };
   const carry = { ...state.foodCarry };
   const unmet = { ...state.unmet };
-  for (const id of FOOD_IDS) {
-    const numerator = demand[id] * minutes + carry[id];
-    const needed = Math.floor(numerator / rules.time.minutesPerDay);
-    carry[id] = numerator % rules.time.minutesPerDay;
-    const used = Math.min(resources[id], needed);
-    resources[id] -= used;
-    unmet[id] += needed - used;
-    if (!Number.isSafeInteger(unmet[id])) fail();
-  }
+  const shortDays = { ...state.shortDays };
   // 절기·온돌·체온: 정시 경계에서 끊어 1시간 이하씩 (불때기 시간표가 시각마다 맞게)
   let winter = state.winter;
   let citizens = state.citizens;
@@ -501,6 +522,15 @@ export function advancePlayMinutes(
     const logging = hour >= LOGGING.from && hour < LOGGING.to;
     // 벌목 중에는 매분 난방 후 생산: 그 목재는 다음 분부터 연료로 쓸 수 있다.
     const chunk = logging ? 1 : Math.min(left, 60 - (wMinute % 60));
+    for (const id of FOOD_IDS) {
+      const numerator = demand[id] * chunk + carry[id];
+      const needed = Math.floor(numerator / rules.time.minutesPerDay);
+      carry[id] = numerator % rules.time.minutesPerDay;
+      const used = Math.min(resources[id], needed);
+      resources[id] -= used;
+      unmet[id] += needed - used;
+      if (!Number.isSafeInteger(unmet[id])) fail();
+    }
     const r = stepWinter({
       winter,
       day: wDay,
@@ -512,6 +542,7 @@ export function advancePlayMinutes(
       reservedWood: 0,
       scale: AMOUNT_SCALE,
       citizens,
+      snap: inColdSnap({ campaign, day: wDay, minute: wMinute }),
     });
     winter = r.winter;
     resources.RES_COAL -= r.coalUsed;
@@ -539,6 +570,44 @@ export function advancePlayMinutes(
     if (wMinute >= rules.time.minutesPerDay) {
       wMinute -= rules.time.minutesPerDay;
       wDay += 1;
+      // 자정: 식성마다 오늘 배급이 80% 미만이었는지 (SHORTAGE)
+      for (const id of FOOD_IDS) {
+        const group = citizens.filter((c) => c.alive && c.diet === id);
+        const short =
+          group.length > 0 && unmet[id] > demand[id] * (1 - SHORTAGE.warnRatio);
+        unmet[id] = 0;
+        shortDays[id] = short ? shortDays[id] + 1 : 0;
+        if (!short) continue;
+        pessimism = Math.min(100, pessimism + SHORTAGE.pessimismPerDay);
+        if (shortDays[id] === SHORTAGE.injuryDay) {
+          const n = Math.max(1, Math.ceil(group.length * SHORTAGE.injuryShare));
+          const bodies = { ...winter.bodies };
+          for (const c of group
+            .filter((c) => (bodies[c.id]?.injury ?? "none") === "none")
+            .slice(0, n)) {
+            const b = bodies[c.id];
+            if (b) bodies[c.id] = { ...b, injury: "injured" };
+          }
+          winter = { ...winter, bodies };
+        }
+        if (shortDays[id] >= SHORTAGE.deathDay) {
+          const n = Math.max(1, Math.ceil(group.length * SHORTAGE.deathShare));
+          // 다친 주민부터
+          const dead = new Set(
+            [...group]
+              .sort(
+                (a, b) =>
+                  Number((winter.bodies[b.id]?.injury ?? "none") !== "none") -
+                  Number((winter.bodies[a.id]?.injury ?? "none") !== "none"),
+              )
+              .slice(0, n)
+              .map((c) => c.id),
+          );
+          citizens = citizens.map((c) =>
+            dead.has(c.id) ? { ...c, alive: false } : c,
+          );
+        }
+      }
     }
     left -= chunk;
     campaign = stepCampaign(campaign, {
@@ -596,6 +665,7 @@ export function advancePlayMinutes(
     resources,
     foodCarry: carry,
     unmet,
+    shortDays,
     citizens,
     optimism,
     pessimism,
@@ -828,6 +898,7 @@ export function evaluateOutcome(
   ])
     number(n, 0, Number.MAX_SAFE_INTEGER, true);
   if (
+    f.admitted - f.dead < SHORTAGE.minAlive ||
     (f.pessimism >= rules.endings.evictionPessimism &&
       f.pessimismExtremeMinutes >= rules.endings.evictionMinutes) ||
     (f.optimism <= rules.endings.evictionOptimism &&

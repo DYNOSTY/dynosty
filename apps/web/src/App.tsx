@@ -18,6 +18,7 @@ import {
   freeHands,
   GAME_RULES,
   type HeatLevel,
+  inColdSnap,
   type LaborState,
   laborScene,
   laborStock,
@@ -818,6 +819,7 @@ export function App() {
         playState.day,
         playState.minute,
         playState.citizens,
+        inColdSnap(playState),
       )
     : null;
   const nestZone = winterNow?.zones.find((z) => z.id === "nest");
