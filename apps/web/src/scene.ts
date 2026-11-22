@@ -110,7 +110,7 @@ export type CameraInfo = {
   heading: number;
 };
 // 시점을 옮길 수 있는 범위(섬 반지름 안쪽)
-const PAN_LIMIT = 36; // 시야 고정: 마을 둘레 안에서만 이동 (임시 값, 예전 58)
+const PAN_LIMIT = 58; // 안개 속 정찰 거점(거리 52)까지 화면을 옮길 수 있게 (사용자 11/22 "안개여도 화면 이동하게", 한때 36으로 묶었음)
 
 export function mountScene(
   canvas: HTMLCanvasElement,
