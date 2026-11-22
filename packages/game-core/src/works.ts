@@ -53,7 +53,8 @@ export const BUILD_RULES = {
   BLD_FISHERY: { wood: 18, metal: 4, workdays: 1, out: ["RES_FISH", 12] },
   BLD_WAREHOUSE: { wood: 18, metal: 4, workdays: 1 },
   BLD_WORKSHOP: { wood: 16, metal: 6, workdays: 1 },
-  BLD_WATCH: { wood: 14, metal: 6, workdays: 1 },
+  // ⚠ 임시: 기획서에 고기 생산처가 없어 육식 주민 20명이 반드시 굶음 → 망루에서 사냥감을 잡아 오는 것으로 (팀 결정 필요)
+  BLD_WATCH: { wood: 14, metal: 6, workdays: 1, out: ["RES_MEAT", 20] },
   BLD_GATE: { wood: 18, metal: 6, workdays: 1 },
   BLD_CLINIC: { wood: 16, metal: 4, workdays: 1 },
 } as const satisfies Record<
