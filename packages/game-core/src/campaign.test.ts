@@ -400,6 +400,7 @@ it("도성은 민심과 관계없이 세 번째 수레를 보내지 못한 채 3
   const base = createVillageGame();
   const city: TimberState = {
     ...base,
+    bokhol: { ...base, campaign: { ...campaignOf(base), beat: "roads" } },
     chapter: 3,
     elapsed: 300,
     campaign: {
@@ -421,6 +422,7 @@ it("도성 기한 이전의 저장은 불러온 때부터 36시간을 주고, �
   const base = createVillageGame();
   const legacy: TimberState = {
     ...base,
+    bokhol: { ...base, campaign: { ...campaignOf(base), beat: "roads" } },
     chapter: 3,
     elapsed: 300 + 3 * 1440,
     campaign: newCampaign("capital", 300),
@@ -1150,4 +1152,19 @@ it("재건 표시가 없는 기존 저장에서도 포졸 배치가 일일 화�
   } finally {
     random.mockRestore();
   }
+});
+
+it("복홀에서 도성 단계를 하던 기존 저장은 도성 함락 기한으로 끝나지 않는다", () => {
+  const base = createVillageGame(false, true);
+  expect(base.bokhol).toBeUndefined();
+  const { capitalDue: _due, ...legacy } = campaignOf(base);
+  const loaded = restore({
+    ...base,
+    chapter: 3,
+    campaign: { ...legacy, beat: "capital", since: 0, relief: "ward" },
+  });
+  const passed = later(loaded, 37 * 60);
+  expect(campaignOf(passed).ending ?? null).toBeNull();
+  expect(campaignOf(passed).beat).toBe("capital");
+  expect(act(passed, "next").campaign?.ending ?? null).toBeNull();
 });

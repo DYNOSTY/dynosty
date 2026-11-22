@@ -2801,7 +2801,11 @@ export function parseTimberState(value: unknown): TimberState {
     previous = h.minute;
   }
   // Saves from before the capital deadline start its clock when first loaded.
-  if (s.campaign?.beat === "capital" && s.campaign.capitalDue === undefined)
+  if (
+    s.campaign?.beat === "capital" &&
+    s.bokhol &&
+    s.campaign.capitalDue === undefined
+  )
     return {
       ...s,
       campaign: { ...s.campaign, capitalDue: s.elapsed + CAPITAL_MINUTES },
@@ -2886,10 +2890,10 @@ function fireOndol(s: TimberState): TimberState {
   const homes = usableHomes(s).filter((h) =>
     s.residents.some((r) => r.homeId === h.id && r.health !== "dead"),
   );
-  const demand = Math.max(
-    s.heating ?? 0,
-    Math.min(3, Math.ceil(-villageTemperature(s) / 8)),
-  );
+  // A manual heating level overrides the automatic one (planner decision).
+  const demand =
+    s.heating ||
+    Math.max(0, Math.min(3, Math.ceil(-villageTemperature(s) / 8)));
   const required = demand * homes.length;
   const inCapital = s.campaign?.beat === "capital";
   const coal = inCapital
@@ -2952,12 +2956,12 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
     s = applyAutomaticCitizenEvent(
       s,
       killed
-        ? { type: "death", id, citizenIds: [victim!.id] }
+        ? { type: "death", id, citizenIds: [victim.id] }
         : {
             type: "illness",
             severity: "major",
             id,
-            citizenIds: [victim!.id],
+            citizenIds: [victim.id],
           },
     );
     if (killed) dead++;
@@ -3182,7 +3186,6 @@ export function advanceTimber(
   let count = 0;
   while (s.elapsed < target) {
     const beforeUpdate = s.campaign?.beat;
-    const previousEnding = s.campaign?.ending;
     if (++count > 1500) fail("작업 정산 경계가 너무 많습니다.");
     if (s.phase === "waiting-labor") s = startDrying(s);
     if (s.phase === "crew-wait") s = replaceCrew(s);
@@ -3237,21 +3240,14 @@ export function advanceTimber(
       if (!escorts || e.decision !== "take") continue;
       if (e.kind === "survivors") {
         const id = "field-" + site + "-" + (s.scoutDepartures?.[site] ?? e.due);
-        s = commandTimber(
-          s,
-          {
-            type: "citizen-event",
-            event: {
-              type: "arrival",
-              id,
-              groups: [
-                { species: "R02", count: 1 },
-                { species: "SPINO", count: 1 },
-              ],
-            },
-          },
+        s = applyAutomaticCitizenEvent(s, {
+          type: "arrival",
           id,
-        );
+          groups: [
+            { species: "R02", count: 1 },
+            { species: "SPINO", count: 1 },
+          ],
+        });
       } else if (e.kind === "wood") s = deposit(s, "RES_WOOD", 12);
       else if (e.kind === "fish") s = deposit(s, "RES_FISH", 8);
       else if (e.kind === "coal") s = deposit(s, "RES_COAL", 10);

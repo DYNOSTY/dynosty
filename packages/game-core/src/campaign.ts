@@ -136,6 +136,10 @@ export function capitalMinutesLeft(s: TimberState) {
 export function convoyReady(s: TimberState) {
   return s.campaign?.departures === 3;
 }
+/** Only the populated capital map has a convoy that can beat the deadline. */
+export function capitalFallen(s: TimberState) {
+  return !!s.bokhol && capitalMinutesLeft(s) === 0 && !convoyReady(s);
+}
 export function capitalReady(s: TimberState) {
   const c = s.campaign;
   // The populated capital holds a snapshot of Bokhol. Dev saves played
@@ -332,8 +336,7 @@ export function verdictRoute(s: TimberState) {
 }
 export function campaignOutcome(s: TimberState): Campaign["ending"] {
   const c = campaignOf(s);
-  if (c.beat === "capital")
-    return capitalMinutesLeft(s) === 0 && !convoyReady(s) ? "collapse" : null;
+  if (c.beat === "capital") return capitalFallen(s) ? "collapse" : null;
   const delay = evictionDelay(c.difficulty);
   if (
     s.world.pessimism >= GAME_RULES.endings.evictionPessimism &&
@@ -509,8 +512,7 @@ export function actCampaign(
   const c = campaignOf(s),
     action = command.action;
   if (command.beat !== c.beat) throw Error("이미 지난 장면입니다.");
-  if (c.beat === "capital" && capitalMinutesLeft(s) === 0 && !convoyReady(s))
-    return updateCampaign(s);
+  if (c.beat === "capital" && capitalFallen(s)) return updateCampaign(s);
   const change = (
     beat: Beat,
     patch: Partial<Campaign> = {},

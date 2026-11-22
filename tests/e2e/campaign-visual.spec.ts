@@ -93,7 +93,7 @@ test("같은 번호의 다른 저장을 불러오면 3D 법령 게시문이 바�
     );
   const before = await texture();
   await page
-    .getByRole("button", { name: "마른 목재20 조달 체험하기" })
+    .getByRole("button", { name: "마른 목재 20 조달", exact: true })
     .dispatchEvent("click");
   await page.keyboard.press("j");
   await page

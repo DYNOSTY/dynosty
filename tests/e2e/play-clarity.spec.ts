@@ -130,10 +130,10 @@ for (const viewport of [
   }) => {
     await p.setViewportSize(viewport);
     await p.goto("/");
-    await b(p, "마른 목재20 조달 체험하기").click();
+    await b(p, "마른 목재 20 조달").click();
     const tools = b(p, "개발 도구");
     await tools.press("Enter");
-    await b(p, "일손 배치·배급 체험하기").click();
+    await b(p, "일손 배치·배급").click();
     await tools.press("Enter");
     await expect(tools).toHaveAttribute("aria-expanded", "false");
     await b(p, "배급 준비 장소 보기").click();
@@ -171,14 +171,14 @@ test.describe("모바일 터치", () => {
     page,
   }) => {
     await page.goto("/");
-    await b(page, "마른 목재20 조달 체험하기").tap();
+    await b(page, "마른 목재 20 조달").tap();
     const commands = b(page, "명령 열기");
     const tools = b(page, "개발 도구");
     await expect(commands).toHaveAttribute("aria-expanded", "false");
     await expect(tools).toHaveAttribute("aria-expanded", "false");
     await tools.tap();
     await expect(tools).toHaveAttribute("aria-expanded", "true");
-    await b(page, "일손 배치·배급 체험하기").tap();
+    await b(page, "일손 배치·배급").tap();
     await b(page, "개발 도구 닫기").tap();
     await expect(tools).toHaveAttribute("aria-expanded", "false");
     await b(page, "배급 준비 장소 보기").tap();
