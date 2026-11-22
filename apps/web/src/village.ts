@@ -71,9 +71,12 @@ const RESIDENT_HEIGHT: Record<string, [number, number]> = {
 export const residentGlb = (file: string) => `/models/residents/${file}_v2.glb`;
 /** 사용자 11/19 "공룡 크기 좀만 더" — 종별 차이는 그대로 두고 모두 15% 키움 */
 const RESIDENT_GROW = 1.15;
+/** 사용자 11/22 "주민 1.5배로 키워봐" — 건물에 비해 너무 작아 짓고 캐는 모습이 안 보였음.
+ *  보이는 크기만 키움: 둥지 문에 들어가는지(isTall)는 예전 키로 따져 밤에 집에 드는 행동은 그대로 */
+const RESIDENT_SHOW = 1.5;
 export const residentScale = (file: string) => {
   const h = RESIDENT_HEIGHT[file];
-  return (h ? h[0] / h[1] : RESIDENT_SCALE) * RESIDENT_GROW;
+  return (h ? h[0] / h[1] : RESIDENT_SCALE) * RESIDENT_GROW * RESIDENT_SHOW;
 };
 const RESIDENTS = [
   "R01_Pachycephalosaurus",
