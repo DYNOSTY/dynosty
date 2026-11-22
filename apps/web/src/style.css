@@ -6653,11 +6653,21 @@ body,
 }
 .play-shell:not(.e2e-all) .tm-right > .new-game-confirm {
   position: absolute;
+  top: auto;
   right: 0;
   bottom: 0;
   left: 0;
   z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: auto;
+  height: auto;
+  margin: 0;
   padding: 12px 14px;
+  transform: none;
+  border-left: 0;
   border-radius: 10px;
   background: var(--hanji, #f6efdf);
   box-shadow: 0 0 0 2px var(--jjok-deep, #232d4d);
@@ -6712,4 +6722,9 @@ body,
   .tm-road__cart.is-moving .tm-road__wheel {
     animation: none;
   }
+}
+
+.play-shell:not(.e2e-all) .tm-right > .new-game-confirm > p {
+  flex: 1 1 260px;
+  margin: 0;
 }
