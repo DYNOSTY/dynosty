@@ -902,6 +902,7 @@ for (const [label, raided, rally, verdict] of [
         side: "control",
         uprising: true,
         coupGateRaided: raided,
+        revivalPrepared: false,
       },
     });
     await page.addInitScript((value) => {
