@@ -34,8 +34,10 @@ test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저�
   await expect(stock(page, "RES_COAL")).toHaveText("60");
   await press(page, "1일 진행");
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
-  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"])
+  for (const id of ["RES_PLANT", "RES_MEAT"])
     await expect(stock(page, id)).toHaveText("100");
+  // 시작부터 서 있는 양식장이 하루 12를 냄 (works.ts START_BUILT)
+  await expect(stock(page, "RES_FISH")).toHaveText("112");
   await saveMenu(page);
   await press(page, "게임 저장");
   await expect(page.getByTestId("play-save-status")).toHaveText(
