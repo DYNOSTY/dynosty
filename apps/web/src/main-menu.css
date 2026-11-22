@@ -28,6 +28,14 @@ dialog.bokhol-title {
 .bokhol-title[data-survived="true"] {
   --cover: url("/story/campaign/menu-bokhol-ending.webp");
 }
+@media (prefers-reduced-motion: no-preference) {
+  .bokhol-title {
+    --cover: url("/story/campaign/menu-bokhol.gif");
+  }
+  .bokhol-title[data-survived="true"] {
+    --cover: url("/story/campaign/menu-bokhol-ending.gif");
+  }
+}
 .bokhol-title h1 span {
   display: block;
   text-align: center;
