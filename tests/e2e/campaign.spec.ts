@@ -184,9 +184,23 @@ test("밤에 달이가 배급령 변경을 재촉하고 주민 청을 거절하�
   await expect(warning).toContainText("오늘 밤 배급령부터 바꾸자");
   await page.getByRole("button", { name: "주민의 청 듣기" }).click();
   await readScene(page, "오늘은 창고의 비축 유지");
-  await expect(page.locator(".fallen-caption .result-quote footer")).toHaveText(
-    "고리",
+  await expect(page.locator(".fallen-caption")).toHaveText(
+    "당신이 알던 대로 공룡 문명은 멸망했습니다.과거의 편린",
+    { useInnerText: false },
   );
+  const caption = page.locator(".fallen-caption");
+  const alignedBelow = await caption.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element.firstChild!);
+    const sentence = range.getBoundingClientRect();
+    range.selectNodeContents(element.querySelector("small")!);
+    const credit = range.getBoundingClientRect();
+    return (
+      credit.top >= sentence.bottom &&
+      Math.abs(credit.right - sentence.right) <= 1
+    );
+  });
+  expect(alignedBelow).toBe(true);
   await expect(page.getByRole("dialog")).toHaveAccessibleName(
     "아무도 깨우지 않는 아침",
   );
@@ -376,9 +390,9 @@ test("성문 수비와 온돌을 배치하고 삽화가 있는 전투 보고를 
   const panel = page.getByRole("region", { name: "성문과 온돌", exact: true });
   await panel.getByRole("button", { name: "4명 배치", exact: true }).click();
   await expect(panel).toContainText("성문 수비병 4명");
-  await panel.getByRole("button", { name: "2단계", exact: true }).click();
+  await panel.getByRole("button", { name: "최소 2단계", exact: true }).click();
   await expect(
-    panel.getByRole("button", { name: "2단계", exact: true }),
+    panel.getByRole("button", { name: "최소 2단계", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   const report = page.getByRole("region", { name: "성문 전투 보고" });
   await expect(report).toContainText("부상 1명");
@@ -532,7 +546,6 @@ for (const prepared of [true, false]) {
       const dialog = page.getByRole("dialog");
       const next = dialog.getByRole("button", { name: /^다음 대사/ });
       await next.click();
-      await next.click();
       await expect(dialog).toContainText("공주마마?");
       const clip = dialog.locator("video");
       await expect(clip).toHaveAttribute(
@@ -550,7 +563,7 @@ for (const prepared of [true, false]) {
   );
 }
 
-test("남문에서 손자들을 본 왕이 세 번째 행렬을 보내고 성안에 남는다", async ({
+test("기한 1분 전 세 번째 행렬을 보내면 왕의 결말에서 남하 호송으로 이어진다", async ({
   page,
 }) => {
   const village = createVillageGame();
@@ -560,6 +573,7 @@ test("남문에서 손자들을 본 왕이 세 번째 행렬을 보내고 성안
   });
   const save = createTimberSave({
     ...capital,
+    elapsed: capital.campaign!.since + 36 * 60 - 1,
     campaign: {
       ...capital.campaign!,
       relief: "report",
@@ -595,6 +609,42 @@ test("남문에서 손자들을 본 왕이 세 번째 행렬을 보내고 성안
   await next.click();
   await expect(ending.locator(".campaign-speech")).toHaveCount(0);
   await expect(ending.locator("video")).toHaveAttribute("src", /ending-3\.mp4/);
+  await readScene(page, "먼저 남하한 충녕의 소식");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "두 번 접힌 봉서",
+  );
+  const letter = page.getByRole("dialog", { name: "두 번 접힌 봉서" });
+  const advance = letter.getByRole("button", { name: /^다음 대사/ });
+  for (const image of ["mokjin-night", "palace-letter", "road-letter"]) {
+    const still = letter.locator("img.campaign-still");
+    await expect(still).toHaveAttribute(
+      "src",
+      "/story/campaign/" + image + ".webp",
+    );
+    await expect(still).toBeVisible();
+    await expect
+      .poll(() => still.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    await expect(letter.locator("video")).toHaveCount(0);
+    if (image === "road-letter") {
+      await expect(letter.locator(".campaign-speech")).toContainText(
+        "호위무사",
+      );
+      await expect(letter.locator(".campaign-speech")).toContainText(
+        "공주마마, 복홀에 닿으면 그 봉서를 먼저 전할까요?",
+      );
+    } else {
+      await expect(letter.locator(".campaign-speech")).toHaveCount(0);
+    }
+    await advance.click();
+  }
+  await expect(letter.locator(".campaign-speech")).toContainText(
+    "아직은요. 그분을 먼저 만나 보고 싶어요.",
+  );
+  await readScene(page, "남하 호송에 동행할까요?");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "길가에서 기다린 목진",
+  );
 });
 
 test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 증가분에 맞는다", async ({
@@ -637,7 +687,25 @@ test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 �
       }),
     );
   const before = await counts();
-  await readScene(page, "5단계로 넘어갈까요? · 성문 앞으로");
+  await expect(dialog).toContainText("나루 밑으로 물이 한 줄 갑니다");
+  await dialog.getByRole("button", { name: /^다음 대사/ }).click();
+  const film = dialog.locator("video");
+  await expect(film).toHaveAttribute("src", /ending-4\.mp4/);
+  await expect
+    .poll(() => film.evaluate((el) => el.currentTime))
+    .toBeGreaterThan(0);
+  await expect(dialog).toContainText("당신이 지켜냈습니다");
+  const quote = dialog.locator(".result-quote");
+  await expect(quote).toBeVisible({ timeout: 15000 });
+  await expect(quote.locator("p")).toHaveText(/\S/);
+  await expect(quote.locator("footer")).toHaveText(/\S/);
+  await dialog
+    .getByRole("button", { name: "5단계로 넘어갈까요? · 성문 앞으로" })
+    .click();
+  const prep = page.getByRole("dialog", { name: "미션 시작 준비" });
+  await expect(prep).toBeVisible();
+  expect(await counts()).toEqual(before);
+  await prep.getByRole("button", { name: "시작하기" }).click();
   await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
   const delta = (await counts()).map((n, i) => n - before[i]);
   expect(delta).toEqual([120, 3000, 1500, 1500, 1800]);
@@ -800,7 +868,6 @@ for (const [hope, allegiance, film] of [
     for (let i = 0; i < 12 && !(await readProgress()).ending; i++) await day();
     const next = dialog.getByRole("button", { name: /^다음 대사/ });
     await next.click();
-    await next.click();
     const clip = dialog.locator("video");
     await expect(clip).toHaveAttribute(
       "src",
@@ -891,3 +958,70 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   expect(resumed.world.resources).toEqual(checkpoint.state.world.resources);
   expect(resumed.world.citizens).toEqual(checkpoint.state.world.citizens);
 });
+
+test("도성 실패 화면에 무음 피습 장면이 열린다", async ({ page }) => {
+  const village = createVillageGame();
+  const capital = createCapital({
+    ...village,
+    campaign: { ...village.campaign!, beat: "roads" },
+  });
+  const expired = commandTimber(
+    { ...capital, elapsed: capital.campaign!.since + 36 * 60 },
+    { type: "campaign", beat: "capital", action: "report" },
+    "deadline",
+  );
+  expect(expired.campaign?.ending).toBe("collapse");
+  await page.addInitScript((save) => {
+    localStorage.setItem("dynosty.village.resume", JSON.stringify(save));
+  }, createTimberSave(expired));
+  await page.goto("/");
+  const dialog = page.getByRole("dialog");
+  const scene = dialog.getByRole("img", { name: "궁궐 침전에서 피습당한 왕" });
+  await expect(scene).toBeVisible();
+  await expect(scene).toHaveAttribute(
+    "src",
+    "/story/campaign/king-palace-night-half-speed.gif",
+  );
+  await expect
+    .poll(() => scene.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(dialog.locator("audio, video")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "다시 시작" }).click();
+  await expect(dialog).toHaveAccessibleName("쥬신 왕의 어전 · 도성 남문");
+  await expect(page.getByTestId("play-population")).toContainText("1000명");
+});
+
+for (const [choice, words] of [
+  [
+    "식량 12 · 난민까지 열 명과 함께 남하",
+    "함께 온 아이들이 어느 솥 앞에 서야 할지 몰라요. 풀죽과 생선죽 솥에 다른 매듭을 달아 두면 어떨까요?",
+  ],
+  [
+    "식량 6 · 현지에 남기고 의원 일행 네 명 호송",
+    "길에 남은 집이 마음에 걸립니다. 길이 열리는 대로 빈 솥부터 돌려받으러 가겠다고 약속했어요.",
+  ],
+] as const) {
+  test("4단계 도착 대사 · " + choice, async ({ page }) => {
+    const village = createVillageGame();
+    const save = createTimberSave({
+      ...village,
+      chapter: 3,
+      campaign: { ...village.campaign!, beat: "escort" },
+    });
+    await page.addInitScript(
+      (value) =>
+        localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+      save,
+    );
+    await page.goto("/");
+    await readScene(page, choice);
+    const arrival = page.getByRole("dialog", { name: "함께 견디는 보름 혹한" });
+    await expect(arrival).toBeVisible();
+    const next = arrival.getByRole("button", { name: /^다음 대사/ });
+    await next.click();
+    await next.click();
+    const speech = arrival.locator(".campaign-speech");
+    await expect(speech.locator("strong")).toHaveText("충녕");
+    await expect(speech.locator("p")).toHaveText(words);
+  });
+}

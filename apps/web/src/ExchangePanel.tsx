@@ -168,10 +168,6 @@ export function ExchangePanel({
           {stock.waiting} · 수령전 {stock.checked}
         </p>
       ) : null}
-      <p className="hint">
-        교환 수치는 체험 개발값입니다. 교환품4는 정상으로 고정하며 본편의 반품
-        책임·위약금·공급처 신뢰도·무작위 불량률은 미정입니다.
-      </p>
     </section>
   );
 }

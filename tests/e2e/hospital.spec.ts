@@ -80,7 +80,7 @@ test("병원 클릭으로 주민별 회복을 보고 저장 후 야간 자동 �
     "3D 준비 완료",
     { timeout: 90_000 },
   );
-  await button("마른 목재20 조달 체험하기").click();
+  await button("마른 목재 20 조달").click();
   await expect(page.getByTestId("timber-clock")).toBeVisible();
   await page.locator("canvas").press("j");
   await button("진행 불러오기").click();

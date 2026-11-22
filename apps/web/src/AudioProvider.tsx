@@ -27,6 +27,8 @@ function readBrowserSettings() {
 }
 
 interface AudioControls {
+  galleryMusic: string | null;
+  setGalleryMusic: (track: string | null) => void;
   settings: AudioSettings;
   warning: string | null;
   saveStatus: string;
@@ -39,6 +41,7 @@ interface AudioControls {
 const AudioContext = createContext<AudioControls | null>(null);
 
 export function AudioProvider({ children }: { children: ReactNode }) {
+  const [galleryMusic, setGalleryMusic] = useState<string | null>(null);
   const [initial] = useState(readBrowserSettings);
   const [settings, setSettings] = useState(initial.settings);
   const [warning, setWarning] = useState<string | null>(initial.warning);
@@ -79,7 +82,15 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   return (
     <AudioContext.Provider
-      value={{ settings, warning, saveStatus, audioRef, updateSettings }}
+      value={{
+        galleryMusic,
+        setGalleryMusic,
+        settings,
+        warning,
+        saveStatus,
+        audioRef,
+        updateSettings,
+      }}
     >
       {children}
     </AudioContext.Provider>

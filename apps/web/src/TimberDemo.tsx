@@ -53,7 +53,7 @@ const phaseNames = {
   relief: "유휴 주민이 업무 교대하러 이동",
   "crew-wait": "교대할 유휴 인력 대기",
   approaching: "운송 주민 자동 배정",
-  transport: "입고 장소로 운송",
+  transport: "야적장으로 운반",
   parking: "수레 내려놓기",
   releasing: "손잡이에서 물러나기",
   unloading: "자동 하역",
@@ -244,8 +244,9 @@ export function TimberDemo({
         try {
           if (m.type === "saved") {
             saveTimber(localStorage, m.save);
-            setSaveStatus("체험판을 저장했습니다.");
-          } else setSaveStatus("체험판을 불러왔습니다. 일시정지 상태입니다.");
+            setSaveStatus("마을 진행을 저장했습니다.");
+          } else
+            setSaveStatus("마을 진행을 불러왔습니다. 일시정지 상태입니다.");
         } catch (err) {
           setError(timberSaveError(err));
         } finally {
@@ -255,9 +256,7 @@ export function TimberDemo({
       }
     };
     w.onerror = () => {
-      setError(
-        "체험판 계산 연결을 확인하지 못했습니다. 기존 저장은 유지됩니다.",
-      );
+      setError("마을 진행 상태를 확인하지 못했습니다. 기존 저장은 유지됩니다.");
       pending.current = null;
       setBusy(false);
     };
@@ -374,14 +373,14 @@ export function TimberDemo({
     <section
       hidden={!active || laborMode}
       className="timber-demo"
-      aria-label="마른 목재20 체험판"
+      aria-label="목재 조달"
     >
       <button
         hidden={!showDevTools}
         type="button"
         onClick={() => setLaborMode(true)}
       >
-        일손 배치·배급 체험하기
+        일손 배치·배급
       </button>
       <div className="timber-heading">
         <div>
@@ -391,7 +390,7 @@ export function TimberDemo({
         <button
           type="button"
           className="g-knob g-knob--close"
-          aria-label="생존 예제로 돌아가기"
+          aria-label="마을로 돌아가기"
           onClick={() => state && onExit(state.world)}
         />
       </div>
@@ -432,7 +431,9 @@ export function TimberDemo({
               /{state.residents.length}
             </span>
             <strong data-testid="timber-phase">
-              {phaseNames[state.phase]}
+              {state.phase === "transport" && warehouseDoor(state)
+                ? "저장소로 운반"
+                : phaseNames[state.phase]}
             </strong>
           </div>
           <div className="timber-controls">
@@ -971,14 +972,14 @@ export function TimberDemo({
                           : selectedSite.buffer >= LOGGING_RULES.buffer
                             ? "현장 적재 공간이 가득 차 생산을 멈췄습니다."
                             : !selectedSite.storageBuilt
-                              ? "저장소가 없으면 현장에만 쌓입니다."
+                              ? "저장소를 짓기 전에는 현장 야적장에 쌓입니다."
                               : "운반할 자원과 유휴 인력을 기다립니다."}
             </p>
             <p className="hint">
               작업장에 배치하면 09–18시 출근한 인원만큼 해당 자원지의 잔량이
               줄어듭니다. 고갈된 숲만 평탄화하며 광산의 함지와 채석장은
               남습니다. 운반은 별도의 유휴 주민 1명이 자동 담당하며, 하역 후
-              공동 재고에 입고하고 빈 수레를 정리합니다. 개발용: 인당 10분에
+              공동 재고에 입고하고 빈 수레를 정리합니다. 일꾼 한 명이 10분에
               자원1, 수레 최대5. 철광석은 제련 전 원료입니다.
             </p>
           </section>
@@ -1076,7 +1077,9 @@ export function TimberDemo({
                 </section>
                 <p>
                   도착지는{" "}
-                  {warehouseDoor(state) ? "공동 저장소" : "임시 야적장"}
+                  {warehouseDoor(state)
+                    ? "공동 저장소"
+                    : "야적장 · 오래 둔 식량은 상할 수 있습니다"}
                   입니다. 합격 물자는 즉시 공동 재고에 더하며 건물마다 배분하지
                   않습니다.
                 </p>
@@ -1245,7 +1248,7 @@ export function TimberDemo({
                 5분 진행
               </button>
               <button type="button" onClick={() => setRestart(true)}>
-                체험 초기화
+                마을 다시 시작
               </button>
               <button type="button" onClick={() => onExit(state.world)}>
                 마을 현황으로
@@ -1253,8 +1256,7 @@ export function TimberDemo({
               {restart ? (
                 <>
                   <p>
-                    체험과 마을을 초기 시작값으로 바꿀까요? 기존 저장은
-                    유지됩니다.
+                    마을을 초기 시작값으로 바꿀까요? 기존 저장은 유지됩니다.
                   </p>
                   <button
                     type="button"

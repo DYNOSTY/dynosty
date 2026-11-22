@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
+import { openLaborPanel } from "./workspace.js";
 
 const b = (p: Page, n: string) =>
   p.getByRole("button", { name: n, exact: true });
 async function enter(p: Page) {
   await p.goto("/");
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 }
 async function initial(p: Page) {
@@ -52,9 +53,9 @@ async function next(p: Page) {
 }
 async function reload(p: Page) {
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );
@@ -139,7 +140,7 @@ test("회수 도중·재검수 도중의 최신/이전 저장을 복원해 추�
 }) => {
   await start(p);
   await b(p, "일손 1시간 진행").click();
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
@@ -152,7 +153,7 @@ test("회수 도중·재검수 도중의 최신/이전 저장을 복원해 추�
   await next(p);
   await b(p, "교환품4 재검수 시작").click();
   await b(p, "일손 1시간 진행").click();
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
@@ -165,7 +166,7 @@ test("회수 도중·재검수 도중의 최신/이전 저장을 복원해 추�
   await next(p);
   await expect(p.getByTestId("labor-clock")).toContainText("13시간 0분");
   await expect(p.getByTestId("labor-iron")).toContainText("철재 3");
-  await b(p, "이전 일손 체험 불러오기").click();
+  await b(p, "이전 일손 배치 불러오기").click();
   await phase(p, "불량품 회수 중", { transit: "4" });
   await expect(p.getByTestId("labor-clock")).toContainText("9시간 0분");
   await expect(p.getByTestId("crew-1-job")).toHaveText("교환·재검수");
@@ -194,7 +195,7 @@ test("실제v1 저장은 진행·담당과 기존 목재/생존 저장 원문을
     localStorage.setItem("dynosty.timber.saves", "old timber");
     localStorage.setItem("dynosty.play.saves", "old survival");
   }, raw);
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-repair")).toContainText(
     "60/240분 · 배정 1/2명",
   );
@@ -204,7 +205,7 @@ test("실제v1 저장은 진행·담당과 기존 목재/생존 저장 원문을
   ).toBe(raw);
   await next(p);
   await expect(p.getByTestId("labor-clock")).toContainText("10시간 20분");
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
@@ -229,7 +230,7 @@ for (const kind of [
     page: p,
   }) => {
     await start(p);
-    await b(p, "일손 체험 저장").click();
+    await b(p, "일손 배치 저장").click();
     await expect(p.getByTestId("labor-save-status")).toContainText(
       "저장했습니다",
     );
@@ -248,10 +249,10 @@ for (const kind of [
       localStorage.setItem("dynosty.labor.saves", text);
       return text;
     }, kind);
-    await b(p, "일손 체험 불러오기").click();
+    await b(p, "일손 배치 불러오기").click();
     await expect(p.getByRole("alert")).toContainText("교환 저장");
     await phase(p, "불량품 회수 중", { transit: "4", allocated: "16" });
-    await b(p, "일손 체험 저장").click();
+    await b(p, "일손 배치 저장").click();
     await expect(p.getByRole("alert")).toContainText("교환 저장");
     expect(
       await p.evaluate(() => localStorage.getItem("dynosty.labor.saves")),

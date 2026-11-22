@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openLaborPanel } from "./workspace.js";
 
 test("HUD 건설·연구 메뉴와 저장·개발 도구가 같은 마을 진행을 유지한다", async ({
   page,
@@ -42,9 +43,9 @@ test("HUD 건설·연구 메뉴와 저장·개발 도구가 같은 마을 진행
       (element) => element === document.querySelector("canvas"),
     ),
   ).toBe(true);
-  await button("일손 배치·배급 체험하기").click();
+  await openLaborPanel(page);
   await expect(page.getByTestId("labor-clock")).toBeVisible();
-  await button("기존 목재 체험 보기").click();
+  await button("목재 조달 보기").click();
   await button("복홀 전체 보기").click();
   await button("개발 도구").click();
   await expect(page.getByTestId("camera-distance")).toHaveText("640.00");

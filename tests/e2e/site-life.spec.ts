@@ -5,6 +5,7 @@ import {
   progressCard,
   receiveProgress,
 } from "./progress-helpers.js";
+import { openLaborPanel } from "./workspace.js";
 
 test("공급 선택부터 실제 운송·하역·검수 안내가 전환되고 안내를 접어도 게임을 유지한다", async ({
   page: p,
@@ -49,15 +50,15 @@ test("교환 운송 저장·새로고침 복원과 재검수·수령·완료 안
   );
   await b(p, "다음 일손 사건까지").click();
   await expect(p.getByTestId("transport-status")).toContainText("재납품 운송");
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   const before = await p.getByTestId("transport-status").textContent();
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );

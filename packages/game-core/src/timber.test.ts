@@ -331,6 +331,22 @@ describe("자동 조달", () => {
   });
 });
 
+it("야적 식량은 저장을 이어 하루 지나면 줄고 저장소로 옮기면 보존된다", () => {
+  const base = createTimberState();
+  const before = { ...base, elapsed: 1439, yardFoodSince: { RES_FISH: 0 } };
+  const resumed = parseTimberSave(createTimberSave(before)).state;
+  const exposed = advanceTimber(resumed, 1);
+  const protectedStock = advanceTimber(
+    { ...resumed, logging: { ...resumed.logging, storageBuilt: true } },
+    1,
+  );
+  expect(exposed.world.resources.RES_FISH).toBe(
+    protectedStock.world.resources.RES_FISH - AMOUNT_SCALE,
+  );
+  expect(protectedStock.yardFoodSince).toBeUndefined();
+  expect(exposed.yardFoodSince?.RES_FISH).toBe(1440);
+});
+
 it("야적장의 젖은 목재는 건조 후 돌아오고 저장소에서는 젖지 않는다", () => {
   const start = createTimberState();
   const thaw = (state: TimberState) =>

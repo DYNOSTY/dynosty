@@ -111,9 +111,9 @@ export function LaborDemo({
         try {
           if (m.type === "saved") {
             saveLabor(localStorage, m.save);
-            setStatus("일손 체험을 저장했습니다.");
+            setStatus("일손 배치를 저장했습니다.");
           } else {
-            setStatus("일손 체험을 불러왔습니다. 일시정지 상태입니다.");
+            setStatus("일손 배치를 불러왔습니다. 일시정지 상태입니다.");
             onClearSelection();
           }
         } catch (err) {
@@ -182,7 +182,7 @@ export function LaborDemo({
       <section
         hidden={!active}
         className="timber-demo"
-        aria-label="일손 배치·배급 체험판"
+        aria-label="일손 배치·배급"
       >
         <p>공유 일손을 준비하고 있습니다.</p>
         {error && !selectedSite ? <p role="alert">{error}</p> : null}
@@ -222,13 +222,13 @@ export function LaborDemo({
     <section
       hidden={!active}
       className="timber-demo labor-demo"
-      aria-label="일손 배치·배급 체험판"
+      aria-label="일손 배치·배급"
     >
       <div className="timber-heading">
         <button
           type="button"
           className="g-knob g-knob--back"
-          aria-label="기존 목재 체험 보기"
+          aria-label="목재 조달 보기"
           title="뒤로 · 목재 조달"
           onClick={() => {
             command({ type: "pause", paused: true });
@@ -236,13 +236,13 @@ export function LaborDemo({
           }}
         />
         <div>
-          <p className="eyebrow">조달 확장 체험 · 같은 일손으로 두 요청</p>
+          <p className="eyebrow">목재 조달과 배급</p>
           <h2 className="timber-title">일손을 어디에 보낼까요?</h2>
         </div>
         <button
           type="button"
           className="g-knob g-knob--close"
-          aria-label="생존 예제로 돌아가기"
+          aria-label="마을로 돌아가기"
           title="닫기 (Esc)"
           onClick={() => {
             command({ type: "pause", paused: true });
@@ -368,7 +368,7 @@ export function LaborDemo({
         ))}
       </fieldset>
       <ExchangePanel state={state} busy={busy} onCommand={command} />
-      <section aria-label="확장 체험 목재 요청">
+      <section aria-label="목재 조달 요청">
         <h3>목재20 · 기한12시간</h3>
         <div className="labor-stock">
           {(
@@ -524,17 +524,17 @@ export function LaborDemo({
       ) : null}
       <div className="timber-controls">
         <button type="button" disabled={busy} onClick={() => access(false)}>
-          일손 체험 저장
+          일손 배치 저장
         </button>
         <button type="button" disabled={busy} onClick={() => access(true)}>
-          일손 체험 불러오기
+          일손 배치 불러오기
         </button>
         <button
           type="button"
           disabled={busy}
           onClick={() => access(true, true)}
         >
-          이전 일손 체험 불러오기
+          이전 일손 배치 불러오기
         </button>
         <button
           type="button"
@@ -542,12 +542,12 @@ export function LaborDemo({
           disabled={busy}
           onClick={() => setConfirm(true)}
         >
-          일손 체험 다시 시작
+          일손 배치 다시 시작
         </button>
       </div>
       {confirm ? (
         <div className="new-game-confirm">
-          <p>이번 확장 체험만 처음부터 다시 할까요? 저장은 유지됩니다.</p>
+          <p>일손 배치를 처음부터 다시 할까요? 저장은 유지됩니다.</p>
           <button
             type="button"
             disabled={busy}
@@ -556,7 +556,7 @@ export function LaborDemo({
               setConfirm(false);
             }}
           >
-            새 일손 체험 확인
+            새 일손 배치 확인
           </button>
           <button type="button" onClick={() => setConfirm(false)}>
             계속 진행
@@ -568,25 +568,6 @@ export function LaborDemo({
         {busy ? "일손 저장 처리 중" : status}
       </p>
       {error && !selectedSite ? <p role="alert">{error}</p> : null}
-      <details>
-        <summary>체험 전용 수치·본편 미정 구분</summary>
-        <p>
-          개발 선택: 일손4명, 배급 요청8시간 공개·10시간 기한,360인·분
-          작업량(3명×2시간), 대기3무리. 목재 보완은 두 명이4시간 진행하며 중단
-          시 진행을 보존합니다.
-        </p>
-        <p>
-          교환은 추가 철재1·담당1명, 회수90분+재납품90분+재검수120분입니다.
-          교환품4는 정상 고정이며 반품 책임·위약금·공급처 신뢰도·무작위 불량률은
-          본편 미정입니다. 배치 전환은 게임 시간0분, 화면 이동은 표시용입니다.
-          대기무리는 혼잡 표시이며 실제 먹이 소비·영양·기아를 계산하지 않습니다.
-          본편의 영양량·시간 배율·배급 간격·사망 수치는 미정입니다.
-        </p>
-        <p>
-          확장 체험 저장은 기존 목재·생존 저장과 별도이며, 기존 기록을 임의로
-          변환하거나 덮어쓰지 않습니다.
-        </p>
-      </details>
       <details>
         <summary>일손 처리 기록</summary>
         <ol>

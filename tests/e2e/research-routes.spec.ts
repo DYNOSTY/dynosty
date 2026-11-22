@@ -87,7 +87,7 @@ async function load(p: Page, s: TimberState) {
   await expect(p.getByTestId("play-scene-status")).toHaveText("3D 준비 완료", {
     timeout: 90_000,
   });
-  await button(p, "마른 목재20 조달 체험하기").click();
+  await button(p, "마른 목재 20 조달").click();
   await expect(p.getByTestId("timber-clock")).toBeVisible();
   await p.locator("canvas").press("j");
   await button(p, "진행 불러오기").click();

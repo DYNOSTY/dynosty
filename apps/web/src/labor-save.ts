@@ -47,7 +47,7 @@ export function saveLabor(storage: ExampleStorage, s: LaborSave) {
 export function loadLabor(storage: ExampleStorage, previous = false) {
   const a = archive(storage),
     s = previous ? a?.previous : a?.current;
-  if (!s) throw new TimberError("해당 일손 체험 저장이 없습니다.");
+  if (!s) throw new TimberError("해당 일손 배치 저장이 없습니다.");
   // archive에서 최근·이전 저장을 모두 검사하고 복사했으므로 선택한 값을 재검사하지 않는다.
   return s;
 }

@@ -60,7 +60,7 @@ self.onmessage = (event: MessageEvent<TimberRequest>) => {
       type: "error",
       requestId: m.type === "save" || m.type === "load" ? m.requestId : null,
       message:
-        e instanceof Error ? e.message : "체험판 명령을 처리하지 못했습니다.",
+        e instanceof Error ? e.message : "마을 명령을 처리하지 못했습니다.",
     });
   }
 };

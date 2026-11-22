@@ -80,7 +80,7 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상�
   await expect(
     page.getByLabel("build-1 운영 인원", { exact: true }),
   ).toHaveValue("1");
-  await b(page, "생존 예제로 돌아가기").click();
+  await b(page, "마을로 돌아가기").click();
   await b(page, "주민").click();
   await b(page, "건설").click();
   await expect(

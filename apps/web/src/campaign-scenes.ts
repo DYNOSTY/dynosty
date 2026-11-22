@@ -3,6 +3,7 @@ import {
   CHAPTERS,
   campaignOf,
   canPay,
+  capitalMinutesLeft,
   capitalRoad,
   convoyReady,
   emergencyRation,
@@ -72,6 +73,7 @@ export interface ScenePage {
   frames?: { image: string; words: string }[];
   illustration?: string;
   laterIllustration?: { from: number; image: string; alt: string };
+  lineImages?: Record<number, { image: string; alt: string }>;
   lineIllustration?: { at: number; image: string; alt: string };
   lines: Line[];
   choices: Choice[];
@@ -107,15 +109,7 @@ export function moraleAdvice(s: TimberState): Line | undefined {
   const limits = GAME_RULES.endings;
   if (s.campaign?.ending || pessimism < limits.concernPessimism) return;
   const day = minute >= 360 && minute < 1080;
-  if (s.campaign?.beat === "capital") {
-    const words =
-      pessimism > limits.urgentPessimism
-        ? "전하, 군량을 나르던 수레까지 멈췄습니다. 지금 배급령을 고쳐 주십시오."
-        : pessimism > limits.warningPessimism
-          ? "전하, 남문 교대에 응한 이가 없습니다. 성안의 청을 들어 주십시오."
-          : "전하, 구호소 앞에 빈 그릇을 놓고 그냥 돌아가는 이들이 늘었습니다.";
-    return [day ? "나르미" : "달이", words];
-  }
+  if (s.campaign?.beat === "capital") return;
   if (pessimism > limits.urgentPessimism)
     return day
       ? [
@@ -259,6 +253,25 @@ export function villageAdvice(
     : "등불이 하나둘 켜지네. 주민 명단을 펴 봐. 오늘 잘 곳을 찾은 이들부터 같이 짚어 보자.";
 }
 
+export const filmMusic = {
+  opening: "00",
+  one: "09",
+  "ending-1": "01",
+  two: "08",
+  "ending-2": "08",
+  three: "12",
+  "ending-3": "10",
+  escort: "13",
+  four: "11",
+  "ending-4": "04",
+  five: "14",
+  hope: "A",
+  escape: "B",
+  "mechanical-late": "B",
+  order: "C",
+  collapse: "C",
+} as const;
+
 export function campaignPage(s: TimberState): ScenePage {
   const c = campaignOf(s),
     chapter = s.chapter ?? 1,
@@ -320,7 +333,7 @@ export function campaignPage(s: TimberState): ScenePage {
       page.nextStage = 1;
       page.title = "별이 진 뒤, 복홀";
       page.clip = "opening";
-      page.music = "00";
+      page.music = filmMusic["opening"];
       line(
         "나르미",
         "운석이 떨어지기 전엔 고려 강가에 장이 섰대요. 아버진 그때 들은 소리를 아직도 흉내 내셨어요. 빈 수레가 다리를 건너는 소리요.",
@@ -338,7 +351,7 @@ export function campaignPage(s: TimberState): ScenePage {
     case "departure":
       page.title = "귀족들이 출문을 청했다";
       page.clip = "one";
-      page.music = "09";
+      page.music = filmMusic["one"];
       page.goal = `출문 전 · 주민 ${s.residents.length}명 · 자원별 10,000`;
       line(
         "가솔을 이끄는 귀족",
@@ -424,6 +437,7 @@ export function campaignPage(s: TimberState): ScenePage {
             "나르미",
             "마지막 수레에서 내린 분이 고른 어른의 장부를 알아보셨어요. 귀족들을 따라갔다 돌아온 집이에요. 이번엔 우리가 이야기를 들으러 갈까요?",
           );
+          page.music = filmMusic["ending-1"];
           complete("2단계로 넘어갈까요? · 다섯 마을로");
         } else {
           line(
@@ -537,7 +551,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     }
     case "roads": {
-      page.music = "08";
+      page.music = filmMusic["two"];
       page.goal = `교섭 회복 ${c.treaties.length} / 5`;
       page.key = "roads-" + c.treaties.length;
       const receipt = c.treaties.at(-1);
@@ -578,6 +592,7 @@ export function campaignPage(s: TimberState): ScenePage {
           "두 표를 포개서 보내시오. 잘못 받은 곳도, 못 받은 곳도 같이 보게.",
         );
       } else if (c.treaties.length === 5) {
+        page.music = filmMusic["ending-2"];
         complete("3단계로 넘어갈까요? · 도성으로");
         page.lineIllustration = {
           at: page.lines.length,
@@ -624,7 +639,7 @@ export function campaignPage(s: TimberState): ScenePage {
     }
     case "capital": {
       page.title = "쥬신 왕의 어전 · 도성 남문";
-      page.music = "10";
+      page.music = filmMusic["ending-3"];
       if (c.relief && convoyReady(s)) {
         page.key = "capital-ready";
         page.nextStage = "escort";
@@ -659,10 +674,11 @@ export function campaignPage(s: TimberState): ScenePage {
           "평소의 배급은 그대로 시행하라. 각 관아는 지금 손에 있는 것으로 어느 일까지 맡을 수 있는지 아뢰라.",
         );
       }
-      page.goal = `남문 피난 명부 ${c.evacuees ?? 0}/200명 · 교역로 ${road === "closed" ? "두절" : road === "slow" ? "지연" : "통행 가능"} · 앓거나 다친 주민 ${s.residents.filter((r) => r.health !== "healthy" && r.health !== "dead").length}명 · 성안 변종 습격 부상 ${(s.world.citizenEvents ?? []).filter((id) => id.startsWith("mutant-") && Number(id.split("-").at(-1)) >= c.since).length}명`;
+      const left = capitalMinutesLeft(s);
+      page.goal = `북문이 버틸 시간 ${Math.floor(left / 60)}시간 ${left % 60}분 · 남문 피난 명부 ${c.evacuees ?? 0}/200명 · 교역로 ${road === "closed" ? "두절" : road === "slow" ? "지연" : "통행 가능"} · 앓거나 다친 주민 ${s.residents.filter((r) => r.health !== "healthy" && r.health !== "dead").length}명 · 성안 변종 습격 부상 ${(s.world.citizenEvents ?? []).filter((id) => id.startsWith("mutant-") && Number(id.split("-").at(-1)) >= c.since).length}명`;
       line(
         "수문장",
-        "전하, 북문 밖에서 변종이 성벽을 긁고 있습니다. 안에서도 하나가 눈을 붉히자 순라 돌던 포졸들이 그 골목으로 달려갔습니다.",
+        "전하, 북문 밖에 변종이 자꾸 모여듭니다. 문짝에 버팀목을 덧대도 하루 반이 고작입니다. 그 안에 남문 수레에 짐을 실어 마지막 행렬까지 내보내야 합니다.",
       );
       line(
         "왕",
@@ -693,28 +709,33 @@ export function campaignPage(s: TimberState): ScenePage {
     }
     case "seal":
       page.clip = "three";
-      page.music = "12";
+      page.music = filmMusic["three"];
       page.title = "두 번 접힌 봉서";
       page.lineIllustration = {
         at: 0,
         image: "mokjin-night",
         alt: "밤중에 붕대를 감은 목진이 홀로 복홀의 작은 성문을 빠져나간다.",
       };
+      page.lineImages = {
+        1: {
+          image: "palace-letter",
+          alt: "도성 궁궐의 회랑에서 양녕이 봉서를 든 충녕에게 말을 건넨다.",
+        },
+        2: {
+          image: "road-letter",
+          alt: "남하길에서 충녕이 봉서를 접는다. 곁에 선 호위무사가 어깨너머로 바라본다.",
+        },
+      };
       line("", "");
-      line(
-        "호위병",
-        "마마, 도성에서 가져온 봉서입니다. 복홀에 닿거든 이대로 전할까요?",
-      );
-      line(
-        "충녕",
-        "‘고려의 후손을 데려오라. 거역하면 처단하라.’ ……접어 두세요. 그분 얼굴 한 번 뵌 적이 없는데, 이런 것부터 내보일 순 없어요.",
-      );
+      line("", "");
+      line("호위무사", "공주마마, 복홀에 닿으면 그 봉서를 먼저 전할까요?");
+      line("충녕", "아직은요. 그분을 먼저 만나 보고 싶어요.");
       choice("next", "남하 호송에 동행할까요?");
       break;
     case "escort":
       page.nextStage = 4;
       page.clip = "escort";
-      page.music = "13";
+      page.music = filmMusic["escort"];
       page.title = "길가에서 기다린 목진";
       line(
         "목진",
@@ -770,7 +791,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     case "winter":
       page.clip = "four";
-      page.music = "11";
+      page.music = filmMusic["four"];
       page.title = "밤새 식지 않은 그릇";
       page.goal = `혹한 ${Math.min(15, days)} / 15일`;
       line(
@@ -787,7 +808,7 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       break;
     case "thaw":
-      page.music = "04";
+      page.music = filmMusic["ending-4"];
       line(
         "장영실",
         "오늘은 얼음이 늘지 않았습니다. 저기 보세요. 나루 밑으로 물이 한 줄 갑니다.",
@@ -796,7 +817,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     case "summit":
       page.clip = "five";
-      page.music = "14";
+      page.music = filmMusic["five"];
       page.title = "두 그릇을 놓고";
       page.goal = "복홀에 들어온 이들의 첫 배급";
       line(
@@ -1059,7 +1080,10 @@ export function campaignPage(s: TimberState): ScenePage {
     case "ending":
     case "finished": {
       const end = c.ending ?? "collapse";
-      if (end === "collapse") page.illustration = "gori-exile";
+      if (end === "collapse") {
+        if (chapter !== 3) page.illustration = "gori-exile";
+        else page.illustration = "king-palace-night";
+      }
       if (end !== "collapse")
         page.clip =
           end === "escape" && c.revivalPrepared === false
@@ -1073,7 +1097,7 @@ export function campaignPage(s: TimberState): ScenePage {
         page.resultQuote = quote;
       }
       page.key = c.beat + end;
-      page.music = end === "hope" ? "A" : end === "escape" ? "B" : "C";
+      page.music = filmMusic[end];
       page.goal = c.beat === "ending" ? "결말 확인" : "캠페인 종료";
       page.title =
         end === "hope"
@@ -1095,17 +1119,18 @@ export function campaignPage(s: TimberState): ScenePage {
           "고리",
           "명부를 가져오시오. 오늘부터 왕자 마마의 인장이 찍힌 명만 받으시오.",
         );
+      } else if (chapter === 3) {
+        line("", "");
       } else {
         line(
           "달이",
           "성문 열쇠를 받으러 온 건 군졸이 아니었어. 함께 줄을 서던 이웃들이었어. 고리야, 이제 내려놓자.",
         );
-        line(
-          "고리",
-          "장부는 두고 가겠소. 죽은 이들의 이름까지 가져갈 권리는 내게 없소.",
-        );
       }
-      if (c.beat === "ending")
+      if (c.beat === "ending" && chapter === 3 && end === "collapse") {
+        page.title = "3단계 실패 · 도성 함락";
+        choice("retry-capital", "다시 시작");
+      } else if (c.beat === "ending")
         choice(
           "finish",
           end === "collapse"

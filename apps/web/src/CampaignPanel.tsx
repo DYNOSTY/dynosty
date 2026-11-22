@@ -33,6 +33,7 @@ import { EndingMenu } from "./EndingMenu.js";
 
 import "./campaign.css";
 
+const levelMarks = ["□□□", "■□□", "□■□", "□□■"] as const;
 const media = "/story/campaign/";
 export function PatrolPortrait({ index }: { index: number }) {
   return (
@@ -58,6 +59,7 @@ function SceneDialog({
   close: () => void;
   act: (action: string, difficulty?: "normal" | "hard") => void;
 }) {
+  const palaceFilm = page.illustration === "king-palace-night";
   const dialog = useRef<HTMLDialogElement>(null);
   const [cursor, setCursor] = useState(0);
   const [pending, setPending] = useState("");
@@ -83,11 +85,12 @@ function SceneDialog({
   }, [cursor, frame, total]);
   const [name, words] = page.lines[lineIndex]!;
   const later =
-    page.lineIllustration?.at === cursor
+    page.lineImages?.[cursor] ??
+    (page.lineIllustration?.at === cursor
       ? page.lineIllustration
       : page.laterIllustration && cursor >= page.laterIllustration.from
         ? page.laterIllustration
-        : undefined;
+        : undefined);
   const face = PATROL_NAMES.findIndex((x) => x === name);
   const last = cursor === total - 1;
   useEffect(() => {
@@ -211,7 +214,15 @@ function SceneDialog({
               alt="도성 광장에 홀로 선 왕의 뒷모습"
             />
           )}
-          {!flashback &&
+          {palaceFilm && (
+            <img
+              className="campaign-still"
+              src={media + "king-palace-night-half-speed.gif"}
+              alt="궁궐 침전에서 피습당한 왕"
+            />
+          )}
+          {!palaceFilm &&
+            !flashback &&
             !frame &&
             (familyScene || later || page.illustration) && (
               <img
@@ -235,6 +246,7 @@ function SceneDialog({
             </section>
           )}
           {page.clip &&
+            !page.lineImages?.[cursor] &&
             page.lineIllustration?.at !== cursor &&
             !familyScene &&
             !frame &&
@@ -343,6 +355,9 @@ export function CampaignPanel({
 }) {
   const c = campaignOf(s);
   const p = campaignPage(s);
+  const gateCrew = s.residents.filter(
+    (r) => r.workplaceId === "gate" && r.health === "healthy",
+  ).length;
   const advice = moraleAdvice(s);
   const rumor = gatheringRumor(s);
   const advisory = (
@@ -377,7 +392,7 @@ export function CampaignPanel({
     else if (gateSelected) setDefenseOpen?.(true);
   }, [gateSelected, setDefenseOpen, c.beat]);
   const [sound, setSound] = useState(false);
-  const { audioRef } = useAudio();
+  const { audioRef, galleryMusic } = useAudio();
   const canPetition =
     [
       "patrol",
@@ -399,7 +414,7 @@ export function CampaignPanel({
     return () => window.clearTimeout(timer);
   }, [c.ending]);
   const open =
-    (c.ending !== "collapse" || lossShown) &&
+    (c.ending !== "collapse" || s.chapter === 3 || lossShown) &&
     (petitionOpen || opened === p.key || (p.auto && dismissed !== p.key));
   const petitionPage: ScenePage = {
     key: "petition-" + s.world.day,
@@ -445,24 +460,27 @@ export function CampaignPanel({
     ],
   };
   const scene = petitionOpen ? petitionPage : p;
-  const track = open
-    ? scene.music
-    : c.ending
-      ? p.music
-      : trade
-        ? "03"
-        : foodWarnings(s.world).length
-          ? "10"
-          : c.beat === "winter"
-            ? "11"
-            : work
-              ? "02"
-              : c.beat === "patrol" &&
-                  Object.keys(s.scoutDepartures ?? {}).length > c.reports.length
-                ? "05"
-                : s.world.minute < 360 || s.world.minute >= 1080
-                  ? "04"
-                  : "01";
+  const track =
+    galleryMusic ??
+    (open
+      ? scene.music
+      : c.ending
+        ? p.music
+        : trade
+          ? "03"
+          : foodWarnings(s.world).length
+            ? "10"
+            : c.beat === "winter"
+              ? "11"
+              : work
+                ? "02"
+                : c.beat === "patrol" &&
+                    Object.keys(s.scoutDepartures ?? {}).length >
+                      c.reports.length
+                  ? "05"
+                  : s.world.minute < 360 || s.world.minute >= 1080
+                    ? "04"
+                    : "01");
   useEffect(() => {
     if (!sound) return;
     const audio = audioRef.current;
@@ -676,22 +694,16 @@ export function CampaignPanel({
           </button>
           {defenseOpen && (
             <section className="office-panel" aria-label="성문과 온돌">
-              <strong>
-                성문 수비병{" "}
-                {
-                  s.residents.filter(
-                    (r) => r.workplaceId === "gate" && r.health === "healthy",
-                  ).length
-                }
-                명
-              </strong>
+              <strong>성문 수비병 {gateCrew}명</strong>
               <p>수비병이 많으면 습격 때 다치거나 숨지는 주민이 줄어듭니다.</p>
-              {([0, 4, 8, 16] as const).map((count) => (
+              {([0, 4, 8, 16] as const).map((count, level) => (
                 <button
                   key={count}
                   type="button"
+                  aria-pressed={gateCrew === count}
                   onClick={() => command({ type: "set-gate", count })}
                 >
+                  <span aria-hidden="true">{levelMarks[level]} </span>
                   {count}명 배치
                 </button>
               ))}
@@ -708,6 +720,7 @@ export function CampaignPanel({
                   aria-pressed={(s.heating ?? 0) === level}
                   onClick={() => command({ type: "set-heating", level })}
                 >
+                  <span aria-hidden="true">{levelMarks[level]} </span>
                   {level ? "최소 " + level + "단계" : "자동"}
                 </button>
               ))}
