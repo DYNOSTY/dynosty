@@ -6603,7 +6603,26 @@ body,
    오른쪽 칸 = 길 그림 · 숫자 여섯 칸 · 설명+단추 칸(높이 고정, 단추는 늘 칸 맨 아래 한 줄) · 처음부터.
    단계가 바뀌어도 칸 높이와 단추 자리가 그대로다. 왼쪽 칸의 일손 단추는 늘 맨 아래. */
 .play-shell:not(.e2e-all) .tm-grid {
-  min-height: 500px;
+  min-height: 430px;
+}
+/* 숫자 여섯 칸: 한 줄로, 0인 칸은 흐리게 (있는 것만 눈에 들어오게) */
+.play-shell:not(.e2e-all) .tm-right > .timber-stock {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0;
+}
+.play-shell:not(.e2e-all) .tm-right > .timber-stock > div {
+  padding: 4px 8px;
+}
+.play-shell:not(.e2e-all) .tm-right > .timber-stock .timber-stock-label {
+  white-space: nowrap;
+  font-size: 13px;
+}
+.play-shell:not(.e2e-all) .tm-right > .timber-stock > .is-zero {
+  opacity: 0.38;
+}
+.play-shell:not(.e2e-all) .tm-right > .timber-stock > div:not(.is-zero) .timber-stock-value {
+  color: var(--nakgwan, #a8322d);
 }
 .play-shell:not(.e2e-all) .tm-left {
   display: flex;
@@ -6625,10 +6644,10 @@ body,
   display: flex;
   flex: none;
   flex-wrap: wrap;
-  align-content: space-between;
+  align-content: flex-start;
   gap: 10px;
-  height: 176px;
-  margin: 12px 0;
+  height: 126px;
+  margin: 14px 0 12px;
 }
 .play-shell:not(.e2e-all) .timber-actions:has(.timber-result) {
   height: auto;
@@ -6636,7 +6655,10 @@ body,
 .play-shell:not(.e2e-all) .timber-actions > p {
   flex: 0 0 100%;
   order: 0;
+  /* 글은 두 줄 자리를 늘 차지 → 바로 아래 단추 자리가 안 움직임 */
+  height: 58px;
   margin: 0;
+  overflow: hidden;
   text-wrap: pretty;
 }
 .play-shell:not(.e2e-all) .timber-actions > button {
@@ -6727,4 +6749,42 @@ body,
 .play-shell:not(.e2e-all) .tm-right > .new-game-confirm > p {
   flex: 1 1 260px;
   margin: 0;
+}
+
+/* 조달·일손 창이 열려 있을 때는 조작 설명 단추를 숨김 (창 위에 겹쳤음) · 고르기 화면에서는 빈 단추 칸을 없앰 */
+.play-shell.is-procurement .g-keys-btn {
+  display: none;
+}
+.play-shell:not(.e2e-all) .tm-right > .timber-actions:empty {
+  display: none;
+}
+/* 사건 칸의 고리 표정 그림: 그림 아래 원래 글씨(표정 이름)가 안 비치게 아래를 잘라 내고, 밝은 그림 위 글이 읽히게 그늘을 짙게 */
+.story-side img[src^="/ui/gori/"] {
+  height: 124%;
+  object-position: 50% 0;
+}
+.story-side img[src^="/ui/gori/"] + .story-side__shade {
+  background: linear-gradient(
+    rgb(12 14 24 / 0%) 38%,
+    rgb(12 14 24 / 82%) 70%,
+    rgb(12 14 24 / 94%) 100%
+  );
+}
+/* 조달 창: 고르기 화면과 그 뒤 화면의 틀 높이를 같게 (약정할 때 틀이 줄지 않게) · 숫자는 크게 */
+.play-shell:not(.e2e-all) .tm-grid {
+  min-height: 520px;
+}
+.play-shell:not(.e2e-all) .tm-right > .timber-stock > div {
+  padding: 10px 8px;
+}
+.play-shell:not(.e2e-all) .tm-right > .timber-stock .timber-stock-value {
+  font-size: 26px;
+}
+/* '처음부터 다른 선택'은 어느 단계든 틀 맨 아래 같은 자리 */
+.play-shell:not(.e2e-all) .tm-grid {
+  align-items: stretch;
+}
+.play-shell:not(.e2e-all) .tm-grid .tm-right > .timber-controls {
+  margin-top: auto;
+  margin-bottom: 0;
 }

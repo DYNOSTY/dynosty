@@ -1593,7 +1593,7 @@ export function App() {
                 <button
                   key={entity.id}
                   type="button"
-                  className="quiet-button"
+                  className="quiet-button dev-only"
                   aria-pressed={entity.id === selectedId}
                   onClick={() => sceneRef.current?.select(entity.id)}
                 >

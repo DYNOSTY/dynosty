@@ -275,6 +275,7 @@ export function LaborDemo({
       <div className="timber-controls">
         <button
           type="button"
+          className="dev-only"
           disabled={busy || done}
           onClick={() => command({ type: "pause", paused: !state.paused })}
         >
@@ -292,12 +293,13 @@ export function LaborDemo({
         </button>
         <button
           type="button"
+          className="is-primary"
           disabled={busy || done || laborNextAt(state) === null}
           onClick={() => command({ type: "next" })}
         >
           다음 일손 사건까지
         </button>
-        <label>
+        <label className="dev-only">
           속도{" "}
           <select
             aria-label="일손 진행 속도"
@@ -311,7 +313,9 @@ export function LaborDemo({
             <option value="3">3배</option>
           </select>
         </label>
-        <span>{state.paused ? "일시정지" : "동시 진행 중"}</span>
+        <span className="dev-only">
+          {state.paused ? "일시정지" : "동시 진행 중"}
+        </span>
       </div>
       <div className="labor-tasks">
         <section className="labor-task" aria-label="목재 보완 작업">

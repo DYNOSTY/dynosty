@@ -419,7 +419,7 @@ export function TimberDemo({
                     ["used", "사용 확인"],
                   ] as const
                 ).map(([k, label]) => (
-                  <div key={k}>
+                  <div key={k} className={stock?.[k] ? undefined : "is-zero"}>
                     <span className="timber-stock-label">{label}</span>
                     <strong
                       className="timber-stock-value"
