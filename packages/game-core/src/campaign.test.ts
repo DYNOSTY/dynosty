@@ -1,5 +1,6 @@
 import { expect, it, vi } from "vitest";
 import {
+  CAPITAL_MINUTES,
   CONVOY_ITEMS,
   campaignOf,
   campaignOutcome,
@@ -389,7 +390,11 @@ it("도성은 민심과 관계없이 세 번째 수레를 보내지 못한 채 3
     ...base,
     chapter: 3,
     elapsed: 300,
-    campaign: { ...newCampaign("capital", 300), difficulty: "hard" },
+    campaign: {
+      ...newCampaign("capital", 300),
+      capitalDue: 300 + CAPITAL_MINUTES,
+      difficulty: "hard",
+    },
     world: { ...base.world, pessimism: 100 },
   };
   const before = restore(later(city, 36 * 60 - 1));
@@ -399,6 +404,21 @@ it("도성은 민심과 관계없이 세 번째 수레를 보내지 못한 채 3
     later({ ...before, campaign: { ...before.campaign!, departures: 3 } }, 1)
       .campaign?.ending,
   ).toBeNull();
+});
+it("도성 기한 이전의 저장은 불러온 때부터 36시간을 주고, 이후 저장은 기한을 유지한다", () => {
+  const base = createVillageGame();
+  const legacy: TimberState = {
+    ...base,
+    chapter: 3,
+    elapsed: 300 + 3 * 1440,
+    campaign: newCampaign("capital", 300),
+  };
+  const loaded = restore(legacy);
+  expect(campaignOf(loaded).capitalDue).toBe(legacy.elapsed + CAPITAL_MINUTES);
+  expect(later(loaded, 1).campaign?.ending).toBeNull();
+  const halfway = restore(later(loaded, CAPITAL_MINUTES / 2));
+  expect(campaignOf(halfway).capitalDue).toBe(legacy.elapsed + CAPITAL_MINUTES);
+  expect(later(halfway, CAPITAL_MINUTES / 2).campaign?.ending).toBe("collapse");
 });
 it.each([1, 2, 4, 5] as const)(
   "단계 %i에서 99는 버티고 100에 닿으면 난이도에 따라 추방된다",
