@@ -6621,7 +6621,11 @@ body,
 .play-shell:not(.e2e-all) .tm-right > .timber-stock > .is-zero {
   opacity: 0.38;
 }
-.play-shell:not(.e2e-all) .tm-right > .timber-stock > div:not(.is-zero) .timber-stock-value {
+.play-shell:not(.e2e-all)
+  .tm-right
+  > .timber-stock
+  > div:not(.is-zero)
+  .timber-stock-value {
   color: var(--nakgwan, #a8322d);
 }
 .play-shell:not(.e2e-all) .tm-left {
