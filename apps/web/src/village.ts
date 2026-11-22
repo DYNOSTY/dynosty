@@ -80,6 +80,15 @@ export const residentScale = (file: string) => {
   const h = RESIDENT_HEIGHT[file];
   return (h ? h[0] / h[1] : RESIDENT_SCALE) * RESIDENT_GROW * RESIDENT_SHOW;
 };
+/** 고리가 도는 길 (대표 주민 자리 기준, 세계 방향 x·z) — 온돌 앞 길 가운데(빈 터 울타리 밖). 일하는 곳 = 1·3번 */
+const GORI_ROUTE: readonly [number, number][] = [
+  [0, 0],
+  [3.0, -1.2],
+  [2.0, -2.6],
+  [0.6, -1.6],
+];
+const GORI_WORK = [1, 3];
+const GORI_SPEED = 1.1;
 const RESIDENTS = [
   "R01_Pachycephalosaurus",
   "R02_Triceratops",
@@ -913,6 +922,43 @@ export function createVillage(
       kind === "building" ? 4 : 2,
     );
     v.play("Idle", 0);
+    // 고리: 대표 주민 자리에 묶인 채(누르면 어디서나 창이 뜸) 온돌 앞마당을 돌고, 두 곳에서 일함. 게임이 멈추면 섬
+    let leg = 0,
+      wait = 0,
+      route: Vector3[] | null = null,
+      speed = 0;
+    const walkGori = (delta: number) => {
+      if (!running) return v.play("Idle");
+      if (!route) {
+        const inv = (parent as TransformNode).getWorldMatrix().clone().invert();
+        route = GORI_ROUTE.map(([x, z]) =>
+          Vector3.TransformNormal(new Vector3(x, 0, z), inv),
+        );
+        speed =
+          GORI_SPEED * Vector3.TransformNormal(Vector3.Right(), inv).length();
+        node.position.x = node.position.z = 0;
+      }
+      if (wait > 0) {
+        wait -= delta;
+        return v.play("Work");
+      }
+      const to = route[(leg + 1) % route.length] as Vector3;
+      const dx = to.x - node.position.x,
+        dz = to.z - node.position.z,
+        d = Math.hypot(dx, dz),
+        step = speed * delta;
+      node.rotation.y = Math.atan2(dx, dz);
+      if (d <= step) {
+        node.position.x = to.x;
+        node.position.z = to.z;
+        leg = (leg + 1) % route.length;
+        if (GORI_WORK.includes(leg)) wait = 3.5;
+      } else {
+        node.position.x += (dx / d) * step;
+        node.position.z += (dz / d) * step;
+      }
+      v.play("Walk");
+    };
     if (kind === "building") {
       for (const m of v.meshes) lib.dress(m.material);
       // 큰 굴뚝 연기 (온돌은 늘 땜)
@@ -937,9 +983,11 @@ export function createVillage(
         }
       },
       setMotion(value) {
-        v.play(value === "walking" ? "Walk" : "Idle");
+        if (kind !== "resident") v.play(value === "walking" ? "Walk" : "Idle");
       },
-      animate() {},
+      animate(delta) {
+        if (kind === "resident") walkGori(delta);
+      },
       dispose() {
         v.dispose();
         node.dispose();

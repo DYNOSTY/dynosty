@@ -44,8 +44,54 @@ def mat(name, rgb, rough=0.8):
         p = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
         p.inputs["Base Color"].default_value = (*lin(rgb), 1)
         p.inputs["Roughness"].default_value = rough
+        pattern(m, p, name, rgb)
         MAT[name] = m
     return MAT[name]
+
+
+def pattern(m, p, name, rgb):
+    """구울 결: 도포 = 소용돌이 무늬, 피부 = 비늘, 머리깃 = 가닥 결, 천·가죽 = 잔 얼룩"""
+    N, L = m.node_tree.nodes, m.node_tree.links
+    kind = {"robe": "robe", "skin": "scale", "belly": "scale", "hair": "hair", "hair2": "hair",
+            "pants": "cloth", "sash": "cloth", "pouch": "cloth", "book": "cloth", "patch": "cloth", "collar": "cloth"}.get(name)
+    if not kind:
+        return
+    tc = N.new("ShaderNodeTexCoord")
+    mix = N.new("ShaderNodeMix")
+    mix.data_type = "RGBA"
+    a, b = [i for i in mix.inputs if i.type == "RGBA"][:2]
+    out = next(o for o in mix.outputs if o.type == "RGBA")
+    lo = lambda k: (*lin(tuple(min(1, c * k) for c in rgb)), 1)
+    if kind == "robe":  # 은은한 소용돌이 무늬 (밝게)
+        t = N.new("ShaderNodeTexWave")
+        t.wave_type = "RINGS"
+        t.inputs["Scale"].default_value = 9
+        t.inputs["Distortion"].default_value = 10
+        t.inputs["Detail"].default_value = 3
+        fac = t.outputs["Fac"]
+        a.default_value, b.default_value = lo(0.94), lo(1.12)
+    elif kind == "scale":  # 비늘: 칸 가운데 밝고 가장자리 어둡게
+        t = N.new("ShaderNodeTexVoronoi")
+        t.inputs["Scale"].default_value = 70
+        fac = t.outputs["Distance"]
+        a.default_value, b.default_value = lo(1.04), lo(0.9)
+    elif kind == "hair":  # 위아래로 흐르는 가닥 결
+        t = N.new("ShaderNodeTexWave")
+        t.wave_type = "BANDS"
+        t.bands_direction = "Z"
+        t.inputs["Scale"].default_value = 6
+        t.inputs["Distortion"].default_value = 14
+        t.inputs["Detail"].default_value = 4
+        fac = t.outputs["Fac"]
+        a.default_value, b.default_value = lo(0.92), lo(1.1)
+    else:  # 천·가죽 잔 얼룩
+        t = N.new("ShaderNodeTexNoise")
+        t.inputs["Scale"].default_value = 40
+        fac = t.outputs["Fac"]
+        a.default_value, b.default_value = lo(0.86), lo(1.1)
+    L.new(tc.outputs["Object"], t.inputs["Vector"])
+    L.new(fac, mix.inputs[0])
+    L.new(out, p.inputs["Base Color"])
 
 
 SKIN = ("skin", (0.86, 0.72, 0.46))
@@ -272,7 +318,7 @@ def almond(bm, P, n, u, a, b, lift, dome=0.0, shift=V((0, 0, 0)), pointy=0.35, u
 
 
 def eye_frame(s):
-    d = V((s * 0.75, -0.65, 0.12)).normalized()
+    d = V((s * 0.5, -0.85, 0.08)).normalized()
     c = V((0, -0.06, 1.985))
     hit, n, _, _ = HEAD_BVH.ray_cast(c + d * 0.4, -d)
     n = n.normalized()
@@ -305,6 +351,14 @@ bm = bmesh.new()
 C = V((0, 0.035, 2.07))
 ellipsoid(bm, C, (0.11, 0.115, 0.07), 16, 10)
 UP, DOWN = V((0, 0, 1)), V((0, 0, -1))
+def dense(pts, rad, nrm):
+    P = smooth_path(pts, 2)
+    f = lambda i: i / 2
+    R = [tuple(rad[int(f(i))][k] + (rad[min(len(rad) - 1, int(f(i)) + 1)][k] - rad[int(f(i))][k]) * (f(i) % 1) for k in (0, 1))
+         for i in range(len(P))]
+    return P, [(x, y * 1.15) for x, y in R], [nrm[min(len(nrm) - 1, int(f(i)))] for i in range(len(P))]
+
+
 def lock(root, d, L, w, curl_dir, front=False):
     hz = V((d.x, d.y, 0)).normalized()
     p1 = root + (d * 0.6 + UP * 0.25).normalized() * L * 0.2
@@ -331,13 +385,13 @@ for k in range(72):
     L = random.uniform(0.09, 0.13) if front else (random.uniform(0.07, 0.11) if el > 0.95 else random.uniform(0.14, 0.2))
     cd = V((random.uniform(-1, 1), random.uniform(-1, 1), 0)).normalized()
     pts, rad, nrm = lock(root, d, L, random.uniform(0.045, 0.06), cd, front)
-    loft(bm, pts, rad, 6, normals=nrm, seg_mat=lambda i, k=k: 1 if (k % 3 == 0 and i >= 2) else 0)
+    loft(bm, *dense(pts, rad, nrm)[:2], 8, normals=dense(pts, rad, nrm)[2], seg_mat=lambda i, k=k: 1 if (k % 3 == 0 and i >= 4) else 0)
 for s in (-1, 1):  # 옆머리: 관자놀이에서 뺨 옆으로
     for j in range(3):
         root = V((s * (0.085 + 0.01 * j), -0.06 + 0.035 * j, 2.06))
         d = V((s * 0.8, -0.3, 0.2)).normalized()
         pts, rad, nrm = lock(root, d, 0.2 - 0.02 * j, 0.05, V((0, -1, 0)))
-        loft(bm, pts, rad, 6, normals=nrm)
+        loft(bm, *dense(pts, rad, nrm)[:2], 8, normals=dense(pts, rad, nrm)[2])
 new_obj("hair", bm, [HAIR, HAIR2], ["head"])
 
 # 목걸이 (끈 + 옥)
@@ -472,7 +526,53 @@ mod = gori.modifiers.new("Armature", "ARMATURE")
 mod.object = arm
 tris = sum(len(p.vertices) - 2 for p in gori.data.polygons)
 print("TRIS", tris)
-bpy.ops.export_scene.gltf(filepath=dst, export_format="GLB", export_animations=True)
+import numpy as np
+TEX = 1024
+sc = bpy.context.scene
+me = gori.data
+me.uv_layers.active = me.uv_layers.new(name="bake")
+bpy.ops.object.select_all(action="DESELECT")
+gori.select_set(True)
+bpy.context.view_layer.objects.active = gori
+bpy.ops.object.mode_set(mode="EDIT")
+bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.003)
+bpy.ops.object.mode_set(mode="OBJECT")
+sc.render.engine = "CYCLES"
+sc.cycles.device = "CPU"
+sc.render.bake.margin = 6
+sc.render.bake.use_clear = True
+
+
+def bake_one(kind, samples, **kw):
+    img = bpy.data.images.new("g_bake_" + kind, TEX, TEX, alpha=False)
+    for m in me.materials:
+        n = m.node_tree.nodes.new("ShaderNodeTexImage")
+        n.image = img
+        m.node_tree.nodes.active = n
+    sc.cycles.samples = samples
+    bpy.ops.object.bake(type=kind, **kw)
+    px = np.empty(TEX * TEX * 4, dtype=np.float32)
+    img.pixels.foreach_get(px)
+    return px.reshape(TEX, TEX, 4)
+
+
+color = bake_one("DIFFUSE", 4, pass_filter={"COLOR"})
+ao = bake_one("AO", 16)[..., :1]
+rgb = color[..., :3] * (0.78 + 0.22 * np.clip(ao, 0, 1))
+final = bpy.data.images.new("GORI_tex", TEX, TEX, alpha=False)
+final.pixels.foreach_set(np.dstack([np.clip(rgb, 0, 1), np.ones((TEX, TEX, 1), np.float32)]).astype(np.float32).ravel())
+final.pack()
+baked = bpy.data.materials.new("GORI")
+baked.use_nodes = True
+t = baked.node_tree.nodes.new("ShaderNodeTexImage")
+t.image = final
+pb = next(n for n in baked.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+baked.node_tree.links.new(t.outputs[0], pb.inputs["Base Color"])
+pb.inputs["Roughness"].default_value = 0.85
+me.materials.clear()
+me.materials.append(baked)
+bpy.ops.export_scene.gltf(filepath=dst, export_format="GLB", export_animations=True, export_image_format="JPEG")
 
 # ── 미리보기: 앞 · 옆 · 뒤 비스듬히 · 게임 카메라(36° 내려다봄) 네 장을 한 장으로 ──
 sc = bpy.context.scene
