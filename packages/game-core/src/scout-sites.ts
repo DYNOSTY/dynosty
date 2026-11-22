@@ -1,5 +1,6 @@
 import { SETTLEMENTS } from "./campaign.js";
 import { scoutSpeedRate } from "./development.js";
+import { requireValue } from "./require-value.js";
 import type { TimberState } from "./timber.js";
 
 // 정찰 거점 (기획서: BOKHOL Dev Lite 03_시스템/정찰과조달.md, 시나리오 1단계 '정찰 5회')
@@ -90,7 +91,10 @@ export type ScoutFind = {
 };
 export function scoutFinding(kind: ScoutFind["kind"]) {
   if (kind.startsWith("contact")) {
-    const village = SETTLEMENTS[Number(kind.slice(-1))]!.name;
+    const village = requireValue(
+      SETTLEMENTS[Number(kind.slice(-1))],
+      "교역 마을",
+    ).name;
     return [
       village + "의 길잡이",
       village +

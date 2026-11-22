@@ -552,6 +552,9 @@ export function actCampaign(
         const crew = send ? recoveryCrew(s) : [];
         if (send && crew.length < SCOUT_CREW)
           throw Error("수습대에 나설 주민 두 명이 필요합니다.");
+        const site = SCOUT_SITES.find((entry) => entry.id === report);
+        const run = site && scoutRun(s, site);
+        if (send && !run) throw Error("정찰대의 행군 기록이 없습니다.");
         const base = action === "recover" ? pay("RES_MEAT", 6) : s;
         const loss = dead.length
           ? commandTimber(
@@ -567,11 +570,7 @@ export function actCampaign(
           "patrol",
           {
             reports: [...c.reports, report],
-            recoveryDue: send
-              ? s.elapsed +
-                scoutRun(s, SCOUT_SITES.find((site) => site.id === report)!)!
-                  .minutes
-              : null,
+            recoveryDue: send && run ? s.elapsed + run.minutes : null,
             memorial: action === "recover" ? "recover" : "remember",
           },
           {
@@ -798,7 +797,7 @@ export function actCampaign(
       const supplied = deposit(base, "RES_MEAT", 8);
       return {
         ...supplied,
-        campaign: { ...supplied.campaign!, emergencyDay: s.world.day },
+        campaign: { ...campaignOf(supplied), emergencyDay: s.world.day },
         world: {
           ...supplied.world,
           pessimism: Math.max(

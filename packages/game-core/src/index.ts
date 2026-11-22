@@ -1,3 +1,4 @@
+export { requireValue } from "./require-value.js";
 export {
   createSceneExample,
   type SceneEntity,

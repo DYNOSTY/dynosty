@@ -80,7 +80,7 @@ it("제재소 두 곳이 주민을 중복 고용하지 않고 자기 숲만 줄�
       .every((r) => r.workplaceId !== loggingWorkId("central")),
   ).toBe(true);
   const delivered = loggingSites(s).reduce((sum, l) => sum + l.delivered, 0);
-  expect(s.world.resources.RES_WOOD).toBe((450 - 400 + delivered) * 10000);
+  expect(s.world.resources.RES_WOOD).toBe((450 - 200 + delivered) * 10000);
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
 it("한 숲이 고갈되어도 다른 숲과 지형은 남고 다음 권역에 별도 시설을 건설한다", () => {

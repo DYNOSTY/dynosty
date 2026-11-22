@@ -1,3 +1,7 @@
+.merchant-dialog p,
+.merchant-dialog h2 {
+  margin: 0 0 0.5rem;
+}
 .campaign-quest {
   display: grid;
   gap: 4px;
@@ -56,11 +60,6 @@
   justify-content: space-between;
   margin-bottom: 10px;
 }
-.campaign-dialog header h2 {
-  font-size: clamp(18px, 3vw, 24px);
-  color: #30251d;
-  margin: 0;
-}
 .campaign-dialog .campaign-still,
 .campaign-dialog video {
   display: block;
@@ -100,8 +99,7 @@
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
-.campaign-speech img,
-.campaign-speech .patrol-portrait {
+.campaign-speech img {
   width: 64px;
   height: 70px;
   object-fit: cover;
@@ -116,6 +114,13 @@
   background-image: url("/story/campaign/patrol.webp");
   background-size: 200% 200%;
   border-radius: 5px;
+}
+.campaign-speech .patrol-portrait {
+  width: 64px;
+  height: 70px;
+  object-fit: cover;
+  flex: none;
+  border-radius: 4px;
 }
 .g-scout-face .patrol-portrait {
   width: 100%;
@@ -268,9 +273,6 @@
   border: 0.35rem solid transparent;
   border-bottom-color: #fff3d6;
 }
-.prince-greetings p + p {
-  animation-delay: 1s;
-}
 @keyframes prince-hello {
   0%,
   100% {
@@ -325,6 +327,9 @@ dialog.result-screen {
   line-height: 1.6;
   word-break: keep-all;
 }
+.prince-greetings p + p {
+  animation-delay: 1s;
+}
 .result-quote footer {
   display: block;
   text-align: right;
@@ -355,10 +360,46 @@ dialog.result-screen {
     clamp(24px, 4vw, 60px) Georgia,
     serif;
 }
+.campaign-dialog header h2 {
+  font-size: clamp(18px, 3vw, 24px);
+  color: #30251d;
+  margin: 0;
+}
 .mission-entry label {
   position: absolute;
   right: 5%;
   bottom: 18%;
   background: #14191f;
   padding: 1em;
+}
+
+dialog.bokhol-title::backdrop,
+dialog.mission-entry::backdrop,
+dialog.film-screen::backdrop,
+dialog.scene-cinema::backdrop,
+dialog.result-screen::backdrop {
+  background: #100f0d;
+  opacity: 1;
+  animation: none;
+}
+.merchant-dialog {
+  margin: auto;
+  width: min(90vw, 30rem);
+  max-height: 90dvh;
+  overflow: auto;
+  background: #f2e4ca;
+  color: #312418;
+  border: 1px solid #97734c;
+  padding: 2rem;
+  text-align: center;
+}
+.merchant-dialog[open] {
+  display: grid;
+  gap: 0.65rem;
+}
+.merchant-dialog img {
+  justify-self: center;
+}
+.merchant-dialog::backdrop {
+  background: #111a;
 }

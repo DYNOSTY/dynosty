@@ -10,6 +10,7 @@ import {
   RESEARCH_CATALOG,
   type TimberState,
 } from "../../packages/game-core/dist/index.js";
+import { readVillage } from "./read-village.js";
 
 const button = (p: Page, name: string) =>
   p.getByRole("button", { name, exact: true });
@@ -124,11 +125,7 @@ test("야근 선택은 추가 식량을 차감하지 않고 부상 기록을 남
   }
   const ledger = page.getByText(/야근 부상 기록 \d+건/);
   await expect(ledger).toBeVisible();
-  const saved = await page.evaluate(
-    () =>
-      JSON.parse(localStorage.getItem("dynosty.village.resume")!).state.world
-        .pessimism,
-  );
+  const saved = (await page.evaluate(readVillage)).world.pessimism;
   expect(saved).toBe(1);
   await expect(page.getByText(/수당·추가 식량은 없습니다/)).toBeVisible();
   await ledger.scrollIntoViewIfNeeded();

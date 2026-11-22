@@ -202,7 +202,7 @@ export function createSceneEntities(
           if (departure) {
             // Six lanes between the workshops and houses. Each household walks, unloads and turns independently.
             const i = crowdIndex++;
-            const lane = [-23, -17, -6, 5, 17, 24][i % 6]!;
+            const lane = [-23, -17, -6, 5, 17, 24][i % 6] ?? 0;
             const phase =
               (processionTime * (0.09 + (i % 7) * 0.009) + i * 2.39996) %
               (2 * Math.PI);

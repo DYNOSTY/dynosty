@@ -33,6 +33,7 @@ import {
 } from "react";
 import { CampaignPanel, PatrolPortrait } from "./CampaignPanel.js";
 import {
+  firstVillageTask,
   PATROL_NAMES,
   PATROL_REQUESTS,
   villageAdvice,
@@ -54,7 +55,7 @@ import {
   saveLocalExample,
 } from "./local-save.js";
 import { MediaPanel } from "./MediaPanel.js";
-import { MerchantOffers, merchantCards } from "./MerchantOffers.js";
+import { MerchantDialog, merchantCards } from "./MerchantOffers.js";
 import { PlayPanel } from "./PlayPanel.js";
 import { PlaySavePanel } from "./PlaySavePanel.js";
 import { loadPlay, playSaveError, savePlay } from "./play-save.js";
@@ -422,12 +423,35 @@ export function App() {
     return () => sceneRef.current?.setSiteMarkers(null);
   }, [timberOpen, laborOpen, sceneStatus]);
 
+  const prologue =
+    !timberState ||
+    ["opening", "after", "departure"].includes(
+      timberState.campaign?.beat ?? "",
+    );
   const showConstructionGrid =
-    timberOpen && consoleOpen && villageSection?.label === "건설과 식량 수급";
+    !prologue &&
+    timberOpen &&
+    consoleOpen &&
+    villageSection?.label === "건설과 식량 수급";
   useEffect(() => {
     if (sceneStatus === "준비 완료")
       sceneRef.current?.setConstructionGrid(showConstructionGrid);
   }, [showConstructionGrid, sceneStatus]);
+  const stateNow = useRef(timberState);
+  stateNow.current = timberState;
+  const resumeAfterConstruction = useRef(false);
+  const constructionOpen = useRef(false);
+  useEffect(() => {
+    constructionOpen.current = showConstructionGrid;
+    if (showConstructionGrid) {
+      resumeAfterConstruction.current = stateNow.current?.paused === false;
+      if (resumeAfterConstruction.current)
+        villageCommand.current?.({ type: "pause", paused: true });
+    } else if (resumeAfterConstruction.current) {
+      resumeAfterConstruction.current = false;
+      villageCommand.current?.({ type: "pause", paused: false });
+    }
+  }, [showConstructionGrid]);
   const beginHomePlacement = useCallback(
     (
       confirm: (pose: HomePlacement) => void,
@@ -799,19 +823,51 @@ export function App() {
     timberState?.merchantItem === undefined
       ? null
       : merchantCards[timberState.merchantItem];
+  const firstTask = timberState && firstVillageTask(timberState);
+  const lastMerchantVisit = useRef("");
+  useEffect(() => {
+    if (
+      !visitor ||
+      !timberState ||
+      prologue ||
+      firstTask ||
+      timberOpen ||
+      toolsOpen ||
+      saveOpen ||
+      regionOpen ||
+      laborOpen ||
+      scoutOpen ||
+      document.querySelector("dialog:modal, .village-bulletin")
+    )
+      return;
+    const visit = `${timberState.world.day}:${timberState.merchantItem}`;
+    if (lastMerchantVisit.current === visit) return;
+    lastMerchantVisit.current = visit;
+    setConsoleOpen(true);
+    setVillageSection({ label: "교역소 방문" });
+  }, [
+    visitor,
+    timberState,
+    prologue,
+    firstTask,
+    timberOpen,
+    toolsOpen,
+    saveOpen,
+    regionOpen,
+    laborOpen,
+    scoutOpen,
+  ]);
   const daylight = (playMinute ?? 540) >= 360 && (playMinute ?? 540) < 1080;
   const showTrade =
     !!visitor && consoleOpen && villageSection?.label === "교역소 방문";
-  const prologue =
-    !timberState ||
-    ["opening", "after", "departure"].includes(
-      timberState.campaign?.beat ?? "",
-    );
   function openVillageSection(section: string) {
     setSelectedWorkplace(null);
     if (prologue) return;
     setConsoleOpen(true);
     if (!timberOpen) openTimber();
+    if (section === "교역소 방문" && visitor && timberState) {
+      lastMerchantVisit.current = `${timberState.world.day}:${timberState.merchantItem}`;
+    }
     setVillageSection({ label: section });
   }
   function toggleAuxiliary(panel: "save" | "tools") {
@@ -862,6 +918,23 @@ export function App() {
         target.closest("input, select, textarea, dialog:modal")
       )
         return;
+      if (
+        event.code === "Space" &&
+        !event.repeat &&
+        stateNow.current &&
+        !(
+          target instanceof HTMLElement &&
+          target.closest("[contenteditable=true]")
+        )
+      ) {
+        event.preventDefault();
+        if (!constructionOpen.current)
+          villageCommand.current?.({
+            type: "pause",
+            paused: !stateNow.current.paused,
+          });
+        return;
+      }
       const key = event.key.toLowerCase();
       if (key === "m") setRegionOpen((v) => !v);
       if (key === "e") openTimberRef.current();
@@ -952,6 +1025,13 @@ export function App() {
           <h1>DYNOSTY</h1>
         </div>
       </header>
+      {showTrade && timberState && (
+        <MerchantDialog
+          state={timberState}
+          close={closePopups}
+          command={(cmd) => villageCommand.current?.(cmd)}
+        />
+      )}
       <section className="g-quests" aria-label="의뢰">
         <h2>의뢰</h2>
         {timberState?.campaign && (
@@ -964,6 +1044,64 @@ export function App() {
             gateSelected={!!selectedId?.startsWith("village:BLD_GATE:")}
             onPatrolMap={showPatrolMap}
             officeSelected={!!selectedId?.startsWith("village:BLD_OFFICE:")}
+            onFirstTask={() => {
+              switch (firstTask?.step) {
+                case "restaurant":
+                case "home":
+                  setBuildPage(0);
+                  openVillageSection("건설과 식량 수급");
+                  break;
+                case "gate":
+                  closePopups();
+                  sceneRef.current?.select("village:BLD_GATE:0:24");
+                  setDefenseOpen(true);
+                  break;
+                case "staff":
+                  openVillageSection("일터 배치");
+                  setSelectedWorkplace(
+                    timberState.town.facilities.find(
+                      (f) => f.kind === "restaurant",
+                    )?.id ?? null,
+                  );
+                  break;
+                case "policy":
+                  openVillageSection("배급 정책");
+                  break;
+                case "wait": {
+                  const site = timberState.town.orders.find(
+                    (o) => o.kind === "restaurant",
+                  );
+                  if (site) sceneRef.current?.focus(site.position, 32);
+                  break;
+                }
+              }
+            }}
+            resetView={() => {
+              lastMerchantVisit.current = "";
+              resumeAfterConstruction.current = false;
+              closePopups();
+              cancelHomePlacement();
+              sceneRef.current?.select(null);
+              sceneRef.current?.overview();
+              setSelectedWorkplace(null);
+              setBuildingHover(null);
+              setPlacementHint("");
+              setDefenseOpen(false);
+              visitSouth(0);
+              setSiteNotices([]);
+              setReports([]);
+              lastResearch.current = null;
+              setBuildPage(0);
+              setConsoleOpen(true);
+            }}
+            workspaceOpen={
+              timberOpen ||
+              regionOpen ||
+              saveOpen ||
+              toolsOpen ||
+              laborOpen ||
+              !!scoutOpen
+            }
             trade={showTrade}
             work={
               villageSection?.label === "건설과 식량 수급" ||
@@ -971,7 +1109,8 @@ export function App() {
             }
           />
         )}
-        {!timberState?.chapter &&
+        {!firstTask &&
+          !timberState?.chapter &&
           (!timberState?.campaign ||
             timberState.campaign.beat === "patrol") && (
             <>
@@ -1047,7 +1186,7 @@ export function App() {
             </>
           )}
         <div className="play-status">
-          {!timberOpen ? (
+          {firstTask || prologue ? null : !timberOpen ? (
             <button
               type="button"
               className="timber-entry-link"
@@ -1197,7 +1336,14 @@ export function App() {
                   ref={(el) => {
                     pinRefs.current["visitor-mineral-" + m.id] = el;
                   }}
-                  title={m.name + " · 인근 부지 보기"}
+                  title={
+                    m.name +
+                    " · 남은 매장량 " +
+                    (timberState?.mineralSites.find(
+                      (site) => site.siteId === m.id,
+                    )?.remaining ?? m.initial) +
+                    " · 인근 부지 보기"
+                  }
                   onClick={() => {
                     const kind = m.kind === "stone" ? "quarry" : m.kind;
                     openVillageSection("건설과 식량 수급");
@@ -1837,15 +1983,7 @@ export function App() {
           </>
         )}
         <div className="g-console__info">
-          {showTrade && timberState ? (
-            <section className="trade-deck" aria-label="상인 계약 선택">
-              {dialogue}
-              <MerchantOffers
-                state={timberState}
-                command={(cmd) => villageCommand.current?.(cmd)}
-              />
-            </section>
-          ) : timberOpen && villageSection?.label === "건설과 식량 수급" ? (
+          {showConstructionGrid ? (
             <section className="building-shelf" aria-label="건물 목록">
               <button
                 type="button"

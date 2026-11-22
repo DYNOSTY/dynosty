@@ -2,6 +2,7 @@ import {
   actCampaign,
   CHAPTERS,
   CONVOY_GOALS,
+  campaignOf,
   createCapital,
   createTimberSave,
   createVillageGame,
@@ -70,7 +71,7 @@ export function standardMissionStart(stage: number) {
   if (stage === 2) return roads;
   const connected = {
     ...roads,
-    campaign: { ...roads.campaign!, treaties: SETTLEMENTS.map((_, i) => i) },
+    campaign: { ...campaignOf(roads), treaties: SETTLEMENTS.map((_, i) => i) },
   };
   if (stage === 3) return createCapital(connected);
   const escort: TimberState = {
@@ -92,7 +93,7 @@ export function standardMissionStart(stage: number) {
   });
   if (stage === 4) return fourth;
   return actCampaign(
-    { ...fourth, campaign: { ...fourth.campaign!, beat: "thaw" } },
+    { ...fourth, campaign: { ...campaignOf(fourth), beat: "thaw" } },
     { type: "campaign", beat: "thaw", action: "next" },
   );
 }

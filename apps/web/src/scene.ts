@@ -222,10 +222,14 @@ export function mountScene(
     "procurement-ground-material",
     scene,
   );
-  const vertices = demoGround.getVerticesData(VertexBuffer.PositionKind)!;
+  const vertices = demoGround.getVerticesData(VertexBuffer.PositionKind);
+  if (!vertices) throw Error("지면 모형의 꼭짓점이 없습니다.");
   const groundColors = [];
-  for (let i = 0; i < vertices.length; i += 3) {
-    groundColors.push(...groundColor(vertices[i]!, vertices[i + 2]!), 1);
+  for (const [i, x] of vertices.entries()) {
+    if (i % 3 !== 0) continue;
+    const z = vertices[i + 2];
+    if (z === undefined) throw Error("지면 좌표가 불완전합니다.");
+    groundColors.push(...groundColor(x, z), 1);
   }
   demoGround.setVerticesData(VertexBuffer.ColorKind, groundColors);
   const plotTexture = new DynamicTexture("construction-plots", 64, scene, true);
@@ -433,9 +437,10 @@ export function mountScene(
       const homeId = villageState?.homes.find(
         (home) => home.id === hit?.id,
       )?.id;
-      if (townId || villageId || homeId) {
+      const target = townId ?? villageId ?? homeId;
+      if (target) {
         if (homePreview.active) homePreview.cancel();
-        select(townId ?? villageId ?? homeId!);
+        select(target);
         const facility = villageState?.town.facilities.find(
           (f) => "town:" + f.id === townId,
         );
@@ -729,12 +734,16 @@ export function mountScene(
         heading: Math.atan2(fwd.x, fwd.z),
       });
     }
+    const villageDelta =
+      villageState?.paused && villageState.campaign?.beat !== "departure"
+        ? 0
+        : (engine.getDeltaTime() / 1000) * animationSpeed;
     entities.animate(
-      (engine.getDeltaTime() / 1000) * animationSpeed,
+      villageDelta,
       villageState?.campaign?.beat === "departure",
     );
     if (legacyVisual) legacyVisual.animate(engine.getDeltaTime() / 1000);
-    else timberVisual.animate((engine.getDeltaTime() / 1000) * animationSpeed);
+    else timberVisual.animate(villageDelta);
     laborVisual.animate(engine.getDeltaTime() / 1000);
     scene.render();
     if (markerLayer) {

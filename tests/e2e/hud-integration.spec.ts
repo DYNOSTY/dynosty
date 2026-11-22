@@ -3,6 +3,7 @@ import {
   createTimberSave,
   createVillageGame,
   payTown,
+  requireValue,
 } from "../../packages/game-core/dist/index.js";
 import { clickExample } from "./scene-picking.js";
 import { openLaborPanel } from "./workspace.js";
@@ -151,12 +152,13 @@ test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에�
   await expect(
     page.getByRole("button", { name: /갈대나루 정찰 중/ }),
   ).toHaveCount(1);
-  const bounds = await face.boundingBox();
-  const consoleBounds = await page.locator(".g-console").boundingBox();
-  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(consoleBounds!.y);
-  expect(bounds!.x).toBeGreaterThan(
-    consoleBounds!.x + consoleBounds!.width * 0.8,
+  const bounds = requireValue(await face.boundingBox(), "화면 위치");
+  const consoleBounds = requireValue(
+    await page.locator(".g-console").boundingBox(),
+    "화면 위치",
   );
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(consoleBounds.y);
+  expect(bounds.x).toBeGreaterThan(consoleBounds.x + consoleBounds.width * 0.8);
   const detail = face.locator(".g-scout-detail");
   await expect(detail).toBeHidden();
   await face.hover();

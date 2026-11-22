@@ -3,6 +3,8 @@ import {
   type TimberState,
   visitorOffer,
 } from "@dynosty/game-core";
+import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 export const merchantCards = [
   [
     "plant",
@@ -77,7 +79,9 @@ export function MerchantOffers({
   command: (c: TimberCommand) => void;
   busy?: boolean;
 }) {
-  const merchant = merchantCards[state.merchantItem!];
+  const item = state.merchantItem;
+  if (item === undefined) return null;
+  const merchant = merchantCards[item];
   if (!merchant) return null;
   return (
     <>
@@ -86,7 +90,7 @@ export function MerchantOffers({
         {state.town.facilities.find((f) => f.kind === "trade")?.level ?? 1}레벨
         상인 · {merchant[2]}
       </p>
-      {state.riskyMerchants?.includes(state.merchantItem!) && (
+      {state.riskyMerchants?.includes(item) && (
         <p>
           지난 납품에 규격 미달품이 있었습니다. 이번에는 값을 낮추거나 대량
           계약의 물량을 더 받을 수 있습니다.
@@ -102,7 +106,7 @@ export function MerchantOffers({
             onClick={() =>
               command({
                 type: "visit-decision",
-                item: state.merchantItem!,
+                item: item,
                 day: state.world.day,
                 option,
               })
@@ -119,7 +123,7 @@ export function MerchantOffers({
         onClick={() =>
           command({
             type: "visit-decision",
-            item: state.merchantItem!,
+            item: item,
             day: state.world.day,
             option: "decline",
           })
@@ -128,5 +132,54 @@ export function MerchantOffers({
         이번 거래 거절
       </button>
     </>
+  );
+}
+
+export function MerchantDialog({
+  state,
+  command,
+  close,
+}: {
+  state: TimberState;
+  command: (c: TimberCommand) => void;
+  close: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+  const merchant =
+    state.merchantItem === undefined ? null : merchantCards[state.merchantItem];
+  if (!merchant) return null;
+  return createPortal(
+    <dialog
+      ref={dialog}
+      className="merchant-dialog"
+      aria-label="상인 계약 선택"
+      onCancel={(e) => {
+        e.preventDefault();
+        close();
+      }}
+    >
+      <img
+        src={`/art/merchants/${merchant[0]}.png`}
+        alt={`${merchant[1]} 상인 ${merchant[2]}의 초상`}
+        width="86"
+        height="86"
+      />
+      <h2>{merchant[2]}</h2>
+      <p>{merchant[3]}</p>
+      <MerchantOffers
+        state={state}
+        command={(cmd) => {
+          command(cmd);
+          close();
+        }}
+      />
+      <button type="button" onClick={close}>
+        나중에 보기
+      </button>
+    </dialog>,
+    document.body,
   );
 }

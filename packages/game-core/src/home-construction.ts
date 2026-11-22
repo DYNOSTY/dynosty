@@ -10,7 +10,11 @@ import {
 } from "./resident-path.js";
 import { workplaceOpen } from "./resident-routine.js";
 import type { TimberState } from "./timber.js";
-import { assignHomes, VILLAGE_RULES } from "./village-services.js";
+import {
+  assignHomes,
+  nextDwellingId,
+  VILLAGE_RULES,
+} from "./village-services.js";
 
 export interface HomeBuilder {
   readonly id: string | null;
@@ -168,7 +172,8 @@ export function advanceHomeConstruction(
     };
   if (s.elapsed < b.finishAt) return next;
   const home = {
-    id: `dwelling-${s.homes.length + 1}`,
+    id: nextDwellingId(s.homes),
+    timberCost: crew.reduce((sum, w) => sum + w.amount, 0),
     position: { ...b.position },
     headingRadians: pose.headingRadians,
     capacity: VILLAGE_RULES.homeSpace,

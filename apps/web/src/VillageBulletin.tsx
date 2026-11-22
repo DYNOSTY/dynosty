@@ -147,8 +147,8 @@ export function VillageBulletin({
             )}
             <div>
               <small>
-                {finding
-                  ? site!.name + " 방면 · 정찰대의 전갈"
+                {finding && site
+                  ? site.name + " 방면 · 정찰대의 전갈"
                   : bulletin?.kind === "decree"
                     ? "관아의 방"
                     : bulletin

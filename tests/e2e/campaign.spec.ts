@@ -1,15 +1,19 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
   CONVOY_GOALS,
+  campaignOf,
   commandTimber,
   createCapital,
   createTimberSave,
   createVillageGame,
   deposit,
+  mutantRepairCost,
   payTown,
   RESEARCH_CATALOG,
+  requireValue,
   SCOUT_SITES,
 } from "../../packages/game-core/dist/index.js";
+import { readVillage } from "./read-village.js";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -21,7 +25,7 @@ async function readScene(page: Page, label: string) {
   const action = next.or(choice).first();
   for (;;) {
     await expect(action).toBeVisible();
-    const previous = await action.innerText();
+    const previous = (await action.textContent()) ?? "";
     if (previous.trim() === label) {
       await choice.click();
       break;
@@ -102,11 +106,20 @@ for (const [level, label] of [
       await expect(firstSpeech.locator("strong")).toHaveText(
         "가솔을 이끄는 귀족",
       );
-      const portrait = await firstSpeech.locator(".story-face").boundingBox(),
-        speaker = await firstSpeech.locator("strong").boundingBox(),
-        words = await firstSpeech.locator("p").boundingBox();
-      expect(portrait!.x + portrait!.width).toBeLessThanOrEqual(speaker!.x);
-      expect(Math.abs(speaker!.x - words!.x)).toBeLessThan(2);
+      const portrait = requireValue(
+          await firstSpeech.locator(".story-face").boundingBox(),
+          "화면 위치",
+        ),
+        speaker = requireValue(
+          await firstSpeech.locator("strong").boundingBox(),
+          "화면 위치",
+        ),
+        words = requireValue(
+          await firstSpeech.locator("p").boundingBox(),
+          "화면 위치",
+        );
+      expect(portrait.x + portrait.width).toBeLessThanOrEqual(speaker.x);
+      expect(Math.abs(speaker.x - words.x)).toBeLessThan(2);
       await page.reload();
       await expect(dialog).toHaveAccessibleName("귀족들이 출문을 청했다");
       await expect(dialog.locator("video")).toHaveCount(0);
@@ -118,8 +131,13 @@ for (const [level, label] of [
       for (let i = 0; i < 3; i++)
         await dialog.locator(".campaign-speech").click();
       await expect(dialog).toHaveClass(/scene-cinema/);
-      const still = await dialog.locator(".campaign-still").boundingBox();
-      expect(still!.height).toBeGreaterThan(page.viewportSize()!.height * 0.95);
+      const still = requireValue(
+        await dialog.locator(".campaign-still").boundingBox(),
+        "화면 위치",
+      );
+      expect(still.height).toBeGreaterThan(
+        requireValue(page.viewportSize(), "page.viewportSize()").height * 0.95,
+      );
       await expect(dialog.locator(".campaign-still")).toHaveAttribute(
         "src",
         /mokjin-exodus.webp$/,
@@ -135,11 +153,7 @@ for (const [level, label] of [
       await expect(page.getByTestId("play-population")).toContainText("60");
       await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,000");
       expect(
-        await page.evaluate(
-          () =>
-            JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
-              .campaign.difficulty,
-        ),
+        await page.evaluate(readVillage).then((s) => s.campaign?.difficulty),
       ).toBe(level);
       await readScene(page, "남은 예순 명과 시작");
       await page.getByRole("button", { name: "관아 · 순라 배치" }).click();
@@ -160,6 +174,7 @@ for (const [level, label] of [
     label +
       " · 함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단계는 플레이어가 선택한다",
     async ({ page }) => {
+      test.setTimeout(240_000);
       const sent = commandTimber(
         createVillageGame(),
         { type: "scout-sites", ids: SCOUT_SITES.map((x) => x.id) },
@@ -167,7 +182,7 @@ for (const [level, label] of [
       );
       const save = createTimberSave({
         ...sent,
-        campaign: { ...sent.campaign!, difficulty: level },
+        campaign: { ...campaignOf(sent), difficulty: level },
         world: { ...sent.world, day: 4 },
       });
       await page.addInitScript((value) => {
@@ -213,18 +228,25 @@ for (const [level, label] of [
         .getByRole("button", { name: /1단계 · 복홀의 첫 명령/ })
         .click();
       const nextLine = page.getByRole("button", { name: /^다음 대사/ });
-      while (await nextLine.count()) await nextLine.click();
+      await nextLine.click();
+      await expect(
+        page.getByRole("dialog").locator("video.campaign-still"),
+      ).toBeVisible();
+      await expect(transition).toBeVisible();
       await transition.click();
       await settings.click();
       await difficulty.selectOption(level);
       await page.getByRole("button", { name: "시작하기" }).click();
+      const missionFilm = page.locator("dialog.film-screen");
+      await expect(missionFilm.locator("video")).toHaveAttribute(
+        "src",
+        /two\.mp4$/,
+      );
+      await missionFilm.locator(".film-skip").click();
       await expect
         .poll(() =>
-          page.evaluate(() => {
-            const state = JSON.parse(
-              localStorage.getItem("dynosty.village.resume")!,
-            ).state;
-            return [state.chapter, state.campaign.difficulty];
+          page.evaluate(readVillage).then((state) => {
+            return [state.chapter, state.campaign?.difficulty];
           }),
         )
         .toEqual([2, level]);
@@ -257,11 +279,7 @@ for (const [level, label] of [
       );
       await expect
         .poll(() =>
-          page.evaluate(
-            () =>
-              JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
-                .campaign.difficulty,
-          ),
+          page.evaluate(readVillage).then((s) => s.campaign?.difficulty),
         )
         .toBe("normal");
     },
@@ -274,7 +292,7 @@ test("밤에 달이가 배급령 변경을 재촉하고 주민 청을 거절하�
   const save = createTimberSave({
     ...start,
     world: { ...start.world, minute: 1080, pessimism: 94 },
-    campaign: { ...start.campaign!, difficulty: "hard" },
+    campaign: { ...campaignOf(start), difficulty: "hard" },
   });
   await page.addInitScript((value) => {
     if (!localStorage.getItem("dynosty.village.resume"))
@@ -293,9 +311,12 @@ test("밤에 달이가 배급령 변경을 재촉하고 주민 청을 거절하�
   const caption = page.locator(".fallen-caption");
   const alignedBelow = await caption.evaluate((element) => {
     const range = document.createRange();
-    range.selectNodeContents(element.firstChild!);
+    const sentenceNode = element.firstChild;
+    const creditNode = element.querySelector("small");
+    if (!sentenceNode || !creditNode) return false;
+    range.selectNodeContents(sentenceNode);
     const sentence = range.getBoundingClientRect();
-    range.selectNodeContents(element.querySelector("small")!);
+    range.selectNodeContents(creditNode);
     const credit = range.getBoundingClientRect();
     return (
       credit.top >= sentence.bottom &&
@@ -322,7 +343,7 @@ test("어려움으로 저장된 5단계에서 지지가 사라지면 시간 진�
   const save = createTimberSave({
     ...s,
     chapter: 5,
-    campaign: { ...s.campaign!, beat: "vigil", difficulty: "hard" },
+    campaign: { ...campaignOf(s), beat: "vigil", difficulty: "hard" },
     world: { ...s.world, optimism: 0, pessimism: 20 },
   });
   await page.addInitScript(
@@ -342,11 +363,11 @@ test("옛 저장은 기본 보통 난이도로 남은 유예 시간을 이어간
   const save = createTimberSave({
     ...s,
     chapter: 5,
-    campaign: { ...s.campaign!, beat: "vigil", pessimismExtremeSince: 0 },
+    campaign: { ...campaignOf(s), beat: "vigil", pessimismExtremeSince: 0 },
     elapsed: 1439,
     world: { ...s.world, pessimism: 100 },
   });
-  delete save.state.campaign!.difficulty;
+  delete requireValue(save.state.campaign, "save.state.campaign").difficulty;
   await page.addInitScript(
     (value) =>
       localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
@@ -369,7 +390,7 @@ test("좁은 화면의 5단계 컷씬과 성안 변종 없는 반란을 이어 �
     ...start,
     chapter: 5,
     world: { ...start.world, pessimism: 85, optimism: 75 },
-    campaign: { ...start.campaign!, beat: "summit" },
+    campaign: { ...campaignOf(start), beat: "summit" },
   });
   await page.addInitScript(
     (data) =>
@@ -383,9 +404,8 @@ test("좁은 화면의 5단계 컷씬과 성안 변종 없는 반란을 이어 �
   await page.goto("/");
   const dialog = page.getByRole("dialog");
   await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
-  await expect
-    .poll(() => dialog.locator("video").evaluate((v) => v.readyState))
-    .toBeGreaterThan(1);
+  // A resumed summit starts at the meeting. The stage introduction plays on entry.
+  await expect(dialog).toContainText("마지막 수레에 어린 것들이 타고 있어요");
   await dialog.getByRole("button", { name: /^다음 대사/ }).click();
   const family = dialog.getByRole("img", { name: /포와 혜/ });
   await expect
@@ -517,7 +537,10 @@ test("붉은 눈의 주민에게 치안대를 보내고 훼손된 둥지만 수�
 }) => {
   const base = createVillageGame(false, true);
   const guard = commandTimber(base, { type: "set-guards", count: 4 }, "guard");
-  const patient = guard.residents.find((r) => !r.workplaceId)!;
+  const patient = requireValue(
+    guard.residents.find((r) => !r.workplaceId),
+    "시나리오 대상",
+  );
   const injured = commandTimber(
     guard,
     {
@@ -534,7 +557,9 @@ test("붉은 눈의 주민에게 치안대를 보내고 훼손된 둥지만 수�
   const save = createTimberSave({
     ...injured,
     mutants: [{ id: patient.id, due: 30 }],
-    mutantDamage: { [injured.homes[0]!.id]: 25 },
+    mutantDamage: {
+      [requireValue(injured.homes[0], "injured.homes[0]").id]: 25,
+    },
   });
   await page.addInitScript((value) => {
     if (!localStorage.getItem("dynosty.village.resume"))
@@ -551,7 +576,13 @@ test("붉은 눈의 주민에게 치안대를 보내고 훼손된 둥지만 수�
     .toBeGreaterThan(0);
   await active.getByRole("button", { name: "치안대 출동" }).click();
   await expect(active).toHaveCount(0);
-  const repair = page.getByRole("button", { name: "수리 · 목재 4, 석재 1" });
+  const cost = mutantRepairCost(
+    save.state,
+    requireValue(injured.homes[0], "손상된 둥지").id,
+  );
+  const repair = page.getByRole("button", {
+    name: `수리 · 목재 ${cost.RES_WOOD}, 석재 ${cost.RES_STONE}`,
+  });
   await repair.click();
   await expect(repair).toHaveCount(0);
   await page.reload();
@@ -564,7 +595,7 @@ test("쥬신 왕으로 도성 구호를 명하고 설정에서 변종 야습 기
 }) => {
   const s = createVillageGame();
   const save = createTimberSave(
-    createCapital({ ...s, campaign: { ...s.campaign!, beat: "roads" } }),
+    createCapital({ ...s, campaign: { ...campaignOf(s), beat: "roads" } }),
   );
   await page.addInitScript((value) => {
     if (!localStorage.getItem("dynosty.village.resume"))
@@ -605,14 +636,20 @@ test("쥬신 왕으로 도성 구호를 명하고 설정에서 변종 야습 기
 function awakenedVillageSave(completed: string[], days: number) {
   let base = createVillageGame();
   for (const id of completed)
-    base = payTown(base, RESEARCH_CATALOG.find((r) => r.id === id)!.cost);
+    base = payTown(
+      base,
+      requireValue(
+        RESEARCH_CATALOG.find((r) => r.id === id),
+        "연구 항목",
+      ).cost,
+    );
   return createTimberSave({
     ...base,
     chapter: 5,
     elapsed: base.elapsed + days * 1440,
     world: { ...base.world, day: base.world.day + days },
     campaign: {
-      ...base.campaign!,
+      ...campaignOf(base),
       beat: "vigil",
       side: "control",
       revivalPrepared: true,
@@ -641,7 +678,7 @@ for (const prepared of [true, false]) {
       const save = createTimberSave({
         ...base.state,
         campaign: {
-          ...base.state.campaign!,
+          ...campaignOf(base.state),
           beat: "ending",
           ending: "escape",
           revivalPrepared: prepared,
@@ -679,13 +716,14 @@ test("기한 1분 전 세 번째 행렬을 보내면 왕의 결말에서 남하 
   const village = createVillageGame();
   const capital = createCapital({
     ...village,
-    campaign: { ...village.campaign!, beat: "roads" },
+    campaign: { ...campaignOf(village), beat: "roads" },
   });
   const save = createTimberSave({
     ...capital,
-    elapsed: capital.campaign!.since + 36 * 60 - 1,
+    elapsed:
+      requireValue(capital.campaign, "capital.campaign").since + 36 * 60 - 1,
     campaign: {
-      ...capital.campaign!,
+      ...campaignOf(capital),
       relief: "report",
       departures: 2,
       evacuees: 200,
@@ -766,7 +804,7 @@ test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 �
     chapter: 4,
     paused: true,
     campaign: {
-      ...village.campaign!,
+      ...campaignOf(village),
       beat: "thaw",
       departures: 3,
       evacuees: 200,
@@ -790,7 +828,7 @@ test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 �
         "resource-RES_FISH",
         "resource-RES_COAL",
       ].map(async (id) => {
-        const label = await page.getByTestId(id).innerText();
+        const label = (await page.getByTestId(id).textContent()) ?? "";
         const match = label.match(/[\d,]+/);
         if (!match) throw Error(id + " 수량 누락");
         return Number(match[0].replaceAll(",", ""));
@@ -823,7 +861,7 @@ test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 �
   expect(delta).toEqual([120, 3000, 1500, 1500, 1800]);
   const advance = dialog.getByRole("button", { name: /^다음 대사/ });
   for (let i = 0; i < 6; i++) {
-    const label = await advance.innerText();
+    const label = (await advance.textContent()) ?? "";
     await advance.click();
     await expect(advance).not.toHaveText(label);
   }
@@ -835,7 +873,12 @@ test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 �
   await expect(dialog).toContainText("입고 장부");
   await expect(dialog).toContainText(
     ["목재", "고기", "어류", "석탄"]
-      .map((label, i) => label + " " + delta[i + 1]!.toLocaleString("ko-KR"))
+      .map(
+        (label, i) =>
+          label +
+          " " +
+          requireValue(delta[i + 1], "delta[i + 1]").toLocaleString("ko-KR"),
+      )
       .join(" · "),
   );
 });
@@ -851,7 +894,7 @@ for (const [label, raided, rally, verdict] of [
       chapter: 5,
       paused: true,
       campaign: {
-        ...base.campaign!,
+        ...campaignOf(base),
         beat: "rally",
         side: "control",
         uprising: true,
@@ -916,7 +959,7 @@ for (const [hope, allegiance, film] of [
       elapsed: 5 * 1440,
       world: { ...village.world, day: 6, minute: 1260, optimism: hope },
       campaign: {
-        ...village.campaign!,
+        ...campaignOf(village),
         beat: "rally",
         since: 0,
         side: "coexist",
@@ -938,14 +981,11 @@ for (const [hope, allegiance, film] of [
         : "판결을 기록하고 마을로",
     );
     const readProgress = () =>
-      page.evaluate(() => {
-        const s = JSON.parse(
-          localStorage.getItem("dynosty.village.resume")!,
-        ).state;
+      page.evaluate(readVillage).then((s) => {
         return {
           elapsed: s.elapsed as number,
           completed: s.town.development.completed as string[],
-          ending: s.campaign.ending as string | null,
+          ending: s.campaign?.ending,
         };
       });
     const dismissNotices = async () => {
@@ -1029,11 +1069,15 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
     ...village,
     chapter: 5,
     paused: true,
-    campaign: { ...village.campaign!, beat: "summit" },
+    campaign: { ...campaignOf(village), beat: "summit" },
   });
   const ending = createTimberSave({
     ...checkpoint.state,
-    campaign: { ...checkpoint.state.campaign!, beat: "ending", ending: "hope" },
+    campaign: {
+      ...campaignOf(checkpoint.state),
+      beat: "ending",
+      ending: "hope",
+    },
   });
   await page.addInitScript((value) => {
     if (!localStorage.getItem("dynosty.village.resume"))
@@ -1062,9 +1106,7 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   await expect(dialog.getByRole("button", { name: /^슬롯 / })).toHaveCount(10);
   await dialog.getByRole("button", { name: /슬롯 10 · 빈 슬롯/ }).click();
   await expect(dialog).toContainText("슬롯 10에 저장했습니다.");
-  const manual = await page.evaluate(
-    () => JSON.parse(localStorage.getItem("dynosty.village.resume")!).state,
-  );
+  const manual = await page.evaluate(readVillage);
   await page.evaluate(
     (value) =>
       localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
@@ -1078,17 +1120,9 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   await dialog.getByRole("button", { name: "이어하기" }).click();
   await dialog.getByRole("button", { name: /슬롯 10 · 5단계/ }).click();
   await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
-            .campaign.beat,
-      ),
-    )
+    .poll(() => page.evaluate(readVillage).then((s) => s.campaign?.beat))
     .toBe("forecast");
-  const loaded = await page.evaluate(
-    () => JSON.parse(localStorage.getItem("dynosty.village.resume")!).state,
-  );
+  const loaded = await page.evaluate(readVillage);
   expect(loaded.world).toEqual(manual.world);
   expect(loaded.town).toEqual(manual.town);
   await expect(
@@ -1101,9 +1135,7 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   await expect(dialog.locator("video")).toHaveAttribute("src", /five\.mp4$/);
   await dialog.getByRole("button", { name: "건너뛰기" }).click();
   await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
-  const resumed = await page.evaluate(
-    () => JSON.parse(localStorage.getItem("dynosty.village.resume")!).state,
-  );
+  const resumed = await page.evaluate(readVillage);
   expect(resumed.world.resources).toEqual(checkpoint.state.world.resources);
   expect(resumed.world.citizens).toEqual(checkpoint.state.world.citizens);
 });
@@ -1112,10 +1144,14 @@ test("도성 실패 화면에 무음 피습 장면이 열린다", async ({ page 
   const village = createVillageGame();
   const capital = createCapital({
     ...village,
-    campaign: { ...village.campaign!, beat: "roads" },
+    campaign: { ...campaignOf(village), beat: "roads" },
   });
   const expired = commandTimber(
-    { ...capital, elapsed: capital.campaign!.since + 36 * 60 },
+    {
+      ...capital,
+      elapsed:
+        requireValue(capital.campaign, "capital.campaign").since + 36 * 60,
+    },
     { type: "campaign", beat: "capital", action: "report" },
     "deadline",
   );
@@ -1155,7 +1191,7 @@ for (const [choice, words] of [
     const save = createTimberSave({
       ...village,
       chapter: 3,
-      campaign: { ...village.campaign!, beat: "escort" },
+      campaign: { ...campaignOf(village), beat: "escort" },
     });
     await page.addInitScript(
       (value) =>

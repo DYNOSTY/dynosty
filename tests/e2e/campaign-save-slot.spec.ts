@@ -1,10 +1,12 @@
 import { expect, test } from "@playwright/test";
 import {
   AMOUNT_SCALE,
+  campaignOf,
   createPlayState,
   createTimberSave,
   createVillageGame,
 } from "../../packages/game-core/dist/index.js";
+import { readVillage } from "./read-village.js";
 
 test.use({
   launchOptions: { args: ["--disable-webgl"] },
@@ -24,7 +26,7 @@ test("이어하기로 저장 슬롯을 열면 첫 재고부터 저장한 고기 
 
   const slot = createTimberSave({
     ...village,
-    campaign: { ...village.campaign!, difficulty: "easy" },
+    campaign: { ...campaignOf(village), difficulty: "easy" },
     paused: true,
     world: {
       ...village.world,
@@ -85,11 +87,7 @@ test("이어하기로 저장 슬롯을 열면 첫 재고부터 저장한 고기 
   await expect(meat).toHaveText(meatText);
   await expect
     .poll(() =>
-      page.evaluate(
-        (key) =>
-          JSON.parse(localStorage.getItem(key)!).state.campaign.difficulty,
-        resumeKey,
-      ),
+      page.evaluate(readVillage, resumeKey).then((s) => s.campaign?.difficulty),
     )
     .toBe("easy");
 });
@@ -116,13 +114,9 @@ test("처음 본 서막은 한 번만 재생하고 남은 주민의 장부는 �
   await button("나가기").click();
   await button("새로 시작").click();
   await button("돌아가기").click();
-  expect(
-    await page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
-          .campaign.beat,
-    ),
-  ).toBe("after");
+  expect(await page.evaluate(readVillage).then((s) => s.campaign?.beat)).toBe(
+    "after",
+  );
   await button("새로 시작").click();
   await button("시작하기").click();
   await expect(
@@ -154,7 +148,7 @@ test("돌아보기에서 서막 영상을 넘길 때 마을을 가린 채 다음
     ),
   ).toBe("rgb(18, 16, 14)");
   await expect(
-    gallery.getByRole("img", { name: "1단계 · 복홀" }),
+    gallery.getByRole("img", { name: "복홀의 첫 명령", exact: true }),
   ).toBeVisible();
 });
 

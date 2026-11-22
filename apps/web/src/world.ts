@@ -1,3 +1,4 @@
+import { VILLAGE_POND as POND } from "@dynosty/game-core";
 // 본진 세상: 운석 뒤 혹한(기획서) — 눈보라 속 떠 있는 땅, 베어 낸 숲, 무너진 집터, 따뜻한 불빛만 남은 마을
 import "@babylonjs/core/Particles/particleSystemComponent";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
@@ -20,7 +21,8 @@ import { SCOUT_SITES } from "./scout-sites.js";
 export const ISLAND_RADIUS = 70;
 /** 미니맵 한 변(m) */
 export const MAP_SPAN = (ISLAND_RADIUS + 1) * 2;
-export const POND = { x: 17, z: 15, r: 3.6 };
+export { VILLAGE_POND as POND } from "@dynosty/game-core";
+
 const LAKE = { x: 40, z: -26, r: 10 };
 
 const smooth = (a: number, b: number, v: number) => {
@@ -614,7 +616,7 @@ export function buildWorld(
     [52, 18],
     [-20, -46],
     [18, -50],
-  ].forEach(([cx = 0, cz = 0], i) => {
+  ].forEach(([cx = 0, cz = 0]) => {
     const yaw = ruinR() * Math.PI;
     for (let k = 0; k < 4; k++) {
       const side = k % 2 ? 1 : -1,

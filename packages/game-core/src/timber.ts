@@ -4,9 +4,9 @@ import {
   BOKHOL_MINERALS,
   BOKHOL_PRODUCTION_SITES,
   constructionPlot,
-  fixedBuildingAt,
   type ProductionSiteId,
   productionSiteDefinition,
+  reservedVillageLand,
   sawmillHasForest,
 } from "./bokhol.js";
 import {
@@ -83,6 +83,7 @@ import {
   type PlayState,
   parsePlayState,
 } from "./play.js";
+import { requireValue } from "./require-value.js";
 import {
   type GroundObstacle,
   type GroundPoint,
@@ -120,6 +121,7 @@ import {
   BUILDING_RULES,
   type BuildingKind,
   createTown,
+  demolishBuilding,
   deposit,
   dispatchFood,
   type Facility,
@@ -144,6 +146,7 @@ import {
   initialHomes,
   type MealPlan,
   mealPlan,
+  nextDwellingId,
   type RationPolicy,
   rationLimit,
   speciesRule,
@@ -305,6 +308,7 @@ export interface TimberState {
     readonly cart: GroundPoint;
   } | null;
   readonly homes: readonly VillageHome[];
+  readonly firstRationSet?: boolean;
   readonly restaurantWorkerTarget: number;
   readonly rationPolicy: RationPolicy;
   readonly restaurantBuilt: boolean;
@@ -380,6 +384,7 @@ export type TimberCommand =
   | { type: "dismiss-sighting" }
   | { type: "dismiss-raid" }
   | { type: "set-gate"; count: number }
+  | { type: "demolish-building"; id: string }
   | { type: "set-guards"; count: 0 | 4 | 8 | 16 }
   | { type: "set-ration-policy"; policy: RationPolicy }
   | { type: "citizen-event"; event: CitizenEvent }
@@ -525,7 +530,10 @@ export function createVillageGame(
     ? [
         ...world.citizens,
         ...Array.from({ length: 540 }, (_, i) => ({
-          ...world.citizens[i % world.citizens.length]!,
+          ...requireValue(
+            world.citizens[i % world.citizens.length],
+            "복홀 주민 원형",
+          ),
           id: `departing-${i}`,
         })),
       ]
@@ -562,7 +570,10 @@ export function createCapital(s: TimberState): TimberState {
   const seed = createVillageGame();
   const { lastPolicyAt: _lastPolicyAt, ...history } = campaignOf(s);
   const citizens = Array.from({ length: 1000 }, (_, i) => ({
-    ...seed.world.citizens[i % seed.world.citizens.length]!,
+    ...requireValue(
+      seed.world.citizens[i % seed.world.citizens.length],
+      "도성 주민 원형",
+    ),
     id: `capital-${i + 1}`,
   }));
   const buildings = Array.from({ length: 100 }, (_, i) => ({
@@ -578,7 +589,7 @@ export function createCapital(s: TimberState): TimberState {
   // Keep the palace quarter and gate clear. Displaced homes line the outer street.
   let outerStreetX = -72;
   for (const home of buildings) {
-    if (fixedBuildingAt(home.position, false)) {
+    if (reservedVillageLand(home.position, false)) {
       home.position = { x: outerStreetX, y: 0, z: -88 };
       outerStreetX += 16;
     }
@@ -605,7 +616,7 @@ export function createCapital(s: TimberState): TimberState {
   ];
   function capitalWorkPlot(i: number) {
     const p = { x: ((i % 6) - 3) * 16, z: i < 6 ? -16 : 16 };
-    return fixedBuildingAt(p, false) ? { ...p, z: 2 * p.z } : p;
+    return reservedVillageLand(p, false) ? { ...p, z: 2 * p.z } : p;
   }
   const facilities = kinds.map(
     (kind, i): Facility => ({
@@ -623,14 +634,23 @@ export function createCapital(s: TimberState): TimberState {
       haul: null,
     }),
   );
-  const hospital = facilities.find((f) => f.kind === "hospital")!;
+  const hospital = requireValue(
+    facilities.find((f) => f.kind === "hospital"),
+    "병원",
+  );
   city = payTown(city, upgradeCost(hospital));
   hospital.level = 2;
   const completed = ["TECH_SEED", "TECH_TRAIL", "UPGRADE_HOSPITAL_2"];
   for (const f of facilities)
     city = payTown(city, originalBuildingCost(f.kind));
   for (const tech of completed)
-    city = payTown(city, RESEARCH_CATALOG.find((r) => r.id === tech)!.cost);
+    city = payTown(
+      city,
+      requireValue(
+        RESEARCH_CATALOG.find((r) => r.id === tech),
+        "연구 항목",
+      ).cost,
+    );
   const posts = facilities.flatMap((facility, index) =>
     Array.from({ length: facility.target }, () => ({
       workplaceId: index === 0 ? "restaurant" : "facility:" + facility.id,
@@ -1227,7 +1247,12 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
           ? [
               ...next.homes,
               {
-                id: `dwelling-${next.homes.length + 1}`,
+                id: nextDwellingId(next.homes),
+                timberCost:
+                  next.construction?.crew?.reduce(
+                    (sum, w) => sum + w.amount,
+                    0,
+                  ) ?? VILLAGE_RULES.constructionWood,
                 position: { ...build.position },
                 capacity: VILLAGE_RULES.homeSpace,
               },
@@ -2010,8 +2035,9 @@ export function parseTimberState(value: unknown): TimberState {
   }
   if (
     !Array.isArray(value.homes) ||
-    value.homes.length < 1 ||
     value.homes.length > 100 ||
+    (value.firstRationSet !== undefined &&
+      typeof value.firstRationSet !== "boolean") ||
     !["needs", "cap"].includes(value.rationPolicy as string)
   )
     fail("거주지·배급 정책이 올바르지 않습니다.");
@@ -2023,6 +2049,10 @@ export function parseTimberState(value: unknown): TimberState {
       typeof h.id !== "string" ||
       !h.id ||
       homeIds.has(h.id) ||
+      (h.priceVersion !== undefined &&
+        ![2, 3, 4].includes(Number(h.priceVersion))) ||
+      (h.timberCost !== undefined &&
+        ![20, 50, 100].includes(Number(h.timberCost))) ||
       !point(h.position) ||
       !Number.isInteger(h.level ?? 1) ||
       Number(h.level ?? 1) < 1 ||
@@ -2112,7 +2142,11 @@ export function parseTimberState(value: unknown): TimberState {
           builders.add(w.id as string);
         }
       }
-      if (amount !== 20 && amount !== VILLAGE_RULES.constructionWood)
+      if (
+        amount !== 20 &&
+        amount !== 100 &&
+        amount !== VILLAGE_RULES.constructionWood
+      )
         fail("건설 자재 합계가 일치하지 않습니다.");
       if (
         build.finishAt !== null &&
@@ -2295,7 +2329,7 @@ export function parseTimberState(value: unknown): TimberState {
       (r.rationDay as number) > (value.world as unknown as PlayState).day ||
       !Number.isSafeInteger(r.rationUsed) ||
       (r.rationUsed as number) < 0 ||
-      (r.rationUsed as number) > 20000 ||
+      (r.rationUsed as number) > 200000 ||
       (r.lastMeal !== null &&
         (!isRecord(r.lastMeal) ||
           Object.entries(r.lastMeal).some(
@@ -2303,7 +2337,7 @@ export function parseTimberState(value: unknown): TimberState {
               !["RES_PLANT", "RES_MEAT", "RES_FISH"].includes(food) ||
               !Number.isSafeInteger(amount) ||
               (amount as number) <= 0 ||
-              (amount as number) > 5000,
+              (amount as number) > 50000,
           ))) ||
       (r.home !== null && !point(r.home)) ||
       (r.diningSeat !== null &&
@@ -2776,15 +2810,22 @@ function merchantStaff(s: TimberState) {
       ).length
     : 0;
 }
+function pickOne<T>(items: readonly [T, ...T[]], random: () => number): T {
+  return items[Math.floor(random() * items.length)] ?? items[0];
+}
 export function visitorOffer(s: TimberState, option: "A" | "B") {
   const item = s.merchantItem;
   if (item === undefined) throw Error("방문 상인이 없습니다.");
   const level = s.town.facilities.find((f) => f.kind === "trade")?.level ?? 1;
   const risk = s.riskyMerchants?.includes(item);
-  const payment = paymentItems[item]!;
+  const payment = paymentItems[item];
+  const goods = merchantGoods[item];
+  const tender = payment !== undefined && merchantGoods[payment];
+  if (!goods || !tender || payment === undefined)
+    throw Error("상인의 거래 품목을 확인할 수 없습니다.");
   return {
-    goods: merchantGoods[item]!,
-    payment: merchantGoods[payment]!,
+    goods,
+    payment: tender,
     paymentIndex: payment,
     cost: (option === "A" ? 4 : 7) - (risk ? 1 : 0),
     quantity:
@@ -2808,7 +2849,7 @@ export function villageTemperature(s: TimberState) {
         ? Math.min(30, Math.floor((s.elapsed - s.campaign.since) / 60) * 2)
         : 0) +
       6 * Math.cos(((hour - 14) * Math.PI) / 12) +
-      [0, 2, -3, 1, -2][(s.world.day - 1) % 5]!,
+      ([0, 2, -3, 1, -2][(s.world.day - 1) % 5] ?? 0),
   );
 }
 export function capitalRoad(s: TimberState) {
@@ -2876,6 +2917,7 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
   for (let i = 0; i < 2 && exposed.length; i++) {
     if (random() >= 0.7 / (1 + defenders / 4)) continue;
     const [victim] = exposed.splice(Math.floor(random() * exposed.length), 1);
+    if (!victim) continue;
     const killed = random() < 0.2;
     const id = "gate-raid-" + s.elapsed + "-" + i;
     s = commandTimber(
@@ -2883,12 +2925,12 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
       {
         type: "citizen-event",
         event: killed
-          ? { type: "death", id, citizenIds: [victim!.id] }
+          ? { type: "death", id, citizenIds: [victim.id] }
           : {
               type: "illness",
               severity: "major",
               id,
-              citizenIds: [victim!.id],
+              citizenIds: [victim.id],
             },
       },
       id,
@@ -2896,7 +2938,7 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
     if (killed) dead++;
     else {
       injured++;
-      s = mutantWound(s, victim!.id, random);
+      s = mutantWound(s, victim.id, random);
     }
   }
   return note(
@@ -2904,7 +2946,7 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
       ...s,
       sighting: {
         source: "gate",
-        species: ["R02", "R03", "SPINO"][Math.floor(random() * 3)]!,
+        species: pickOne(["R02", "R03", "SPINO"], random),
       },
       raid: {
         minute: s.elapsed,
@@ -2959,11 +3001,14 @@ export function villageFatalIncident(
       mutant = night && random() < 0.7;
       cause = mutant
         ? "성 밖에서 붉은 눈의 변종 공룡에게 습격당해 숨졌습니다."
-        : [
-            "산적의 매복으로 정찰 중 숨졌습니다.",
-            "정찰길 낙석 사고로 숨졌습니다.",
-            "정찰 중 들짐승의 습격으로 숨졌습니다.",
-          ][Math.floor(random() * 3)]!;
+        : pickOne(
+            [
+              "산적의 매복으로 정찰 중 숨졌습니다.",
+              "정찰길 낙석 사고로 숨졌습니다.",
+              "정찰 중 들짐승의 습격으로 숨졌습니다.",
+            ],
+            random,
+          );
       injury = cause.replace("숨졌습니다.", "다쳤습니다.");
     } else if (atHospital(s, r)) {
       if (
@@ -3052,7 +3097,7 @@ export function villageFatalIncident(
     ...result,
     sighting: {
       source: "scout",
-      species: ["R02", "R03", "SPINO"][Math.floor(random() * 3)]!,
+      species: pickOne(["R02", "R03", "SPINO"], random),
     },
   };
   return wounded ? mutantWound(seen, casualty.id, random) : seen;
@@ -3166,7 +3211,7 @@ export function advanceTimber(
       };
       if (!escorts || e.decision !== "take") continue;
       if (e.kind === "survivors") {
-        const id = "field-" + site + "-" + s.scoutDepartures![site];
+        const id = "field-" + site + "-" + (s.scoutDepartures?.[site] ?? e.due);
         s = commandTimber(
           s,
           {
@@ -3252,20 +3297,19 @@ export function advanceTimber(
       };
     }
     const repair = s.merchantRepair;
+    const repairGoods = repair && merchantGoods[repair.item];
     if (
       repair &&
+      repairGoods &&
       s.world.minute >= 540 &&
       s.world.minute < 1080 &&
       merchantStaff(s) > 0
     ) {
       const work = Math.max(0, repair.work - merchantStaff(s));
-      if (
-        !work &&
-        storageRoom(s, merchantGoods[repair.item]!) >= repair.quantity
-      )
+      if (!work && storageRoom(s, repairGoods) >= repair.quantity)
         s = note(
           {
-            ...deposit(s, merchantGoods[repair.item]!, repair.quantity),
+            ...deposit(s, repairGoods, repair.quantity),
             merchantRepair: undefined,
           },
           "교역소 직원이 보완을 마쳐 공동 재고에 입고했습니다.",
@@ -3463,6 +3507,9 @@ export function commandTimber(
         };
       }
       break;
+    case "demolish-building":
+      n = demolishBuilding(s, command.id);
+      break;
     case "plan-building":
       n = planBuilding(s, command.kind, {
         position: constructionPlot(command.position),
@@ -3589,9 +3636,7 @@ export function commandTimber(
           durations[id] = scoutTripMinutes(site, s);
           if (command.explore) {
             finds[id] = {
-              kind: SCOUT_FINDS[
-                Math.floor(Math.random() * SCOUT_FINDS.length)
-              ]!,
+              kind: pickOne(SCOUT_FINDS, Math.random),
               decision: "waiting",
               due: now + Math.ceil(durations[id] / 2),
             };
@@ -3713,6 +3758,7 @@ export function commandTimber(
       n = note(
         {
           ...s,
+          firstRationSet: true,
           rationPolicy: command.policy,
           ...(s.campaign &&
             command.policy !== s.rationPolicy && {
@@ -3796,7 +3842,7 @@ export function commandTimber(
             finishAt: null,
           },
         },
-        "온돌 둥지 배치 확정. 목재100을 확보하고 가까운 유휴 주민이 자재를 운반합니다.",
+        `온돌 둥지 배치 확정. 목재${VILLAGE_RULES.constructionWood}을 확보하고 가까운 유휴 주민이 자재를 운반합니다.`,
       );
       break;
     }
@@ -3836,7 +3882,7 @@ export function commandTimber(
         s.world.resources.RES_WOOD - s.reservedWood * AMOUNT_SCALE <
         VILLAGE_RULES.constructionWood * AMOUNT_SCALE
       )
-        fail("공동 목재100이 필요합니다.");
+        fail(`공동 목재${VILLAGE_RULES.constructionWood}이 필요합니다.`);
       const workerId = eligible(s, constructionSite(kind, position), 1)[0];
       if (!workerId) fail("건설할 유휴 주민이 없습니다.");
       n = note(
@@ -3902,6 +3948,10 @@ export function commandTimber(
         command.type === "mechanize"
           ? mechanizeCitizen(s, command.source)
           : applyCitizenEvent(s.world, command.event);
+      const workshop =
+        command.type === "mechanize" &&
+        s.town.facilities.find((f) => f.kind === "workshop");
+      const arrivalPoint = workshop ? facilityDoor(workshop) : { x: 0, z: 21 };
       n = {
         ...s,
         world,
@@ -3921,7 +3971,10 @@ export function commandTimber(
                     }
                   : {}),
               }
-            : createVillageResident(c, i, world.day);
+            : {
+                ...createVillageResident(c, i, world.day),
+                position: arrivalPoint,
+              };
         }),
       };
       n = {
@@ -4307,6 +4360,7 @@ export function commandTimber(
   }
   if (
     decision &&
+    n.decree &&
     [
       "공동 배식과 교류",
       "배급 통제",
@@ -4321,10 +4375,10 @@ export function commandTimber(
       bulletins: [
         ...(n.bulletins ?? []).slice(-99),
         {
-          key: "decree-" + n.decree!.serial,
+          key: "decree-" + n.decree.serial,
           kind: "decree",
           title: decision,
-          detail: "관아 앞에 방이 붙었습니다. “" + n.decree!.reaction + "”",
+          detail: "관아 앞에 방이 붙었습니다. “" + n.decree.reaction + "”",
         },
       ],
     };

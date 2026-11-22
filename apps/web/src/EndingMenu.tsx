@@ -26,7 +26,7 @@ import "./main-menu.css";
 
 const films: [keyof typeof filmMusic, string][] = [
   ["opening", "서막"],
-  ["one", "1단계 · 복홀"],
+  ["one", "복홀의 첫 명령"],
   ["ending-1", "복홀의 성곽"],
   ["two", "2단계 · 정찰"],
   ["ending-2", "돌아온 수레 행렬"],
@@ -87,7 +87,9 @@ export function EndingMenu({
   const [replayMovie, setReplayMovie] = useState(0);
   const [slots, setSlots] = useState<Awaited<ReturnType<typeof listSlots>>>([]);
   const [film, setFilm] = useState<keyof typeof filmMusic | "">("");
-  const unlockedFilms = films.filter(([id]) => filmSeen(id));
+  const unlockedFilms = films.filter(
+    ([id]) => id === "opening" || filmSeen(id),
+  );
   const [slide, setSlide] = useState(0);
   const exhibit = unlockedFilms[slide];
   const { setGalleryMusic } = useAudio();
@@ -128,11 +130,14 @@ export function EndingMenu({
     }
   }
   const beginReplay = (stage: number) => {
-    if (stage === 1) void run(() => replayStage(stage, restartLevel));
+    const intro = ["one", "two", "three", "four", "five"][stage - 1];
+    if (stage === 1 || (intro && filmSeen(intro)))
+      void run(() => replayStage(stage, restartLevel));
     else setReplayMovie(stage);
   };
-  if (replayMovie) {
-    const id = ["one", "two", "three", "four", "five"][replayMovie - 1]!;
+  const id = ["one", "two", "three", "four", "five"][replayMovie - 1];
+  const chapterTitle = CHAPTERS[replayMovie - 1];
+  if (id && chapterTitle) {
     const finish = () =>
       fadeOut(modal.current, () => {
         rememberFilm(id);
@@ -143,17 +148,13 @@ export function EndingMenu({
       <dialog
         ref={modal}
         className="film-screen"
-        aria-label={CHAPTERS[replayMovie - 1]}
+        aria-label={chapterTitle}
         onCancel={(e) => {
           e.preventDefault();
           finish();
         }}
       >
-        <CampaignFilm
-          id={id}
-          title={CHAPTERS[replayMovie - 1]!}
-          finish={finish}
-        />
+        <CampaignFilm id={id} title={chapterTitle} finish={finish} />
       </dialog>
     );
   }

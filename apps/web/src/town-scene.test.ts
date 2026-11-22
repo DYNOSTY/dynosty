@@ -7,6 +7,7 @@ import {
   createPlayState,
   createTimberState,
   createVillageGame,
+  requireValue,
 } from "@dynosty/game-core";
 import { expect, it } from "vitest";
 import { createTownVisual } from "./town-scene.js";
@@ -85,7 +86,10 @@ it("구릉지 목축장의 기초 전체가 정지된 땅 위에 놓인다", () 
     const center = bokholElevation(position.x, position.z);
     expect(Math.abs(center)).toBeGreaterThan(1);
     visual.update(state);
-    const root = scene.getMeshById("town:build-1")!;
+    const root = requireValue(
+      scene.getMeshById("town:build-1"),
+      "scene.getMeshById('town:build-1')",
+    );
     expect(root.position.y).toBeCloseTo(center + 0.05);
     for (let i = 0; i < 800 && state.town.orders.length; i++)
       state = advanceTimber(state, 1);

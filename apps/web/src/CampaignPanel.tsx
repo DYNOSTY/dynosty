@@ -39,6 +39,7 @@ import {
 } from "./CampaignFilm.js";
 import {
   campaignPage,
+  firstVillageTask,
   gatheringRumor,
   moraleAdvice,
   PATROL_NAMES,
@@ -103,7 +104,8 @@ function SceneDialog({
     const timer = window.setTimeout(() => setCursor(cursor + 1), 7500);
     return () => window.clearTimeout(timer);
   }, [cursor, frameImage, total]);
-  const [name, words] = page.lines[lineIndex]!;
+  const [name, words] = page.lines[lineIndex] ?? ["", ""];
+  const firstChoice = page.choices[0];
   const later =
     page.lineImages?.[cursor] ??
     (page.lineIllustration?.at === cursor
@@ -310,9 +312,10 @@ function SceneDialog({
           bubble &&
           !stage &&
           page.choices.length === 1 &&
-          !page.choices[0]!.disabled
+          firstChoice &&
+          !firstChoice.disabled
         )
-          act(page.choices[0]!.action);
+          act(firstChoice.action);
       }}
       onCancel={(e) => {
         e.preventDefault();
@@ -450,7 +453,7 @@ function SceneDialog({
         </>
       )}
       <footer>
-        {["departure", "after"].includes(page.key) && !last && (
+        {["departure", "after"].includes(page.key) && firstChoice && !last && (
           <button
             type="button"
             onClick={() => {
@@ -461,8 +464,8 @@ function SceneDialog({
               )
                 step(page.lineIllustration.at);
               else if (cinematic)
-                fadeOut(dialog.current, () => act(page.choices[0]!.action));
-              else act(page.choices[0]!.action);
+                fadeOut(dialog.current, () => act(firstChoice.action));
+              else act(firstChoice.action);
             }}
           >
             대화 건너뛰기
@@ -516,6 +519,9 @@ export function CampaignPanel({
   state: s,
   command,
   trade,
+  resetView,
+  onFirstTask,
+  workspaceOpen,
   officeSelected,
   onPatrolMap,
   gateSelected,
@@ -527,6 +533,9 @@ export function CampaignPanel({
   state: TimberState;
   command: (cmd: TimberCommand) => void;
   trade: boolean;
+  resetView?: () => void;
+  onFirstTask?: () => void;
+  workspaceOpen?: boolean;
   officeSelected?: boolean;
   onPatrolMap?: (visible: boolean) => void;
   gateSelected?: boolean;
@@ -535,8 +544,13 @@ export function CampaignPanel({
   setDefenseOpen?: (open: boolean) => void;
   work: boolean;
 }) {
+  const [heating, setHeating] = useState(s.heating ?? 0);
+  useEffect(() => {
+    setHeating(s.heating ?? 0);
+  }, [s.heating]);
   const c = campaignOf(s);
   const p = campaignPage(s);
+  const firstTask = firstVillageTask(s);
   const gateCrew = s.residents.filter(
     (r) => r.workplaceId === "gate" && r.health === "healthy",
   ).length;
@@ -794,6 +808,11 @@ export function CampaignPanel({
         advisory={null}
         close={() => setPreparingNewGame(false)}
         act={(action, difficulty) => {
+          resetView?.();
+          setPetition(false);
+          setSouth(false);
+          setOffice(false);
+          setDefenseOpen?.(false);
           command({ type: "restart" });
           command({
             type: "campaign",
@@ -821,6 +840,11 @@ export function CampaignPanel({
           key={pauseMenu ? "pause" : "title"}
           initialView={pauseMenu ? "pause" : "menu"}
           exit={() => {
+            resetView?.();
+            setDefenseOpen?.(false);
+            setPetition(false);
+            setSouth(false);
+            setOffice(false);
             setPauseMenu(false);
             setMainMenu(true);
           }}
@@ -850,7 +874,7 @@ export function CampaignPanel({
         <VillageBulletin
           state={s}
           command={command}
-          showEvents={!open}
+          showEvents={!open && !workspaceOpen && !trade}
           heat={() => setDefenseOpen?.(true)}
         />
       )}
@@ -858,12 +882,16 @@ export function CampaignPanel({
         type="button"
         className="scout-all"
         onClick={() => {
+          if (firstTask && onFirstTask) {
+            onFirstTask();
+            return;
+          }
           setOpened(p.key);
           setDismissed(null);
         }}
       >
         {s.chapter ?? 1}단계 · {CHAPTERS[(s.chapter ?? 1) - 1]}
-        <small>{p.goal || p.title}</small>
+        <small>{firstTask?.words ?? (p.goal || p.title)}</small>
       </button>
       {c.beat === "capital" && (
         <>
@@ -998,7 +1026,7 @@ export function CampaignPanel({
                       onChange={(e) =>
                         command({
                           type: "set-gate",
-                          count: gateLevels[Number(e.target.value)]!,
+                          count: gateLevels[Number(e.target.value)] ?? gateCrew,
                         })
                       }
                     />
@@ -1023,14 +1051,13 @@ export function CampaignPanel({
                   min="0"
                   max="3"
                   step="1"
-                  value={s.heating ?? 0}
+                  value={heating}
                   aria-valuetext={s.heating ? s.heating + "단계" : "자동"}
-                  onChange={(e) =>
-                    command({
-                      type: "set-heating",
-                      level: Number(e.target.value),
-                    })
-                  }
+                  onChange={(e) => {
+                    const level = Number(e.target.value);
+                    setHeating(level);
+                    command({ type: "set-heating", level });
+                  }}
                 />
                 <span aria-hidden="true">
                   {["자동", "1단계", "2단계", "3단계"].map((t) => (
@@ -1068,7 +1095,8 @@ export function CampaignPanel({
           {s.mutants?.map((m) => {
             const species = s.world.citizens.find(
               (r) => r.id === m.id,
-            )!.species;
+            )?.species;
+            if (!species) return null;
             return (
               <section
                 key={m.id}
@@ -1166,11 +1194,16 @@ export function CampaignPanel({
               key={policy}
               type="button"
               aria-pressed={s.rationPolicy === policy}
-              disabled={policyWait(s) > 0 || s.rationPolicy === policy}
+              disabled={
+                policyWait(s) > 0 ||
+                (s.rationPolicy === policy && (s.firstRationSet || !firstTask))
+              }
               onClick={() => command({ type: "set-ration-policy", policy })}
             >
               {policy === "needs" ? "필요량에 따른 배급" : "식단별 배급 상한"}{" "}
-              {s.rationPolicy === policy ? "시행 중" : "반포"}
+              {s.rationPolicy === policy && (s.firstRationSet || !firstTask)
+                ? "시행 중"
+                : "반포"}
             </button>
           ))}
           {c.beat === "capital" && (

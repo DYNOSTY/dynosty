@@ -22,8 +22,8 @@ const citizen = (species: string) =>
   })();
 const resources = () => ({ ...createPlayState().resources });
 it.each([
-  ["R03", "RES_MEAT", "RES_FISH", 2500],
-  ["SPINO", "RES_FISH", "RES_MEAT", 5000],
+  ["R03", "RES_MEAT", "RES_FISH", 25000],
+  ["SPINO", "RES_FISH", "RES_MEAT", 50000],
 ] as const)(
   "%s는 선호 식량이 없으면 다른 동물성 식량을 같은 몫으로 배급받는다",
   (species, primary, alternative, amount) => {
@@ -38,32 +38,32 @@ it.each([
 );
 it("선호 먹이부터 쓰고 부족분만 대체하며 초식 주민에게는 동물성 식량을 쓰지 않는다", () => {
   const stock = resources();
-  stock.RES_MEAT = 1000;
-  stock.RES_FISH = 2000;
+  stock.RES_MEAT = 10000;
+  stock.RES_FISH = 20000;
   expect(mealPlan(citizen("R03"), "needs", 0, stock).foods).toEqual({
-    RES_MEAT: 1000,
-    RES_FISH: 1500,
+    RES_MEAT: 10000,
+    RES_FISH: 15000,
   });
   stock.RES_PLANT = 0;
   expect(mealPlan(citizen("R02"), "needs", 0, stock).amount).toBe(0);
 });
 it("종별 정량·하루 상한을 지키며 덜 배급받은 큰 주민의 허기는 남는다", () => {
   expect(mealPlan(citizen("R02"), "needs", 0, resources())).toMatchObject({
-    amount: 5000,
+    amount: 50000,
     relief: 360,
   });
   expect(mealPlan(citizen("R02"), "cap", 0, resources())).toMatchObject({
-    amount: 2500,
+    amount: 25000,
     relief: 180,
   });
-  expect(rationLimit("R02", "needs")).toBe(20000);
-  expect(rationLimit("R03", "needs")).toBe(10000);
-  expect(mealPlan(citizen("R02"), "cap", 10000, resources()).amount).toBe(0);
+  expect(rationLimit("R02", "needs")).toBe(200000);
+  expect(rationLimit("R03", "needs")).toBe(100000);
+  expect(mealPlan(citizen("R02"), "cap", 100000, resources()).amount).toBe(0);
   const stock = resources();
   stock.RES_FISH = 0;
-  stock.RES_MEAT = 1000;
+  stock.RES_MEAT = 10000;
   expect(mealPlan(citizen("SPINO"), "needs", 0, stock)).toMatchObject({
-    amount: 1000,
+    amount: 10000,
     relief: 72,
   });
 });
@@ -197,7 +197,7 @@ it("합류로 거주 공간이 부족하면 요구하고 둥지 증설 뒤 자�
   expect(s.homes).toHaveLength(7);
   expect(s.world.buildings).toHaveLength(7);
   expect(s.residents.every((r) => r.homeId !== null)).toBe(true);
-  expect(s.world.resources.RES_WOOD).toBe(200000);
+  expect(s.world.resources.RES_WOOD).toBe(700000);
   expect(s.residents.find((r) => r.id === builder)?.task).toBeNull();
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
@@ -206,7 +206,7 @@ it("거주·배급·직원 기록이 손상된 저장을 거부한다", () => {
   for (const damage of ["home", "ration", "staff"]) {
     const bad = JSON.parse(JSON.stringify(createTimberSave(s)));
     if (damage === "home") bad.state.residents[0].homeId = "missing";
-    if (damage === "ration") bad.state.residents[0].rationUsed = 30000;
+    if (damage === "ration") bad.state.residents[0].rationUsed = 300000;
     if (damage === "staff") bad.state.restaurantWorkerTarget = 3;
     expect(() => parseTimberSave(bad)).toThrow();
   }

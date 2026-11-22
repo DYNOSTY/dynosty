@@ -23,7 +23,8 @@ export const LOGGING_RULES = {
   pickup: { x: -24, z: -7 },
   maxWorkers: 4,
   forest: 120,
-  minutesPerWood: 10,
+  treesPerForest: 32,
+  workPerUnit: 10,
   buffer: 20,
   batch: 5,
   speed: 2,
@@ -285,13 +286,14 @@ function advanceOneLogging(
       Math.round(
         (l.progress +
           work *
+            LOGGING_RULES.workPerUnit *
             minutes *
             resourceRate(s, definition.resource) *
             productionMultiplier(s.campaign?.difficulty)) *
           1000,
       ) / 1000;
     const made = Math.min(
-      Math.floor(total / LOGGING_RULES.minutesPerWood),
+      Math.floor(total / LOGGING_RULES.workPerUnit),
       l.remaining,
       LOGGING_RULES.buffer - l.buffer,
     );
@@ -299,7 +301,7 @@ function advanceOneLogging(
       ...l,
       remaining: l.remaining - made,
       buffer: l.buffer + made,
-      progress: total % LOGGING_RULES.minutesPerWood,
+      progress: total % LOGGING_RULES.workPerUnit,
     };
   }
   if (!l.haul && l.storageBuilt && l.buffer && workplaceOpen(s.world.minute)) {
@@ -506,7 +508,7 @@ function oneLoggingValid(s: TimberState): boolean {
     typeof l.progress !== "number" ||
     !Number.isFinite(l.progress) ||
     l.progress < 0 ||
-    l.progress >= LOGGING_RULES.minutesPerWood ||
+    l.progress >= LOGGING_RULES.workPerUnit ||
     !integer(l.delivered, definition.initial)
   )
     return false;

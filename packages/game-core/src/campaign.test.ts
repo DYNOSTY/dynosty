@@ -14,6 +14,7 @@ import {
 } from "./campaign.js";
 import { RESEARCH_CATALOG } from "./development.js";
 import { AMOUNT_SCALE } from "./play.js";
+import { requireValue } from "./require-value.js";
 import { SCOUT_SITES } from "./scout-sites.js";
 import {
   capitalRoad,
@@ -219,7 +220,12 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
     expect(workingDay.logging.buffer).toBe(before.logging.buffer);
     const lastMinute = later(
       workingDay,
-      s.campaign!.recoveryDue! - workingDay.elapsed - 1,
+      requireValue(
+        requireValue(s.campaign, "s.campaign").recoveryDue,
+        "s.campaign.recoveryDue",
+      ) -
+        workingDay.elapsed -
+        1,
     );
     expect(
       lastMinute.residents.filter((r) => r.task === "patrol-recovery"),
@@ -249,9 +255,10 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
   expect(s.town.facilities.length).toBeGreaterThan(10);
   expect(s.town.development.completed).toContain("UPGRADE_HOSPITAL_2");
   const city = restore(s);
-  const hospital = city.town.facilities.find(
-    (f) => f.kind === "hospital" && f.level === 2,
-  )!;
+  const hospital = requireValue(
+    city.town.facilities.find((f) => f.kind === "hospital" && f.level === 2),
+    "병원",
+  );
   expect(() =>
     act({ ...city, mutantDamage: { [hospital.id]: 100 } }, "share"),
   ).toThrow("병원");
@@ -361,7 +368,10 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
           d++
         )
           run = day(run);
-        const lab = run.town.facilities.find((f) => f.kind === "workshop")!;
+        const lab = requireValue(
+          run.town.facilities.find((f) => f.kind === "workshop"),
+          "시나리오 대상",
+        );
         run = command(run, { type: "facility-staff", id: lab.id, count: 2 });
         for (const tech of ["R17", "R18", "TECH_MECHA2"]) {
           expect(run.campaign?.ending).toBeNull();
@@ -396,7 +406,7 @@ it("도성은 민심과 관계없이 세 번째 수레를 보내지 못한 채 3
   expect(before.campaign?.ending).toBeNull();
   expect(later(before, 1).campaign?.ending).toBe("collapse");
   expect(
-    later({ ...before, campaign: { ...before.campaign!, departures: 3 } }, 1)
+    later({ ...before, campaign: { ...campaignOf(before), departures: 3 } }, 1)
       .campaign?.ending,
   ).toBeNull();
 });
@@ -408,9 +418,12 @@ it.each([1, 2, 4, 5] as const)(
       ...base,
       ...(chapter === 1 ? {} : { chapter }),
       campaign: newCampaign(
-        (["patrol", "roads", "capital", "winter", "vigil"] as const)[
-          chapter - 1
-        ]!,
+        requireValue(
+          (["patrol", "roads", "capital", "winter", "vigil"] as const)[
+            chapter - 1
+          ],
+          "(['patrol', 'roads', 'capital', 'winter', 'vigil'] as c",
+        ),
       ),
       world: { ...base.world, pessimism: 99 },
     });
@@ -430,7 +443,7 @@ it.each([1, 2, 4, 5] as const)(
     });
     expect(later(relapse, 1).campaign?.ending).toBeNull();
     const end = act(
-      { ...s, campaign: { ...s.campaign!, difficulty: "hard" } },
+      { ...s, campaign: { ...campaignOf(s), difficulty: "hard" } },
       "reserve",
     );
     expect(end.elapsed).toBe(s.elapsed);
@@ -578,7 +591,7 @@ it("온돌 연료를 매시간 결제하고 성문 전투 결과와 삽화를 �
     ["normal", 0.15],
     ["hard", 0.75],
   ] as const) {
-    const state = { ...s, campaign: { ...s.campaign!, difficulty } };
+    const state = { ...s, campaign: { ...campaignOf(s), difficulty } };
     expect(gateRaid(state, () => threshold)).toBe(state);
     expect(gateRaid(state, () => threshold - 0.0001).raid).toBeDefined();
   }

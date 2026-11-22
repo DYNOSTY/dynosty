@@ -6,8 +6,10 @@ import {
   createTimberSave,
   createTimberState,
   createVillageGame,
+  requireValue,
   type TimberState,
 } from "../../packages/game-core/dist/index.js";
+import { readVillage } from "./read-village.js";
 
 const button = (page: Page, name: string) =>
   page.getByRole("button", { name, exact: true });
@@ -44,12 +46,7 @@ test("시설 완성 모습으로 회전 배치하고 자재를 확보한 두 공
     if (!localStorage.getItem("dynosty.village.resume"))
       localStorage.setItem("dynosty.village.resume", JSON.stringify(save));
   }, createTimberSave(state));
-  const read = () =>
-    page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem("dynosty.village.resume")!)
-          .state as TimberState,
-    );
+  const read = () => page.evaluate(readVillage);
   await page.goto("/");
   await expect(page.getByTestId("play-scene-status")).toHaveText(
     "3D 준비 완료",
@@ -84,7 +81,10 @@ test("시설 완성 모습으로 회전 배치하고 자재를 확보한 두 공
       },
       [x, z] as const,
     );
-    const box = (await page.locator("canvas").first().boundingBox())!;
+    const box = requireValue(
+      await page.locator("canvas").first().boundingBox(),
+      "화면 위치",
+    );
     const px = box.x + box.width / 2,
       py = box.y + box.height / 2;
     await page.mouse.move(px, py);
@@ -99,7 +99,7 @@ test("시설 완성 모습으로 회전 배치하고 자재를 확보한 두 공
   }
   const ordered = await read();
   expect(ordered.world.resources.RES_WOOD).toBe(
-    state.world.resources.RES_WOOD - 185 * 10000,
+    state.world.resources.RES_WOOD - (30 + 63) * 10000,
   );
   await page.keyboard.press("Escape");
   const dialog = page.getByRole("dialog");

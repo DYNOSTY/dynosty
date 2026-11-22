@@ -147,5 +147,5 @@ it("식당 공사도 퇴근하면 멈추고 다음날 현장으로 돌아와 남
   expect(s.restaurantBuilt).toBe(false);
   s = advanceTimber(s, 60);
   expect(s.restaurantBuilt).toBe(true);
-  expect(s.world.resources.RES_WOOD).toBe(200000);
+  expect(s.world.resources.RES_WOOD).toBe(700000);
 });

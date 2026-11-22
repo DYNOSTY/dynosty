@@ -28,7 +28,7 @@ export const PATROL_REQUESTS = [
 ] as const;
 type Choice = { action: string; label: string; disabled?: boolean };
 type Line = [speaker: string, words: string];
-const victoryQuotes: Line[] = [
+const victoryQuotes: [Line, ...Line[]] = [
   [
     "공자 · 『논어』 옹야",
     "어진 이는 자기가 서고자 하면 남도 서게 한다. — 己欲立而立人",
@@ -142,6 +142,53 @@ export function moraleAdvice(s: TimberState): Line | undefined {
       ];
 }
 
+export function firstVillageTask(s: TimberState) {
+  if (
+    !s.rebuilding ||
+    (s.chapter ?? 1) !== 1 ||
+    campaignOf(s).beat !== "patrol"
+  )
+    return null;
+  const building =
+    s.town.orders.some((o) => o.kind === "restaurant") ||
+    s.construction?.kind === "restaurant";
+  if (!s.restaurantBuilt && !building)
+    return {
+      step: "restaurant" as const,
+      words: "솥은 건져 뒀어요. 건설에서 공동 식당을 골라 터를 잡아 주세요.",
+    };
+  if (!s.residents.some((r) => r.workplaceId === "gate") && !s.firstRationSet)
+    return {
+      step: "gate" as const,
+      words:
+        "일꾼들이 솥을 걸 동안 성문을 살펴봐 주세요. 성문을 누르면 보초를 세울 수 있어요.",
+    };
+  if (!s.restaurantBuilt)
+    return {
+      step: "wait" as const,
+      words:
+        "식당 지붕을 올리고 있어요. 일꾼들이 마무리할 때까지 기다려 주세요.",
+    };
+  if (s.restaurantWorkerTarget === 0)
+    return {
+      step: "staff" as const,
+      words:
+        "식당이 다 지어졌어요. 공동 식당을 눌러 밥을 지을 분을 배치해 주세요.",
+    };
+  if (!s.firstRationSet)
+    return {
+      step: "policy" as const,
+      words:
+        "이제 솥에 불이 들었어요. 배급 정책에서 주민들에게 한 끼를 얼마나 나눌지 정해 주세요.",
+    };
+  if (s.homes.length <= 2 && !s.town.orders.some((o) => o.kind === "home"))
+    return {
+      step: "home" as const,
+      words:
+        "밤이 오면 지붕 아래 자리가 모자라요. 온돌 둥지를 한 채 더 지어 주세요.",
+    };
+  return null;
+}
 export function villageAdvice(
   s: TimberState,
   daylight: boolean,
@@ -152,6 +199,8 @@ export function villageAdvice(
     return daylight
       ? "전하, 의원이 밤새 돌본 이들의 명부를 올렸습니다. 남문으로 올 짐수레도 장부와 대조하고 있습니다."
       : "전하, 성벽 아래서 울음소리가 납니다. 성안에서 붉은 눈을 봤다는 골목에는 벌써 포졸이 갔습니다.";
+  const firstTask = firstVillageTask(s);
+  if (firstTask) return firstTask.words;
   if (merchant)
     return daylight
       ? `고리야, 교역소에 상인이 왔어요. ${merchant}의 짐을 같이 보실래요?`
@@ -281,10 +330,10 @@ export function campaignPage(s: TimberState): ScenePage {
     days = Math.floor(age / 1440);
   const found = returnedScouts(s);
   const quote =
-    victoryQuotes[c.victoryQuotes?.[chapter - 1] ?? 0] ?? victoryQuotes[0]!;
+    victoryQuotes[c.victoryQuotes?.[chapter - 1] ?? 0] ?? victoryQuotes[0];
   const page: ScenePage = {
     key: c.beat,
-    title: CHAPTERS[chapter - 1]!,
+    title: CHAPTERS[chapter - 1] ?? CHAPTERS[0],
     music: "01",
     lines: [],
     choices: [],
@@ -422,14 +471,6 @@ export function campaignPage(s: TimberState): ScenePage {
         "나르미",
         "식당 지붕이 내려앉았어요. 솥은 건졌으니 식당부터 다시 지어요. 오늘 저녁엔 다들 앉아서 따뜻한 걸 먹게요.",
       );
-      line(
-        "달이",
-        "온돌에 불이 드는 둥지도 둘뿐이야. 오늘 밤 지붕 아래서 잘 자리도 같이 마련하자.",
-      );
-      line(
-        "달이",
-        "고리야, 해 떨어지기 전에 성문에 보초를 세워 줘. 성문을 누르면 몇을 보낼지 정할 수 있어.",
-      );
       choice("next", "남은 예순 명과 시작");
       break;
     case "patrol": {
@@ -459,7 +500,8 @@ export function campaignPage(s: TimberState): ScenePage {
         }
         break;
       }
-      const site = SCOUT_SITES.find((q) => q.id === id)!;
+      const site = SCOUT_SITES.find((q) => q.id === id);
+      if (!site) break;
       const idx = c.patrolOrder.indexOf(id);
       page.key = "report-" + id;
       page.title = site.name + " · 정찰 결과";
@@ -494,7 +536,8 @@ export function campaignPage(s: TimberState): ScenePage {
         choice("remember", "추가 파견을 멈추고 두 이름을 추모 장부에");
         break;
       }
-      const who = PATROL_NAMES[Math.max(0, idx) % 4]!;
+      const who =
+        PATROL_NAMES[Math.max(0, idx) % PATROL_NAMES.length] ?? PATROL_NAMES[0];
       const reports: Record<string, Line[]> = {
         reed: [
           [
@@ -547,7 +590,7 @@ export function campaignPage(s: TimberState): ScenePage {
           ],
         ],
       };
-      page.lines = reports[id]!;
+      page.lines = reports[id] ?? [];
       if (c.reports.length === 4)
         line(
           "달이",
@@ -585,7 +628,8 @@ export function campaignPage(s: TimberState): ScenePage {
             "쇳덩이를 싣고 자갈길을 세 번이나 돌았소. 덜컹거려도 짐이 쏠리지 않았지. 다음 장에 내 수레로 가리다.",
           ],
         ];
-        page.lines.push(replies[receipt]!);
+        const reply = replies[receipt];
+        if (reply) page.lines.push(reply);
       }
       if (c.treaties.length === 2) {
         page.clip = "two";
@@ -629,10 +673,11 @@ export function campaignPage(s: TimberState): ScenePage {
           "당성은 들보가 먼저고, 새금은 지난번 깨져 온 화덕돌을 기다려요. 먼저 지킬 수 있는 약속 하나를 골라요.",
         );
       }
-      if (c.caravan)
+      const destination = c.caravan && SETTLEMENTS[c.caravan.village];
+      if (destination)
         line(
           "달이",
-          `${SETTLEMENTS[c.caravan.village]!.name}에 간 수레는 아직이야. 돌아오는 대로 여기서 짐꾼들한테 무슨 일이 있었는지 물어볼게.`,
+          `${destination.name}에 간 수레는 아직이야. 돌아오는 대로 여기서 짐꾼들한테 무슨 일이 있었는지 물어볼게.`,
         );
       for (const [i, v] of SETTLEMENTS.entries())
         if (!c.treaties.includes(i))

@@ -116,26 +116,29 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
     [rules.workshop.x, 0.5, rules.workshop.z + 3],
     logs,
   );
-  const forest = Array.from({ length: isForest ? 32 : 0 }, (_, i) => {
-    const tree = new TransformNode(unique(`logging-tree-${i}`), scene);
-    tree.position.set(
-      patch.x - 7 + (i % 8) * 2 + Math.sin(i * 13 + patch.x) * 0.8,
-      0,
-      patch.z - 9 + Math.floor(i / 8) * 6 + Math.cos(i * 7 + patch.z) * 1.1,
-    );
-    box("logging-trunk", [0.35, 1.4, 0.35], [0, 0.7, 0], wood, tree);
-    const crown = CreateCylinder(
-      unique("logging-crown"),
-      { height: 3, diameterBottom: 2, diameterTop: 0, tessellation: 6 },
-      scene,
-    );
-    tree.scaling.setAll(0.8 + (1 + Math.sin(i * 4.9 + patch.z)) * 0.24);
-    tree.rotation.y = i * 1.61;
-    crown.parent = tree;
-    crown.position.y = 2.5;
-    crown.material = leaves;
-    return tree;
-  });
+  const forest = Array.from(
+    { length: isForest ? LOGGING_RULES.treesPerForest : 0 },
+    (_, i) => {
+      const tree = new TransformNode(unique(`logging-tree-${i}`), scene);
+      tree.position.set(
+        patch.x - 7 + (i % 8) * 2 + Math.sin(i * 13 + patch.x) * 0.8,
+        0,
+        patch.z - 9 + Math.floor(i / 8) * 6 + Math.cos(i * 7 + patch.z) * 1.1,
+      );
+      box("logging-trunk", [0.35, 1.4, 0.35], [0, 0.7, 0], wood, tree);
+      const crown = CreateCylinder(
+        unique("logging-crown"),
+        { height: 3, diameterBottom: 2, diameterTop: 0, tessellation: 6 },
+        scene,
+      );
+      tree.scaling.setAll(0.8 + (1 + Math.sin(i * 4.9 + patch.z)) * 0.24);
+      tree.rotation.y = i * 1.61;
+      crown.parent = tree;
+      crown.position.y = 2.5;
+      crown.material = leaves;
+      return tree;
+    },
+  );
   const deposit = new TransformNode(unique("mineral-deposit"), scene);
   deposit.position.set(patch.x, 0, patch.z);
   if (!isForest) {

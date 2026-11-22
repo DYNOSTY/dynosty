@@ -205,11 +205,13 @@ export function DevelopmentPanel({
             aria-label="연구 기술"
             value={selected}
             onChange={(e) => {
-              setTech(e.target.value);
-              setBranch(
-                visibleResearch.find((node) => node.id === e.target.value)!
-                  .category,
+              const node = visibleResearch.find(
+                (item) => item.id === e.target.value,
               );
+              if (node) {
+                setTech(node.id);
+                setBranch(node.category);
+              }
             }}
           >
             {Object.entries(categories)

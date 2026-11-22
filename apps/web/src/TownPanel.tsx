@@ -2,16 +2,19 @@ import {
   BOKHOL_WATERS,
   BUILDING_RULES,
   type BuildingKind,
+  connectedDeposits,
   type FoodId,
   facilityResource,
   facilityStaffLimit,
   GAME_RULES,
   hospitalBeds,
   hospitalHours,
+  LOGGING_RULES,
   orderWork,
   productionRate,
   restaurantStaff,
   STORAGE_SPACE,
+  salvageMaterials,
   storageCapacity,
   storageResearchLevel,
   type TimberCommand,
@@ -34,6 +37,59 @@ export const buildingCost = (kind: BuildingKind) =>
         `${GAME_RULES.resources[r as keyof typeof GAME_RULES.resources].name}${n}`,
     )
     .join(" · ");
+function Reserve({
+  state,
+  facility,
+}: {
+  state: TimberState;
+  facility: TimberState["town"]["facilities"][number];
+}) {
+  const sites = connectedDeposits(state, facility.kind, facility.position);
+  const remaining = sites.reduce((sum, site) => sum + site.remaining, 0);
+  if (facility.kind !== "logging")
+    return <p>채굴권 안의 매장량 · {remaining} 남음</p>;
+  const trees = sites.reduce(
+    (sum, site) =>
+      sum +
+      Math.ceil(
+        (site.remaining * LOGGING_RULES.treesPerForest) / LOGGING_RULES.forest,
+      ),
+    0,
+  );
+  return (
+    <p>
+      벌목권 안의 나무 {trees}그루 · 채취 가능한 목재 {remaining}
+    </p>
+  );
+}
+function Demolition({
+  state,
+  id,
+  command,
+}: {
+  state: TimberState;
+  id: string;
+  command: (c: TimberCommand) => void;
+}) {
+  const refund = Object.entries(salvageMaterials(state, id))
+    .map(
+      ([r, n]) =>
+        `${GAME_RULES.resources[r as keyof typeof GAME_RULES.resources].name} ${n}`,
+    )
+    .join(" · ");
+  return (
+    <details>
+      <summary>건물 철거</summary>
+      <p>회수할 자재 · {refund}</p>
+      <button
+        type="button"
+        onClick={() => command({ type: "demolish-building", id })}
+      >
+        철거 확정
+      </button>
+    </details>
+  );
+}
 export function TownPanel({
   state,
   command,
@@ -177,6 +233,8 @@ export function TownPanel({
                   명 · 식사 30분 이내
                 </p>
               ) : null}
+              {f.sourceId && <Reserve state={state} facility={f} />}
+              <Demolition state={state} id={f.id} command={command} />
               <BuildingUpgrade state={state} id={f.id} command={command} />
               {f.kind === "hospital" ? (
                 <p>
@@ -363,6 +421,7 @@ export function TownPanel({
             <strong>
               둥지 {h.id} · {h.level ?? 1}단계 · 공간{h.capacity}
             </strong>
+            <Demolition state={state} id={h.id} command={command} />
             <BuildingUpgrade state={state} id={h.id} command={command} />
           </article>
         ))}

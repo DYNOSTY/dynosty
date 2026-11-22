@@ -15,6 +15,7 @@ import {
   type HomePlacement,
   homePlacementIssue,
   PLOT_STEP,
+  requireValue,
   type TimberState,
 } from "@dynosty/game-core";
 import { facilityModel } from "./facility-model.js";
@@ -49,7 +50,10 @@ export function createHomePlacementVisual(
     },
     scene,
   );
-  const plane = footprint.getVerticesData(VertexBuffer.PositionKind)!;
+  const plane = requireValue(
+    footprint.getVerticesData(VertexBuffer.PositionKind),
+    "건설 부지 꼭짓점",
+  );
   const corners = plane.slice();
   footprint.setEnabled(false);
   footprint.material = material;
@@ -110,8 +114,12 @@ export function createHomePlacementVisual(
     // The footprint covers the three survey cells centred on the selected plot.
     const width = 3 * PLOT_STEP;
     for (let i = 0; i < plane.length; i += 3) {
-      const x = position.x + corners[i]! * width,
-        z = position.z + corners[i + 2]! * width;
+      const dx = corners[i],
+        dz = corners[i + 2];
+      if (dx === undefined || dz === undefined)
+        throw Error("건설 부지 좌표가 불완전합니다.");
+      const x = position.x + dx * width,
+        z = position.z + dz * width;
       plane[i] = x;
       plane[i + 1] = elevation(x, z) + 0.16;
       plane[i + 2] = z;

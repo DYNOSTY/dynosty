@@ -294,6 +294,16 @@ export function TimberDemo({
   function command(c: TimberCommand) {
     if (busy || !worker.current) return;
     setError(null);
+    if (c.type === "restart") {
+      setLaborMode(false);
+      setSlotPicker(false);
+      setRestart(false);
+      setPlacementStatus("");
+      setPlacingHome(false);
+      setPlacingKind("home");
+      setSelectedSiteId("west");
+      setSaveStatus("");
+    }
     worker.current.postMessage({
       type: "command",
       id: `${session.current}-${++counter.current}`,
@@ -489,6 +499,7 @@ export function TimberDemo({
           ) : null}
           {service === "일터 배치" && chosenSource && (
             <section aria-label="생산지 일손 배치">
+              <p>남은 자원 {loggingSite(state, chosenSource.id).remaining}</p>
               <label>
                 운영 인원{" "}
                 <select
@@ -647,6 +658,20 @@ export function TimberDemo({
                 <option value="cap">식단별 상한</option>
               </select>
             </label>
+            {state.rebuilding && !state.chapter && !state.firstRationSet && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  command({
+                    type: "set-ration-policy",
+                    policy: state.rationPolicy,
+                  })
+                }
+              >
+                현재 배급 방식으로 반포
+              </button>
+            )}
             <table data-testid="ration-table">
               <thead>
                 <tr>
@@ -659,7 +684,7 @@ export function TimberDemo({
                 {Object.entries(VILLAGE_RULES.species).map(
                   ([species, rule]) => {
                     const portion =
-                      state.rationPolicy === "cap" ? 2500 : rule.portion;
+                      state.rationPolicy === "cap" ? 25000 : rule.portion;
                     return (
                       <tr key={species}>
                         <th>
@@ -710,7 +735,7 @@ export function TimberDemo({
                 .join(" · ")}
             </p>
           )}
-          {merchant && (
+          {showDevTools && merchant && (
             <aside aria-label="교역소 방문" className="village-service">
               <h3>
                 ❗ 교역소 · {merchant[1]} 상인 {merchant[2]} 방문
@@ -771,7 +796,7 @@ export function TimberDemo({
               }
               onClick={() => placeBuilding("home")}
             >
-              온돌 둥지 증설 · 목재100
+              온돌 둥지 증설 · 목재{VILLAGE_RULES.constructionWood}
             </button>
             {placingHome ? (
               <div role="status" data-testid="home-placement-status">

@@ -2,7 +2,7 @@ import {
   BOKHOL_FORESTS,
   BOKHOL_MAP,
   BOKHOL_MINERALS,
-  fixedBuildingAt,
+  reservedVillageLand,
 } from "./bokhol.js";
 import { loggingSiteRules, loggingSites, productionSites } from "./logging.js";
 import { AMOUNT_SCALE } from "./play.js";
@@ -157,8 +157,8 @@ export function homePlacementIssue(
     p.headingRadians >= Math.PI * 2
   )
     return "건물 위치와 방향을 확인해 주세요.";
-  if (fixedBuildingAt(p.position, !!s.rebuilding))
-    return "기존 시설이 차지한 구획이에요.";
+  const protectedLand = reservedVillageLand(p.position, !!s.rebuilding);
+  if (protectedLand) return protectedLand;
   const rect = {
     ...p,
     halfWidth: HOME_PLACEMENT_RULES.halfWidth + 0.2,
@@ -259,7 +259,7 @@ export function homePlacementIssue(
     s.world.resources.RES_WOOD - s.reservedWood * AMOUNT_SCALE <
     VILLAGE_RULES.constructionWood * AMOUNT_SCALE
   )
-    return "건설에 필요한 공동 목재100이 부족해요.";
+    return `건설에 필요한 공동 목재${VILLAGE_RULES.constructionWood}이 부족해요.`;
   return null;
 }
 export const homeObstacle = (h: {

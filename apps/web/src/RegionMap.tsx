@@ -60,22 +60,25 @@ export function RegionMap({
         >
           복홀
         </button>
-        {SETTLEMENTS.map(
-          (v, i) =>
+        {SETTLEMENTS.map((v, i) => {
+          const position = towns[i];
+          if (!position) return null;
+          return (
             (state.campaign?.treaties.includes(i) ||
               state.scoutClues?.some((k) => k === "contact" + i)) && (
               <span
                 className="region-place"
                 key={v.name}
-                style={{ left: towns[i]![0] + "%", top: towns[i]![1] + "%" }}
+                style={{ left: position[0] + "%", top: position[1] + "%" }}
               >
                 {v.name} ·{" "}
                 {state.campaign?.treaties.includes(i)
                   ? "교역 중"
                   : "교역로 약도"}
               </span>
-            ),
-        )}
+            )
+          );
+        })}
         {state.scoutClues?.includes("record") && (
           <p className="map-clue">정찰 기록 · 고려의 창고 인장이 찍힌 목간</p>
         )}

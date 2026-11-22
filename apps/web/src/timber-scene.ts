@@ -11,6 +11,7 @@ import {
   constructionPlot,
   homeWorkPosition,
   loggingSiteRules,
+  requireValue,
   TIMBER_RULES,
   type TimberState,
   timberCartPosition,
@@ -64,9 +65,10 @@ export function createTimberVisual(scene: Scene) {
   const convoyCarts = CONVOY_ITEMS.map((item, index) => {
     const cart = base.clone("south-gate-" + item);
     cart.position.set(-6 + index * 3, 0.42, 25);
-    const load = cart
-      .getChildMeshes()
-      .find((mesh) => mesh.name.endsWith(cargo.name))!;
+    const load = requireValue(
+      cart.getChildMeshes().find((mesh) => mesh.name.endsWith(cargo.name)),
+      "수레 화물 모형",
+    );
     for (const part of [cart, ...cart.getChildMeshes()])
       part.metadata = { villageTarget: "village:BLD_GATE:0:24" };
     cart.setEnabled(false);

@@ -389,7 +389,7 @@ it("공동 목재가 꽉 차면 조달 검수 물량을 보존하고 공간이 �
   s = advanceTimber(s, 100);
   expect(s.stock.waiting).toBe(0);
   expect(s.stock.available).toBe(20);
-  expect(s.world.resources.RES_WOOD).toBe(4200000);
+  expect(s.world.resources.RES_WOOD).toBe(4700000);
 });
 it("연구와 치료를 이어가도록 경과10일을 지나도 시간이 멈추지 않는다", () => {
   let s = start();

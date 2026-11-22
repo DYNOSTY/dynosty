@@ -5,6 +5,7 @@ import {
   createTimberSave,
   createVillageGame,
   payTown,
+  requireValue,
 } from "../../packages/game-core/dist/index.js";
 import { openLaborPanel } from "./workspace.js";
 
@@ -79,9 +80,9 @@ test("출문 후 연구 가지와 건설 목록에 현재 단계 도면을 표�
     "준비 완료",
   );
   const quest = page.locator(".campaign-quest > .scout-all").first();
-  const rect = await quest.boundingBox();
+  const rect = requireValue(await quest.boundingBox(), "화면 위치");
   expect(rect).toBeTruthy();
-  expect(rect!.x + rect!.width).toBeLessThanOrEqual(1920);
+  expect(rect.x + rect.width).toBeLessThanOrEqual(1920);
   await page.keyboard.press("b");
   const shelf = page.getByRole("region", { name: "건물 목록" });
   const home = shelf.locator('img[src$="/home-2.webp"]');
@@ -117,19 +118,22 @@ test("건설 카드를 골라도 WASD 이동을 유지하고 새 부지를 누�
     .getByRole("region", { name: "건물 목록" })
     .getByRole("button", { name: "온돌 둥지", exact: true });
   await expect(card).toHaveText("온돌 둥지");
-  await expect(card).toHaveAccessibleDescription("목재100");
+  await expect(card).toHaveAccessibleDescription("목재50");
   await card.click();
   const view = page.locator(".g-minimap__view");
   const origin = await view.getAttribute("style");
   await page.keyboard.down("d");
   try {
-    await expect(view).not.toHaveAttribute("style", origin!);
+    await expect(view).not.toHaveAttribute(
+      "style",
+      requireValue(origin, "화면 위치"),
+    );
   } finally {
     await page.keyboard.up("d");
   }
   const hint = page.locator(".building-shelf output");
   const canvas = page.locator(".scene-viewport canvas");
-  const rect = (await canvas.boundingBox())!;
+  const rect = requireValue(await canvas.boundingBox(), "화면 위치");
   for (const ry of [0.42, 0.52, 0.63, 0.35, 0.73]) {
     for (const rx of [0.36, 0.55, 0.63, 0.27, 0.7, 0.2]) {
       const x = rect.x + rx * rect.width,
@@ -138,7 +142,7 @@ test("건설 카드를 골라도 WASD 이동을 유지하고 새 부지를 누�
       if (!(await hint.textContent())?.includes("배치 가능")) continue;
       await page.mouse.click(x, y);
       if ((await card.isVisible()) && !(await hint.isVisible())) {
-        await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("900");
+        await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("950");
         await page.mouse.click(x, y);
         await expect(
           page.getByRole("region", { name: "선택 정보" }),
@@ -192,7 +196,7 @@ test("배치 중 완공된 식당을 누르면 식당의 이름과 단계가 열
     .getByRole("button", { name: "온돌 둥지", exact: true })
     .click();
   const canvas = page.locator(".scene-viewport canvas");
-  const rect = (await canvas.boundingBox())!;
+  const rect = requireValue(await canvas.boundingBox(), "화면 위치");
   await canvas.click({
     position: { x: rect.width / 2, y: rect.height / 2 - 10 },
   });

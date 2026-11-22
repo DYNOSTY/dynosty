@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { requireValue } from "./require-value.js";
 import { encounterReady } from "./scout-sites.js";
 import {
   advanceTimber,
@@ -16,7 +17,10 @@ it.each([true, false])(
       { type: "scout-sites", ids: ["reed"], explore: true },
       "send-reed",
     );
-    const find = sent.scoutFinds!.reed!;
+    const find = requireValue(
+      requireValue(sent.scoutFinds, "sent.scoutFinds").reed,
+      "sent.scoutFinds.reed",
+    );
     const now = (sent.world.day - 1) * 1440 + sent.world.minute;
     const near = {
       ...sent,

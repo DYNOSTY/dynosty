@@ -37,6 +37,18 @@ export function fixedBuildingAt(p: GroundPoint, rebuilding: boolean) {
   );
 }
 
+export function reservedVillageLand(p: GroundPoint, rebuilding: boolean) {
+  if (fixedBuildingAt(p, rebuilding)) return "기존 시설이 차지한 구획이에요.";
+  if (Math.abs(p.x) <= 4 && Math.abs(p.z) <= 4)
+    return "중앙 광장은 비워 두어야 해요.";
+  if (
+    Math.hypot(p.x - VILLAGE_POND.x, p.z - VILLAGE_POND.z) <
+    VILLAGE_POND.r + 3.2
+  )
+    return "물 위에는 지을 수 없어요.";
+  return null;
+}
+export const VILLAGE_POND = { x: 20, z: 16, r: 3.6 };
 export const BOKHOL_WATERS = [
   { id: "east-pond", name: "동쪽 물고기 못", x: 60, z: 32, radius: 10 },
   { id: "south-pond", name: "남쪽 물고기 못", x: 30, z: 65, radius: 12 },

@@ -16,16 +16,16 @@ export type RationPolicy = "needs" | "cap";
 export const VILLAGE_RULES = {
   maxRestaurantStaff: 6,
   homeSpace: 20,
-  constructionWood: 100,
+  constructionWood: 50,
   constructionMinutes: 30,
   species: {
-    R02: { food: "RES_PLANT", portion: 5000, space: 2 },
-    R03: { food: "RES_MEAT", portion: 2500, space: 1 },
-    SPINO: { food: "RES_FISH", portion: 5000, space: 2 },
+    R02: { food: "RES_PLANT", portion: 50000, space: 2 },
+    R03: { food: "RES_MEAT", portion: 25000, space: 1 },
+    SPINO: { food: "RES_FISH", portion: 50000, space: 2 },
   },
 } as const;
 const startingPlots: GroundPoint[] = [
-  { x: 0, z: -2 },
+  { x: -6, z: -2 },
   { x: -10, z: -8 },
   { x: -4, z: -10 },
   { x: 4, z: -10 },
@@ -82,8 +82,15 @@ export interface VillageHome {
   readonly id: string;
   readonly position: GroundPoint;
   readonly capacity: number;
+  readonly priceVersion?: 2 | 3 | 4;
+  readonly timberCost?: number;
   readonly level?: 1 | 2 | 3;
   readonly headingRadians?: number;
+}
+export function nextDwellingId(homes: readonly VillageHome[]) {
+  let number = homes.length + 1;
+  while (homes.some((h) => h.id === `dwelling-${number}`)) number++;
+  return `dwelling-${number}`;
 }
 export const initialHomes = (): VillageHome[] =>
   HOME_PLOTS.slice(0, 6).map((position, i) => ({
@@ -205,7 +212,7 @@ export function mealPlan(
 ): MealPlan {
   if (citizen.mechanicalFrom) return { amount: 0, foods: {}, relief: 0 };
   const rule = speciesRule(citizen.species),
-    portion = policy === "cap" ? 2500 : rule.portion;
+    portion = policy === "cap" ? 25000 : rule.portion;
   let remaining = Math.max(0, Math.min(portion, portion * 4 - used));
   const foods: Partial<Record<FoodId, number>> = {};
   const choices: FoodId[] =
@@ -223,5 +230,5 @@ export function mealPlan(
   return { amount, foods, relief: Math.floor((amount * 360) / rule.portion) };
 }
 export const rationLimit = (species: string, policy: RationPolicy) =>
-  (policy === "cap" ? 2500 : speciesRule(species).portion) * 4;
+  (policy === "cap" ? 25000 : speciesRule(species).portion) * 4;
 export const formatRation = (amount: number) => String(amount / AMOUNT_SCALE);

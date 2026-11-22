@@ -4,13 +4,14 @@ import {
   BOKHOL_MAP,
   bokholElevation,
   constructionPlot,
-  fixedBuildingAt,
   inBokholForest,
+  reservedVillageLand,
   sawmillHasForest,
   VILLAGE_LAYOUT,
 } from "./bokhol.js";
 import { LOGGING_RULES, loggingWorkplace } from "./logging.js";
 import { applyCitizenEvent, createPlayState, parsePlayState } from "./play.js";
+import { requireValue } from "./require-value.js";
 import {
   commandTimber,
   createCapital,
@@ -158,7 +159,7 @@ it("복홀과 도성의 초기 건물은 겹치지 않는 측량 구획에 놓�
     const buildings = [...s.homes, ...s.town.facilities];
     for (const [i, b] of buildings.entries()) {
       expect(constructionPlot(b.position)).toEqual(b.position);
-      expect(fixedBuildingAt(b.position, !!s.rebuilding)).toBe(false);
+      expect(reservedVillageLand(b.position, !!s.rebuilding)).toBeNull();
       expect(
         buildings
           .slice(0, i)
@@ -199,7 +200,12 @@ it("같은 구획에 내린 명령은 한 부지만 쓰고 기존 저장의 위�
     ...s,
     town: {
       ...s.town,
-      orders: [{ ...s.town.orders[0]!, position: { x: 12.25, z: 12.5 } }],
+      orders: [
+        {
+          ...requireValue(s.town.orders[0], "s.town.orders[0]"),
+          position: { x: 12.25, z: 12.5 },
+        },
+      ],
     },
   };
   expect(parseTimberState(old).town.orders[0]?.position).toEqual({

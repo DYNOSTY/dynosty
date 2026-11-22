@@ -2,11 +2,14 @@ import { expect, test } from "@playwright/test";
 import {
   actCampaign,
   advanceTimber,
+  campaignOf,
   commandTimber,
   createTimberSave,
   createVillageGame,
+  requireValue,
   SETTLEMENTS,
 } from "../../packages/game-core/dist/index.js";
+import { readVillage } from "./read-village.js";
 
 test("마을 지도를 축소하면 교역 마을과 이동 중인 정찰대가 보이고 확대하면 복홀로 돌아온다", async ({
   page,
@@ -21,7 +24,7 @@ test("마을 지도를 축소하면 교역 마을과 이동 중인 정찰대가 
       localStorage.setItem("dynosty.village.resume", JSON.stringify(save)),
     createTimberSave({
       ...sent,
-      campaign: { ...sent.campaign!, treaties: [0] },
+      campaign: { ...campaignOf(sent), treaties: [0] },
     }),
   );
   await page.goto("/");
@@ -68,7 +71,10 @@ for (const kind of ["hospital", "logging"] as const)
       );
       for (let i = 0; i < 500 && !s.town.facilities.length; i++)
         s = advanceTimber(s, 1);
-      const facility = s.town.facilities.find((f) => f.kind === kind)!;
+      const facility = requireValue(
+        s.town.facilities.find((f) => f.kind === kind),
+        "시나리오 대상",
+      );
       expect(facility).toBeDefined();
       await page.addInitScript(
         (save) =>
@@ -82,7 +88,7 @@ for (const kind of ["hospital", "logging"] as const)
       const map = page.getByRole("button", {
         name: "지도: 누른 곳으로 시점 이동",
       });
-      const bounds = (await map.boundingBox())!;
+      const bounds = requireValue(await map.boundingBox(), "화면 위치");
       await map.click({
         position: {
           x: bounds.width * (0.5 + position.x / 142),
@@ -90,7 +96,7 @@ for (const kind of ["hospital", "logging"] as const)
         },
       });
       const canvas = page.locator("canvas").first();
-      const windowBox = (await canvas.boundingBox())!;
+      const windowBox = requireValue(await canvas.boundingBox(), "화면 위치");
       const cx = windowBox.x + windowBox.width / 2,
         cy = windowBox.y + windowBox.height / 2;
       await page.mouse.click(cx, cy - 10);
@@ -119,7 +125,7 @@ test("다섯째 미션의 복홀 주변 지도에 다섯 교역 마을이 표시
       ...village,
       chapter: 4,
       campaign: {
-        ...village.campaign!,
+        ...campaignOf(village),
         beat: "thaw",
         treaties: SETTLEMENTS.map((_, i) => i),
       },
@@ -154,7 +160,7 @@ test("복홀에서 땅을 드래그해 회전하고 마우스 휠로 확대한�
     "3D 준비 완료",
   );
   const canvas = page.locator("canvas").first();
-  const box = (await canvas.boundingBox())!;
+  const box = requireValue(await canvas.boundingBox(), "화면 위치");
   const x = box.x + box.width * 0.45,
     y = box.y + box.height * 0.45;
   const camera = () =>
@@ -192,7 +198,8 @@ test("철광맥 표식에서 철광산의 건설 비용과 지면 미리보기�
     const scene = (
       window as unknown as { __scene: import("@babylonjs/core/scene").Scene }
     ).__scene;
-    const ore = scene.getTransformNodeByName("mineral-deposit:iron-bokhol")!;
+    const ore = scene.getTransformNodeByName("mineral-deposit:iron-bokhol");
+    if (!ore) throw Error("mineral-deposit:iron-bokhol 모형이 없습니다.");
     const cam =
       scene.activeCamera as import("@babylonjs/core/Cameras/arcRotateCamera").ArcRotateCamera;
     cam.setTarget(ore.position.clone());
@@ -222,16 +229,16 @@ test("철광맥 표식에서 철광산의 건설 비용과 지면 미리보기�
     .last()
     .click();
   await expect.poll(gridVisible).toBe(false);
-  const pin = page.getByTitle("복홀 북쪽 철광맥 · 인근 부지 보기");
+  const pin = page.getByTitle(/복홀 북쪽 철광맥.*160.*인근 부지 보기/);
   await pin.click();
   const card = page.getByRole("button", { name: "철광산", exact: true });
   await card.hover();
-  await expect(card).toHaveAccessibleDescription(/목재150.*철재30/);
+  await expect(card).toHaveAccessibleDescription(/목재75.*철재30/);
   expect(
     await card.evaluate((el) => getComputedStyle(el, "::after").content),
-  ).toMatch(/목재150/);
+  ).toMatch(/목재75/);
   const canvas = page.locator("canvas").first();
-  const box = (await canvas.boundingBox())!;
+  const box = requireValue(await canvas.boundingBox(), "화면 위치");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   const preview = () =>
     page.evaluate(() => {
@@ -252,7 +259,9 @@ test("철광맥 표식에서 철광산의 건설 비용과 지면 미리보기�
     const scene = (
       window as unknown as { __scene: import("@babylonjs/core/scene").Scene }
     ).__scene;
-    const { x, z } = scene.getMeshByName("home-placement-preview")!.position;
+    const mesh = scene.getMeshByName("home-placement-preview");
+    if (!mesh) throw Error("건설 미리보기 모형이 없습니다.");
+    const { x, z } = mesh.position;
     return { x, z };
   });
   expect(site.x % 2).toBeCloseTo(0);
@@ -260,13 +269,45 @@ test("철광맥 표식에서 철광산의 건설 비용과 지면 미리보기�
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect
     .poll(() =>
-      page.evaluate(() => {
-        const orders = JSON.parse(
-          localStorage.getItem("dynosty.village.resume")!,
-        ).state.town.orders;
+      page.evaluate(readVillage).then((s) => {
+        const orders = s.town.orders;
         return orders.find((order: { kind: string }) => order.kind === "iron")
           ?.position;
       }),
     )
     .toEqual(site);
+});
+
+test("복홀 첫날 건설창과 스페이스바가 시간을 멈추고 닫으면 같은 시점에서 이어간다", async ({
+  page,
+}) => {
+  const s = createVillageGame(false, true);
+  await page.addInitScript(
+    (save) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(save)),
+    createTimberSave(s),
+  );
+  await page.goto("/");
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+  );
+  const hud = page.locator(".g-quests");
+  await expect(hud).toContainText("공동 식당을 골라");
+  await page.keyboard.press("Space");
+  await expect
+    .poll(() => page.evaluate(readVillage).then((s) => s.paused))
+    .toBe(false);
+  await page.keyboard.press("b");
+  await expect(page.getByRole("region", { name: "건물 목록" })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(readVillage).then((s) => s.paused))
+    .toBe(true);
+  await page.getByRole("button", { name: "명령 접기", exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(readVillage).then((s) => s.paused))
+    .toBe(false);
+  await page.keyboard.press("Space");
+  await expect
+    .poll(() => page.evaluate(readVillage).then((s) => s.paused))
+    .toBe(true);
 });
