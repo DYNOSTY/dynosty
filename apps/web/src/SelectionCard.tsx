@@ -20,6 +20,10 @@ type Props = {
   portrait?: string | undefined;
   /** 주민 종의 장단점 (기획서에 적힌 것만) */
   traits?: { gain: string; loss: string } | undefined;
+  /** 짧은 사실 줄 (꼬리표 · 값) — 자원 터의 남은 양, 부지의 비용 등 */
+  rows?: Array<[string, string]> | undefined;
+  /** 진행 막대 0~1 (공사 중) */
+  progress?: number | undefined;
 };
 
 // 구들 축열 = 온돌 단면 가로 띠(사용자 11/19 3차 "가로로 연출") — 왼쪽 아궁이 불이 고래를 따라
@@ -135,6 +139,24 @@ export function SelectionCard(p: Props) {
           <h2>{p.name}</h2>
           <p>{p.role}</p>
           {isOndol && p.state ? <OndolGauge state={p.state} /> : null}
+          {p.rows?.length ? (
+            <dl className="sc-facts">
+              {p.rows.map(([k, v]) => (
+                <div key={k}>
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+          {p.progress !== undefined ? (
+            <progress
+              className="sc-progress"
+              max={1}
+              value={p.progress}
+              aria-label="공사 진행"
+            />
+          ) : null}
           {p.traits ? (
             <span className="story-gl sc-traits">
               <span className="is-gain">

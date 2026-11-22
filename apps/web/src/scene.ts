@@ -10,10 +10,12 @@ import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { CreateScreenshotUsingRenderTarget } from "@babylonjs/core/Misc/screenshotTools";
 import { Scene } from "@babylonjs/core/scene";
-import type {
-  LaborState,
-  SceneSnapshot,
-  TimberState,
+import {
+  buildMinutes,
+  type LaborState,
+  type SceneSnapshot,
+  type TimberState,
+  type WorksState,
 } from "@dynosty/game-core";
 import { TURN_STEP, turnStep } from "./camera-turn.js";
 import { createFog } from "./fog.js";
@@ -23,14 +25,16 @@ import { createLandmarks } from "./landmarks.js";
 import { createLogging } from "./logging.js";
 import { type MarkerRect, placeMarker } from "./marker-layout.js";
 import { loadModelAssets } from "./model-assets.js";
+import { createPlots, type PlotStage } from "./plots.js";
 import { createQualityVisual } from "./quality-scene.js";
 import { createResourceSites } from "./resource-sites.js";
 import { createSceneEntities } from "./scene-entities.js";
 import { observeSceneClicks } from "./scene-input.js";
-import { SCOUT_SITES } from "./scout-sites.js";
+import { RESOURCE_SITES, SCOUT_SITES } from "./scout-sites.js";
 import { focusSiteCamera, resetSceneCamera } from "./site-camera.js";
 import { createSiteSelection } from "./site-selection.js";
 import { isSiteId, type SiteId } from "./site-targets.js";
+import { createSiteWork } from "./site-work.js";
 import { SCENE_SIGNS } from "./site-zones.js";
 import { createTimberVisual } from "./timber-scene.js";
 import { createVillage, LAYOUT } from "./village.js";
@@ -87,6 +91,8 @@ export interface SceneController {
   ): void;
   /** 게임 누적 시각(분) */
   setGameMinutes(total: number): void;
+  /** 자원 터의 일꾼과 건물 공사 (game-core works.ts) → 일꾼이 걸어가 일하고, 부지에 건물이 올라감 */
+  setWorks(works: WorksState): void;
   /** 3D 지점들을 화면 좌표로 계속 알려 줌 (HTML 표식용) */
   trackPoints(
     points: Array<{ id: string; x: number; y: number; z: number }>,
@@ -182,8 +188,12 @@ export function mountScene(
   });
   const fog = createFog(scene, SCOUT_SITES);
   const landmarks = createLandmarks(scene, SCOUT_SITES, glow, warmMat);
-  createResourceSites(scene, worldRoot, () => {
+  const resourceSites = createResourceSites(scene, worldRoot, () => {
     if (!disposed) onAssetWarning("자원 터 모델을 불러오지 못했습니다.");
+  });
+  const siteWork = createSiteWork({ scene, shadow, worldRoot });
+  const plots = createPlots(scene, worldRoot, () => {
+    if (!disposed) onAssetWarning("공사 모형을 불러오지 못했습니다.");
   });
   for (const node of [...scene.meshes, ...scene.transformNodes])
     if (node !== worldRoot && !node.parent) node.parent = worldRoot;
@@ -260,12 +270,21 @@ export function mountScene(
     entities.select(null);
     publishSelection(`bld:${i}`);
   };
+  // 자원 터는 "res:이름"으로 고름
+  const selectResource = (id: string) => {
+    village.highlight(null);
+    sites.select(null);
+    entities.select(null);
+    publishSelection(`res:${id}`);
+  };
   const select = (id: string | null) => {
     const bld = id?.startsWith("bld:") ? Number(id.slice(4)) : null;
     if (bld !== null) return selectBuilding(bld);
+    if (id?.startsWith("res:")) return selectResource(id.slice(4));
     village.highlight(null);
-    // 마을 건물 선택은 예제·현장 선택기가 모르는 값이라 여기서 직접 해제를 알림 (X·Esc·빈 바닥)
-    if (id === null && selected?.startsWith("bld:")) publishSelection(null);
+    // 마을 건물·자원 터 선택은 예제·현장 선택기가 모르는 값이라 여기서 직접 해제를 알림 (X·Esc·빈 바닥)
+    if (id === null && /^(bld|res):/.test(selected ?? ""))
+      publishSelection(null);
     if (isSiteId(id)) {
       entities.select(null);
       sites.select(id);
@@ -329,8 +348,11 @@ export function mountScene(
     // 가려진 주민 대신 화면에서 앞에 보이는 대상을 선택한다.
     const mesh = scene.pick(x, y)?.pickedMesh ?? null,
       site = sites.idForMesh(mesh),
-      bld = village.buildingForMesh(mesh);
+      res = resourceSites.idForMesh(mesh),
+      // 다 지은 건물이든, 빈 터·공사 중인 부지든 같은 번호로 고름
+      bld = village.buildingForMesh(mesh) ?? plots.plotForMesh(mesh);
     if (site) select(site);
+    else if (res) selectResource(res);
     else if (bld !== null) selectBuilding(bld);
     else {
       village.highlight(null);
@@ -433,6 +455,9 @@ export function mountScene(
     setTime(demoActive ? 16 * 60 : clockShown); // 조달 중엔 해가 낮은 오후 — 눈밭이 하얗게 날리지 않게
     village.animate(dt);
     logging.animate(dt);
+    siteWork.setClock(clockShown);
+    siteWork.animate(dt);
+    plots.animate(dt);
     fog.animate(dt);
     landmarks.animate(dt);
     if (runningNow) gameMin = Math.min(gameMin + dt * 10, gameMinSync + 10);
@@ -732,14 +757,19 @@ export function mountScene(
     },
     focusSelected() {
       const id = selected;
-      const at = id?.startsWith("bld:")
-        ? LAYOUT[Number(id.slice(4))]
-        : id
-          ? (["", 0, -1] as const)
-          : null;
+      const res = id?.startsWith("res:")
+        ? RESOURCE_SITES.find((s) => s.id === id.slice(4))
+        : null;
+      const at = res
+        ? (["", res.x, res.z] as const)
+        : id?.startsWith("bld:")
+          ? LAYOUT[Number(id.slice(4))]
+          : id
+            ? (["", 0, -1] as const)
+            : null;
       if (!at) return;
       camera.target.set(at[1], 1, at[2]);
-      camera.radius = 16;
+      camera.radius = res ? 22 : 16;
     },
     resetCamera() {
       if (demoActive) resetSceneCamera(camera);
@@ -818,6 +848,30 @@ export function mountScene(
       gameMinSync = total;
       gameMin = total;
     },
+    setWorks(works) {
+      siteWork.setJobs(
+        Object.fromEntries(
+          Object.entries(works.sites).map(([id, s]) => [id, s.crew]),
+        ),
+        works.building.map((j) => j.plot),
+      );
+      village.setBuilt(works.built);
+      // 안 지은 부지 = 빈 터(0), 짓는 중 = 진행에 따라 터 닦기(1)·골조(2)·지붕 얹기(3)
+      const stages = new Map<number, PlotStage>();
+      LAYOUT.forEach((_, i) => {
+        if (!works.built.includes(i)) stages.set(i, 0);
+      });
+      for (const j of works.building)
+        stages.set(
+          j.plot,
+          (1 +
+            Math.min(
+              2,
+              Math.floor((3 * j.done) / buildMinutes(j.plot)),
+            )) as PlotStage,
+        );
+      for (const at of plots.set(stages)) siteWork.puff(at);
+    },
     trackPoints(points, cb) {
       tracked = points;
       onTrack = cb;
@@ -868,6 +922,8 @@ export function mountScene(
       entities.dispose();
       village.dispose();
       logging.dispose();
+      siteWork.dispose();
+      plots.dispose();
       fuelYard.dispose();
       fog.dispose();
       scene.dispose();

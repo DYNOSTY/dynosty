@@ -71,8 +71,10 @@ describe("식성별 고정 정밀도 소비와 시간", () => {
     expect(split).toEqual(one);
     expect(one.day).toBe(2);
     expect(one.minute).toBe(0);
-    for (const id of FOOD_IDS)
-      expect(one.resources[id]).toBe(100 * AMOUNT_SCALE);
+    // 식성마다 하루 20을 먹음. 어류는 처음부터 서 있는 강물 양식장이 하루 12를 보탬 (works.ts)
+    expect(one.resources.RES_PLANT).toBe(100 * AMOUNT_SCALE);
+    expect(one.resources.RES_MEAT).toBe(100 * AMOUNT_SCALE);
+    expect(one.resources.RES_FISH).toBe(112 * AMOUNT_SCALE);
     expect(initial.resources.RES_PLANT).toBe(120 * AMOUNT_SCALE);
   });
   it("날짜 경계에서 한 번만 변경하고 식량을 음수·다른 식성 대체로 만들지 않는다", () => {

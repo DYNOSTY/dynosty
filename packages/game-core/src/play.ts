@@ -18,6 +18,20 @@ import {
   stepWinter,
   type WinterState,
 } from "./winter.js";
+import {
+  BUILD_RULES,
+  type BuildingType,
+  buildMinutes,
+  canBuild,
+  createWorks,
+  PLOTS,
+  parseWorks,
+  type SiteId,
+  setSiteCrew,
+  startBuild,
+  stepWorks,
+  type WorksState,
+} from "./works.js";
 
 export type RuleSet = typeof raw;
 export type ResourceId = keyof RuleSet["resources"];
@@ -241,6 +255,8 @@ export interface PlayState {
   readonly work: { readonly woodCarry: number };
   /** 사건·정책 선택 (story.ts) — 옛 저장에는 없어서 불러올 때 기본값으로 채움 */
   readonly story: StoryState;
+  /** 자원 터의 일꾼과 건물 공사 (works.ts) — 옛 저장에는 없어서 불러올 때 '다 지은 마을'로 채움 */
+  readonly works: WorksState;
 }
 // 벌목장 B02 (온돌 UI v0.4 표): 정원6 · 목재18/일 → 1단계 초기 배치 4명 = 하루 12, 낮 9~18시에만
 export const LOGGING = { woodPerDay: 12, from: 9, to: 18 } as const;
@@ -286,6 +302,7 @@ export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
     winter: createWinterState(citizens.map((c) => c.id)),
     work: { woodCarry: 0 },
     story: createStoryState(),
+    works: createWorks(AMOUNT_SCALE),
   };
 }
 export function parsePlayState(
@@ -399,6 +416,13 @@ export function parsePlayState(
         fail();
       }
     })(),
+    works: (() => {
+      try {
+        return parseWorks(value.works, AMOUNT_SCALE);
+      } catch {
+        fail();
+      }
+    })(),
   };
 }
 export function dailyFoodDemand(
@@ -441,6 +465,7 @@ export function advancePlayMinutes(
   let wDay = state.day;
   let wMinute = state.minute;
   let woodCarry = state.work.woodCarry;
+  let works = state.works;
   const workMinutes = (LOGGING.to - LOGGING.from) * 60;
   let left = minutes;
   while (left > 0) {
@@ -475,6 +500,10 @@ export function advancePlayMinutes(
       const n = LOGGING.woodPerDay * AMOUNT_SCALE * chunk + woodCarry;
       resources.RES_WOOD += Math.floor(n / workMinutes);
       woodCarry = n % workMinutes;
+      // 자원 터의 일꾼·다 지은 건물의 생산·공사 진행 (works.ts) — 벌목과 같은 시각에만
+      const w = stepWorks(works, chunk, AMOUNT_SCALE);
+      works = w.works;
+      for (const id of RESOURCE_IDS) resources[id] += w.gained[id] ?? 0;
     }
     pessimism = Math.min(100, Math.max(0, pessimism + r.pessimismDelta));
     optimism = Math.min(100, Math.max(0, optimism + r.optimismDelta));
@@ -510,6 +539,36 @@ export function advancePlayMinutes(
     pessimism,
     winter,
     work: { woodCarry },
+    works,
+  };
+}
+/** 자원 터에 일꾼 한 조를 보내거나 불러들임 */
+export function commandSiteCrew(
+  input: PlayState,
+  site: SiteId,
+  on: boolean,
+): PlayState {
+  const state = parsePlayState(input);
+  return { ...state, works: setSiteCrew(state.works, site, on) };
+}
+/** 빈 부지에 공사를 시작: 나무·철을 바로 쓰고 일꾼 한 조가 붙는다. 작업일 0인 건물은 바로 선다 */
+export function startBuilding(input: PlayState, plot: number): PlayState {
+  const state = parsePlayState(input);
+  const { RES_WOOD: wood, RES_METAL: metal } = state.resources;
+  if (!canBuild(state.works, plot, wood, metal, AMOUNT_SCALE)) fail();
+  const rule = BUILD_RULES[PLOTS[plot] as BuildingType];
+  const works =
+    buildMinutes(plot) === 0
+      ? { ...state.works, built: [...state.works.built, plot] }
+      : startBuild(state.works, plot);
+  return {
+    ...state,
+    works,
+    resources: {
+      ...state.resources,
+      RES_WOOD: wood - rule.wood * AMOUNT_SCALE,
+      RES_METAL: metal - rule.metal * AMOUNT_SCALE,
+    },
   };
 }
 export function tickPlay(

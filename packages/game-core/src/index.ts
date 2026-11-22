@@ -38,7 +38,13 @@ export type PlayCommand =
       readonly type: "story-pick";
       readonly id: import("./story.js").StoryId;
       readonly side: import("./story.js").StorySide;
-    };
+    }
+  | {
+      readonly type: "site-crew";
+      readonly site: import("./works.js").SiteId;
+      readonly on: boolean;
+    }
+  | { readonly type: "build"; readonly plot: number };
 export type GameCommand =
   | { readonly type: "play-command"; readonly command: PlayCommand }
   | { readonly type: "request-play-save"; readonly requestId: number }
@@ -106,6 +112,7 @@ export {
   advancePlayMinutes,
   advanceToStory,
   type Citizen,
+  commandSiteCrew,
   createPlaySave,
   createPlayScene,
   createPlayState,
@@ -128,9 +135,11 @@ export {
   type ResourceId,
   type RuleSet,
   setPlayPaused,
+  startBuilding,
   supplyFood,
   tickPlay,
 } from "./play.js";
 export * from "./story.js";
 export * from "./timber.js";
 export * from "./winter.js";
+export * from "./works.js";

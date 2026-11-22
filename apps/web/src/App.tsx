@@ -9,14 +9,22 @@ import type {
 import {
   AMOUNT_SCALE,
   absMinute,
+  BUILD_RULES,
+  type BuildingType,
+  buildMinutes,
+  CREW_SIZE,
+  freeHands,
   type HeatLevel,
   type LaborState,
   laborScene,
   laborStock,
+  PLOTS,
   pendingStory,
+  SITE_RULES,
   STORY_RULES,
   type TimberState,
   timberScene,
+  type SiteId as WorkSiteId,
   winterReport,
   ZONES,
 } from "@dynosty/game-core";
@@ -28,7 +36,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { BUILDINGS, type BuildingAction, commandGrid } from "./buildings.js";
+import {
+  BUILDINGS,
+  type BuildingAction,
+  type BuildingCommand,
+  commandGrid,
+  RESOURCE_NAMES,
+  SITE_INFO,
+} from "./buildings.js";
 import {
   CmdButton,
   CmdFace,
@@ -180,6 +195,9 @@ export function App() {
     Record<string, { status: "going" | "found"; start: number }>
   >({});
   const [scoutOpen, setScoutOpen] = useState<string | null>(null);
+  // 건축 목록 (새로 지을 건물 고르기)
+  const [buildOpen, setBuildOpen] = useState(false);
+  const buildPanelId = useId();
   const [scoutMenuOnly, setScoutMenuOnly] = useState(false);
   const scoutListId = useId();
   const scoutListTitleId = useId();
@@ -501,13 +519,129 @@ export function App() {
     appliedSnapshot?.entities.find(
       (entity) => entity.id === selectedId && entity.visible,
     ) ?? null;
-  const hasPanels = saveOpen || toolsOpen || scoutOpen !== null;
+  const hasPanels = saveOpen || toolsOpen || scoutOpen !== null || buildOpen;
   // 하단 콘솔 내용: 마을 건물(bld:번호) · 가운데 온돌(건물 예제) · 주민 예제
   const selectedBuilding = selectedId?.startsWith("bld:")
     ? (LAYOUT[Number(selectedId.slice(4))]?.[0] ?? null)
     : selectedEntity?.kind === "building"
       ? "BLD_ONDOL"
       : null;
+  // 자원 터(res:이름): 남은 양과 일꾼, 일꾼 보내기·부르기
+  const works = playState?.works ?? null;
+  const resCard = (() => {
+    const id = selectedId?.startsWith("res:")
+      ? (selectedId.slice(4) as WorkSiteId)
+      : null;
+    const site = id && works?.sites[id];
+    const info = id && SITE_INFO[id];
+    if (!id || !works || !site || !info) return null;
+    const rule = SITE_RULES[id];
+    const spent = site.left === 0;
+    const cmd: BuildingCommand = site.crew
+      ? { icon: "residents", label: "일꾼 부르기", action: "crew-off" }
+      : { icon: "residents", label: "일꾼 보내기", action: "crew-on" };
+    return {
+      id,
+      info,
+      grid: commandGrid({ ...info, facts: [], commands: [cmd] }),
+      rows: [
+        ["얻는 것", `${RESOURCE_NAMES[rule.resource]} 하루 ${rule.perDay}`],
+        [
+          "남은 양",
+          site.left === null
+            ? "마르지 않음"
+            : spent
+              ? "바닥남"
+              : `${Math.ceil(site.left / AMOUNT_SCALE)}`,
+        ],
+        ["일꾼", site.crew ? `${CREW_SIZE}명 나가 있음` : "없음"],
+        ["쉬는 일손", `${freeHands(works)}명`],
+      ] as Array<[string, string]>,
+      // 다 캤거나 보낼 일손이 없으면 못 보냄
+      blocked: !site.crew && (spent || freeHands(works) < CREW_SIZE),
+    };
+  })();
+  // 부지(bld:번호): 아직 안 지었으면 '터' 창(드는 것·짓기), 짓는 중이면 진행
+  const costText = (type: BuildingType) => {
+    const rule = BUILD_RULES[type];
+    const parts = [
+      rule.wood ? `목재 ${rule.wood}` : "",
+      rule.metal ? `철재 ${rule.metal}` : "",
+    ].filter(Boolean);
+    return parts.length ? parts.join(" · ") : "없음";
+  };
+  /** 지금 못 짓는 까닭 (지을 수 있으면 null) */
+  const buildBlock = (plot: number): string | null => {
+    const type = PLOTS[plot];
+    if (!playState || !works || !type) return "준비 중";
+    if (works.building.some((j) => j.plot === plot)) return "짓는 중";
+    const rule = BUILD_RULES[type];
+    if (playState.resources.RES_WOOD < rule.wood * AMOUNT_SCALE)
+      return "목재 부족";
+    if (playState.resources.RES_METAL < rule.metal * AMOUNT_SCALE)
+      return "철재 부족";
+    return freeHands(works) < CREW_SIZE ? "일손 없음" : null;
+  };
+  const plotCard = (() => {
+    const plot = selectedId?.startsWith("bld:")
+      ? Number(selectedId.slice(4))
+      : null;
+    const type = plot === null ? undefined : PLOTS[plot];
+    const info = type && BUILDINGS[type];
+    if (plot === null || !type || !info || !works) return null;
+    if (works.built.includes(plot)) return null; // 다 지은 건물은 아래 건물 창으로
+    const job = works.building.find((j) => j.plot === plot);
+    const total = buildMinutes(plot);
+    const hours = (m: number) => `${Math.ceil(m / 60)}시간`;
+    return {
+      plot,
+      type,
+      name: job ? `${info.name} 짓는 중` : `${info.name} 터`,
+      role: info.role,
+      progress: job ? job.done / total : undefined,
+      grid: commandGrid({
+        ...info,
+        commands: job
+          ? []
+          : [{ icon: "build", label: "짓기", hotkey: "B", action: "build" }],
+      }),
+      rows: (job
+        ? [
+            ["공사", `${Math.floor((100 * job.done) / total)}%`],
+            ["남은 일", `작업 ${hours(total - job.done)}`],
+            ["일꾼", `${CREW_SIZE}명`],
+          ]
+        : [
+            ["드는 것", costText(type)],
+            ["걸리는 일", `작업 ${hours(total)}`],
+            ["쉬는 일손", `${freeHands(works)}명`],
+          ]) as Array<[string, string]>,
+      blocked: job ? null : buildBlock(plot),
+    };
+  })();
+  // 건축 목록: 아직 안 지은 건물을 종류별로 한 줄씩 (둥지처럼 여러 채면 남은 수)
+  const buildOptions = works
+    ? [...new Set(PLOTS)].flatMap((type) => {
+        const left = PLOTS.flatMap((t, i) =>
+          t === type && !works.built.includes(i) ? [i] : [],
+        );
+        const plot = left.find(
+          (i) => !works.building.some((j) => j.plot === i),
+        );
+        const info = BUILDINGS[type];
+        if (!left.length || !info) return [];
+        return [
+          {
+            type,
+            info,
+            left: left.length,
+            // 남은 부지가 다 짓는 중이면 더 시작할 곳이 없음
+            plot: plot ?? null,
+            block: plot === undefined ? "짓는 중" : buildBlock(plot),
+          },
+        ];
+      })
+    : [];
   const selection =
     selectedBuilding || selectedEntity
       ? {
@@ -676,6 +810,10 @@ export function App() {
     if (sceneStatus === "준비 완료")
       sceneRef.current?.setGameMinutes(gameMinutes);
   }, [gameMinutes, sceneStatus]);
+  // 자원 터의 일꾼·공사 상태를 장면에 알림 (일꾼이 걸어가 일하고, 부지에 건물이 올라감)
+  useEffect(() => {
+    if (sceneStatus === "준비 완료" && works) sceneRef.current?.setWorks(works);
+  }, [works, sceneStatus]);
   useEffect(() => {
     if (sceneStatus !== "준비 완료") return;
     sceneRef.current?.trackPoints(
@@ -811,6 +949,7 @@ export function App() {
   function closePopups() {
     setSaveOpen(false);
     setToolsOpen(false);
+    setBuildOpen(false);
     closeScout();
     setTimberOpen(false);
   }
@@ -831,6 +970,8 @@ export function App() {
   closeRef.current = closePopups;
   const saveOpenRef = useRef(saveOpen);
   saveOpenRef.current = saveOpen;
+  const buildOpenRef = useRef(buildOpen);
+  buildOpenRef.current = buildOpen;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
@@ -847,6 +988,11 @@ export function App() {
         return;
       const key = event.key.toLowerCase();
       if (key === "t" || event.code === "KeyT") openTimberRef.current();
+      if (key === "b" || event.code === "KeyB") {
+        const wasOpen = buildOpenRef.current;
+        closeRef.current();
+        setBuildOpen(!wasOpen);
+      }
       if (key === "j") {
         const wasOpen = saveOpenRef.current;
         closeRef.current();
@@ -864,7 +1010,17 @@ export function App() {
     if (action === "procure") openTimber();
     else if (action === "focus") sceneRef.current?.focusSelected();
     else if (action === "clear") clearSelection();
-    else if (action.startsWith("heat-")) {
+    else if (action === "build") {
+      if (plotCard && !plotCard.blocked)
+        commandPlay({ type: "build", plot: plotCard.plot });
+    } else if (action === "crew-on" || action === "crew-off") {
+      if (resCard)
+        commandPlay({
+          type: "site-crew",
+          site: resCard.id,
+          on: action === "crew-on",
+        });
+    } else if (action.startsWith("heat-")) {
       // 온돌 화력: 마을 모든 구역(둥지·재배소·쉼터·연구동·치료소)에 한 번에
       const heat = action.slice(5) as HeatLevel;
       for (const zone of ZONES) commandPlay({ type: "set-heat", zone, heat });
@@ -1119,6 +1275,7 @@ export function App() {
           </div>
           {/* 개발용 안내·예제 단추: 플레이어 화면에선 숨김 (?dev=1 또는 자동 시험에서만) */}
           <div className="scene-footer" hidden={!DEV_UI}>
+            {/* 한 줄을 넘기면 아래 '기본 시점' 단추가 밀려 정찰 표식에 가려진다 (e2e approved-play) — 길이를 늘리지 말 것 */}
             <p>클릭으로 선택 · Q·E로 회전 · 휠로 확대</p>
             <span>
               {timberOpen && laborOpen
@@ -1309,6 +1466,55 @@ export function App() {
             ) : null}
           </WorkspacePanel>
           <WorkspacePanel
+            id={buildPanelId}
+            title="짓기"
+            open={buildOpen}
+            onClose={() => setBuildOpen(false)}
+          >
+            {/* 새로 지을 건물 고르기: 드는 자재와 걸리는 일, 지금 못 짓는 까닭 */}
+            <section className="panel g-build">
+              <p className="g-build__hands">
+                쉬는 일손 {works ? freeHands(works) : 0}명 · 공사 한 곳에{" "}
+                {CREW_SIZE}명
+              </p>
+              {buildOptions.length ? (
+                <ul className="g-build__list">
+                  {buildOptions.map((o) => (
+                    <li key={o.type}>
+                      <img src={`/ui/buildings/${o.type}.jpg`} alt="" />
+                      <div className="g-build__text">
+                        <strong>
+                          {o.info.name}
+                          {o.left > 1 ? ` · 남은 터 ${o.left}곳` : ""}
+                        </strong>
+                        <span>{o.info.role}</span>
+                        <span className="g-build__cost">
+                          {costText(o.type)} · 작업{" "}
+                          {Math.ceil((BUILD_RULES[o.type].workdays * 540) / 60)}
+                          시간
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={o.block !== null || o.plot === null}
+                        onClick={() => {
+                          if (o.plot === null) return;
+                          commandPlay({ type: "build", plot: o.plot });
+                          sceneRef.current?.select(`bld:${o.plot}`);
+                          sceneRef.current?.focusSelected();
+                        }}
+                      >
+                        {o.block ?? "짓기"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>지을 수 있는 건물을 모두 지었습니다.</p>
+              )}
+            </section>
+          </WorkspacePanel>
+          <WorkspacePanel
             id={savePanelId}
             title="저장"
             open={saveOpen}
@@ -1470,6 +1676,14 @@ export function App() {
           controls={savePanelId}
           onClick={() => openOnly(() => setSaveOpen(!saveOpen))}
         />
+        <CmdButton
+          icon="build"
+          label="짓기"
+          hotkey="B"
+          pressed={buildOpen}
+          controls={buildPanelId}
+          onClick={() => openOnly(() => setBuildOpen(!buildOpen))}
+        />
         <SettingsMenu className="g-cmd">
           <CmdFace icon="settings" label="설정" hotkey="Esc" />
         </SettingsMenu>
@@ -1583,7 +1797,41 @@ export function App() {
         </div>
         {/* 고른 것이 있을 때만: 왼쪽 초상·이름·역할 · 오른쪽 건물별 명령 9칸 */}
       </section>
-      {selection ? (
+      {resCard ? (
+        <SelectionCard
+          id={`SITE_${resCard.id}`}
+          portrait={`/ui/sites/res_${resCard.id}.jpg`}
+          name={resCard.info.name}
+          role={resCard.info.role}
+          rows={resCard.rows}
+          commands={resCard.grid}
+          state={playState}
+          onAction={runAction}
+          toggled={() => undefined}
+          disabled={(cmd) =>
+            !cmd.action || (cmd.action === "crew-on" && resCard.blocked)
+          }
+        />
+      ) : plotCard ? (
+        <SelectionCard
+          id={plotCard.type}
+          name={plotCard.name}
+          role={plotCard.role}
+          rows={
+            plotCard.blocked
+              ? [...plotCard.rows, ["지금은", plotCard.blocked]]
+              : plotCard.rows
+          }
+          progress={plotCard.progress}
+          commands={plotCard.grid}
+          state={null}
+          onAction={runAction}
+          toggled={() => undefined}
+          disabled={(cmd) =>
+            !cmd.action || (cmd.action === "build" && plotCard.blocked !== null)
+          }
+        />
+      ) : selection ? (
         <SelectionCard
           id={selection.building ?? "RESIDENT"}
           portrait={

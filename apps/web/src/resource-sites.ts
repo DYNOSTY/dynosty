@@ -6,19 +6,22 @@ import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import type { Node } from "@babylonjs/core/node";
 import type { Scene } from "@babylonjs/core/scene";
 import { loadSceneAsset } from "./scene-assets.js";
 import { RESOURCE_SITES } from "./scout-sites.js";
 import { elevation } from "./world.js";
 
 /** 블렌더 1 = 게임 1.5 — 1.1로는 적송 한 그루 폭이라 숲에 묻혔음 */
-const SITE_SCALE = 1.5;
+export const SITE_SCALE = 1.5;
 
 export function createResourceSites(
   scene: Scene,
   root: TransformNode | null,
   onFail: () => void,
 ) {
+  /** 누를 수 있는 터: 터 뿌리 노드 → 터 이름 */
+  const owners = new Map<Node, string>();
   for (const site of RESOURCE_SITES)
     void loadSceneAsset(scene, `/models/sites/${site.file}.glb`)
       .then((asset) => {
@@ -27,6 +30,7 @@ export function createResourceSites(
         node.position.set(site.x, elevation(site.x, site.z), site.z);
         node.rotation.y = Math.PI; // 모델의 앞(트인 쪽)이 기본 시점의 카메라를 봄
         node.scaling.setAll(SITE_SCALE);
+        owners.set(node, site.id);
         const inst = asset.instantiateModelsToScene(
           (n) => `site-${site.id}:${n}`,
           false,
@@ -47,7 +51,7 @@ export function createResourceSites(
         const base = elevation(site.x, site.z);
         const p = new Vector3();
         for (const mesh of node.getChildMeshes()) {
-          mesh.isPickable = false;
+          mesh.isPickable = true;
           mesh.material = baked;
           // 눈밭이 비탈에 묻히거나 뜨지 않게, 꼭짓점마다 그 자리 땅 높이를 따라가게 함
           const at = mesh.getVerticesData(VertexBuffer.PositionKind);
@@ -69,4 +73,14 @@ export function createResourceSites(
         }
       })
       .catch(onFail);
+  return {
+    /** 누른 조각이 어느 터인지 (터가 아니면 null) */
+    idForMesh(mesh: Node | null): string | null {
+      for (let n = mesh; n; n = n.parent) {
+        const id = owners.get(n);
+        if (id) return id;
+      }
+      return null;
+    },
+  };
 }

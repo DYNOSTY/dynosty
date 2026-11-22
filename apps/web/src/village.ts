@@ -176,6 +176,8 @@ export function createVillage(
   // ── 주민 움직임: 마당을 걷는 주민 · 자원 나르는 일꾼 ──
   type Hauler = {
     work: Vector3;
+    /** 일터의 부지 번호 — 아직 안 지었으면 나르지 않고 마당을 거닒 */
+    workPlot: number;
     store: Vector3;
     /** 등에 늘 지는 지게 (일꾼 노드에 붙임) */
     rig: TransformNode;
@@ -218,9 +220,29 @@ export function createVillage(
   >();
   // 누를 수 있는 마을 건물: 건물 뿌리 노드 → LAYOUT 번호
   const buildingNodes = new Map<Node, number>();
+  // 다 지은 부지만 건물이 보임 (game-core works.built). null = 아직 모름 → 다 보임
+  let builtNow: Set<number> | null = null;
+  const roots = new Map<number, TransformNode>();
+  const smokeOf = new Map<number, ParticleSystem>();
+  const smokeOff = new Set<ParticleSystem>();
+  const isBuilt = (i: number) => builtNow === null || builtNow.has(i);
+  const applyBuilt = (i: number) => {
+    const on = isBuilt(i);
+    roots.get(i)?.setEnabled(on);
+    const ps = smokeOf.get(i);
+    if (!ps) return;
+    if (on) smokeOff.delete(ps);
+    else smokeOff.add(ps);
+    ps.emitRate = on ? (smokeBase.get(ps) ?? 10) * smokeScale : 0;
+  };
+  const plotAt = (x: number, z: number) =>
+    LAYOUT.findIndex(([, lx, lz]) => lx === x && lz === z);
   const register = (node: TransformNode, x: number, z: number) => {
-    const i = LAYOUT.findIndex(([, lx, lz]) => lx === x && lz === z);
-    if (i >= 0) buildingNodes.set(node, i);
+    const i = plotAt(x, z);
+    if (i < 0) return;
+    buildingNodes.set(node, i);
+    roots.set(i, node);
+    applyBuilt(i);
   };
   // 고른 건물 발밑 금빛 고리는 없앰 (사용자 11/19: "분위기 깬다") — 고른 건 오른쪽 아래 메달 창으로 알 수 있음
   plinthMat.freeze();
@@ -260,14 +282,16 @@ export function createVillage(
       }
       shadow(node, radius, depth);
       if (tpl.smoke)
-        addSmoke(
-          Vector3.TransformCoordinates(tpl.smoke, node.getWorldMatrix()),
+        smokeOf.set(
+          plotAt(x, z),
+          addSmoke(
+            Vector3.TransformCoordinates(tpl.smoke, node.getWorldMatrix()),
+          ),
         );
       register(node, x, z);
       return;
     }
     const v = instantiate(asset, node, scale, shadow, radius, depth);
-    if (!role) register(node, x, z);
     for (const m of v.meshes) {
       m.isPickable = !role;
       if (!role) lib.dress(m.material);
@@ -300,7 +324,7 @@ export function createVillage(
         : chimney !== undefined
           ? new Vector3(x, chimney + elevation(x, z), z)
           : null;
-      if (at) addSmoke(at);
+      if (at) smokeOf.set(plotAt(x, z), addSmoke(at));
       for (const m of v.meshes) {
         m.computeWorldMatrix(true);
         m.freezeWorldMatrix();
@@ -319,6 +343,8 @@ export function createVillage(
         local,
         smoke: at && smokeNode ? Vector3.TransformCoordinates(at, inv) : null,
       });
+      // 굴뚝 연기를 단 뒤에 등록해야 안 지은 부지의 연기도 같이 꺼짐
+      register(node, x, z);
     }
     if (clip) v.play(clip, r());
     disposers.push(v.dispose);
@@ -386,6 +412,7 @@ export function createVillage(
     return new Vector3(x - (x / d) * 3.4, 0, z - (z / d) * 3.4);
   };
   const store = spot(3); // 갈무리 창고
+  const officeSpot = spot(0); // 조달소 — 창고를 짓기 전에 짐을 내려놓는 곳
   const HAULS: Record<number, [number, "plant" | "wood" | "fish"]> = {
     2: [5, "plant"],
     5: [11, "wood"],
@@ -405,7 +432,12 @@ export function createVillage(
           "Idle",
           1.3,
           2,
-          { work, store: store.clone(), ...makeProp(haul[1]) },
+          {
+            work,
+            workPlot: haul[0],
+            store: store.clone(),
+            ...makeProp(haul[1]),
+          },
         ),
       );
       return;
@@ -477,6 +509,7 @@ export function createVillage(
     smokeBase.set(ps, ps.emitRate);
     ps.emitRate = ps.emitRate * smokeScale;
     if (running) ps.start();
+    return ps;
   }
 
   // ── 발견한 거점: 건물 도감 GLB가 땅에서 솟아오름 (전용 모형은 모델링 담당 몫) ──
@@ -486,7 +519,7 @@ export function createVillage(
     forge: "BLD_SALVAGE",
     hunt: "BLD_FORAGE",
   };
-  const risers: Array<{ node: TransformNode; t: number }> = [];
+  const risers: Array<{ node: TransformNode; t: number; base: number }> = [];
   async function addLandmark(id: string, x: number, z: number) {
     const file = LANDMARK_GLB[id];
     if (!file || disposed || landmarkVisuals.has(id)) return;
@@ -501,7 +534,7 @@ export function createVillage(
     const v = instantiate(asset, node, BUILDING_SCALE, shadow, 4.2, 3.8);
     for (const m of v.meshes) m.isPickable = false;
     node.scaling.y = 0.01 * BUILDING_SCALE;
-    risers.push({ node, t: 0 });
+    risers.push({ node, t: 0, base: BUILDING_SCALE });
     landmarkVisuals.set(id, { node, dispose: v.dispose });
   }
   function animateRisers(dt: number) {
@@ -509,7 +542,7 @@ export function createVillage(
       const rz = risers[i];
       if (!rz) continue;
       rz.t = Math.min(1, rz.t + dt / 1.6);
-      rz.node.scaling.y = Math.max(0.01, 1 - (1 - rz.t) ** 3) * BUILDING_SCALE;
+      rz.node.scaling.y = Math.max(0.01, 1 - (1 - rz.t) ** 3) * rz.base;
       if (rz.t >= 1) risers.splice(i, 1);
     }
   }
@@ -723,7 +756,8 @@ export function createVillage(
   function setHeat(scale: number) {
     if (Math.abs(scale - smokeScale) < 0.01) return;
     smokeScale = scale;
-    for (const ps of smokes) ps.emitRate = (smokeBase.get(ps) ?? 10) * scale;
+    for (const ps of smokes)
+      ps.emitRate = smokeOff.has(ps) ? 0 : (smokeBase.get(ps) ?? 10) * scale;
   }
   let running = false;
   function setRunning(value: boolean) {
@@ -757,12 +791,13 @@ export function createVillage(
         if (w.asleep) continue;
         if (!w.bed) {
           const p = w.node.position;
-          const nest = LAYOUT.filter(([id]) => id === "BLD_NEST").reduce(
-            (best, n) =>
-              Math.hypot(n[1] - p.x, n[2] - p.z) <
-              Math.hypot(best[1] - p.x, best[2] - p.z)
-                ? n
-                : best,
+          const nest = LAYOUT.filter(
+            ([id], i) => id === "BLD_NEST" && isBuilt(i),
+          ).reduce((best, n) =>
+            Math.hypot(n[1] - p.x, n[2] - p.z) <
+            Math.hypot(best[1] - p.x, best[2] - p.z)
+              ? n
+              : best,
           );
           const [, nx, nz] = nest;
           const d = Math.hypot(nx, nz) || 1;
@@ -788,15 +823,20 @@ export function createVillage(
         if (w.haul) w.haul.state = "toWork";
         w.play("Walk");
       }
-      const h = w.haul;
+      // 일터를 아직 안 지었으면 나르지 않고 다른 주민처럼 마당을 거닒
+      const h = w.haul && isBuilt(w.haul.workPlot) ? w.haul : undefined;
+      if (w.haul && !h) w.haul.prop.setEnabled(false);
       if (h) {
-        // 일꾼: 일터에서 작업 → 짐 지고 창고로 → 내려놓고 → 빈손으로 돌아감
+        // 일꾼: 일터에서 작업 → 짐 지고 창고로(창고를 짓기 전에는 조달소로) → 내려놓고 → 빈손으로 돌아감
         h.timer -= dt;
         if (h.state === "work" && h.timer <= 0) {
           h.state = "toStore";
           h.prop.setEnabled(true);
           w.play("Walk");
-        } else if (h.state === "toStore" && moveTo(w, h.store, dt)) {
+        } else if (
+          h.state === "toStore" &&
+          moveTo(w, isBuilt(3) ? h.store : officeSpot, dt)
+        ) {
           h.state = "drop";
           h.timer = 1.2;
           h.prop.setEnabled(false);
@@ -917,6 +957,17 @@ export function createVillage(
     /** 고른 건물 발밑 고리 (null이면 숨김) */
     /** 고른 마을 건물 표시 — 바닥 고리는 없앰(메달 창으로 대신) */
     highlight(_i: number | null) {},
+    /** 다 지은 부지 (game-core works.built): 그 건물만 보이고 굴뚝 연기가 남 */
+    setBuilt(plots: readonly number[]) {
+      const before = builtNow;
+      builtNow = new Set(plots);
+      for (const [i, node] of roots) {
+        applyBuilt(i);
+        // 방금 다 지은 건물은 땅에서 솟음
+        if (before && !before.has(i) && builtNow.has(i))
+          risers.push({ node, t: 0.25, base: node.scaling.x });
+      }
+    },
     setRunning,
     animate,
     setMissions,

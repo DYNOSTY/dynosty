@@ -2,6 +2,7 @@
 import {
   advanceDay,
   advanceToStory,
+  commandSiteCrew,
   createExampleSave,
   createInitialState,
   createPlaySave,
@@ -17,6 +18,7 @@ import {
   pickStory,
   setPlayPaused,
   setZoneHeat,
+  startBuilding,
   supplyFood,
   tickPlay,
 } from "@dynosty/game-core";
@@ -76,6 +78,10 @@ self.onmessage = (event: MessageEvent<GameCommand>) => {
           play = supplyFood(play, command.days);
         else if (command.type === "story-pick")
           play = pickStory(play, command.id, command.side);
+        else if (command.type === "site-crew")
+          play = commandSiteCrew(play, command.site, command.on);
+        else if (command.type === "build")
+          play = startBuilding(play, command.plot);
         else if (command.type === "set-heat")
           play = {
             ...play,

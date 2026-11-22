@@ -8,7 +8,10 @@ export type BuildingAction =
   | "clear"
   | "heat-절약"
   | "heat-보통"
-  | "heat-긴급";
+  | "heat-긴급"
+  | "crew-on"
+  | "crew-off"
+  | "build";
 export type BuildingCommand = {
   icon: string;
   label: string;
@@ -157,6 +160,44 @@ export const BUILDINGS: Record<string, BuildingInfo> = {
     facts: [["종류", "치료"]],
     commands: [locked("residents", "환자 보기")],
   },
+};
+
+/** 자원 터: 이름·한 줄 설명 (수치는 game-core works.ts의 SITE_RULES) */
+export const SITE_INFO: Record<string, { name: string; role: string }> = {
+  coal: {
+    name: "석탄 노두",
+    role: "눈 언덕이 무너져 드러난 석탄 켜. 온돌에 땔 석탄을 캡니다.",
+  },
+  iron: {
+    name: "철광 노두",
+    role: "녹빛 바위 봉우리. 건물과 연장에 쓸 철을 캡니다.",
+  },
+  spring: {
+    name: "얼지 않는 샘",
+    role: "한겨울에도 얼지 않는 샘. 마실 물을 길어 옵니다.",
+  },
+  store: {
+    name: "버려진 곳간",
+    role: "눈에 묻힌 옛 곳간. 남은 곡식을 거두어 옵니다.",
+  },
+  fish: {
+    name: "얼음 낚시 못",
+    role: "얼어붙은 못. 얼음 구멍으로 물고기를 낚습니다.",
+  },
+  pine: {
+    name: "쓰러진 적송",
+    role: "눈 무게에 부러진 적송. 잘라서 목재로 씁니다.",
+  },
+};
+/** 자원 이름 (선택 창의 사실 줄) */
+export const RESOURCE_NAMES: Record<string, string> = {
+  RES_PLANT: "풀",
+  RES_MEAT: "고기",
+  RES_FISH: "어류",
+  RES_WOOD: "목재",
+  RES_METAL: "철재",
+  RES_WATER: "물",
+  RES_COAL: "석탄",
 };
 
 /** 9칸: 건물 명령 + 빈 칸 + 늘 있는 가까이 보기·선택 해제 (칸마다 고정 이름) */

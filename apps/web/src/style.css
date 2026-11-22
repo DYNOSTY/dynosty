@@ -3250,6 +3250,53 @@ body {
   margin: 16px 0 0;
 }
 
+/* 건축 목록: 한 줄에 그림 · 이름과 설명 · 짓기 단추. 단추 폭을 고정해 글이 바뀌어도(짓기 ↔ 목재 부족) 줄이 흔들리지 않게 */
+.g-build__hands {
+  margin: 0 0 12px;
+  font-weight: 700;
+}
+.g-build__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.g-build__list li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 104px;
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--hanji-line, rgb(43 38 32 / 20%));
+}
+.g-build__list img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.g-build__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.g-build__text span {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--meok-sub, #5d5347);
+}
+.g-build__text .g-build__cost {
+  font-weight: 700;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.g-build__list button {
+  padding: 0.6rem 0.4rem;
+  white-space: nowrap;
+}
+
 /* 화면 밖 정찰 거점: 가장자리에 붙고 방향 화살표 */
 .g-pin__arrow {
   display: none;
@@ -4888,6 +4935,37 @@ body,
 }
 .sc-traits > span {
   font-size: 15px;
+}
+/* 사실 줄: 꼬리표는 왼쪽, 값은 오른쪽 끝에 숫자 폭 고정 (값이 바뀌어도 줄이 흔들리지 않게) */
+.sc-facts {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+  min-width: 232px;
+}
+.sc-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 15px;
+  border-bottom: 1px solid rgb(43 38 32 / 12%);
+  padding-bottom: 2px;
+}
+.sc-facts dt {
+  color: var(--meok-sub);
+  white-space: nowrap;
+}
+.sc-facts dd {
+  margin: 0;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sc-progress {
+  width: 100%;
+  height: 10px;
+  margin-top: 4px;
+  accent-color: #a8322d;
 }
 .sc-traits i {
   font-size: 13px;
