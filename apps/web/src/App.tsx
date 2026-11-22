@@ -1119,7 +1119,7 @@ export function App() {
           </div>
           {/* 개발용 안내·예제 단추: 플레이어 화면에선 숨김 (?dev=1 또는 자동 시험에서만) */}
           <div className="scene-footer" hidden={!DEV_UI}>
-            <p>클릭으로 선택 · 끌어서 이동 · Q·E로 회전 · 휠로 확대</p>
+            <p>클릭으로 선택 · Q·E로 회전 · 휠로 확대</p>
             <span>
               {timberOpen && laborOpen
                 ? "검수대 · 격리품 · 배급소"
