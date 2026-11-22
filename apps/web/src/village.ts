@@ -66,6 +66,8 @@ const RESIDENT_HEIGHT: Record<string, [number, number]> = {
   R09_Oviraptor: [0.78, 3.49],
   R04_Ankylosaurus: [0.75, 2.45],
   R12_Protoceratops: [0.6, 2.28],
+  /** 주인공 고리 (tools/blender/gori.py, R09 뼈대) — 사용자 11/22 "조금 크게": 같은 몸꼴 R09의 1.2배 */
+  GORI: [0.94, 2.15],
 };
 /** 겨울 차림(컨셉 시트 재질 누빔·비늘, 털 테두리·목도리·짚 장화·등불·등짐) — tools/blender/tex.py → dino2.py */
 export const residentGlb = (file: string) => `/models/residents/${file}_v2.glb`;
@@ -896,7 +898,7 @@ export function createVillage(
       scene,
       kind === "building"
         ? glbFile("BLD_ONDOL") // 가운데 온돌: 난방의 중심 (블렌더로 만든 화덕·큰 굴뚝·구들 고래)
-        : residentGlb("R02_Triceratops"),
+        : "/models/gori/GORI.glb",
     );
     if (disposed || parent.isDisposed()) throw new Error("종료한 대상입니다.");
     const node = new TransformNode(`${parent.name}:glb`, scene);
@@ -905,7 +907,7 @@ export function createVillage(
     const v = instantiate(
       asset,
       node,
-      kind === "building" ? BUILDING_SCALE : residentScale("R02_Triceratops"),
+      kind === "building" ? BUILDING_SCALE : residentScale("GORI"),
       shadow,
       kind === "building" ? 4.2 : 1.3,
       kind === "building" ? 4 : 2,
@@ -929,8 +931,8 @@ export function createVillage(
         if (kind === "building") return; // 건물은 바닥 고리·윤곽선 없이
         for (const m of v.meshes) {
           m.outlineColor = OUTLINE;
-          // 주민은 작게 줄여 그려서(0.3배대) 0.025면 1픽셀도 안 됨 — 고르면 보이게 두껍게
-          m.outlineWidth = 0.09;
+          // 고리는 부품이 잘고 많아 두꺼우면 덩어리로 번짐 (0.09 → 0.012)
+          m.outlineWidth = 0.012;
           m.renderOutline = value;
         }
       },

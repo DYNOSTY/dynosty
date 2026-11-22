@@ -56,7 +56,7 @@ export function createSceneExample(updated = false): SceneSnapshot {
       {
         id: "example-resident-1",
         kind: "resident",
-        position: { x: updated ? 2 : -2, y: 0, z: 1 },
+        position: { x: updated ? 2 : -2, y: 0, z: -6.2 },
         headingRadians: updated ? Math.PI / 2 : 0,
         visible: true,
         motion: updated ? "walking" : "idle",

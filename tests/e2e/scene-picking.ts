@@ -10,7 +10,7 @@ export async function examplePoint(
 ) {
   return worldPoint(
     page,
-    kind === "building" ? [0, 0.75, -1] : [updated ? 2 : -2, 0.5, 1],
+    kind === "building" ? [0, 0.75, -1] : [updated ? 2 : -2, 0.5, -6.2],
     false,
   );
 }
@@ -100,7 +100,7 @@ export async function clickVisibleResident(page: Page) {
         };
       };
       const camera = __scene.activeCamera;
-      camera.target.set(-2, 0.5, 1);
+      camera.target.set(-2, 0.5, -6.2);
       camera.alpha = angle;
       camera.beta = Math.PI / 3;
       camera.radius = 8;

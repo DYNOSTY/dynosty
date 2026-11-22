@@ -14,11 +14,11 @@ describe("표시 정보에서 Babylon 객체로 변환", () => {
     try {
       entities.update(createSceneExample());
       const resident = scene.getMeshById("example-resident-1");
-      expect(resident?.position).toMatchObject({ x: -2, y: 0.5, z: 1 });
+      expect(resident?.position).toMatchObject({ x: -2, y: 0.5, z: -6.2 });
       entities.update(createSceneExample(true));
       expect(scene.getMeshById("example-resident-1")).toBe(resident);
       expect(scene.meshes).toHaveLength(2);
-      expect(resident?.position).toMatchObject({ x: 2, y: 0.5, z: 1 });
+      expect(resident?.position).toMatchObject({ x: 2, y: 0.5, z: -6.2 });
       expect(resident?.rotation.y).toBe(Math.PI / 2);
       const material = scene.getMeshById("example-building-1")?.material;
       expect(material).toBeInstanceOf(StandardMaterial);

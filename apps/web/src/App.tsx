@@ -126,11 +126,18 @@ const STORY =
 
 // 주민 종의 장단점 — 기획서에 적힌 것만 (개발인계서 2.1: 4족 짐 수송대 시속 6km, 2족 정찰병 12km)
 const RESIDENT_TRAITS = {
-  R02: {
-    gain: "무거운 짐을 나른다 · 네 발 수송대",
-    loss: "느리다 · 시속 6km",
+  GORI: {
+    gain: "조달과 배급을 이끈다 · 복홀의 지휘관",
+    loss: "지휘권은 매일의 성과로만 지킨다",
   },
 };
+/** 고리 초상 (인계 자료 표정 6장): 평소 지친 얼굴 · 사람을 잃었거나 비관 50 이상이면 불안 · 실패면 무너짐 · 엔딩이면 결심 */
+function goriFace(s: PlayState | null) {
+  const o = s?.campaign.outcome;
+  const lost = s && (s.pessimism >= 50 || s.citizens.some((c) => !c.alive));
+  const n = o === "failure" ? 4 : o ? 6 : lost ? 3 : 1;
+  return `/ui/gori/face${n}.png`;
+}
 
 const CLUE_NAMES: Record<string, string> = {
   C01: "아버지의 장부",
@@ -2026,19 +2033,17 @@ export function App() {
       ) : selection ? (
         <SelectionCard
           id={selection.building ?? "RESIDENT"}
-          portrait={
-            selection.building ? undefined : "/ui/residents/R02_Triceratops.jpg"
-          }
-          traits={selection.building ? undefined : RESIDENT_TRAITS.R02}
+          portrait={selection.building ? undefined : goriFace(playState)}
+          traits={selection.building ? undefined : RESIDENT_TRAITS.GORI}
           name={
             selection.building
               ? (BUILDINGS[selection.building]?.name ?? "건물")
-              : "트리케라톱스"
+              : "고리"
           }
           role={
             selection.building
               ? (BUILDINGS[selection.building]?.role ?? "")
-              : "짐 운반꾼. 일터와 창고 사이로 짐을 나릅니다."
+              : "복홀의 지휘관. 부친의 장부를 이어받아 조달과 배급으로 마을을 지킵니다."
           }
           commands={selection.grid}
           state={playState}
