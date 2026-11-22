@@ -27,9 +27,14 @@ export const VILLAGE_LAYOUT: ReadonlyArray<readonly [string, number, number]> =
     ["BLD_GATE", 0, 24],
   ];
 
-export function fixedBuildingAt(p: GroundPoint, rebuilding: boolean) {
+export function fixedBuildingAt(
+  p: GroundPoint,
+  rebuilding: boolean,
+  removed: readonly string[] = [],
+) {
   return VILLAGE_LAYOUT.some(
     ([id, x, z]) =>
+      !removed.includes(id) &&
       id !== "BLD_NEST" &&
       !(rebuilding && (id === "BLD_WORKSHOP" || id === "BLD_CLINIC")) &&
       Math.abs(x - p.x) < 4.5 &&
@@ -37,8 +42,13 @@ export function fixedBuildingAt(p: GroundPoint, rebuilding: boolean) {
   );
 }
 
-export function reservedVillageLand(p: GroundPoint, rebuilding: boolean) {
-  if (fixedBuildingAt(p, rebuilding)) return "기존 시설이 차지한 구획이에요.";
+export function reservedVillageLand(
+  p: GroundPoint,
+  rebuilding: boolean,
+  removed: readonly string[] = [],
+) {
+  if (fixedBuildingAt(p, rebuilding, removed))
+    return "기존 시설이 차지한 구획이에요.";
   if (Math.abs(p.x) <= 4 && Math.abs(p.z) <= 4)
     return "중앙 광장은 비워 두어야 해요.";
   if (
@@ -254,14 +264,22 @@ export function bokholElevation(
   x: number,
   z: number,
   forest: ForestAmounts = 120,
-  foundations: readonly GroundPoint[] = [],
+  foundations: readonly (GroundPoint & { headingRadians?: number })[] = [],
 ): number {
   const height = landscape(x, z, forest);
   let total = 0,
     levels = 0;
   for (const p of foundations) {
-    const distance = Math.hypot(x - p.x, z - p.z);
-    const weight = 1 - smooth((distance - 5) / 2);
+    const dx = x - p.x,
+      dz = z - p.z;
+    if (Math.abs(dx) > 6 || Math.abs(dz) > 6) continue;
+    const cos = Math.cos(p.headingRadians ?? 0),
+      sin = Math.sin(p.headingRadians ?? 0);
+    const edge =
+      Math.max(Math.abs(dx * cos - dz * sin), Math.abs(dx * sin + dz * cos)) -
+      2.25;
+    if (edge <= 0) return landscape(p.x, p.z, forest);
+    const weight = 1 - smooth(edge / 2);
     if (weight === 0) continue;
     total += weight;
     levels += landscape(p.x, p.z, forest) * weight;

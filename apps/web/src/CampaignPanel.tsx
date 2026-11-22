@@ -1073,7 +1073,7 @@ export function CampaignPanel({
               <strong>온돌 · 현재 화력 {s.firedHeat ?? 0}단계</strong>
               <p>
                 추워지면 집집마다 불을 더 땝니다. 거주 중인 집 한 채가 화력 한
-                단계마다 한 시간에 목재 1을 써서 8 °C를 덥힙니다. 땔감이
+                단계마다 한 시간에 목재 1을 써서 10 °C를 덥힙니다. 땔감이
                 모자라면 남은 만큼만 땝니다.
               </p>
               <label className="village-slider">
@@ -1220,6 +1220,17 @@ export function CampaignPanel({
       )}
       {office && (
         <section className="office-panel" aria-label="관아">
+          <button
+            type="button"
+            disabled={
+              !!s.childLabor ||
+              policyWait(s) > 0 ||
+              (!!firstTask && !s.firstRationSet)
+            }
+            onClick={() => command({ type: "enact-child-labor" })}
+          >
+            {s.childLabor ? "아동 노동 허용 시행 중" : "아동 노동 허용 반포"}
+          </button>
           <strong>관아에서 반포할 배급령</strong>
           {(["needs", "cap"] as const).map((policy) => (
             <button

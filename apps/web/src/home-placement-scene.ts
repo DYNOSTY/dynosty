@@ -14,8 +14,8 @@ import {
   HOME_PLACEMENT_RULES,
   type HomePlacement,
   homePlacementIssue,
-  PLOT_STEP,
   requireValue,
+  rotatedPoint,
   type TimberState,
 } from "@dynosty/game-core";
 import { facilityModel } from "./facility-model.js";
@@ -111,15 +111,18 @@ export function createHomePlacementVisual(
     );
     root.rotation.y = heading;
     material.emissiveColor = color;
-    // The footprint covers the three survey cells centred on the selected plot.
-    const width = 3 * PLOT_STEP;
+    const width = kind ? 4.5 : 2 * (HOME_PLACEMENT_RULES.halfWidth + 0.2);
+    const depth = kind ? 4.5 : 2 * (HOME_PLACEMENT_RULES.halfDepth + 0.2);
     for (let i = 0; i < plane.length; i += 3) {
       const dx = corners[i],
         dz = corners[i + 2];
       if (dx === undefined || dz === undefined)
         throw Error("건설 부지 좌표가 불완전합니다.");
-      const x = position.x + dx * width,
-        z = position.z + dz * width;
+      const { x, z } = rotatedPoint(
+        { position, headingRadians: heading },
+        dx * width,
+        dz * depth,
+      );
       plane[i] = x;
       plane[i + 1] = elevation(x, z) + 0.16;
       plane[i + 2] = z;

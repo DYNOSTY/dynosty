@@ -157,7 +157,11 @@ export function homePlacementIssue(
     p.headingRadians >= Math.PI * 2
   )
     return "건물 위치와 방향을 확인해 주세요.";
-  const protectedLand = reservedVillageLand(p.position, !!s.rebuilding);
+  const protectedLand = reservedVillageLand(
+    p.position,
+    !!s.rebuilding,
+    s.removedLandmarks,
+  );
   if (protectedLand) return protectedLand;
   const rect = {
     ...p,

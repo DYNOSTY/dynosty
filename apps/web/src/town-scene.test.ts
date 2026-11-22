@@ -12,6 +12,7 @@ import {
   requireValue,
 } from "@dynosty/game-core";
 import { expect, it } from "vitest";
+import { terrainElevation } from "./terrain.js";
 import { createTownVisual } from "./town-scene.js";
 import { villageCompletions } from "./village-completions.js";
 
@@ -118,13 +119,13 @@ it("구릉지 목축장의 기초 전체가 정지된 땅 위에 놓인다", () 
     visual.update(state);
     expect(root.position.y).toBeCloseTo(center + 0.75);
     for (const [dx, dz] of [
-      [3.2, 0],
-      [0, 3.2],
-      [-3.2, 0],
-      [0, -3.2],
+      [Math.SQRT2 * 2.25, 0],
+      [0, Math.SQRT2 * 2.25],
+      [-Math.SQRT2 * 2.25, 0],
+      [0, -Math.SQRT2 * 2.25],
     ] as const)
       expect(
-        bokholElevation(position.x + dx, position.z + dz, 120, [position]),
+        terrainElevation(state)(position.x + dx, position.z + dz),
       ).toBeCloseTo(center);
   } finally {
     visual.dispose();

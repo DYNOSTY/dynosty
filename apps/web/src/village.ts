@@ -264,6 +264,8 @@ export function createVillage(
     return node;
   };
   const face = (x: number, z: number) => Math.atan2(-x, -z); // +Z가 마당 쪽
+  const permanent = new Map<string, TransformNode>();
+  let missing = new Set<string>();
   const lostQuarter = new Set<TransformNode>();
   let exodusVisible = false;
   let previewResidentsVisible = true;
@@ -276,7 +278,12 @@ export function createVillage(
       z,
       id === "BLD_GATE" ? Math.PI : face(x, z),
       BUILDING_SCALE,
-    ),
+    ).then((node) => {
+      if (node) {
+        permanent.set(id, node);
+        node.setEnabled(!missing.has(id));
+      }
+    }),
   );
 
   for (const [row, z] of [-28, -14, 0, 14, 28].entries()) {
@@ -833,7 +840,17 @@ export function createVillage(
       herald.setEnabled(false);
       writ.setEnabled(false);
     },
-    setFireDamage(burned: boolean, burning: boolean) {
+    setFireDamage(
+      burned: boolean,
+      burning: boolean,
+      removed: readonly string[] = [],
+    ) {
+      missing = new Set(removed);
+      if (burned) {
+        missing.add("BLD_WORKSHOP");
+        missing.add("BLD_CLINIC");
+      }
+      for (const [id, node] of permanent) node.setEnabled(!missing.has(id));
       exodusVisible = burning;
       for (const w of walkers)
         if (w.haul) w.node.setEnabled(burning || previewResidentsVisible);
@@ -842,12 +859,6 @@ export function createVillage(
         if (burning && !fire.isStarted()) fire.start();
         if (!burning && fire.isStarted()) fire.stop();
       }
-      for (const node of nodes)
-        if (
-          !lostQuarter.has(node) &&
-          ["BLD_CLINIC.glb", "BLD_WORKSHOP.glb"].includes(node.name)
-        )
-          node.setEnabled(!burned);
     },
     setPreviewResidentsVisible(visible: boolean) {
       previewResidentsVisible = visible;

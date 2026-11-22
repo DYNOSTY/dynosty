@@ -3,9 +3,9 @@ import {
   BOKHOL_MAP,
   BOKHOL_MINERALS,
   BOKHOL_WATERS,
-  fixedBuildingAt,
   type ProductionSiteId,
   reservedVillageLand,
+  VILLAGE_LAYOUT,
 } from "./bokhol.js";
 import {
   advanceDevelopment,
@@ -55,7 +55,7 @@ import {
 } from "./resident-path.js";
 import { workplaceOpen } from "./resident-routine.js";
 import { isRecord } from "./save.js";
-import { storageRoom, warehouseDoor } from "./storage.js";
+import { warehouseDoor } from "./storage.js";
 import { capitalRoad, type TimberState } from "./timber.js";
 import {
   assignHomes,
@@ -395,7 +395,11 @@ export function buildingIssue(
     [...s.town.facilities, ...s.town.orders].some((f) => f.kind === kind)
   )
     return "정찰 거점과 교역소는 맵에 각각 한 곳만 건설할 수 있어요.";
-  const protectedLand = reservedVillageLand(p.position, !!s.rebuilding);
+  const protectedLand = reservedVillageLand(
+    p.position,
+    !!s.rebuilding,
+    s.removedLandmarks,
+  );
   if (protectedLand) return protectedLand;
   const rect = { ...p, halfWidth: 2.25, halfDepth: 2.25 };
   const samples = [-1, 0, 1].flatMap((x) =>
@@ -495,8 +499,6 @@ export function buildingIssue(
     )
   )
     return "출입구와 접근 공간을 비워 주세요.";
-  if (fixedBuildingAt(p.position, !!s.rebuilding))
-    return "기존 시설이 차지한 구획이에요.";
   for (const [resource, amount] of Object.entries(BUILDING_RULES[kind].cost)) {
     const id = resource as ResourceId;
     const available =
@@ -557,7 +559,7 @@ export function planBuilding(
     stage: "waiting",
     workDone: 0,
   };
-  if (townShiftOpen(n, order.id)) {
+  if (!n.town.orders.length && townShiftOpen(n, order.id)) {
     order.crew = freeTownResidents(n, facilityDoor(order), 4);
     if (order.crew.length) order.stage = "collect";
   }
@@ -590,7 +592,7 @@ export function idleTownResidents(s: TimberState) {
   return s.residents.filter(
     (r) =>
       r.health === "healthy" &&
-      !children.has(r.id) &&
+      (s.childLabor || !children.has(r.id)) &&
       !r.workplaceId &&
       !r.task &&
       !r.nextWork &&
@@ -631,7 +633,23 @@ export const orderResting = (s: TimberState, id: string) =>
 export function advanceTown(input: TimberState, minutes: number): TimberState {
   if (!minutes) return input;
   let s = input;
-  for (const first of input.town.orders) {
+  const waiting = input.town.orders.slice(1);
+  if (waiting.some((o) => o.crew.length)) {
+    const tasks = new Set(waiting.map((o) => `build-order:${o.id}`));
+    s = {
+      ...s,
+      residents: s.residents.map((r) =>
+        r.task && tasks.has(r.task) ? { ...r, task: null, routine: "idle" } : r,
+      ),
+      town: {
+        ...s.town,
+        orders: s.town.orders.map((o, i) =>
+          i && o.crew.length ? { ...o, crew: [] } : o,
+        ),
+      },
+    };
+  }
+  for (const first of input.town.orders.slice(0, 1)) {
     const open = first ? townShiftOpen(s, first.id) : false;
     if (
       first &&
@@ -846,28 +864,61 @@ export const facilityResource = (f: Facility): ResourceId | null =>
       ranch: "RES_MEAT",
     }) as Partial<Record<BuildingKind, ResourceId>>
   )[f.kind] ?? null;
+const landmarkKinds: Record<string, BuildingKind> = {
+  BLD_WAREHOUSE: "storage",
+  BLD_WORKSHOP: "workshop",
+  BLD_FORAGE: "farm",
+  BLD_GREENHOUSE: "farm",
+  BLD_WATER: "storage",
+  BLD_FISHERY: "fishery",
+  BLD_CLINIC: "hospital",
+  BLD_SALVAGE: "quarry",
+};
+export function demolishableLandmark(s: TimberState, target: string) {
+  return VILLAGE_LAYOUT.find(
+    ([id, x, z]) =>
+      target === `village:${id}:${x}:${z}` &&
+      Object.hasOwn(landmarkKinds, id) &&
+      !s.removedLandmarks?.includes(id) &&
+      !(s.rebuilding && ["BLD_CLINIC", "BLD_WORKSHOP"].includes(id)),
+  )?.[0];
+}
 export function salvageMaterials(s: TimberState, id: string): Cost {
   const building = upgradeTarget(s, id);
-  if (!building) return {};
-  const cost: Cost =
-    building.kind === "home" && building.timberCost !== undefined
+  const landmark = demolishableLandmark(s, id);
+  const kind = landmark && landmarkKinds[landmark];
+  if (!building && !kind) return {};
+  const cost: Cost = !building
+    ? originalBuildingCost(kind as BuildingKind)
+    : building.kind === "home" && building.timberCost !== undefined
       ? { RES_WOOD: building.timberCost }
       : { ...constructionCost(building.kind, building.priceVersion ?? 1) };
-  for (let level = 1; level < building.level; level++) {
+  for (let level = 1; level < (building?.level ?? 1); level++) {
     for (const [key, n] of Object.entries(
-      upgradeCost({ kind: building.kind, level }),
+      upgradeCost({ kind: building?.kind ?? (kind as BuildingKind), level }),
     )) {
       const r = key as ResourceId;
       cost[r] = (cost[r] ?? 0) + n;
     }
   }
+  const rate = (s.mutantDamage?.[id] ?? 0) > 0 ? 0.1 : 0.9;
   return Object.fromEntries(
-    Object.entries(cost).map(([r, n]) => [r, Math.floor(n * 0.9)]),
+    Object.entries(cost).map(([r, n]) => [r, Math.floor(n * rate)]),
   );
 }
 export function demolishBuilding(s: TimberState, id: string): TimberState {
   const b = upgradeTarget(s, id);
-  if (!b) throw Error("철거할 건물이 없습니다.");
+  if (!b) {
+    const landmark = demolishableLandmark(s, id);
+    if (!landmark) throw Error("철거할 건물이 없습니다.");
+    const refund = salvageMaterials(s, id);
+    for (const [r, n] of Object.entries(refund))
+      s = deposit(s, r as ResourceId, n);
+    return {
+      ...s,
+      removedLandmarks: [...(s.removedLandmarks ?? []), landmark],
+    };
+  }
   const dev = s.town.development;
   if (
     s.town.orders.some((o) => o.upgradeTarget === id) ||
@@ -919,6 +970,11 @@ export function demolishBuilding(s: TimberState, id: string): TimberState {
         ? assignHomes(residents, s.world.citizens, usableHomes(s, homes))
         : residents,
     mutantDamage: damage,
+    ...(b.kind === "trade" &&
+      !facilities.some((f) => f.kind === "trade") && {
+        merchantRepair: undefined,
+        merchantItem: undefined,
+      }),
     restaurantBuilt: primary?.id === id ? !!nextRestaurant : s.restaurantBuilt,
     restaurantWorkerTarget:
       primary?.id === id
@@ -957,7 +1013,7 @@ export function directStaff(
   if (
     !r ||
     !citizen?.alive ||
-    citizen.age === "child" ||
+    (!s.childLabor && citizen.age === "child") ||
     r.health !== "healthy" ||
     r.task ||
     r.nextWork ||
@@ -1178,7 +1234,7 @@ function advanceTownProduction(
     f.progress = Math.min(f.progress, unitWork);
     const destination = warehouseDoor(s, f.position) ?? { x: 4.5, z: 0.6 };
     if (f.kind === "fishery") {
-      const amount = Math.min(f.buffer, storageRoom(s, resource));
+      const amount = f.buffer;
       s = deposit(s, resource, amount);
       f.buffer -= amount;
       f.delivered += amount;
@@ -1250,7 +1306,7 @@ function advanceTownProduction(
         if (Math.hypot(position.x - goal.x, position.z - goal.z) < 0.01) {
           if (h.stage === "pickup") h.stage = "store";
           else if (h.stage === "store") {
-            const unloaded = Math.min(h.cargo, storageRoom(s, resource));
+            const unloaded = h.cargo;
             s = deposit(s, resource, unloaded);
             f.delivered += unloaded;
             h = {
@@ -1424,7 +1480,7 @@ function advanceTrips(input: TimberState, minutes: number): TimberState {
           t.stage = "return";
         }
       } else if (t.stage === "return") {
-        const unloaded = Math.min(t.cargo, storageRoom(s, t.food));
+        const unloaded = t.cargo;
         s = deposit(s, t.food, unloaded);
         t.cargo -= unloaded;
         if (t.cargo > 0) {

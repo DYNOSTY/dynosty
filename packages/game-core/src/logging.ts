@@ -13,7 +13,6 @@ import { AMOUNT_SCALE, productionMultiplier } from "./play.js";
 import { type GroundPoint, residentPath } from "./resident-path.js";
 import { workplaceOpen } from "./resident-routine.js";
 import { isRecord } from "./save.js";
-import { storageRoom } from "./storage.js";
 import type { TimberState } from "./timber.js";
 
 // shortcut: 권역별 지정 부지와 시험 수치, 자유 배치·채취 범위 중첩을 구현할 때 교체한다.
@@ -110,13 +109,15 @@ export function setLoggingSite(
 export function loggingSiteRules(id: ProductionSiteId = "west") {
   const f = BOKHOL_PRODUCTION_SITES.find((f) => f.id === id);
   if (!f) throw new RangeError("알 수 없는 숲 권역입니다.");
+  const workshopPlot = constructionPlot({ x: f.x + 13, z: f.z });
+  const storagePlot = constructionPlot({ x: f.x + 13, z: f.z + 10 });
   return {
     ...LOGGING_RULES,
-    workshopPlot: constructionPlot({ x: f.x + 13, z: f.z }),
-    storagePlot: constructionPlot({ x: f.x + 13, z: f.z + 10 }),
-    workshop: { x: f.x + 13, z: f.z },
-    storage: { x: f.x + 16, z: f.z + 10 },
-    pickup: { x: f.x + 16, z: f.z + 1 },
+    workshopPlot,
+    storagePlot,
+    workshop: workshopPlot,
+    storage: { x: storagePlot.x + 3, z: storagePlot.z },
+    pickup: { x: workshopPlot.x + 3, z: workshopPlot.z + 1 },
   };
 }
 export const loggingWorkId = (id: ProductionSiteId) =>
@@ -397,7 +398,7 @@ function advanceOneLogging(
   } else if (h.phase === "unload") {
     if (go({ x: h.cart.x + 2.5, z: h.cart.z })) {
       h = { ...h, wait: Math.max(0, h.wait - minutes) };
-      if (!h.wait && storageRoom(s, definition.resource) >= h.cargo) {
+      if (!h.wait) {
         s = {
           ...s,
           world: {

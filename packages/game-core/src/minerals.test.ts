@@ -20,7 +20,7 @@ import {
   type TimberCommand,
   type TimberState,
 } from "./timber.js";
-import { buildingIssue } from "./town.js";
+import { buildingIssue, idleTownResidents } from "./town.js";
 
 let sequence = 0;
 function fundedTown() {
@@ -218,4 +218,45 @@ it("주민을 지정해 병원으로 보내거나 빼고 저장 후에도 지정
   );
   s = command(s, { type: "direct-staff", resident: r.id, destination: null });
   expect(s.residents.find((q) => q.id === r.id)?.workplaceId).toBeNull();
+});
+
+it("관아의 아동 노동령을 유휴 명부와 병원 직접 배치에 함께 적용한다", () => {
+  let s = command(createVillageGame(), {
+    type: "plan-building",
+    kind: "hospital",
+    position: { x: 12, z: 12 },
+    headingRadians: 0,
+  });
+  s = advanceTimber(s, 120);
+  const hospital = s.town.facilities.find((f) => f.kind === "hospital");
+  const child = s.world.citizens.find(
+    (c) =>
+      c.age === "child" &&
+      s.residents.some(
+        (r) =>
+          r.id === c.id &&
+          !r.task &&
+          !r.workplaceId &&
+          r.health === "healthy" &&
+          r.routine !== "eating",
+      ),
+  );
+  if (!hospital || !child)
+    throw Error("병원과 대기 중인 새끼 공룡이 필요합니다.");
+  const assign = {
+    type: "direct-staff" as const,
+    resident: child.id,
+    destination: hospital.id,
+  };
+  expect(idleTownResidents(s).some((r) => r.id === child.id)).toBe(false);
+  expect(() => command(s, assign)).toThrow();
+  s = parseTimberSave(
+    createTimberSave(command(s, { type: "enact-child-labor" })),
+  ).state;
+  expect(idleTownResidents(s).some((r) => r.id === child.id)).toBe(true);
+  s = command(s, assign);
+  expect(s.residents.find((r) => r.id === child.id)?.workplaceId).toBe(
+    "facility:" + hospital.id,
+  );
+  expect(idleTownResidents(s).some((r) => r.id === child.id)).toBe(false);
 });
