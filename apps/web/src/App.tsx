@@ -1879,6 +1879,7 @@ export function App() {
                 하루 진행
               </button>
               <button
+                className="dev-only"
                 type="button"
                 onClick={toggleSceneExample}
                 disabled={!appliedSnapshot || workerError !== null || saveBusy}
@@ -1907,6 +1908,7 @@ export function App() {
                 있습니다.
               </p>
               <button
+                className="dev-only"
                 type="button"
                 onClick={() => accessSave("save")}
                 disabled={saveDisabled}
@@ -1914,6 +1916,7 @@ export function App() {
                 예제 저장
               </button>
               <button
+                className="dev-only"
                 type="button"
                 onClick={() => accessSave("load")}
                 disabled={saveDisabled}
@@ -1921,6 +1924,7 @@ export function App() {
                 저장 불러오기
               </button>
               <button
+                className="dev-only"
                 type="button"
                 onClick={() => accessSave("load", "previous")}
                 disabled={saveDisabled}

@@ -192,6 +192,7 @@ export function TimberDemo({
               <div className="timber-controls">
                 <button
                   type="button"
+                  className="dev-only"
                   disabled={busy || state.phase === "completed"}
                   onClick={() =>
                     command({ type: "pause", paused: !state.paused })
@@ -203,6 +204,7 @@ export function TimberDemo({
                 </button>
                 <button
                   type="button"
+                  className="dev-only"
                   disabled={busy || state.phase === "completed"}
                   onClick={() => command({ type: "advance", minutes: 60 })}
                 >
@@ -210,12 +212,13 @@ export function TimberDemo({
                 </button>
                 <button
                   type="button"
+                  className="is-primary"
                   disabled={busy || state.due === null}
                   onClick={() => command({ type: "next" })}
                 >
                   다음 작업 완료까지
                 </button>
-                <label>
+                <label className="dev-only">
                   진행 속도{" "}
                   <select
                     aria-label="체험 진행 속도"
@@ -232,7 +235,7 @@ export function TimberDemo({
                     <option value="3">3배</option>
                   </select>
                 </label>
-                <span className="hint">
+                <span className="hint dev-only">
                   {state.paused ? "일시정지" : "진행 중"} · 결정 지점과 탭
                   비활성 시 정지
                 </span>
@@ -252,6 +255,7 @@ export function TimberDemo({
             ) : null}
             <button
               type="button"
+              className="quiet-button"
               disabled={busy}
               onClick={() => setLaborMode(true)}
             >
@@ -259,6 +263,61 @@ export function TimberDemo({
             </button>
           </div>
           <div className="tm-right">
+            {/* 수레가 어디까지 왔는지: 공급처 → 조달소 → 검사 → 둥지 (사용자 11/22 "글 말고 시각적으로") */}
+            {(() => {
+              const stops = ["공급처", "조달소 도착", "검사", "둥지"];
+              const moving =
+                state.phase === "transport" &&
+                state.departure !== null &&
+                state.due !== null &&
+                state.due > state.departure;
+              const at = ["select", "contracted"].includes(state.phase)
+                ? 0
+                : moving
+                  ? Math.min(
+                      1,
+                      Math.max(
+                        0,
+                        (state.elapsed - (state.departure ?? 0)) /
+                          ((state.due ?? 1) - (state.departure ?? 0)),
+                      ),
+                    )
+                  : state.phase === "transport" || state.phase === "arrived"
+                    ? 1
+                    : state.phase === "completed"
+                      ? 3
+                      : 2;
+              const pct = (at / (stops.length - 1)) * 100;
+              return (
+                <div
+                  className="tm-road"
+                  role="img"
+                  aria-label={`수레 위치: ${stops[Math.round(at)]}`}
+                >
+                  <div className="tm-road__track">
+                    <span
+                      className="tm-road__fill"
+                      style={{ width: `${pct}%` }}
+                    />
+                    {stops.map((name, i) => (
+                      <span
+                        key={name}
+                        className={`tm-road__stop${at >= i ? " is-done" : ""}`}
+                        style={{ left: `${(i / (stops.length - 1)) * 100}%` }}
+                      >
+                        {name}
+                      </span>
+                    ))}
+                    <span
+                      className={`tm-road__cart${moving ? " is-moving" : ""}`}
+                      style={{ left: `${pct}%` }}
+                    >
+                      <img src="/ui/resources/RES_WOOD.png" alt="" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
             {!["select", "contracted"].includes(state.phase) ? (
               <section className="timber-stock" aria-label="목재 처리 상태">
                 {(
@@ -499,6 +558,7 @@ export function TimberDemo({
             <div className="timber-controls">
               <button
                 type="button"
+                className="dev-only"
                 disabled={busy}
                 onClick={() => access(false)}
               >
@@ -506,6 +566,7 @@ export function TimberDemo({
               </button>
               <button
                 type="button"
+                className="dev-only"
                 disabled={busy}
                 onClick={() => access(true)}
               >
@@ -513,6 +574,7 @@ export function TimberDemo({
               </button>
               <button
                 type="button"
+                className="dev-only"
                 disabled={busy}
                 onClick={() => access(true, true)}
               >
@@ -544,10 +606,14 @@ export function TimberDemo({
                 </button>
               </div>
             ) : null}
-            <p aria-live="polite" data-testid="timber-save-status">
+            <p
+              className="dev-only"
+              aria-live="polite"
+              data-testid="timber-save-status"
+            >
               {busy ? "저장 처리 중" : saveStatus}
             </p>
-            <details>
+            <details className="dev-only">
               <summary>체험 규칙·미정 수치 구분</summary>
               <p>
                 기존 정찰대 사건 이전 구간, 주민60명(성인45·아동15) 중 가용
@@ -567,7 +633,7 @@ export function TimberDemo({
                 검사·시설별 난방. 이번 체험에서 확정하지 않습니다.
               </p>
             </details>
-            <details>
+            <details className="dev-only">
               <summary>조달 처리 기록</summary>
               <ol>
                 {state.history.map((h) => (

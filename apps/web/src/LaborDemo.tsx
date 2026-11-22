@@ -283,6 +283,7 @@ export function LaborDemo({
           </span>
         </button>
         <button
+          className="dev-only"
           type="button"
           disabled={busy || done}
           onClick={() => command({ type: "advance", minutes: 60 })}
@@ -523,13 +524,24 @@ export function LaborDemo({
         </div>
       ) : null}
       <div className="timber-controls">
-        <button type="button" disabled={busy} onClick={() => access(false)}>
+        <button
+          className="dev-only"
+          type="button"
+          disabled={busy}
+          onClick={() => access(false)}
+        >
           일손 체험 저장
         </button>
-        <button type="button" disabled={busy} onClick={() => access(true)}>
+        <button
+          className="dev-only"
+          type="button"
+          disabled={busy}
+          onClick={() => access(true)}
+        >
           일손 체험 불러오기
         </button>
         <button
+          className="dev-only"
           type="button"
           disabled={busy}
           onClick={() => access(true, true)}
