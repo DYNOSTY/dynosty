@@ -210,14 +210,6 @@ export function TimberDemo({
                 >
                   1시간 진행
                 </button>
-                <button
-                  type="button"
-                  className="is-primary"
-                  disabled={busy || state.due === null}
-                  onClick={() => command({ type: "next" })}
-                >
-                  다음 작업 완료까지
-                </button>
                 <label className="dev-only">
                   진행 속도{" "}
                   <select
@@ -312,13 +304,110 @@ export function TimberDemo({
                       className={`tm-road__cart${moving ? " is-moving" : ""}`}
                       style={{ left: `${pct}%` }}
                     >
-                      <img src="/ui/resources/RES_WOOD.png" alt="" />
+                      {moving ? (
+                        <b className="tm-road__eta">
+                          도착까지 {time((state.due ?? 0) - state.elapsed)}
+                        </b>
+                      ) : null}
+                      {/* 수레: 통나무 세 단 + 묶은 줄 + 짐판 + 끌채 + 살 달린 바퀴(갈 때 돎) */}
+                      <svg
+                        viewBox="0 0 72 44"
+                        width="72"
+                        height="44"
+                        aria-hidden="true"
+                      >
+                        <rect
+                          x="14"
+                          y="2"
+                          width="34"
+                          height="8"
+                          rx="4"
+                          fill="#c2905f"
+                        />
+                        <rect
+                          x="9"
+                          y="10"
+                          width="44"
+                          height="8"
+                          rx="4"
+                          fill="#b17e4d"
+                        />
+                        <rect
+                          x="6"
+                          y="18"
+                          width="50"
+                          height="8"
+                          rx="4"
+                          fill="#a06d3e"
+                        />
+                        <circle
+                          cx="48"
+                          cy="6"
+                          r="4"
+                          fill="#ecd2a6"
+                          stroke="#6e4a2a"
+                          strokeWidth="1.2"
+                        />
+                        <circle
+                          cx="53"
+                          cy="14"
+                          r="4"
+                          fill="#ecd2a6"
+                          stroke="#6e4a2a"
+                          strokeWidth="1.2"
+                        />
+                        <circle
+                          cx="56"
+                          cy="22"
+                          r="4"
+                          fill="#ecd2a6"
+                          stroke="#6e4a2a"
+                          strokeWidth="1.2"
+                        />
+                        <path
+                          d="M22 2v25M38 2v25"
+                          stroke="#3f2a18"
+                          strokeWidth="1.6"
+                        />
+                        <rect
+                          x="2"
+                          y="26"
+                          width="58"
+                          height="5"
+                          rx="1.5"
+                          fill="#55381f"
+                        />
+                        <path
+                          d="M60 28h10"
+                          stroke="#55381f"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                        {[16, 46].map((cx) => (
+                          <g key={cx} className="tm-road__wheel">
+                            <circle
+                              cx={cx}
+                              cy="35"
+                              r="7.5"
+                              fill="#d2b382"
+                              stroke="#33200f"
+                              strokeWidth="3"
+                            />
+                            <path
+                              d={`M${cx} 28v14M${cx - 7} 35h14M${cx - 5} 30l10 10M${cx + 5} 30l-10 10`}
+                              stroke="#33200f"
+                              strokeWidth="1.2"
+                            />
+                            <circle cx={cx} cy="35" r="1.8" fill="#33200f" />
+                          </g>
+                        ))}
+                      </svg>
                     </span>
                   </div>
                 </div>
               );
             })()}
-            {!["select", "contracted"].includes(state.phase) ? (
+            {state.phase !== "select" ? (
               <section className="timber-stock" aria-label="목재 처리 상태">
                 {(
                   [
@@ -417,6 +506,17 @@ export function TimberDemo({
               </>
             ) : null}
             <div className="timber-actions">
+              {/* 누를 것은 늘 이 줄 한 자리: 기다릴 때는 '다음 작업 완료까지', 정할 때는 그 단계의 단추 (자리 고정) */}
+              {state.phase !== "select" ? (
+                <button
+                  type="button"
+                  className="is-primary tm-next"
+                  disabled={busy || state.due === null}
+                  onClick={() => command({ type: "next" })}
+                >
+                  다음 작업 완료까지
+                </button>
+              ) : null}
               {state.phase === "contracted" ? (
                 <>
                   <p>
