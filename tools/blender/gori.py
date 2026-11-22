@@ -560,6 +560,9 @@ def bake_one(kind, samples, **kw):
 color = bake_one("DIFFUSE", 4, pass_filter={"COLOR"})
 ao = bake_one("AO", 16)[..., :1]
 rgb = color[..., :3] * (0.78 + 0.22 * np.clip(ao, 0, 1))
+# 게임 조명은 블렌더보다 어둡다 (낮 화면에서 피부·머리깃이 흙빛) → 한 단계 밝히고 채도를 조금 살림
+gray = rgb.mean(axis=2, keepdims=True)
+rgb = np.clip((gray + (rgb - gray) * 1.15) * 1.45, 0, 1)
 final = bpy.data.images.new("GORI_tex", TEX, TEX, alpha=False)
 final.pixels.foreach_set(np.dstack([np.clip(rgb, 0, 1), np.ones((TEX, TEX, 1), np.float32)]).astype(np.float32).ravel())
 final.pack()
