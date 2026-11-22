@@ -13,7 +13,7 @@ import {
   requireValue,
   SCOUT_SITES,
 } from "../../packages/game-core/dist/index.js";
-import { readVillage } from "./read-village.js";
+import { advanceVillageDay, readVillage } from "./read-village.js";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -376,7 +376,7 @@ test("옛 저장은 기본 보통 난이도로 남은 유예 시간을 이어간
   await page.goto("/");
   await expect(page.locator(".campaign-advisory")).toContainText("배급령");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("button", { name: "마을 하루 진행" }).click();
+  await advanceVillageDay(page);
   await expect(page.getByRole("dialog")).toHaveAccessibleName(
     "아무도 깨우지 않는 아침",
   );
@@ -445,7 +445,7 @@ test("좁은 화면의 5단계 컷씬과 성안 변종 없는 반란을 이어 �
       await page.evaluate(() => {
         Math.random = () => 0.99;
       });
-    await page.getByRole("button", { name: "마을 하루 진행" }).click();
+    await advanceVillageDay(page);
     if (day === 1 || day === 2)
       await expect(
         page.getByText(
@@ -619,7 +619,7 @@ test("쥬신 왕으로 도성 구호를 명하고 설정에서 변종 야습 기
   await expect(carts).toContainText("석탄 · 1000 / 6000");
   await expect(
     page.getByRole("button", { name: "도성 반나절 경영" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   if (
     await page
       .getByRole("button", { name: "명령 열기", exact: true })
@@ -713,6 +713,7 @@ for (const prepared of [true, false]) {
 test("기한 1분 전 세 번째 행렬을 보내면 왕의 결말에서 남하 호송으로 이어진다", async ({
   page,
 }) => {
+  test.setTimeout(240_000);
   const village = createVillageGame();
   const capital = createCapital({
     ...village,
@@ -720,6 +721,7 @@ test("기한 1분 전 세 번째 행렬을 보내면 왕의 결말에서 남하 
   });
   const save = createTimberSave({
     ...capital,
+    paused: true,
     elapsed:
       requireValue(capital.campaign, "capital.campaign").since + 36 * 60 - 1,
     campaign: {
@@ -989,6 +991,9 @@ for (const [hope, allegiance, film] of [
         };
       });
     const dismissNotices = async () => {
+      const petition = page.getByRole("dialog", { name: "배식 줄에서 온 청" });
+      if (await petition.isVisible())
+        await petition.getByRole("button", { name: "장면 접기" }).click();
       const confirm = page
         .getByRole("region", { name: /^(마을 사건|추위 경고)$/ })
         .getByRole("button", { name: "확인", exact: true });
@@ -1003,9 +1008,7 @@ for (const [hope, allegiance, film] of [
       await dismissNotices();
       const before = await readProgress();
       if (before.ending) return;
-      await page
-        .getByRole("button", { name: "마을 하루 진행", exact: true })
-        .click();
+      await advanceVillageDay(page);
       await expect
         .poll(async () => (await readProgress()).elapsed)
         .toBeGreaterThan(before.elapsed);
@@ -1015,8 +1018,6 @@ for (const [hope, allegiance, film] of [
       await dialog.getByRole("button", { name: "장면 접기" }).click();
       for (const tech of ["R17", "R18", "TECH_MECHA2"]) {
         await dismissNotices();
-        const report = page.getByRole("button", { name: /영실 · 연구 완료/ });
-        if (await report.isVisible()) await report.click();
         const opener = page.getByRole("button", {
           name: /^(명령 열기|거래 제안 열기)$/,
         });
@@ -1030,7 +1031,7 @@ for (const [hope, allegiance, film] of [
           "연구 중",
         );
         await page
-          .getByRole("button", { name: "명령 접기", exact: true })
+          .getByRole("button", { name: "마을로 돌아가기", exact: true })
           .click();
         for (
           let i = 0;

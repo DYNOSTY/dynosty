@@ -70,14 +70,6 @@ export function PlayPanel({
             type="button"
             className="quiet-button"
             disabled={busy}
-            onClick={() => onCommand({ type: "advance-day" })}
-          >
-            1일 진행
-          </button>
-          <button
-            type="button"
-            className="quiet-button"
-            disabled={busy}
             onClick={() => setConfirm(true)}
           >
             새 게임

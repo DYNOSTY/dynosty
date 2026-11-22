@@ -521,8 +521,8 @@ export function CampaignPanel({
   trade,
   resetView,
   onFirstTask,
-  workspaceOpen,
   officeSelected,
+  workspaceOpen,
   onPatrolMap,
   gateSelected,
   southVisits,
@@ -640,8 +640,40 @@ export function CampaignPanel({
       "winter",
       "forecast",
       "vigil",
-    ].includes(c.beat) && policyWait(s) === 0;
-  const petitionOpen = petition && canPetition;
+    ].includes(c.beat) &&
+    policyWait(s) === 0 &&
+    c.petitionDay !== s.world.day;
+  const presentedDay = useRef(0);
+  useEffect(() => {
+    if (
+      canPetition &&
+      s.world.minute >= 17 * 60 &&
+      !mainMenu &&
+      !pauseMenu &&
+      !trade &&
+      !workspaceOpen &&
+      opened !== p.key &&
+      (!p.auto || dismissed === p.key) &&
+      presentedDay.current !== s.world.day
+    ) {
+      presentedDay.current = s.world.day;
+      setPetition(true);
+    }
+  }, [
+    canPetition,
+    s.world.day,
+    s.world.minute,
+    mainMenu,
+    pauseMenu,
+    trade,
+    workspaceOpen,
+    opened,
+    p.auto,
+    p.key,
+    dismissed,
+  ]);
+  const petitionOpen =
+    petition && canPetition && !workspaceOpen && opened !== p.key;
   const [lossShown, setLossShown] = useState(false);
   useEffect(() => {
     if (c.ending !== "collapse") {
@@ -874,7 +906,7 @@ export function CampaignPanel({
         <VillageBulletin
           state={s}
           command={command}
-          showEvents={!open && !workspaceOpen && !trade}
+          showEvents={!open && !trade}
           heat={() => setDefenseOpen?.(true)}
         />
       )}
@@ -1271,28 +1303,6 @@ export function CampaignPanel({
           onClick={() => setPetition(true)}
         >
           주민의 청 듣기
-        </button>
-      )}
-      {[
-        "patrol",
-        "roads",
-        "capital",
-        "arrival",
-        "winter",
-        "forecast",
-        "vigil",
-      ].includes(c.beat) && (
-        <button
-          type="button"
-          className="scout-all"
-          onClick={() =>
-            command({
-              type: "advance",
-              minutes: c.beat === "capital" ? 720 : 1440,
-            })
-          }
-        >
-          {c.beat === "capital" ? "도성 반나절 경영" : "마을 하루 진행"}
         </button>
       )}
       {open ? (

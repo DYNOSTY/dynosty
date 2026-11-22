@@ -9,7 +9,7 @@ import {
   requireValue,
   type TimberState,
 } from "../../packages/game-core/dist/index.js";
-import { readVillage } from "./read-village.js";
+import { advanceVillageDay, readVillage } from "./read-village.js";
 
 const button = (page: Page, name: string) =>
   page.getByRole("button", { name, exact: true });
@@ -116,9 +116,7 @@ test("시설 완성 모습으로 회전 배치하고 자재를 확보한 두 공
   await expect(page.getByTestId("play-scene-status")).toHaveText(
     "3D 준비 완료",
   );
-  await page
-    .getByRole("button", { name: "마을 하루 진행", exact: true })
-    .click();
+  await advanceVillageDay(page);
   await expect
     .poll(async () => (await read()).town.facilities.map((f) => f.kind).sort())
     .toEqual(["farm", "storage"]);

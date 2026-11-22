@@ -9,7 +9,9 @@ import {
   GAME_RULES,
   hospitalBeds,
   hospitalHours,
+  idleTownResidents,
   LOGGING_RULES,
+  mineralWorksites,
   orderWork,
   productionRate,
   restaurantStaff,
@@ -45,9 +47,20 @@ function Reserve({
   facility: TimberState["town"]["facilities"][number];
 }) {
   const sites = connectedDeposits(state, facility.kind, facility.position);
-  const remaining = sites.reduce((sum, site) => sum + site.remaining, 0);
+  const remaining = (
+    facility.kind === "logging"
+      ? sites
+      : sites.filter((s) => s.siteId === facility.sourceId)
+  ).reduce((sum, site) => sum + site.remaining, 0);
   if (facility.kind !== "logging")
-    return <p>채굴권 안의 매장량 · {remaining} 남음</p>;
+    return (
+      <p>
+        채굴권 안의 매장량 · {remaining} 남음
+        {facility.sourceId && (
+          <> · 채굴 시설 {mineralWorksites(state, facility.sourceId)}/2곳</>
+        )}
+      </p>
+    );
   const trees = sites.reduce(
     (sum, site) =>
       sum +
@@ -112,6 +125,7 @@ export function TownPanel({
   const [kind, setKind] = useState<BuildingKind>("home"),
     [food, setFood] = useState<FoodId>("RES_PLANT"),
     [range, setRange] = useState<1 | 2 | 3>(1);
+  const idleCount = idleTownResidents(state).length;
   return (
     <section className="village-service" aria-label="건설과 식량 수급">
       <h3>마을 건설 · 식량 수급</h3>
@@ -280,7 +294,7 @@ export function TownPanel({
               {facilityStaffLimit(f) > 0 ? (
                 <label>
                   {" "}
-                  운영 인원{" "}
+                  운영 인원 · 유휴 일손 {idleCount}명{" "}
                   <select
                     aria-label={`${f.id} 운영 인원`}
                     value={

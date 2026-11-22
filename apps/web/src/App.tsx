@@ -15,7 +15,6 @@ import {
   type HomePlacement,
   type LaborState,
   laborScene,
-  RESEARCH_CATALOG,
   scoutRun,
   scoutTripMinutes,
   TIMBER_RULES,
@@ -90,6 +89,7 @@ import { WorkspacePanel } from "./WorkspacePanel.js";
 import { elevation, MAP_SPAN } from "./world.js";
 
 export function App() {
+  const [keyHelp, setKeyHelp] = useState(false);
   const [defenseOpen, setDefenseOpen] = useState(false);
   const [laborOpen, setLaborOpen] = useState(false);
   const [laborState, setLaborState] = useState<LaborState | null>(null);
@@ -135,19 +135,23 @@ export function App() {
   const [consoleOpen, setConsoleOpen] = useState(true);
   const inCapital = timberState?.campaign?.beat === "capital";
   const [reports, setReports] = useState<string[]>([]);
-  const lastResearch = useRef<string[] | null>(null);
+  const onVillageState = useCallback(
+    (state: TimberState, lines?: string[], reset?: boolean) => {
+      setTimberState(state);
+      if (reset) setReports([]);
+      else if (lines?.length) setReports((old) => [...old, ...lines]);
+    },
+    [],
+  );
+  const hasReport = reports.length > 0;
   useEffect(() => {
-    if (!timberState) return;
-    const current = timberState.town.development.completed;
-    const previous = lastResearch.current;
-    if (previous && current.length > previous.length) {
-      const names = current
-        .filter((id) => !previous.includes(id))
-        .map((id) => RESEARCH_CATALOG.find((r) => r.id === id)?.name ?? id);
-      setReports((old) => [...old, ...names]);
-    } else if (previous && current.length < previous.length) setReports([]);
-    lastResearch.current = current;
-  }, [timberState]);
+    if (!hasReport) return;
+    const timer = window.setInterval(
+      () => setReports((old) => old.slice(1)),
+      6500,
+    );
+    return () => window.clearInterval(timer);
+  }, [hasReport]);
   const [buildPage, setBuildPage] = useState(0);
   const [placementHint, setPlacementHint] = useState("");
   useEffect(() => {
@@ -359,8 +363,9 @@ export function App() {
     };
   }, []);
 
+  const previewExample = toolsOpen && exampleClock && !laborOpen;
   useEffect(() => {
-    if (timberState) return;
+    if (timberState && !previewExample) return;
     sceneRef.current?.updateTimber(null);
     sceneRef.current?.updateLabor(null);
     if (!snapshot || sceneStatus !== "준비 완료" || !sceneRef.current) return;
@@ -370,9 +375,10 @@ export function App() {
     } catch {
       setSceneStatus("3D 표시 정보 오류 — 전달 형식을 확인해 주세요");
     }
-  }, [snapshot, sceneStatus, timberState]);
+  }, [snapshot, sceneStatus, timberState, previewExample]);
   useEffect(() => {
     if (
+      previewExample ||
       laborOpen ||
       !timberState ||
       sceneStatus !== "준비 완료" ||
@@ -398,7 +404,7 @@ export function App() {
     sceneRef.current.update(display);
     sceneRef.current.updateTimber(timberState);
     setAppliedSnapshot(display);
-  }, [timberState, sceneStatus, laborOpen]);
+  }, [timberState, sceneStatus, laborOpen, previewExample]);
   useEffect(() => {
     if (
       !timberOpen ||
@@ -489,6 +495,7 @@ export function App() {
 
   function toggleSceneExample() {
     if (pendingSaveRef.current !== null) return;
+    setExampleClock(true);
     const command: GameCommand = { type: "toggle-scene-example" };
     workerRef.current?.postMessage(command);
   }
@@ -862,9 +869,9 @@ export function App() {
     !!visitor && consoleOpen && villageSection?.label === "교역소 방문";
   function openVillageSection(section: string) {
     setSelectedWorkplace(null);
-    if (prologue) return;
+    if (prologue || (!timberReady && section !== "배급 정책")) return;
     setConsoleOpen(true);
-    if (!timberOpen) openTimber();
+    if (!timberOpen) openOnly(() => setTimberOpen(true));
     if (section === "교역소 방문" && visitor && timberState) {
       lastMerchantVisit.current = `${timberState.world.day}:${timberState.merchantItem}`;
     }
@@ -936,9 +943,16 @@ export function App() {
         return;
       }
       const key = event.key.toLowerCase();
+      if (key === "?" && !event.repeat) setKeyHelp((open) => !open);
       if (key === "m") setRegionOpen((v) => !v);
       if (key === "e") openTimberRef.current();
-      if (key === "b") openVillageRef.current("건설과 식량 수급");
+      if (key === "b" && !event.repeat) {
+        if (constructionOpen.current) {
+          sceneRef.current?.cancelHomePlacement();
+          setPlacementHint("");
+          closeRef.current();
+        } else openVillageRef.current("건설과 식량 수급");
+      }
       if (key === "u") openVillageRef.current("거주지");
       if (key === "p") openVillageRef.current("배급 정책");
       if (key === "t") openVillageRef.current("연구와 교역망");
@@ -1090,7 +1104,7 @@ export function App() {
               visitSouth(0);
               setSiteNotices([]);
               setReports([]);
-              lastResearch.current = null;
+
               setBuildPage(0);
               setConsoleOpen(true);
             }}
@@ -1233,7 +1247,9 @@ export function App() {
             timberState?.campaign?.beat === "capital" ? "도성" : "복홀"
           }
           compact={timberOpen}
-          day={timberState?.world.day ?? shownDay}
+          day={
+            previewExample ? state?.day : (timberState?.world.day ?? shownDay)
+          }
           minute={playMinute}
           state={
             timberState
@@ -1498,8 +1514,19 @@ export function App() {
               ) : null}
             </div>
           ) : null}
+          {keyHelp && !prologue && (
+            <aside className="village-key-help" aria-label="조작 안내">
+              <strong>조작 안내</strong>
+              <p>W A S D 이동 · 드래그 회전 · 휠 확대·축소</p>
+              <p>B 건설 · M 지도 · P 배급 정책 · T 연구</p>
+              <p>Space 일시정지 · ? 안내 닫기</p>
+              <button type="button" onClick={() => setKeyHelp(false)}>
+                닫기
+              </button>
+            </aside>
+          )}
           <div className="scene-footer">
-            <p>클릭 선택 · 드래그 회전 · 휠 확대·축소</p>
+            <p>클릭 선택 · 드래그 회전 · 휠 확대·축소 · ? 조작 안내</p>
             <span>
               {timberOpen && laborOpen
                 ? "검수대 · 격리품 · 배급소"
@@ -1584,7 +1611,7 @@ export function App() {
             world={playState}
             showDevTools={toolsOpen}
             saveOpen={saveOpen}
-            onState={setTimberState}
+            onState={onVillageState}
             onLaborState={receiveLabor}
             onLaborModeChange={setLaborOpen}
             selectedSite={selectedSite}
@@ -1879,22 +1906,9 @@ export function App() {
         />
       )}
       <FpsBadge />
-      {reports.length > 0 && !visitor && (
-        <button
-          type="button"
-          className="guide-report"
-          onClick={() => setReports((old) => old.slice(1))}
-        >
-          <img alt="" src="/ui/cmd/research.png" />
-          <span>
-            {inCapital ? "사곡" : "영실"} · 연구 완료
-            <small>
-              {inCapital ? "전하" : "공자님"}, ‘{reports[0]}’ 연구를 마쳤습니다.
-            </small>
-          </span>{" "}
-          보고 닫기
-        </button>
-      )}
+      <div role="status" aria-live="polite" className="village-completion-line">
+        {reports[0]}
+      </div>
       <section className="g-scout-faces" aria-label="파견 중인 정찰대">
         {SCOUT_SITES.filter((site) => scouts[site.id]?.status === "going").map(
           (site) => (
@@ -1914,7 +1928,7 @@ export function App() {
       <button
         type="button"
         className="guide-toggle"
-        hidden={consoleOpen || (reports.length > 0 && !visitor)}
+        hidden={consoleOpen}
         aria-label={
           consoleOpen ? "명령 접기" : visitor ? "거래 제안 열기" : "명령 열기"
         }

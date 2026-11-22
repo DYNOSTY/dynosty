@@ -1,11 +1,14 @@
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { Scene } from "@babylonjs/core/scene";
 import {
   BOKHOL_WATERS,
+  facilityDoor,
+  isMechanical,
   type TimberState,
   townShiftOpen,
 } from "@dynosty/game-core";
@@ -59,20 +62,47 @@ export function createTownVisual(scene: Scene) {
     string,
     { root: Mesh; visual: ModelVisual | null; level: number }
   >();
+  const hammers = new Map<Mesh, { actor: AbstractMesh; pitch: number }>();
+  let paused = true;
+  let swingTime = 0;
+  const animate = scene.onBeforeRenderObservable.add(() => {
+    if (paused || !hammers.size) return;
+    swingTime += Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
+    for (const [mesh, { actor, pitch }] of hammers) {
+      const swing = Math.sin(swingTime * 7 + mesh.uniqueId);
+      actor.rotation.x = pitch + 0.11 + 0.16 * swing;
+      mesh.rotation.x = 0.2 + swing * 0.95;
+      mesh.position.y = 0.55 + 0.22 * swing;
+    }
+  });
   return {
     update(s: TimberState | null) {
       const wanted = new Map<string, "cargo" | "tool">();
+      paused = !s || s.paused;
       if (s) {
-        for (const o of s.town.orders.filter((o) => townShiftOpen(s, o.id)))
+        for (const o of s.town.orders) {
+          const door = facilityDoor(o);
           for (const id of o.crew) {
+            if (!townShiftOpen(s, o.id) && !isMechanical(s, id)) continue;
             if (o.stage === "deliver") wanted.set(id, "cargo");
-            else if (o.stage === "build") wanted.set(id, "tool");
+            if (o.stage === "build") {
+              const r = s.residents.find((q) => q.id === id);
+              if (
+                r &&
+                Math.hypot(r.position.x - door.x, r.position.z - door.z) < 0.01
+              )
+                wanted.set(id, "tool");
+            }
           }
+        }
         for (const f of s.town.facilities)
           if (f.haul?.stage === "store") wanted.set(f.haul.worker, "cargo");
       }
       for (const [id, mesh] of props)
-        if (!wanted.has(id)) {
+        if (wanted.get(id) !== mesh.metadata?.kind) {
+          const worker = hammers.get(mesh);
+          if (worker) worker.actor.rotation.x = worker.pitch;
+          hammers.delete(mesh);
           mesh.dispose();
           props.delete(id);
         }
@@ -83,15 +113,31 @@ export function createTownVisual(scene: Scene) {
         if (!mesh) {
           mesh = CreateBox(`town-job:${id}`, { size: 1 }, scene);
           mesh.material = mat;
+          mesh.metadata = { kind };
+          mesh.position.set(0.6, 0.55, 0.5);
+          mesh.isPickable = false;
+          if (kind === "tool") {
+            const head = CreateBox(
+              "mallet-head:" + id,
+              { width: 0.85, height: 0.4, depth: 0.4 },
+              scene,
+            );
+            head.parent = mesh;
+            head.material = dark;
+            head.isPickable = false;
+            head.scaling.set(1 / 0.18, 1 / 0.95, 1 / 0.22);
+            head.position.y = 0.5;
+            hammers.set(mesh, { actor, pitch: actor.rotation.x });
+          }
           props.set(id, mesh);
         }
         mesh.parent = actor;
         mesh.scaling.set(
-          kind === "cargo" ? 0.7 : 0.12,
-          kind === "cargo" ? 0.3 : 0.65,
-          0.25,
+          kind === "cargo" ? 0.7 : 0.18,
+          kind === "cargo" ? 0.3 : 0.95,
+          kind === "cargo" ? 0.25 : 0.22,
         );
-        mesh.position.set(0.5, 0.35, 0.4);
+
         mesh.setEnabled(true);
       }
       for (const p of ponds) {
@@ -146,6 +192,9 @@ export function createTownVisual(scene: Scene) {
       }
     },
     dispose() {
+      scene.onBeforeRenderObservable.remove(animate);
+      for (const { actor, pitch } of hammers.values()) actor.rotation.x = pitch;
+      hammers.clear();
       for (const mesh of props.values()) mesh.dispose();
       for (const o of objects.values()) {
         o.visual?.dispose();

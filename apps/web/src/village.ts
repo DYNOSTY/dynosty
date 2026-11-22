@@ -22,7 +22,7 @@ import { elevation, rng } from "./world.js";
 
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
 export const BUILDING_SCALE = 0.75; // 둥지 지붕 1.85m = 목재 체험 보수 표시 높이
-export const RESIDENT_SCALE = 0.5;
+export const RESIDENT_SCALE = 0.75;
 const OUTLINE = new Color3(0.3, 0.9, 1); // 현장과 대표 모델의 공통 선택색
 
 export { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";

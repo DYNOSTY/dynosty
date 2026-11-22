@@ -4428,6 +4428,8 @@ dialog.film-gallery:has(.campaign-film) .campaign-film {
   font-size: 0.82em;
 }
 .village-census {
+  text-shadow: none;
+  line-height: 1.45;
   color: #382c20;
   background: #efe1c8;
   border: 1px solid #806548;
@@ -4957,4 +4959,55 @@ dialog.film-gallery:has(.campaign-film) .campaign-film {
   color: #ffedc9;
   font-size: 13px;
   pointer-events: none;
+}
+
+.resident-ledger {
+  max-height: 50dvh;
+  overflow: auto;
+  padding: 0.6rem;
+  text-align: left;
+}
+.resident-ledger ul {
+  list-style: none;
+  padding: 0;
+}
+.resident-ledger li {
+  padding: 0.5rem 0;
+  border-top: 1px solid #b89a70;
+}
+.resident-ledger small,
+.resident-ledger select {
+  display: block;
+}
+.ration-choices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.4rem;
+}
+.ration-choices button {
+  width: 100%;
+  white-space: normal;
+  word-break: keep-all;
+}
+.village-bulletin {
+  inset: auto auto 23vh 1rem;
+}
+
+.village-completion-line:not(:empty) {
+  position: fixed;
+  z-index: 16;
+  bottom: calc(clamp(140px, 23dvh, 210px) + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 92vw;
+  padding: 0.35rem 0.9rem;
+  background: #30271e;
+  color: #fff1d4;
+  border: 1px solid #a98b5d;
+  border-radius: 4px;
+  pointer-events: none;
+  text-align: center;
+}
+.play-shell:has(.console-folded) .village-completion-line {
+  bottom: 1rem;
 }

@@ -246,12 +246,27 @@ export interface Facility extends HomePlacement {
     stage: "pickup" | "store" | "return";
   } | null;
 }
+export const individualWorkplaces = [
+  "logging",
+  "workshop",
+  "hospital",
+  "fishery",
+  "farm",
+  "quarry",
+  "coal",
+  "iron",
+] as const;
+export function canDirectStaff(kind: BuildingKind) {
+  return individualWorkplaces.some((k) => k === kind);
+}
 export const facilityStaffLimit = (f: Pick<Facility, "kind" | "level">) =>
-  f.kind === "restaurant" || f.kind === "hospital"
+  f.kind === "restaurant"
     ? ([2, 4, 6][f.level - 1] ?? 2)
     : f.kind === "fishery"
       ? ([5, 10, 20][f.level - 1] ?? 5)
-      : BUILDING_RULES[f.kind].staff;
+      : canDirectStaff(f.kind)
+        ? BUILDING_RULES[f.kind].staff * (f.level + 1)
+        : BUILDING_RULES[f.kind].staff;
 export interface Expedition {
   id: string;
   facilityId: string;
@@ -334,6 +349,17 @@ export function connectedDeposits(
         Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(p.x - b.x, p.z - b.z),
     )
     .map((d) => sites.find((l) => l.siteId === d.id) ?? invalidTown());
+}
+export function mineralWorksites(s: TimberState, siteId: ProductionSiteId) {
+  return (
+    s.town.facilities.filter((f) => f.sourceId === siteId).length +
+    s.town.orders.filter((o) => !o.upgradeTarget && o.sourceId === siteId)
+      .length +
+    Number(!!productionSites(s).find((site) => site.siteId === siteId)?.built) +
+    Number(
+      s.construction?.kind === "logging" && s.construction.siteId === siteId,
+    )
+  );
 }
 export function buildingSource(
   s: TimberState,
@@ -441,6 +467,11 @@ export function buildingIssue(
     !buildingSource(s, kind, p.position)
   )
     return "해당 자원이 남아 있는 숲·광맥·암반 가까이에 지어 주세요.";
+  if (kind === "coal" || kind === "iron" || kind === "quarry") {
+    const source = buildingSource(s, kind, p.position);
+    if (source && mineralWorksites(s, source) >= 2)
+      return "이 광맥에는 건설 중인 곳을 포함해 채굴 시설을 두 곳까지 지을 수 있어요.";
+  }
   if (kind === "fishery" && !waterAt(p.position, 7))
     return "물고기가 모이는 물가에만 어획막을 지을 수 있어요.";
   if (
@@ -552,27 +583,29 @@ export function planBuilding(
     },
   };
 }
+export function idleTownResidents(s: TimberState) {
+  const children = new Set(
+    s.world.citizens.filter((c) => c.age === "child").map((c) => c.id),
+  );
+  return s.residents.filter(
+    (r) =>
+      r.health === "healthy" &&
+      !children.has(r.id) &&
+      !r.workplaceId &&
+      !r.task &&
+      !r.nextWork &&
+      r.routine !== "eating" &&
+      !s.workerIds.includes(r.id) &&
+      !s.town.trips.some((t) => t.ids.includes(r.id)),
+  );
+}
 export function freeTownResidents(
   s: TimberState,
   p: GroundPoint,
   count: number,
 ): string[] {
   if (count <= 0) return [];
-  const children = new Set(
-    s.world.citizens.filter((c) => c.age === "child").map((c) => c.id),
-  );
-  return s.residents
-    .filter(
-      (r) =>
-        r.health === "healthy" &&
-        !children.has(r.id) &&
-        !r.workplaceId &&
-        !r.task &&
-        !r.nextWork &&
-        r.routine !== "eating" &&
-        !s.workerIds.includes(r.id) &&
-        !s.town.trips.some((t) => t.ids.includes(r.id)),
-    )
+  return idleTownResidents(s)
     .map((r) => ({
       id: r.id,
       path: residentPath(r.position, p, townObstacles(s)),
@@ -910,6 +943,63 @@ export function demolishBuilding(s: TimberState, id: string): TimberState {
     s = deposit(s, r as ResourceId, n);
   return s;
 }
+export function directStaff(
+  s: TimberState,
+  residentId: string,
+  destination: string | null,
+): TimberState {
+  const r = s.residents.find((r) => r.id === residentId);
+  const citizen = s.world.citizens.find((c) => c.id === residentId);
+  const previous = s.town.facilities.find(
+    (f) => "facility:" + f.id === r?.workplaceId,
+  );
+  const next = s.town.facilities.find((f) => f.id === destination);
+  if (
+    !r ||
+    !citizen?.alive ||
+    citizen.age === "child" ||
+    r.health !== "healthy" ||
+    r.task ||
+    r.nextWork ||
+    r.routine === "eating" ||
+    s.workerIds.includes(r.id) ||
+    s.town.trips.some((t) => t.ids.includes(r.id)) ||
+    (r.workplaceId && (!previous || !canDirectStaff(previous.kind))) ||
+    (destination !== null && (!next || !canDirectStaff(next.kind)))
+  )
+    throw Error("지금은 이 주민을 배치할 수 없습니다.");
+  if (next?.id === previous?.id) return s;
+  const assigned = (id: string) =>
+    s.residents.filter((r) => r.workplaceId === "facility:" + id).length;
+  if (
+    next &&
+    (assigned(next.id) >= facilityStaffLimit(next) ||
+      !residentPath(r.position, facilityDoor(next), townObstacles(s)).length)
+  )
+    throw Error("근무지의 빈자리와 이동 경로를 확인해 주세요.");
+  return {
+    ...s,
+    residents: s.residents.map((q) =>
+      q.id === residentId
+        ? {
+            ...q,
+            workplaceId: next ? "facility:" + next.id : null,
+            insideHome: false,
+          }
+        : q,
+    ),
+    town: {
+      ...s.town,
+      facilities: s.town.facilities.map((f) =>
+        f.id === previous?.id
+          ? { ...f, target: Math.max(0, f.target - 1) }
+          : f.id === next?.id
+            ? { ...f, target: Math.max(f.target, assigned(f.id) + 1) }
+            : f,
+      ),
+    },
+  };
+}
 export function setFacilityStaff(
   s: TimberState,
   id: string,
@@ -1055,9 +1145,12 @@ function advanceTownProduction(
       if (f.sourceId) {
         let l = productionSites(s).find((site) => site.siteId === f.sourceId);
         if (!l?.remaining) {
-          l = connectedDeposits(s, f.kind, f.position).find(
-            (site) => site.remaining > 0,
-          );
+          l =
+            f.kind !== "logging"
+              ? undefined
+              : connectedDeposits(s, f.kind, f.position).find(
+                  (site) => site.remaining > 0,
+                );
           if (!l) {
             f.progress = 0;
             break;
@@ -1249,7 +1342,7 @@ export function dispatchFood(
   };
   n = {
     ...n,
-    paused: false,
+    paused: s.campaign ? s.paused : false,
     town: {
       ...n.town,
       nextId: n.town.nextId + 1,

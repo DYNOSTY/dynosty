@@ -123,11 +123,13 @@ import {
   createTown,
   demolishBuilding,
   deposit,
+  directStaff,
   dispatchFood,
   type Facility,
   facilityDoor,
   facilityResource,
   facilityStaffLimit,
+  mineralWorksites,
   orderResting,
   originalBuildingCost,
   payTown,
@@ -359,6 +361,7 @@ export type TimberCommand =
       position: GroundPoint;
       headingRadians: number;
     }
+  | { type: "direct-staff"; resident: string; destination: string | null }
   | { type: "facility-staff"; id: string; count: number }
   | { type: "dispatch-food"; id: string; food: FoodId; rank?: 1 | 2 | 3 }
   | { type: "begin-chapter-two" }
@@ -557,6 +560,7 @@ export function createVillageGame(
   });
   return {
     ...village,
+    paused: beforeDeparture || afterFire,
     restaurantBuilt: beforeDeparture,
     rebuilding: afterFire,
     campaign: newCampaign(beforeDeparture ? "opening" : "patrol"),
@@ -659,6 +663,7 @@ export function createCapital(s: TimberState): TimberState {
   );
   city = {
     ...city,
+    paused: false,
     chapter: 3,
     elapsed: s.elapsed,
     rebuilding: true,
@@ -3147,12 +3152,7 @@ export function advanceTimber(
 ): TimberState {
   let s = parseTimberState(input);
   num(minutes, 1440);
-  if (
-    s.workerIds.some(
-      (id) => s.residents.find((r) => r.id === id)?.health !== "healthy",
-    )
-  )
-    return { ...s, paused: true };
+  s = replaceCrew(s);
   const target = Math.min(144000000, s.elapsed + minutes);
   let count = 0;
   while (s.elapsed < target) {
@@ -3516,6 +3516,9 @@ export function commandTimber(
         headingRadians: command.headingRadians,
       });
       break;
+    case "direct-staff":
+      n = directStaff(s, command.resident, command.destination);
+      break;
     case "facility-staff":
       n = setFacilityStaff(s, command.id, command.count);
       break;
@@ -3662,7 +3665,7 @@ export function commandTimber(
               },
             }
           : {}),
-        paused: command.recall ? s.paused : false,
+        paused: command.recall || s.campaign ? s.paused : false,
       };
       break;
     }
@@ -3751,7 +3754,11 @@ export function commandTimber(
       n = staffRestaurant({ ...s, restaurantWorkerTarget: command.count });
       break;
     case "set-ration-policy":
-      if (s.campaign && command.policy !== s.rationPolicy && policyWait(s))
+      if (
+        s.campaign &&
+        (!s.firstRationSet || command.policy !== s.rationPolicy) &&
+        policyWait(s)
+      )
         fail("다음 정책은 발효 후 열두 시간이 지나야 내릴 수 있습니다.");
       if (!["needs", "cap"].includes(command.policy))
         fail("배급 정책이 올바르지 않습니다.");
@@ -3761,7 +3768,7 @@ export function commandTimber(
           firstRationSet: true,
           rationPolicy: command.policy,
           ...(s.campaign &&
-            command.policy !== s.rationPolicy && {
+            (!s.firstRationSet || command.policy !== s.rationPolicy) && {
               campaign: { ...s.campaign, lastPolicyAt: s.elapsed },
             }),
         },
@@ -3809,7 +3816,7 @@ export function commandTimber(
       n = note(
         {
           ...s,
-          paused: false,
+          paused: s.campaign ? s.paused : false,
           woodSpent: s.woodSpent + VILLAGE_RULES.constructionWood,
           world: {
             ...s.world,
@@ -3857,6 +3864,12 @@ export function commandTimber(
             : "restaurant";
       const site = loggingSite(s, command.siteId ?? "west");
       const siteRules = loggingSiteRules(site.siteId);
+      if (
+        kind === "logging" &&
+        productionSiteDefinition(site.siteId).kind !== "forest" &&
+        mineralWorksites(s, site.siteId) >= 2
+      )
+        fail("광맥당 채굴 시설은 두 곳까지입니다.");
       if (
         (kind === "logging" && site.built) ||
         (kind === "storage" && site.storageBuilt)
@@ -3920,7 +3933,7 @@ export function commandTimber(
                 }
               : r,
           ),
-          paused: false,
+          paused: s.campaign ? s.paused : false,
         },
         kind === "restaurant"
           ? "공동 식당 건설 명령."
@@ -4066,7 +4079,7 @@ export function commandTimber(
                   s.world.resources.RES_METAL - offer.cost * AMOUNT_SCALE,
               },
             },
-            paused: false,
+            paused: s.campaign ? s.paused : false,
           },
           "approaching",
           ids,
@@ -4090,7 +4103,7 @@ export function commandTimber(
             ...s,
             repairWorkerId: ids[0] ?? null,
             reservedWood: 20,
-            paused: false,
+            paused: s.campaign ? s.paused : false,
           },
           "building-travel",
           ids,
@@ -4284,7 +4297,8 @@ export function commandTimber(
       : undefined;
   const decision =
     order?.[0] ??
-    (command.type === "set-ration-policy" && command.policy !== s.rationPolicy
+    (command.type === "set-ration-policy" &&
+    (!s.firstRationSet || command.policy !== s.rationPolicy)
       ? command.policy === "needs"
         ? "필요량에 따른 배급"
         : "식단별 배급 상한"

@@ -779,3 +779,18 @@ it("닷새째 밤 습격 기록은 저장하거나 성문 보고를 닫아도 �
     }
   }
 });
+
+it("첫 배급령이 기존 배급 방식과 같아도 방과 주민 반응을 한 번만 기록한다", () => {
+  const start = createVillageGame();
+  const policy = {
+    type: "set-ration-policy",
+    policy: start.rationPolicy,
+  } as const;
+  const first = commandTimber(start, policy, "first-decree");
+  expect(first.decree?.title).toBe("필요량에 따른 배급");
+  expect(first.decree?.serial).toBe(1);
+  expect(first.world.optimism).toBe(start.world.optimism + 1);
+  const again = commandTimber(restore(first), policy, "same-decree");
+  expect(again.decree).toEqual(first.decree);
+  expect(again.world.optimism).toBe(first.world.optimism);
+});

@@ -12,7 +12,12 @@ export type TimberRequest =
   | { type: "load"; requestId: number; data: unknown };
 export type TimberResponse =
   | { type: "exited"; world: PlayState }
-  | { type: "state"; state: TimberState }
+  | {
+      type: "state";
+      state: TimberState;
+      completions?: string[];
+      resetNotices?: boolean;
+    }
   | { type: "saved"; requestId: number; save: TimberSave }
   | { type: "loaded"; requestId: number }
   | { type: "error"; message: string; requestId: number | null };

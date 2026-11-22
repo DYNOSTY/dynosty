@@ -528,7 +528,8 @@ export function actCampaign(
         };
       break;
     case "after":
-      if (action === "next") return change("patrol");
+      if (action === "next")
+        return change("patrol", {}, { ...s, paused: false });
       break;
     case "patrol": {
       const report = returnedScouts(s).find(

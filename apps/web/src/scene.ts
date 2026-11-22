@@ -557,16 +557,28 @@ export function mountScene(
       }
       const resident = villageState?.residents.find((r) => r.id === mesh?.id);
       if (resident) {
-        name = `주민 ${villageState?.residents.findIndex((r) => r.id === resident.id) ?? 0 + 1}`;
-        details = resident.request
-          ? RESIDENT_REQUEST_TEXT[resident.request]
-          : resident.workplaceId === "restaurant"
-            ? "공동 식당 직원"
-            : resident.workplaceId?.startsWith("logging")
-              ? "자원 작업장 직원"
-              : resident.task?.startsWith("logging-haul")
-                ? "자원 운반 담당"
-                : "마을 주민";
+        name = `주민 ${(villageState?.residents.findIndex((r) => r.id === resident.id) ?? 0) + 1}`;
+        const job = villageState?.town.orders.find((o) =>
+          o.crew.includes(resident.id),
+        );
+        details = job
+          ? BUILDING_RULES[job.kind].name +
+            " 공사 배정 · " +
+            {
+              waiting: "대기",
+              collect: "자재 수령",
+              deliver: "자재 운반",
+              build: "시공",
+            }[job.stage]
+          : resident.request
+            ? RESIDENT_REQUEST_TEXT[resident.request]
+            : resident.workplaceId === "restaurant"
+              ? "공동 식당 직원"
+              : resident.workplaceId?.startsWith("logging")
+                ? "자원 작업장 직원"
+                : resident.task?.startsWith("logging-haul")
+                  ? "자원 운반 담당"
+                  : "마을 주민";
         break;
       }
       mesh = mesh.parent as typeof mesh;

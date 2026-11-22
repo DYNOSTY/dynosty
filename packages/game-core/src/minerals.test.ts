@@ -14,6 +14,7 @@ import {
   commandTimber,
   createTimberSave,
   createTimberState,
+  createVillageGame,
   parseTimberSave,
   parseTimberState,
   type TimberCommand,
@@ -165,4 +166,56 @@ it("새 광맥 옆에는 건설할 자리가 있고 예전 광산 재고가 보�
   const restored = parseTimberState(legacy);
   expect(restored.mineralSites.slice(0, 6)).toEqual(legacy.mineralSites);
   expect(restored.mineralSites).toHaveLength(BOKHOL_MINERALS.length);
+});
+
+it("한 광맥의 공사 두 곳이 자리를 예약하고 저장 후에도 세 번째 광산을 막는다", () => {
+  let s = createVillageGame();
+  for (const z of [-48, -40])
+    s = command(s, {
+      type: "plan-building",
+      kind: "quarry",
+      position: { x: 164, z },
+      headingRadians: 0,
+    });
+  s = parseTimberSave(createTimberSave(s)).state;
+  expect(s.town.orders.map((o) => o.sourceId)).toEqual([
+    "stone-east",
+    "stone-east",
+  ]);
+  expect(() =>
+    command(s, {
+      type: "plan-building",
+      kind: "quarry",
+      position: { x: 164, z: -32 },
+      headingRadians: 0,
+    }),
+  ).toThrow(/두 곳/);
+  expect(() =>
+    command(s, { type: "build-logging", siteId: "stone-east" }),
+  ).toThrow();
+});
+it("주민을 지정해 병원으로 보내거나 빼고 저장 후에도 지정을 유지한다", () => {
+  let s = command(createVillageGame(), {
+    type: "plan-building",
+    kind: "hospital",
+    position: { x: 12, z: 12 },
+    headingRadians: 0,
+  });
+  s = advanceTimber(s, 120);
+  const f = s.town.facilities[0];
+  const r = s.residents.find(
+    (r, i) =>
+      !r.workplaceId &&
+      !r.task &&
+      !r.nextWork &&
+      s.world.citizens[i]?.age !== "child",
+  );
+  if (!f || !r) throw Error("근무지와 주민이 필요합니다.");
+  s = command(s, { type: "direct-staff", resident: r.id, destination: f.id });
+  s = parseTimberSave(createTimberSave(advanceTimber(s, 1))).state;
+  expect(s.residents.find((q) => q.id === r.id)?.workplaceId).toBe(
+    "facility:" + f.id,
+  );
+  s = command(s, { type: "direct-staff", resident: r.id, destination: null });
+  expect(s.residents.find((q) => q.id === r.id)?.workplaceId).toBeNull();
 });

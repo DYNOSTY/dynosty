@@ -152,6 +152,7 @@
 
 .office-panel,
 .office-decree {
+  text-shadow: none;
   background: #302b24;
   color: #fff4d9;
   padding: 0.6rem;

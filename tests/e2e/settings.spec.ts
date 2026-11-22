@@ -61,9 +61,10 @@ test("돌아보기 영상에 저장한 음량을 적용한다", async ({ page })
     localStorage.setItem("dynosty.film.opening", "seen"),
   );
   await menu.getByRole("button", { name: "돌아보기" }).click();
-  await menu.getByRole("button", { name: "영상 보기" }).click();
-  await expect(menu.locator("video")).toHaveJSProperty("volume", 0.25);
-  await expect(menu.locator("video")).toHaveJSProperty("muted", false);
+  const gallery = page.getByRole("dialog", { name: "돌아보기" });
+  await gallery.getByRole("button", { name: "영상 보기" }).click();
+  await expect(gallery.locator("video")).toHaveJSProperty("volume", 0.25);
+  await expect(gallery.locator("video")).toHaveJSProperty("muted", false);
 });
 
 for (const raw of [

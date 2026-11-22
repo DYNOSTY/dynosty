@@ -21,8 +21,12 @@ export function residentModel(species: string): ModelAsset {
     parts.push({
       name,
       shape,
-      size,
-      position,
+      size: [size[0] * 1.5, size[1] * 1.5, size[2] * 1.5],
+      position: [
+        position[0] * 1.5,
+        (position[1] + 0.5) * 1.5 - 0.5,
+        position[2] * 1.5,
+      ],
       color,
       rotation,
       ...(role ? { role, phase } : {}),

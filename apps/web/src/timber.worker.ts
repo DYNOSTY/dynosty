@@ -10,6 +10,8 @@ import {
 } from "@dynosty/game-core";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 
+import { villageCompletions } from "./village-completions.js";
+
 function resumeVillage(data: unknown) {
   const saved = parseTimberSave(data).state;
   // Earlier developer saves can already have a mutually exclusive research ending.
@@ -17,15 +19,24 @@ function resumeVillage(data: unknown) {
     saved.campaign || !saved.town.development.story.rebellion
       ? { campaign: campaignOf(saved) }
       : {};
-  return updateCampaign({ ...saved, ...campaign, paused: true, remainder: 0 });
+  return updateCampaign({ ...saved, ...campaign, remainder: 0 });
 }
 let state = createVillageGame(true),
   last = performance.now();
 let initialized = false;
 const send = (m: TimberResponse) => self.postMessage(m);
-const publish = () => send({ type: "state", state });
+const publish = (before?: typeof state) =>
+  send({
+    type: "state",
+    state,
+    ...(before
+      ? { completions: villageCompletions(before, state) }
+      : { resetNotices: true }),
+  });
 self.onmessage = (event: MessageEvent<TimberRequest>) => {
   const m = event.data;
+  const before = state;
+  const wasPaused = state.paused;
   try {
     if (m.type === "init") {
       if (!initialized)
@@ -53,8 +64,20 @@ self.onmessage = (event: MessageEvent<TimberRequest>) => {
       initialized = true;
       send({ type: "loaded", requestId: m.requestId });
     }
-    last = performance.now();
-    publish();
+    if (
+      m.type !== "command" ||
+      wasPaused !== state.paused ||
+      m.command.type === "restart"
+    )
+      last = performance.now();
+    publish(
+      m.type === "command" &&
+        m.command.type !== "restart" &&
+        before.chapter === state.chapter &&
+        before.campaign?.beat !== "departure"
+        ? before
+        : undefined,
+    );
   } catch (e) {
     send({
       type: "error",
@@ -70,8 +93,9 @@ setInterval(() => {
   last = now;
   if (state.paused) return;
   try {
+    const before = state;
     state = tickTimber(state, elapsed);
-    publish();
+    publish(before);
   } catch {
     state = { ...state, paused: true };
     publish();

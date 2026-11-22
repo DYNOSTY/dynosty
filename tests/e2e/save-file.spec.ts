@@ -13,19 +13,19 @@ const fileValue = {
 async function seed(page: Page) {
   await page.goto("/");
   await openWorkspace(page);
-  await page.getByRole("button", { name: "하루 진행" }).click();
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await page.getByRole("button", { name: "3D 연결 예제 바꾸기" }).click();
   await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
   );
-  await page.getByRole("button", { name: "하루 진행" }).click();
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await page.getByRole("button", { name: "3D 연결 예제 바꾸기" }).click();
   await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
   );
-  await page.getByRole("button", { name: "하루 진행" }).click();
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await expect(page.getByText("4일차", { exact: true })).toBeVisible();
 }
 
@@ -111,7 +111,7 @@ test("최근·직전 저장을 실제 파일로 내보내고 가져오기 확정
   await expect(page.getByTestId("scene-example-motion")).toHaveText(
     "걷기 표시",
   );
-  await page.getByRole("button", { name: "하루 진행" }).click();
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await expect(page.getByText("3일차", { exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: "이전 저장 불러오기", exact: true })
