@@ -199,10 +199,13 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.route("**/models/buildings/BLD_NEST.glb", (r) =>
-    r.fulfill({ status: 404, body: "missing" }),
-  );
-  await ready(page);
+  const nestGlb = "**/models/buildings/BLD_NEST.glb";
+  await page.route(nestGlb, (r) => r.fulfill({ status: 404, body: "missing" }));
+  const [response] = await Promise.all([
+    page.waitForResponse(nestGlb, { timeout: 90_000 }),
+    ready(page),
+  ]);
+  expect(response.status()).toBe(404);
   await expect(page.getByRole("alert")).toContainText("모델");
   const fallback = await page.evaluate(() => {
     const scene = (
@@ -225,10 +228,19 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
   });
   expect(fallback.glb).toBe(false);
   expect(fallback.meshes).toBeGreaterThan(0);
+  // 캔버스에서 직접 선택한 뒤 접혀 있는 명령 콘솔에서 결과를 확인한다.
   await clickExample(page, "building");
+  await button(page, "명령 열기").click();
+  const selection = page.getByRole("region", {
+    name: "선택 정보",
+    exact: true,
+  });
   await expect(
-    page.getByRole("region", { name: "선택 정보", exact: true }),
-  ).toContainText("복홀 방 게시판");
+    selection.getByRole("heading", {
+      name: "건물 예제 · 온돌 둥지",
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
   expect(errors).toEqual([]);
 });

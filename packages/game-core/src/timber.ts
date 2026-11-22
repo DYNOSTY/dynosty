@@ -75,6 +75,7 @@ import {
   applyCitizenEvent,
   type Citizen,
   type CitizenEvent,
+  type CitizenEventRecording,
   createPlayState,
   FOOD_IDS,
   type FoodId,
@@ -263,6 +264,7 @@ export interface TimberState {
   };
   readonly rebuilding?: boolean;
   readonly openingFight?: boolean;
+  readonly rationReactionDay?: number;
   readonly decree?: { title: string; reaction: string; serial: number };
   readonly version: 18;
   readonly town: TownState;
@@ -509,6 +511,8 @@ function createVillageResident(
     routine: "idle",
   };
 }
+export const DEPARTURE_SURVIVING_HOME_COUNT = 2;
+
 export function createVillageGame(
   beforeDeparture = false,
   afterFire = false,
@@ -549,7 +553,7 @@ export function createVillageGame(
     ...(afterFire && {
       pessimism: 30,
       buildings: initialHomes()
-        .slice(0, 2)
+        .slice(0, DEPARTURE_SURVIVING_HOME_COUNT)
         .map((home) => ({
           id: home.id,
           type: "ondol-nest" as const,
@@ -2461,6 +2465,10 @@ export function parseTimberState(value: unknown): TimberState {
   if (
     (s.rebuilding !== undefined && typeof s.rebuilding !== "boolean") ||
     (s.openingFight !== undefined && typeof s.openingFight !== "boolean") ||
+    (s.rationReactionDay !== undefined &&
+      (!Number.isSafeInteger(s.rationReactionDay) ||
+        s.rationReactionDay < 1 ||
+        s.rationReactionDay > s.world.day)) ||
     (s.decree !== undefined &&
       (!isRecord(s.decree) ||
         typeof s.decree.title !== "string" ||
@@ -2871,31 +2879,39 @@ export function capitalRoad(s: TimberState) {
   return t <= -12 ? "closed" : t < 0 ? "slow" : "open";
 }
 function fireOndol(s: TimberState): TimberState {
-  const wood =
-    Math.floor(s.world.resources.RES_WOOD / AMOUNT_SCALE) - s.reservedWood;
+  const freeWood = Math.max(
+    0,
+    Math.floor(s.world.resources.RES_WOOD / AMOUNT_SCALE) - s.reservedWood,
+  );
   const homes = usableHomes(s).filter((h) =>
     s.residents.some((r) => r.homeId === h.id && r.health !== "dead"),
   );
-  const demand =
-    s.heating ||
-    Math.max(0, Math.min(3, Math.ceil(-villageTemperature(s) / 8)));
-  const needed = demand * homes.length;
-  const coalHeat = GAME_RULES.fuel.coalToWood;
-  const coal =
-    s.campaign?.beat === "capital"
-      ? Math.min(
-          Math.floor(s.world.resources.RES_COAL / AMOUNT_SCALE),
-          Math.floor(needed / coalHeat),
-        )
-      : 0;
-  const firewood = Math.min(Math.max(0, wood), needed - coal * coalHeat);
-  const fuel = coal * coalHeat + firewood;
+  const demand = Math.max(
+    s.heating ?? 0,
+    Math.min(3, Math.ceil(-villageTemperature(s) / 8)),
+  );
+  const required = demand * homes.length;
+  const inCapital = s.campaign?.beat === "capital";
+  const coal = inCapital
+    ? Math.min(required, Math.floor(s.world.resources.RES_COAL / AMOUNT_SCALE))
+    : 0;
+  const woodPerHeat = inCapital ? GAME_RULES.fuel.coalToWood : 1;
+  const woodHeat = Math.min(
+    required - coal,
+    Math.floor(freeWood / woodPerHeat),
+  );
+  const fuel = coal + woodHeat;
   const base = homes.length ? Math.floor(fuel / homes.length) : 0;
   const warmerHomes = homes
     .slice(0, fuel - base * homes.length)
     .map((h) => h.id);
   return {
-    ...(fuel ? payTown(s, { RES_WOOD: firewood, RES_COAL: coal }) : s),
+    ...(fuel
+      ? payTown(s, {
+          ...(coal > 0 && { RES_COAL: coal }),
+          ...(woodHeat > 0 && { RES_WOOD: woodHeat * woodPerHeat }),
+        })
+      : s),
     firedHeat: base + Number(warmerHomes.length > 0),
     warmerHomes,
   };
@@ -2933,20 +2949,16 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
     if (!victim) continue;
     const killed = random() < 0.2;
     const id = "gate-raid-" + s.elapsed + "-" + i;
-    s = commandTimber(
+    s = applyAutomaticCitizenEvent(
       s,
-      {
-        type: "citizen-event",
-        event: killed
-          ? { type: "death", id, citizenIds: [victim.id] }
-          : {
-              type: "illness",
-              severity: "major",
-              id,
-              citizenIds: [victim.id],
-            },
-      },
-      id,
+      killed
+        ? { type: "death", id, citizenIds: [victim!.id] }
+        : {
+            type: "illness",
+            severity: "major",
+            id,
+            citizenIds: [victim!.id],
+          },
     );
     if (killed) dead++;
     else {
@@ -3081,20 +3093,16 @@ export function villageFatalIncident(
   if (s.world.citizenEvents?.includes(id)) return s;
   const wounded = casualty.injury && random() >= 0.25;
   let result = note(
-    commandTimber(
+    applyAutomaticCitizenEvent(
       s,
-      {
-        type: "citizen-event",
-        event: wounded
-          ? {
-              type: "illness",
-              severity: "major",
-              id,
-              citizenIds: [casualty.id],
-            }
-          : { type: "death", id, citizenIds: [casualty.id] },
-      },
-      id,
+      wounded
+        ? {
+            type: "illness",
+            severity: "major",
+            id,
+            citizenIds: [casualty.id],
+          }
+        : { type: "death", id, citizenIds: [casualty.id] },
     ),
     `주민 ${s.residents.findIndex((r) => r.id === casualty.id) + 1} · ${wounded ? casualty.injury : casualty.cause}`,
   );
@@ -3154,12 +3162,21 @@ function ageYardFood(s: TimberState, previousMinute: number): TimberState {
   }
   return next;
 }
+function patrolIncidentChance(s: TimberState): number {
+  const guards = s.residents.filter(
+    (r) => r.workplaceId === "office" && r.health === "healthy",
+  ).length;
+  const level = [4, 8, 16].filter((required) => guards >= required).length;
+  return 0.24 / 2 ** level;
+}
+
 export function advanceTimber(
   input: TimberState,
   minutes: number,
 ): TimberState {
   let s = parseTimberState(input);
   num(minutes, 1440);
+  if (s.campaign?.ending) return s;
   s = replaceCrew(s);
   const target = Math.min(144000000, s.elapsed + minutes);
   let count = 0;
@@ -3325,23 +3342,26 @@ export function advanceTimber(
       else s = { ...s, merchantRepair: { ...repair, work } };
     }
     s = resumeResidents(s, elapsed);
-    if (s.rebuilding && !s.campaign?.ending) {
+    const campaign = s.campaign;
+    if (
+      !campaign?.ending &&
+      campaign?.beat !== "opening" &&
+      campaign?.beat !== "departure" &&
+      (campaign || s.rebuilding)
+    ) {
       const first =
+        s.rebuilding &&
         !s.openingFight &&
         s.restaurantBuilt &&
         (s.logging.built ||
           s.loggingSites.some((site) => site.built) ||
           s.town.facilities.some((f) => f.kind === "logging"));
-      const guards = s.residents.filter(
-        (r) => r.workplaceId === "office" && r.health === "healthy",
-      ).length;
-      const level = [4, 8, 16].filter((required) => guards >= required).length;
       if (
         first ||
-        (s.openingFight &&
+        ((!s.rebuilding || s.openingFight) &&
           s.elapsed % 1440 === 0 &&
           Math.random() <
-            incidentChance(0.24 / 2 ** level, s.campaign?.difficulty))
+            incidentChance(patrolIncidentChance(s), s.campaign?.difficulty))
       ) {
         if (first || Math.random() < 0.5) {
           const ids = s.residents
@@ -3350,7 +3370,7 @@ export function advanceTimber(
             .map((r) => r.id);
           if (ids.length === 2) {
             const eventId = "brawl-" + s.elapsed;
-            s = commandTimber(
+            s = applyTimberCommand(
               { ...s, openingFight: true },
               {
                 type: "citizen-event",
@@ -3362,14 +3382,21 @@ export function advanceTimber(
                 },
               },
               eventId,
+              false,
             );
-            s = note(s, "배식 줄에서 다툼이 벌어져 주민 둘이 다쳤습니다.");
+            s = note(
+              s,
+              s.restaurantBuilt
+                ? "배식 줄에서 다툼이 벌어져 주민 둘이 다쳤습니다."
+                : "마을에서 다툼이 벌어져 주민 둘이 다쳤습니다.",
+            );
           }
         } else {
-          s = commandTimber(
+          s = applyTimberCommand(
             s,
             { type: "building-damage", cause: "fire", amount: 25 },
             "fire-" + s.elapsed,
+            false,
           );
         }
       }
@@ -3395,19 +3422,12 @@ export function advanceTimber(
         if (patient) {
           const id = "capital-cold-" + s.elapsed;
           s = note(
-            commandTimber(
-              s,
-              {
-                type: "citizen-event",
-                event: {
-                  id,
-                  type: "illness",
-                  severity: "minor",
-                  citizenIds: [patient.id],
-                },
-              },
+            applyAutomaticCitizenEvent(s, {
               id,
-            ),
+              type: "illness",
+              severity: "minor",
+              citizenIds: [patient.id],
+            }),
             "의원: 오한이 가시지 않는 이가 또 왔습니다. 마른 이불을 이리 주십시오.",
           );
         }
@@ -3429,7 +3449,7 @@ export function advanceTimber(
 
     s = updateCampaign(s);
     if (
-      (!previousEnding && s.campaign?.ending) ||
+      s.campaign?.ending ||
       (beforeUpdate === "forecast" &&
         (s.campaign?.beat !== "forecast" || minutesUntilCoup(s) === 15 * 60))
     )
@@ -3442,11 +3462,37 @@ export function commandTimber(
   command: TimberCommand,
   id: string,
 ): TimberState {
+  return applyTimberCommand(input, command, id, true);
+}
+
+export function applyAutomaticCitizenEvent(
+  s: TimberState,
+  event: CitizenEvent,
+) {
+  // Simulation fallout must not consume command slots or depend on event log space.
+  return applyTimberCommand(
+    s,
+    { type: "citizen-event", event },
+    event.id,
+    false,
+    "if-room",
+  );
+}
+
+function applyTimberCommand(
+  input: TimberState,
+  command: TimberCommand,
+  id: string,
+  record: boolean,
+  recordCitizenEvent: CitizenEventRecording = record,
+): TimberState {
   const s = parseTimberState(input);
   if (!id || id.length > 100) fail("명령 식별값이 올바르지 않습니다.");
-  if (s.processed.includes(id)) return s;
-  if (s.processed.length >= 1999 && command.type !== "restart")
-    fail("처리 기록이 가득 찼습니다.");
+  if (record) {
+    if (s.processed.includes(id)) return s;
+    if (s.processed.length >= 1999 && command.type !== "restart")
+      fail("처리 기록이 가득 찼습니다.");
+  }
   if (
     (s.campaign?.beat === "opening" || s.campaign?.beat === "departure") &&
     !["campaign", "restart"].includes(command.type)
@@ -3968,7 +4014,7 @@ export function commandTimber(
       const world =
         command.type === "mechanize"
           ? mechanizeCitizen(s, command.source)
-          : applyCitizenEvent(s.world, command.event);
+          : applyCitizenEvent(s.world, command.event, recordCitizenEvent);
       const workshop =
         command.type === "mechanize" &&
         s.town.facilities.find((f) => f.kind === "workshop");
@@ -4336,16 +4382,19 @@ export function commandTimber(
       ? !["비축분 봉인", "창고 출입 통제", "비상 식량 징발"].includes(decision)
       : welcome;
     const key = supported ? "optimism" : "pessimism";
+    const rationChange = command.type === "set-ration-policy";
     n = note(
       {
         ...n,
+        ...(rationChange && { rationReactionDay: s.world.day }),
         decree: {
           title: decision,
           reaction,
           serial: (s.decree?.serial ?? 0) + 1,
         },
         world:
-          n.world[key] > s.world[key]
+          n.world[key] > s.world[key] ||
+          (rationChange && s.rationReactionDay === s.world.day)
             ? n.world
             : { ...n.world, [key]: Math.min(100, n.world[key] + 1) },
       },
@@ -4417,7 +4466,7 @@ export function commandTimber(
         : [],
     );
   return parseTimberState(
-    updateCampaign({ ...n, processed: [...n.processed, id] }),
+    updateCampaign(record ? { ...n, processed: [...n.processed, id] } : n),
   );
 }
 export function tickTimber(input: TimberState, elapsedMs: number): TimberState {

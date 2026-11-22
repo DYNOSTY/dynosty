@@ -5,8 +5,8 @@ import {
   campaignOf,
   canPay,
   capitalMinutesLeft,
+  capitalReady,
   capitalRoad,
-  convoyReady,
   emergencyRation,
   foodWarnings,
   GAME_RULES,
@@ -17,6 +17,8 @@ import {
   SCOUT_SITES,
   SETTLEMENTS,
   type TimberState,
+  usesCoupRules,
+  verdictRoute,
 } from "@dynosty/game-core";
 
 export const PATROL_NAMES = ["돌쇠", "여울쇠", "덕순이", "길룡"] as const;
@@ -436,7 +438,9 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line(
         "돌쇠",
-        "공자님! 식당 처마에 불이 붙었습니다. 불씨가 둥지 지붕으로 넘어갑니다!",
+        s.restaurantBuilt
+          ? "공자님! 식당 처마에 불이 붙었습니다. 불씨가 둥지 지붕으로 넘어갑니다!"
+          : "공자님! 둥지 지붕에 불이 붙었습니다!",
       );
       choice("leave", "성문을 열고 남은 장부 확인");
       break;
@@ -690,9 +694,39 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     }
     case "capital": {
+      if (!s.bokhol) {
+        page.title = "도성 남문, 닫힌 약방";
+        page.music = "10";
+        page.goal = `구호처 지원 · 도성 관측 ${Math.min(24, Math.floor(age / 60))}/24시간`;
+        line(
+          "의원",
+          "마마, 열이 나는 아이와 몸이 식은 아이가 한 이불을 덮고 있습니다. 병자를 가르라 하시려면 방 하나에 먼저 불을 넣어 주십시오.",
+        );
+        if (!c.relief) {
+          choice("ward", "병동에 석탄 12 보내기", !canPay(s, "RES_COAL", 12));
+          choice(
+            "kitchen",
+            "남문 솥에 어류 12 보내기",
+            !canPay(s, "RES_FISH", 12),
+          );
+        } else {
+          page.auto = capitalReady(s);
+          if (page.auto) {
+            page.key = "capital-ready";
+            choice("next", "왕의 봉서 펼치기");
+          }
+          line(
+            "달이",
+            c.relief === "ward"
+              ? "밤새 약방 굴뚝에 연기가 났어. 의원이 이제야 장갑을 벗고 맥을 짚더라."
+              : "남문을 지키던 군졸이 국을 날랐어. 아이들이 빈 그릇을 돌려줄 때까지 거기 서 있더라.",
+          );
+        }
+        break;
+      }
       page.title = "쥬신 왕의 어전 · 도성 남문";
       page.music = filmMusic["ending-3"];
-      if (c.relief && convoyReady(s)) {
+      if (capitalReady(s)) {
         page.key = "capital-ready";
         page.nextStage = "escort";
         page.title = "3단계 완료 · 남문에 남은 왕";
@@ -956,17 +990,21 @@ export function campaignPage(s: TimberState): ScenePage {
     case "rally":
       page.illustration = "gate";
       page.music = "13";
-      page.title = "혹한 닷새 전 · 배반자의 외침";
-      line(
-        "목진",
-        c.coupGateRaided
-          ? "지금이오! 성문에 붉은 눈이 들이닥쳤소. 어서 빗장을 드시오. 왕자 마마의 깃발 아래 서시오!"
-          : "창고에서 나와 약조한 이들, 내 목소리 들리시오? 왕자 마마의 깃발을 보시오. 지금 빗장을 드시오!",
-      );
-      line(
-        "양녕",
-        "내 깃발을 세워라. 남문에서 나와 함께 온 자들은 이리 와라. 오늘부터 내가 창고 열쇠를 맡겠다.",
-      );
+      page.title = usesCoupRules(c)
+        ? "혹한 닷새 전 · 배반자의 외침"
+        : "곳간 앞에 내려놓은 일삯패";
+      if (usesCoupRules(c)) {
+        line(
+          "목진",
+          c.coupGateRaided
+            ? "지금이오! 성문에 붉은 눈이 들이닥쳤소. 어서 빗장을 드시오. 왕자 마마의 깃발 아래 서시오!"
+            : "창고에서 나와 약조한 이들, 내 목소리 들리시오? 왕자 마마의 깃발을 보시오. 지금 빗장을 드시오!",
+        );
+        line(
+          "양녕",
+          "내 깃발을 세워라. 남문에서 나와 함께 온 자들은 이리 와라. 오늘부터 내가 창고 열쇠를 맡겠다.",
+        );
+      }
       line(
         "길룡",
         c.side === "control"
@@ -981,10 +1019,25 @@ export function campaignPage(s: TimberState): ScenePage {
         "덕순이",
         "그 손 치우시오. 내 몫 달라는 말을 당신 좋으라고 한 줄 아시오? 공자님, 여기 우리랑 한 끼 앉아 주시겠어요?",
       );
-      choice("resist", "양녕의 반란에 맞선다");
-      choice("ally", "양녕의 반란에 동조한다");
+      if (usesCoupRules(c)) {
+        choice("resist", "양녕의 반란에 맞선다");
+        choice("ally", "양녕의 반란에 동조한다");
+      } else {
+        choice(
+          "listen",
+          "풀 12를 풀고 대표들과 함께 식사",
+          !canPay(s, "RES_PLANT", 12),
+        );
+        choice("cordon", "창고 문을 닫고 경비를 세우기");
+      }
       break;
-    case "verdict":
+    case "verdict": {
+      const route = verdictRoute(s);
+      const story = s.town.development.story;
+      const life =
+        story.route || route === "flight" ? story.chungnyeong : "dead";
+      const legacyDeath =
+        "고리야, 공주마마께서 돌아가셨어요. 성문 앞 소란 사이에 누가 마마를 살해했어요.";
       page.illustration = "gate";
       page.title = c.uprising
         ? "성문 빗장이 들리던 밤"
@@ -1012,17 +1065,19 @@ export function campaignPage(s: TimberState): ScenePage {
         );
       }
       if (c.uprising) {
-        if (s.town.development.story.chungnyeong === "alive")
+        if (life === "alive")
           page.lineIllustration = {
             at: page.lines.length,
             image: "chungnyeong-dining",
             alt: "복홀 식당에서 어린 공룡들과 한 상에 앉은 충녕",
           };
-        if (s.town.development.story.route !== "dictatorship")
+        if (route !== "dictatorship")
           line(
             "나르미",
-            s.town.development.story.chungnyeong === "dead"
-              ? "고리야, 의원이 오기도 전에 공주마마께서 돌아가셨어요. 성안에서 붕대를 감고 있던 이의 눈이 붉어졌어요. 마마께서 새끼를 밀어내시는 사이에 그이가 덮쳤어요. 길룡 씨가 손을 놓지 못해요."
+            life === "dead"
+              ? usesCoupRules(c)
+                ? "고리야, 의원이 오기도 전에 공주마마께서 돌아가셨어요. 성안에서 붕대를 감고 있던 이의 눈이 붉어졌어요. 마마께서 새끼를 밀어내시는 사이에 그이가 덮쳤어요. 길룡 씨가 손을 놓지 못해요."
+                : legacyDeath
               : "고리야, 공주마마께서는 무사하세요. 어린 공룡들을 데리고 식당에 계세요.",
           );
         line(
@@ -1052,29 +1107,33 @@ export function campaignPage(s: TimberState): ScenePage {
           "내 깃발만 보면 다들 빗장을 들 거라 여겼느냐. 어려 보인다고 제 주인을 버린 놈이 내가 약해 보이면 어찌할지 뻔하구나. 다들 잘 보아라.",
         );
       }
-      if (s.town.development.story.route === "dictatorship") {
+      if (route === "dictatorship") {
         line("양녕", "성문을 닫아라. 이 백성들은 나의 것이다.");
         line("포졸", "공주마마께서 돌아가셨습니다.");
-      } else if (
-        !c.uprising &&
-        s.town.development.story.chungnyeong === "dead"
-      ) {
+      } else if (!c.uprising && life === "dead") {
         line(
           "나르미",
-          "고리야, 공주마마께서 돌아가셨어요. 성안에서 변한 이가 마마를 덮쳤어요.",
+          usesCoupRules(c)
+            ? "고리야, 공주마마께서 돌아가셨어요. 성안에서 변한 이가 마마를 덮쳤어요."
+            : legacyDeath,
         );
       }
       choice(
         "next",
-        s.town.development.story.route === "mechanical"
+        route === "mechanical"
           ? "판결을 기록하고 의원으로"
           : "판결을 기록하고 마을로",
       );
       break;
+    }
     case "vigil":
       page.auto = false;
       page.music = c.side === "control" ? "14" : "04";
-      page.goal = "다가오는 혹한을 견딘다";
+      page.goal = usesCoupRules(c)
+        ? "다가오는 혹한을 견딘다"
+        : c.side === "coexist"
+          ? `봄 장부를 펴기까지 · 마을이 잠잠했던 날 ${Math.min(10, Math.floor((s.elapsed - Math.max(c.since, c.lastHigh)) / 1440))} / 10일`
+          : `출항 준비 · 새 배급령을 내린 지 ${Math.min(10, days)} / 10일`;
       if (s.town.development.story.chungnyeong === "alive") {
         line(
           "충녕",

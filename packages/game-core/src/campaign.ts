@@ -136,6 +136,14 @@ export function capitalMinutesLeft(s: TimberState) {
 export function convoyReady(s: TimberState) {
   return s.campaign?.departures === 3;
 }
+export function capitalReady(s: TimberState) {
+  const c = s.campaign;
+  // The populated capital holds a snapshot of Bokhol. Dev saves played
+  // this beat in Bokhol itself and have no convoy to complete.
+  return (
+    !!c?.relief && (s.bokhol ? convoyReady(s) : s.elapsed - c.since >= 1440)
+  );
+}
 export interface Campaign {
   cargo?: Cargo;
   departures?: number;
@@ -306,6 +314,22 @@ export function recoveryCrew(s: TimberState) {
 export function lostPatrol(s: TimberState) {
   return (s.campaign?.patrolOrder ?? Object.keys(s.scoutDepartures ?? {}))[2];
 }
+// Forecast records this boolean even if revival was not prepared. A rally,
+// verdict or vigil without it was entered under the pre-forecast rules.
+export function usesCoupRules(c: Campaign) {
+  return c.revivalPrepared !== undefined;
+}
+export function verdictRoute(s: TimberState) {
+  const c = campaignOf(s);
+  return (
+    s.town.development.story.route ??
+    (c.side !== "control"
+      ? "flight"
+      : usesCoupRules(c)
+        ? "dictatorship"
+        : "mechanical")
+  );
+}
 export function campaignOutcome(s: TimberState): Campaign["ending"] {
   const c = campaignOf(s);
   if (c.beat === "capital")
@@ -329,12 +353,25 @@ export function campaignOutcome(s: TimberState): Campaign["ending"] {
   if (
     c.beat !== "vigil" ||
     s.elapsed - c.since <
-      (GAME_RULES.campaign.stage5MinimumDays +
-        Number(c.revivalPrepared !== undefined)) *
-        1440
+      (GAME_RULES.campaign.stage5MinimumDays + Number(usesCoupRules(c))) * 1440
   )
     return null;
   const story = s.town.development.story;
+  if (!usesCoupRules(c)) {
+    if (
+      c.side === "coexist" &&
+      s.world.pessimism <= 30 &&
+      s.elapsed - Math.max(c.since, c.lastHigh) >= 10 * 1440
+    )
+      return "hope";
+    if (
+      c.side === "control" &&
+      story.chungnyeong === "mechanical" &&
+      s.town.development.completed.includes("R19")
+    )
+      return "escape";
+    return null;
+  }
   if (story.route === "dictatorship") return "order";
   if (story.chungnyeong === "mechanical") return "escape";
   if (story.route === "flight" && story.chungnyeong === "alive") return "hope";
@@ -397,6 +434,7 @@ export function updateCampaign(s: TimberState): TimberState {
   }
   if (
     s.chapter === 5 &&
+    usesCoupRules(c) &&
     ["rally", "verdict", "vigil"].includes(c.beat) &&
     s.elapsed - c.since >= 10 * 1440 &&
     !s.town.cold
@@ -628,6 +666,16 @@ export function actCampaign(
       break;
     }
     case "capital": {
+      if (!s.bokhol) {
+        if (!c.relief && (action === "ward" || action === "kitchen"))
+          return change(
+            "capital",
+            { relief: action },
+            action === "ward" ? pay("RES_COAL", 12) : pay("RES_FISH", 12),
+          );
+        if (action === "next" && capitalReady(s)) return change("seal");
+        break;
+      }
       const batches = Math.min(4, Math.floor((s.elapsed - c.since) / 360));
       const availableBatches = batches - (c.storeBatches ?? 0);
       if (action === "open-stores" && c.relief && availableBatches > 0) {
@@ -674,22 +722,20 @@ export function actCampaign(
       }
       if (!c.relief && action === "report")
         return change("capital", { relief: "report" });
-      if (action === "next" && c.relief && convoyReady(s))
-        return s.bokhol
-          ? {
-              ...parseTimberState(s.bokhol),
-              processed: s.processed,
-              chapter: 3,
-              campaign: {
-                ...campaignOf(s.bokhol),
-                beat: "seal",
-                since: s.bokhol.elapsed,
-                relief: c.relief,
-                cargo: c.cargo ?? {},
-                evacuees: c.evacuees ?? 0,
-              },
-            }
-          : change("seal");
+      if (action === "next" && c.relief && capitalReady(s))
+        return {
+          ...parseTimberState(s.bokhol),
+          processed: s.processed,
+          chapter: 3,
+          campaign: {
+            ...campaignOf(s.bokhol),
+            beat: "seal",
+            since: s.bokhol.elapsed,
+            relief: c.relief,
+            cargo: c.cargo ?? {},
+            evacuees: c.evacuees ?? 0,
+          },
+        };
       break;
     }
     case "seal":
@@ -752,6 +798,29 @@ export function actCampaign(
       }
       break;
     case "rally":
+      if (!usesCoupRules(c)) {
+        if (action === "listen" || action === "cordon") {
+          const base = action === "listen" ? pay("RES_PLANT", 12) : s;
+          return change(
+            "verdict",
+            { since: c.since },
+            {
+              ...base,
+              world: {
+                ...base.world,
+                pessimism: Math.min(
+                  100,
+                  Math.max(
+                    0,
+                    s.world.pessimism + (action === "listen" ? -8 : 8),
+                  ),
+                ),
+              },
+            },
+          );
+        }
+        break;
+      }
       if (["resist", "ally", "listen", "cordon"].includes(action)) {
         const prior = recordResearchStory(s, "rebellion-started");
         const base = prior.town.development.story.route
@@ -769,14 +838,16 @@ export function actCampaign(
       break;
     case "verdict":
       if (action === "next") {
-        const route = s.town.development.story.route;
-        const base = route
+        const route = verdictRoute(s);
+        const base = s.town.development.story.route
           ? s
           : recordResearchStory(
               s,
-              c.side === "control"
+              route === "dictatorship"
                 ? "allied-yangnyeong"
-                : "rebellion-suppressed",
+                : route === "mechanical"
+                  ? "chungnyeong-assassinated"
+                  : "rebellion-suppressed",
             );
         return change("vigil", { since: c.since }, base);
       }

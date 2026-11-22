@@ -340,6 +340,11 @@ h1 {
 .selection-info {
   border-color: var(--accent);
 }
+.village-selection-portrait {
+  float: inline-start;
+  margin-inline-end: 0.5rem;
+  object-fit: cover;
+}
 .selection-name {
   font-size: 1.25rem;
   font-weight: 700;
@@ -754,6 +759,17 @@ h1 {
 
 .scene-viewport {
   position: relative;
+}
+
+/* Decorative only: leave procurement and canvas hit testing unchanged. */
+.play-shell:not(.is-procurement)
+  .scene-viewport:has(> canvas[data-season="winter"])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url(/ui/kit/frost_vignette.webp) center / 100% 100% no-repeat;
+  opacity: 0.42;
 }
 .site-markers {
   position: absolute;
@@ -3704,12 +3720,12 @@ body,
   padding: 1px 3px;
 }
 @media (min-width: 761px) {
-  .is-procurement .play-workspace.has-tools {
+  .is-procurement:not(.is-labor) .play-workspace.has-tools {
     inset: 55px 0 175px;
     display: block;
   }
-  .is-procurement .play-scene,
-  .is-procurement .scene-viewport {
+  .is-procurement:not(.is-labor) .play-scene,
+  .is-procurement:not(.is-labor) .scene-viewport {
     position: absolute;
     inset: 0;
     height: 100%;
@@ -3717,11 +3733,11 @@ body,
     border-radius: 0;
     overflow: hidden;
   }
-  .is-procurement .scene-heading,
-  .is-procurement .scene-footer {
+  .is-procurement:not(.is-labor) .scene-heading,
+  .is-procurement:not(.is-labor) .scene-footer {
     display: none;
   }
-  .play-shell.is-procurement .workspace-tools.timber-tools {
+  .play-shell.is-procurement:not(.is-labor) .workspace-tools.timber-tools {
     position: absolute;
     inset: 8px 12px 8px auto;
     width: clamp(300px, 29vw, 410px);
@@ -3973,6 +3989,13 @@ body,
 }
 .g-console__info > .g-mood .g-mood__v b {
   font-size: 11px;
+}
+@media (max-width: 760px) {
+  /* 모바일 조달에서 접힌 명령 버튼이 개발 도구(왼쪽 8px + 너비 72px)를 덮지 않게 한다. */
+  .is-procurement > .guide-toggle {
+    left: 88px;
+    max-width: min(430px, calc(100vw - 100px));
+  }
 }
 .trade-deck {
   display: flex;

@@ -689,7 +689,9 @@ export function App() {
     if (fallen && sceneStatus === "준비 완료") sceneRef.current?.overview(true);
   }, [fallen, sceneStatus]);
   const capitalMap =
-    villageVisible && timberState?.campaign?.beat === "capital";
+    villageVisible &&
+    !!timberState?.bokhol &&
+    timberState.campaign?.beat === "capital";
   const [southVisits, visitSouth] = useState(0);
   const gatePending =
     villageVisible &&
@@ -1030,7 +1032,7 @@ export function App() {
       data-loading={!timberState && !workerError && !playError}
       data-prologue={prologue}
       data-section={saveOpen || toolsOpen ? undefined : villageSection?.label}
-      className={`play-shell${timberOpen ? " is-procurement" : ""}`}
+      className={`play-shell${timberOpen ? ` is-procurement${laborOpen ? " is-labor" : ""}` : ""}`}
     >
       <header className="play-header">
         <TopFrame />
@@ -1116,6 +1118,7 @@ export function App() {
               laborOpen ||
               !!scoutOpen
             }
+            clearOfficeSelection={clearSelection}
             trade={showTrade}
             work={
               villageSection?.label === "건설과 식량 수급" ||
@@ -1525,6 +1528,29 @@ export function App() {
               </button>
             </aside>
           )}
+          {timberOpen && laborOpen ? (
+            <fieldset className="selection-actions" aria-label="현장 대상 선택">
+              <button
+                type="button"
+                className="quiet-button"
+                onClick={() => sceneRef.current?.resetCamera()}
+              >
+                기본 시점
+              </button>
+              {SITE_IDS.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="quiet-button"
+                  aria-pressed={selectedSite === id}
+                  disabled={!siteAvailable(laborState, id)}
+                  onClick={() => sceneRef.current?.select(id)}
+                >
+                  {SITE_NAMES[id]} 선택
+                </button>
+              ))}
+            </fieldset>
+          ) : null}
           <div className="scene-footer">
             <p>클릭 선택 · 드래그 회전 · 휠 확대·축소 · ? 조작 안내</p>
             <span>
@@ -1550,13 +1576,15 @@ export function App() {
             className="selection-actions"
             aria-label="예제 대상 선택"
           >
-            <button
-              type="button"
-              className="quiet-button"
-              onClick={() => sceneRef.current?.resetCamera()}
-            >
-              기본 시점
-            </button>
+            {!laborOpen ? (
+              <button
+                type="button"
+                className="quiet-button"
+                onClick={() => sceneRef.current?.resetCamera()}
+              >
+                기본 시점
+              </button>
+            ) : null}
             {appliedSnapshot?.entities
               .filter(
                 (entity) =>
@@ -1578,22 +1606,6 @@ export function App() {
                 </button>
               ))}
           </fieldset>
-          {timberOpen && laborOpen ? (
-            <fieldset className="selection-actions" aria-label="현장 대상 선택">
-              {SITE_IDS.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  className="quiet-button"
-                  aria-pressed={selectedSite === id}
-                  disabled={!siteAvailable(laborState, id)}
-                  onClick={() => sceneRef.current?.select(id)}
-                >
-                  {SITE_NAMES[id]} 선택
-                </button>
-              ))}
-            </fieldset>
-          ) : null}
         </section>
 
         <aside
@@ -2049,8 +2061,39 @@ export function App() {
               aria-label="선택 정보"
               aria-live="polite"
             >
+              {villageInfo.portrait && (
+                <img
+                  key={villageInfo.portrait}
+                  className="village-selection-portrait"
+                  src={villageInfo.portrait}
+                  alt=""
+                  width={64}
+                  height={44}
+                  onError={(event) => {
+                    event.currentTarget.hidden = true;
+                  }}
+                />
+              )}
               <h2>{villageInfo.name}</h2>
               <p>{villageInfo.detail}</p>
+              {villageInfo.buildingPosition && (
+                <>
+                  <button
+                    type="button"
+                    className="quiet-button"
+                    onClick={() => sceneRef.current?.focusSelected()}
+                  >
+                    가까이 보기
+                  </button>{" "}
+                  <button
+                    type="button"
+                    className="quiet-button"
+                    onClick={clearSelection}
+                  >
+                    선택 해제
+                  </button>
+                </>
+              )}
             </section>
           ) : selectedEntity ? (
             <SelectionPanel

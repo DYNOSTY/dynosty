@@ -14,6 +14,7 @@ import {
   SCOUT_SITES,
 } from "../../packages/game-core/dist/index.js";
 import { advanceVillageDay, readVillage } from "./read-village.js";
+import { worldPoint } from "./scene-picking.js";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -1211,3 +1212,74 @@ for (const [choice, words] of [
     await expect(speech.locator("p")).toHaveText(words);
   });
 }
+
+test("출문 대화 중 실제 3D 장면에서 불길이 그려진다", async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 600 });
+  // Start at the actual departure beat without replaying the prologue.
+  const save = createTimberSave(
+    commandTimber(
+      createVillageGame(true),
+      { type: "campaign", beat: "opening", action: "hard" },
+      "visual-departure",
+    ),
+  );
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "귀족들이 출문을 청했다",
+  );
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+    { timeout: 60_000 },
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const { __scene } = window as unknown as {
+          __scene: {
+            particleSystems: { name: string; getActiveCount(): number }[];
+          };
+        };
+        return __scene.particleSystems
+          .filter((system) => system.name.startsWith("처마 불길-"))
+          .reduce((count, system) => count + system.getActiveCount(), 0);
+      }),
+    )
+    .toBeGreaterThan(0);
+});
+
+test("3D 관아 선택과 해제가 순라 패널에 반영된다", async ({ page }) => {
+  const save = createTimberSave(createVillageGame(false, true));
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+  );
+  await page.getByRole("button", { name: "명령 열기", exact: true }).click();
+  const office = page.getByRole("region", { name: "관아", exact: true });
+  const selection = page.getByRole("region", {
+    name: "선택 정보",
+    exact: true,
+  });
+  const pickOffice = async (scroll = false) => {
+    const point = await worldPoint(page, [0, 1.4, -16], scroll);
+    await page.mouse.click(point.x, point.y);
+    await expect(office).toBeVisible();
+  };
+  await pickOffice();
+  await office.getByRole("button", { name: "1단계 · 4명" }).click();
+  await expect(office).toContainText("순라 포졸 4명");
+  await selection.getByRole("button", { name: "가까이 보기" }).click();
+  await selection.getByRole("button", { name: "선택 해제" }).click();
+  await expect(office).toHaveCount(0, { timeout: 5_000 });
+  await pickOffice(true);
+  await expect(office).toContainText("순라 포졸 4명");
+});

@@ -49,7 +49,7 @@ import { createSiteSelection } from "./site-selection.js";
 import { isSiteId, type SiteId } from "./site-targets.js";
 import { SCENE_SIGNS } from "./site-zones.js";
 import { createTimberVisual } from "./timber-scene.js";
-import { createVillage, LAYOUT } from "./village.js";
+import { createVillage, LAYOUT, type VillageTargetInfo } from "./village.js";
 import { buildWorld, ISLAND_RADIUS } from "./world.js";
 import { createZoneVisual } from "./zone-scene.js";
 
@@ -62,9 +62,10 @@ const CAMERA_TARGET = new Vector3(0, 0, -7);
 import { createTownVisual } from "./town-scene.js";
 
 export interface SceneController {
-  villageInfo(id: string): { name: string; detail: string } | undefined;
+  villageInfo(id: string): VillageTargetInfo | undefined;
   update(snapshot: SceneSnapshot, showBoard?: boolean): void;
   select(id: string | null): void;
+  focusSelected(): void;
   focusSite(id: SiteId): boolean;
   dispose(): void;
   readonly ready: Promise<void>;
@@ -181,6 +182,7 @@ export function mountScene(
     new URLSearchParams(location.search).get("season") === "summer"
       ? "summer"
       : "winter";
+  canvas.dataset.season = season;
   const {
     shadow,
     setTime,
@@ -203,6 +205,7 @@ export function mountScene(
     shadow,
     { glow, warmMat },
     previewVillage,
+    season,
   );
   const fog = createFog(scene, SCOUT_SITES);
   const landmarks = createLandmarks(scene, SCOUT_SITES, glow, warmMat);
@@ -900,9 +903,15 @@ export function mountScene(
       if (state && !villageState) resetWorldCamera();
       updateGround(state);
       entities.setElevation(elevation);
-      if (state?.decree && state.decree.serial !== villageState?.decree?.serial)
-        village.postDecree(state.decree.title, !!villageState);
-      if (!state?.decree && villageState?.decree) village.clearDecree();
+      const decree = state?.decree;
+      const priorDecree = villageState?.decree;
+      if (
+        decree &&
+        (decree.serial !== priorDecree?.serial ||
+          decree.title !== priorDecree?.title)
+      )
+        village.postDecree(decree.title, !!villageState);
+      if (!decree && priorDecree) village.clearDecree();
       village.setFireDamage(
         !!state?.rebuilding,
         state?.campaign?.beat === "departure",
@@ -1150,6 +1159,15 @@ export function mountScene(
           detail: "완공 시설 · " + facility.level + "단계",
         };
       return village.targets.get(id);
+    },
+    focusSelected() {
+      const position =
+        selected && village.targets.get(selected)?.buildingPosition;
+      if (!position) return;
+      camera.inertialPanningX = camera.inertialPanningY = 0;
+      camera.inertialRadiusOffset = 0;
+      camera.target.set(position.x, 1, position.z);
+      camera.radius = 16;
     },
     update(snapshot, showBoard) {
       const exodus = snapshot.entities.some((e) => e.id === "departing-0");
