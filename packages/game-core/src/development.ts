@@ -1,4 +1,9 @@
-import { applyCitizenEvent, type ResourceId } from "./play.js";
+import {
+  applyCitizenEvent,
+  incidentChance,
+  productionMultiplier,
+  type ResourceId,
+} from "./play.js";
 import catalog from "./research-catalog.json" with { type: "json" };
 import { workplaceOpen } from "./resident-routine.js";
 import {
@@ -74,6 +79,7 @@ export const collectionRate = (s: TimberState, f: Facility) =>
     s.town.development.electrical.includes(f.id) ? 2 : 1,
   );
 export const productionRate = (s: TimberState, f: Facility) =>
+  productionMultiplier(s.campaign?.difficulty) *
   Math.min(
     2,
     Math.max(
@@ -417,8 +423,11 @@ export function advanceDevelopment(
     };
     for (const actor of actors) {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-      // 개발용: 야근 부상 확률1%/인시. 일반 질병·사망 확률과 구분한다.
-      if (seed / 4294967296 < 1 - 0.99 ** (minutes / 60)) {
+      // 시간당 부상 확률을 이번 작업 시간에 맞게 환산한다.
+      if (
+        seed / 4294967296 <
+        1 - (1 - incidentChance(0.01, s.campaign?.difficulty)) ** (minutes / 60)
+      ) {
         const world = applyCitizenEvent(s.world, {
           type: "illness",
           id: `overtime-${s.world.day}-${s.elapsed}-${actor.id}`,

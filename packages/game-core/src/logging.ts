@@ -8,7 +8,7 @@ import {
   sawmillHasForest,
 } from "./bokhol.js";
 import { residentShiftOpen, resourceRate } from "./development.js";
-import { AMOUNT_SCALE } from "./play.js";
+import { AMOUNT_SCALE, productionMultiplier } from "./play.js";
 import { type GroundPoint, residentPath } from "./resident-path.js";
 import { workplaceOpen } from "./resident-routine.js";
 import { isRecord } from "./save.js";
@@ -279,7 +279,14 @@ function advanceOneLogging(
     work
   ) {
     const total =
-      l.progress + work * minutes * resourceRate(s, definition.resource);
+      Math.round(
+        (l.progress +
+          work *
+            minutes *
+            resourceRate(s, definition.resource) *
+            productionMultiplier(s.campaign?.difficulty)) *
+          1000,
+      ) / 1000;
     const made = Math.min(
       Math.floor(total / LOGGING_RULES.minutesPerWood),
       l.remaining,
@@ -493,7 +500,10 @@ function oneLoggingValid(s: TimberState): boolean {
     !integer(l.target, 4) ||
     !integer(l.remaining, definition.initial) ||
     !integer(l.buffer, 20) ||
-    !integer(l.progress, 9) ||
+    typeof l.progress !== "number" ||
+      !Number.isFinite(l.progress) ||
+      l.progress < 0 ||
+    l.progress >= LOGGING_RULES.minutesPerWood ||
     !integer(l.delivered, definition.initial)
   )
     return false;

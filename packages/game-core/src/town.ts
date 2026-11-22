@@ -35,7 +35,12 @@ import {
 import { advanceHospital, hospitalValid, type Patient } from "./hospital.js";
 import { loggingSites, productionSites, setLoggingSite } from "./logging.js";
 import { usableHomes } from "./mutants.js";
-import { AMOUNT_SCALE, type FoodId, type ResourceId } from "./play.js";
+import {
+  AMOUNT_SCALE,
+  type FoodId,
+  productionMultiplier,
+  type ResourceId,
+} from "./play.js";
 import {
   type GroundPoint,
   moveOnGround,
@@ -876,7 +881,15 @@ function advanceTownProduction(
     )
       ? workers.reduce((n, r) => n + buildingPower(s, r.id), 0)
       : 0;
-    f.progress += power * minutes * collectionRate(s, f);
+    f.progress =
+      Math.round(
+        (f.progress +
+          power *
+            minutes *
+            collectionRate(s, f) *
+            productionMultiplier(s.campaign?.difficulty)) *
+          1000,
+      ) / 1000;
     while (power > 0 && f.progress >= 30 && f.buffer < 20) {
       let amount = f.kind === "farm" ? 3 : f.kind === "ranch" ? 2 : 1;
       const yieldUnits = amount * 6 + f.yieldRemainder;
@@ -1157,7 +1170,10 @@ function advanceTrips(input: TimberState, minutes: number): TimberState {
           t.progress +
             t.ids.reduce((n, id) => n + buildingPower(s, id), 0) *
               minutes *
-              levelProductionRate(f),
+              levelProductionRate(f) *
+              (t.kind === "hunt"
+                ? productionMultiplier(s.campaign?.difficulty)
+                : 1),
         );
         if (t.progress >= 60) {
           t.cargo =

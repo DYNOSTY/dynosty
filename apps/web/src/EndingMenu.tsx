@@ -1,4 +1,9 @@
-import { CHAPTERS, type TimberState } from "@dynosty/game-core";
+import {
+  CHAPTERS,
+  type Difficulty,
+  isDifficulty,
+  type TimberState,
+} from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
 import { filmMusic } from "./campaign-scenes.js";
@@ -50,7 +55,7 @@ export function EndingMenu({
     setGalleryMusic(filmMusic[film]);
     return () => setGalleryMusic(null);
   }, [film, setGalleryMusic]);
-  const [restartLevel, setRestartLevel] = useState<"normal" | "hard">(
+  const [restartLevel, setRestartLevel] = useState<Difficulty>(
     state.campaign?.difficulty ?? "normal",
   );
   const [notice, setNotice] = useState("");
@@ -213,10 +218,13 @@ export function EndingMenu({
                     value={restartLevel}
                     onChange={(e) =>
                       setRestartLevel(
-                        e.target.value === "hard" ? "hard" : "normal",
+                        isDifficulty(e.target.value)
+                          ? e.target.value
+                          : "normal",
                       )
                     }
                   >
+                    <option value="easy">쉬움</option>
                     <option value="normal">보통</option>
                     <option value="hard">어려움</option>
                   </select>

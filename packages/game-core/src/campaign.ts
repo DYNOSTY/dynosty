@@ -5,6 +5,7 @@ import {
   evictionDelay,
   foodWarnings,
   GAME_RULES,
+  isDifficulty,
   type ResourceId,
 } from "./play.js";
 import { isRecord } from "./save.js";
@@ -215,9 +216,7 @@ export function campaignValid(c: unknown, elapsed: number) {
       (Array.isArray(c.victoryQuotes) &&
         c.victoryQuotes.length === CHAPTERS.length &&
         c.victoryQuotes.every((n) => integer(n, 9)))) &&
-    (c.difficulty === undefined ||
-      c.difficulty === "normal" ||
-      c.difficulty === "hard") &&
+    (c.difficulty === undefined || isDifficulty(c.difficulty)) &&
     (c.recoveryDue == null || integer(c.recoveryDue, 144000000)) &&
     integer(c.since, elapsed) &&
     integer(c.lastHigh, elapsed) &&
@@ -515,9 +514,9 @@ export function actCampaign(
   }
   switch (c.beat) {
     case "opening":
-      if (action === "next" || action === "hard")
+      if (action === "next" || isDifficulty(action))
         return change("departure", {
-          difficulty: action === "hard" ? "hard" : "normal",
+          difficulty: isDifficulty(action) ? action : "normal",
         });
       break;
     case "departure":

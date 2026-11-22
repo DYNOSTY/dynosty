@@ -9,8 +9,10 @@ import {
   capitalRoad,
   convoyLoad,
   convoyTarget,
+  type Difficulty,
   foodWarnings,
   GAME_RULES,
+  isDifficulty,
   mutantNames,
   mutantRepairCost,
   mutantStructure,
@@ -54,10 +56,10 @@ function SceneDialog({
   advisory,
 }: {
   page: ScenePage;
-  difficulty: "normal" | "hard";
+  difficulty: Difficulty;
   advisory: ReactNode;
   close: () => void;
-  act: (action: string, difficulty?: "normal" | "hard") => void;
+  act: (action: string, difficulty?: Difficulty) => void;
 }) {
   const palaceFilm = page.illustration === "king-palace-night";
   const dialog = useRef<HTMLDialogElement>(null);
@@ -123,9 +125,12 @@ function SceneDialog({
             <select
               value={level}
               onChange={(e) =>
-                setLevel(e.target.value === "hard" ? "hard" : "normal")
+                setLevel(
+                  isDifficulty(e.target.value) ? e.target.value : "normal",
+                )
               }
             >
+              <option value="easy">쉬움</option>
               <option value="normal">보통</option>
               <option value="hard">어려움</option>
             </select>
@@ -310,8 +315,8 @@ function SceneDialog({
                 if (stage) {
                   setLevel(
                     page.key === "opening"
-                      ? x.action === "hard"
-                        ? "hard"
+                      ? isDifficulty(x.action)
+                        ? x.action
                         : "normal"
                       : difficulty,
                   );
@@ -508,7 +513,7 @@ export function CampaignPanel({
     setDismissed(p.key);
     setPetition(false);
   };
-  function act(action: string, difficulty?: "normal" | "hard") {
+  function act(action: string, difficulty?: Difficulty) {
     command({
       type: "campaign",
       beat: c.beat,

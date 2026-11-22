@@ -573,6 +573,15 @@ it("온돌 연료를 매시간 결제하고 성문 전투 결과와 삽화를 �
   );
   expect(gateRaid(s, () => 0)).toBe(s);
   s = { ...s, world: { ...s.world, minute: 1260 } };
+  for (const [difficulty, threshold] of [
+    ["easy", 0.075],
+    ["normal", 0.15],
+    ["hard", 0.75],
+  ] as const) {
+    const state = { ...s, campaign: { ...s.campaign!, difficulty } };
+    expect(gateRaid(state, () => threshold)).toBe(state);
+    expect(gateRaid(state, () => threshold - 0.0001).raid).toBeDefined();
+  }
   const safe = restore(
     gateRaid(s, vi.fn().mockReturnValueOnce(0).mockReturnValue(0.99)),
   );

@@ -30,141 +30,160 @@ async function readScene(page: Page, label: string) {
     await start.click();
   }
 }
-test("출문을 눈으로 확인하고 장면을 접었다 돌아와도 재고가 중복 차감되지 않는다", async ({
-  page,
-}) => {
-  // Three 3D loads and the complete prologue share this budget on software-rendered CI.
-  test.setTimeout(240_000);
-  await page.goto("/");
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toHaveAccessibleName("별이 진 뒤, 복홀");
-  await expect(page.getByTestId("play-population")).toContainText("600");
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("10,000");
-  await readScene(page, "어려움 · 복홀 성문으로");
-  await expect(dialog).toHaveAccessibleName("귀족들이 출문을 청했다");
-  await page.reload();
-  await expect(dialog).toHaveAccessibleName("귀족들이 출문을 청했다");
-  await readScene(page, "성문을 열고 남은 장부 확인");
-  await expect(page.getByTestId("play-population")).toContainText("60");
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,000");
-  expect(
-    await page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
-          .campaign.difficulty,
-    ),
-  ).toBe("hard");
-  await readScene(page, "남은 예순 명과 시작");
-  await page.getByRole("button", { name: "관아 · 순라 배치" }).click();
-  const office = page.getByRole("region", { name: "관아" });
-  await office.getByRole("button", { name: "1단계 · 4명" }).click();
-  await expect(office).toContainText("순라 포졸 4명");
-  await page.getByRole("button", { name: "관아 · 순라 배치" }).click();
-  await page.getByRole("button", { name: "주민의 청 듣기" }).click();
-  await expect(dialog.locator(".patrol-portrait")).toBeVisible();
-  await readScene(page, "어류 4를 내어 병상까지 배달");
-  await expect(page.getByTestId("resource-RES_FISH")).toHaveText("996");
-  await page.reload();
-  await expect(dialog).toHaveCount(0);
-  await expect(page.getByTestId("resource-RES_FISH")).toHaveText("996");
-});
-test("함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단계는 플레이어가 선택한다", async ({
-  page,
-}) => {
-  const sent = commandTimber(
-    createVillageGame(),
-    { type: "scout-sites", ids: SCOUT_SITES.map((x) => x.id) },
-    "send",
+for (const [level, label] of [
+  ["easy", "쉬움"],
+  ["hard", "어려움"],
+] as const) {
+  test(
+    label +
+      " · 출문을 눈으로 확인하고 장면을 접었다 돌아와도 재고가 중복 차감되지 않는다",
+    async ({ page }) => {
+      // Three 3D loads and the complete prologue share this budget on software-rendered CI.
+      test.setTimeout(240_000);
+      await page.goto("/");
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toHaveAccessibleName("별이 진 뒤, 복홀");
+      await expect(page.getByTestId("play-population")).toContainText("600");
+      await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("10,000");
+      await readScene(page, label + " · 복홀 성문으로");
+      await expect(dialog).toHaveAccessibleName("귀족들이 출문을 청했다");
+      await page.reload();
+      await expect(dialog).toHaveAccessibleName("귀족들이 출문을 청했다");
+      await readScene(page, "성문을 열고 남은 장부 확인");
+      await expect(page.getByTestId("play-population")).toContainText("60");
+      await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,000");
+      expect(
+        await page.evaluate(
+          () =>
+            JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
+              .campaign.difficulty,
+        ),
+      ).toBe(level);
+      await readScene(page, "남은 예순 명과 시작");
+      await page.getByRole("button", { name: "관아 · 순라 배치" }).click();
+      const office = page.getByRole("region", { name: "관아" });
+      await office.getByRole("button", { name: "1단계 · 4명" }).click();
+      await expect(office).toContainText("순라 포졸 4명");
+      await page.getByRole("button", { name: "관아 · 순라 배치" }).click();
+      await page.getByRole("button", { name: "주민의 청 듣기" }).click();
+      await expect(dialog.locator(".patrol-portrait")).toBeVisible();
+      await readScene(page, "어류 4를 내어 병상까지 배달");
+      await expect(page.getByTestId("resource-RES_FISH")).toHaveText("996");
+      await page.reload();
+      await expect(dialog).toHaveCount(0);
+      await expect(page.getByTestId("resource-RES_FISH")).toHaveText("996");
+    },
   );
-  const save = createTimberSave({ ...sent, world: { ...sent.world, day: 4 } });
-  await page.addInitScript((value) => {
-    if (!localStorage.getItem("dynosty.village.resume"))
-      localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
-  }, save);
-  await page.goto("/");
-  for (const x of SCOUT_SITES) {
-    await expect(page.getByRole("dialog")).toHaveAccessibleName(
-      x.name + " · 정찰 결과",
-    );
-    await readScene(
-      page,
-      x.id === "forge"
-        ? "추가 파견을 멈추고 두 이름을 추모 장부에"
-        : "보고를 장부에 적기",
-    );
-  }
-  await page.getByRole("button", { name: /^다음 대사/ }).click();
-  await expect(
-    page.getByRole("dialog").locator("video.campaign-still"),
-  ).toHaveAttribute("src", "/story/campaign/ending-1.mp4#t=0,7.5");
-  await expect(page.locator(".result-screen .result-quote p")).toBeVisible();
-  await expect(
-    page.locator(".result-screen .result-quote footer"),
-  ).toContainText("『");
-  const transition = page.getByRole("button", {
-    name: "2단계로 넘어갈까요? · 다섯 마을로",
-  });
-  const settings = page.getByRole("button", {
-    name: "난이도 설정",
-    exact: true,
-  });
-  const difficulty = page.getByRole("combobox", { name: "난이도" });
-  await transition.click();
-  await settings.click();
-  await difficulty.selectOption("hard");
-  await page.getByRole("button", { name: "돌아가기" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("button", { name: /1단계 · 복홀의 첫 명령/ }).click();
-  const nextLine = page.getByRole("button", { name: /^다음 대사/ });
-  while (await nextLine.count()) await nextLine.click();
-  await transition.click();
-  await settings.click();
-  await difficulty.selectOption("hard");
-  await page.getByRole("button", { name: "시작하기" }).click();
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const state = JSON.parse(
-          localStorage.getItem("dynosty.village.resume")!,
-        ).state;
-        return [state.chapter, state.campaign.difficulty];
-      }),
-    )
-    .toEqual([2, "hard"]);
-  await page.reload();
-  await expect(page.getByRole("dialog")).toHaveAccessibleName(
-    "끊어진 길을 잇다",
-  );
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: /^다음 대사/ })
-    .click();
-  for (const name of ["당성", "압해", "한다사", "새금", "굴아화"]) {
-    await expect(
-      page
+  test(
+    label +
+      " · 함께 돌아온 정찰대는 보고별로 열리고 완료 뒤 다음 단계는 플레이어가 선택한다",
+    async ({ page }) => {
+      const sent = commandTimber(
+        createVillageGame(),
+        { type: "scout-sites", ids: SCOUT_SITES.map((x) => x.id) },
+        "send",
+      );
+      const save = createTimberSave({
+        ...sent,
+        campaign: { ...sent.campaign!, difficulty: level },
+        world: { ...sent.world, day: 4 },
+      });
+      await page.addInitScript((value) => {
+        if (!localStorage.getItem("dynosty.village.resume"))
+          localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
+      }, save);
+      await page.goto("/");
+      for (const x of SCOUT_SITES) {
+        await expect(page.getByRole("dialog")).toHaveAccessibleName(
+          x.name + " · 정찰 결과",
+        );
+        await readScene(
+          page,
+          x.id === "forge"
+            ? "추가 파견을 멈추고 두 이름을 추모 장부에"
+            : "보고를 장부에 적기",
+        );
+      }
+      await page.getByRole("button", { name: /^다음 대사/ }).click();
+      await expect(
+        page.getByRole("dialog").locator("video.campaign-still"),
+      ).toHaveAttribute("src", "/story/campaign/ending-1.mp4#t=0,7.5");
+      await expect(
+        page.locator(".result-screen .result-quote p"),
+      ).toBeVisible();
+      await expect(
+        page.locator(".result-screen .result-quote footer"),
+      ).toContainText("『");
+      const transition = page.getByRole("button", {
+        name: "2단계로 넘어갈까요? · 다섯 마을로",
+      });
+      const settings = page.getByRole("button", {
+        name: "난이도 설정",
+        exact: true,
+      });
+      const difficulty = page.getByRole("combobox", { name: "난이도" });
+      await transition.click();
+      await settings.click();
+      await expect(difficulty).toHaveValue(level);
+      await page.getByRole("button", { name: "돌아가기" }).click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await page
+        .getByRole("button", { name: /1단계 · 복홀의 첫 명령/ })
+        .click();
+      const nextLine = page.getByRole("button", { name: /^다음 대사/ });
+      while (await nextLine.count()) await nextLine.click();
+      await transition.click();
+      await settings.click();
+      await difficulty.selectOption(level);
+      await page.getByRole("button", { name: "시작하기" }).click();
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const state = JSON.parse(
+              localStorage.getItem("dynosty.village.resume")!,
+            ).state;
+            return [state.chapter, state.campaign.difficulty];
+          }),
+        )
+        .toEqual([2, level]);
+      await page.reload();
+      await expect(page.getByRole("dialog")).toHaveAccessibleName(
+        "끊어진 길을 잇다",
+      );
+      await page
         .getByRole("dialog")
-        .getByRole("button", { name: new RegExp("^" + name + " ·") }),
-    ).toBeVisible();
-  }
-  await page.getByRole("button", { name: "장면 접기" }).click();
-  await page.getByRole("button", { name: "나가기", exact: true }).click();
-  await expect(page.getByRole("dialog")).toHaveAccessibleName("메인 메뉴");
-  await page.getByRole("button", { name: "다시하기" }).click();
-  await page.getByLabel("시작 난이도").selectOption("normal");
-  await page.getByRole("button", { name: "현재 2단계 처음부터 시작" }).click();
-  await expect(page.getByRole("dialog")).toHaveAccessibleName(
-    "끊어진 길을 잇다",
+        .getByRole("button", { name: /^다음 대사/ })
+        .click();
+      for (const name of ["당성", "압해", "한다사", "새금", "굴아화"]) {
+        await expect(
+          page
+            .getByRole("dialog")
+            .getByRole("button", { name: new RegExp("^" + name + " ·") }),
+        ).toBeVisible();
+      }
+      await page.getByRole("button", { name: "장면 접기" }).click();
+      await page.getByRole("button", { name: "나가기", exact: true }).click();
+      await expect(page.getByRole("dialog")).toHaveAccessibleName("메인 메뉴");
+      await page.getByRole("button", { name: "다시하기" }).click();
+      await page.getByLabel("시작 난이도").selectOption("normal");
+      await page
+        .getByRole("button", { name: "현재 2단계 처음부터 시작" })
+        .click();
+      await expect(page.getByRole("dialog")).toHaveAccessibleName(
+        "끊어진 길을 잇다",
+      );
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () =>
+              JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
+                .campaign.difficulty,
+          ),
+        )
+        .toBe("normal");
+    },
   );
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          JSON.parse(localStorage.getItem("dynosty.village.resume")!).state
-            .campaign.difficulty,
-      ),
-    )
-    .toBe("normal");
-});
+}
 test("밤에 달이가 배급령 변경을 재촉하고 주민 청을 거절하면 그 자리에서 추방된다", async ({
   page,
 }) => {

@@ -344,7 +344,8 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line("고리", "들어가자. 아버지 방에 불은 켜 두고.");
       page.goal =
-        "난이도를 고르세요. 불안이 한계에 닿으면 보통은 하루 동안 수습할 수 있고, 어려움은 즉시 추방됩니다.";
+        "난이도를 고르세요. 불안이 한계에 닿으면 쉬움과 보통은 하루 동안 수습할 수 있고, 어려움은 즉시 추방됩니다.";
+      choice("easy", "쉬움 · 복홀 성문으로");
       choice("next", "보통 · 복홀 성문으로");
       choice("hard", "어려움 · 복홀 성문으로");
       break;

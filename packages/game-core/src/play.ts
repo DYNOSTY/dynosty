@@ -495,7 +495,13 @@ export function foodWarnings(state: PlayState, rules: RuleSet = GAME_RULES) {
       : [],
   );
 }
-export type Difficulty = "normal" | "hard";
+export type Difficulty = "easy" | "normal" | "hard";
+export const isDifficulty = (v: unknown): v is Difficulty =>
+  v === "easy" || v === "normal" || v === "hard";
+export const productionMultiplier = (d?: Difficulty) =>
+  d === "easy" ? 1.2 : d === "hard" ? 0.8 : 1;
+export const incidentChance = (base: number, d?: Difficulty) =>
+  Math.min(1, base * (d === "easy" ? 0.5 : d === "hard" ? 5 : 1));
 export function evictionDelay(
   difficulty: Difficulty = "normal",
   rules = GAME_RULES,

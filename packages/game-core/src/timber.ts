@@ -75,6 +75,8 @@ import {
   FOOD_IDS,
   type FoodId,
   GAME_RULES,
+  incidentChance,
+  isDifficulty,
   type PlayState,
   parsePlayState,
 } from "./play.js";
@@ -2746,7 +2748,8 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
     !villageDefenseActive(s) ||
     (s.world.minute >= 360 && s.world.minute < 1080) ||
     s.campaign.ending ||
-    (s.campaign.beat !== "capital" && random() >= 0.15)
+    (s.campaign.beat !== "capital" &&
+      random() >= incidentChance(0.15, s.campaign.difficulty))
   )
     return s;
   const defenders = s.residents.filter(
@@ -2810,7 +2813,11 @@ export function villageFatalIncident(
     !s.campaign ||
     s.campaign.ending ||
     !villageDefenseActive(s) ||
-    random() >= 0.01 + Math.max(0, -temperature) * 0.001
+    random() >=
+      incidentChance(
+        0.01 + Math.max(0, -temperature) * 0.001,
+        s.campaign.difficulty,
+      )
   )
     return s;
   const cases: {
@@ -3084,7 +3091,8 @@ export function advanceTimber(
         first ||
         (s.openingFight &&
           s.elapsed % 1440 === 0 &&
-          Math.random() < 0.24 / 2 ** level)
+          Math.random() <
+            incidentChance(0.24 / 2 ** level, s.campaign?.difficulty))
       ) {
         if (first || Math.random() < 0.5) {
           const ids = s.residents
@@ -3245,7 +3253,7 @@ export function commandTimber(
       if (
         n.campaign &&
         n.campaign.beat !== command.beat &&
-        (command.difficulty === "normal" || command.difficulty === "hard")
+        isDifficulty(command.difficulty)
       ) {
         n = {
           ...n,
@@ -3821,7 +3829,8 @@ export function commandTimber(
       if (storageRoom(s, offer.goods) < offer.quantity)
         fail("저장 공간이 부족합니다.");
       const paid = payTown(s, { [offer.payment]: offer.cost });
-      const bad = Math.random() < 0.3 ? 2 : 0;
+      const bad =
+        Math.random() < incidentChance(0.3, s.campaign?.difficulty) ? 2 : 0;
       n = note(
         {
           ...deposit(paid, offer.goods, offer.quantity - bad),

@@ -5,6 +5,7 @@ import {
   createCapital,
   createTimberSave,
   createVillageGame,
+  type Difficulty,
   newCampaign,
   parseTimberSave,
   SETTLEMENTS,
@@ -91,10 +92,7 @@ function resume(data: unknown) {
   window.location.reload();
 }
 
-export async function replayStage(
-  stage: number,
-  difficulty: "normal" | "hard",
-) {
+export async function replayStage(stage: number, difficulty: Difficulty) {
   const data = await archive("starts", "readonly", (table) => table.get(stage));
   const save =
     data === undefined

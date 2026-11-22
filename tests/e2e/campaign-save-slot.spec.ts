@@ -24,6 +24,7 @@ test("이어하기로 저장 슬롯을 열면 첫 재고부터 저장한 고기 
 
   const slot = createTimberSave({
     ...village,
+    campaign: { ...village.campaign!, difficulty: "easy" },
     paused: true,
     world: {
       ...village.world,
@@ -82,4 +83,13 @@ test("이어하기로 저장 슬롯을 열면 첫 재고부터 저장한 고기 
     meatText,
   );
   await expect(meat).toHaveText(meatText);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) =>
+          JSON.parse(localStorage.getItem(key)!).state.campaign.difficulty,
+        resumeKey,
+      ),
+    )
+    .toBe("easy");
 });
