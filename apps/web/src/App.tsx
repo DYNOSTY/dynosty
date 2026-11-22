@@ -12,14 +12,20 @@ import {
   BUILD_RULES,
   type BuildingType,
   buildMinutes,
+  CAMPAIGN_RULES,
   CREW_SIZE,
+  coldForecast,
   freeHands,
+  GAME_RULES,
   type HeatLevel,
   type LaborState,
   laborScene,
   laborStock,
+  nextResearch,
   PLOTS,
+  pendingCampaignEvent,
   pendingStory,
+  type ResearchId,
   SITE_RULES,
   STORY_RULES,
   type TimberState,
@@ -44,6 +50,7 @@ import {
   RESOURCE_NAMES,
   SITE_INFO,
 } from "./buildings.js";
+import { Ending } from "./Ending.js";
 import {
   CmdButton,
   CmdFace,
@@ -124,6 +131,19 @@ const RESIDENT_TRAITS = {
   },
 };
 
+const CLUE_NAMES: Record<string, string> = {
+  C01: "아버지의 장부",
+  C02: "두 화물표",
+  C03: "봉서 속 명단",
+  C04: "역참 기록과 명부",
+};
+const RESEARCH_NAMES: Record<ResearchId, string> = {
+  R17: "유산 기록 대조",
+  R18: "의식 이전 장치",
+  R19: "탈출 기관",
+  MECH2: "메카 2차 개조",
+};
+
 export function App() {
   const [laborOpen, setLaborOpen] = useState(false);
   // 일손 판은 내용이 길어 탭으로 한 덩어리씩 (프로스트펑크 건물 창처럼)
@@ -151,6 +171,15 @@ export function App() {
   const storyDue = playState
     ? pendingStory(playState.story, playState.day, playState.minute)
     : null;
+  // 캠페인 사건 (campaign.ts): 떠 있으면 같은 선택 화면을 띄움
+  const campaign = playState?.campaign;
+  const campaignDue =
+    playState && campaign
+      ? pendingCampaignEvent(
+          campaign,
+          absMinute(playState.day, playState.minute),
+        )
+      : null;
   // 이야기 알림: 사건에서 고른 결과·늦게 들어온 물자를 7초 동안 알림
   const [notice, setNotice] = useState<
     (StoryNoticeData & { key: number }) | null
@@ -166,6 +195,40 @@ export function App() {
     storySeen.current = next;
     if (found) setNotice({ ...found, key: Date.now() });
   }, [playState]);
+  // 단서를 찾았거나 연구를 마쳤을 때의 알림
+  const cluesSeen = useRef<number | null>(null);
+  const researchSeen = useRef<number | null>(null);
+  const clueCount = campaign?.clues.length;
+  const researchCount = campaign?.research.length;
+  useEffect(() => {
+    if (clueCount === undefined || researchCount === undefined || !campaign)
+      return;
+    const clue = campaign.clues[clueCount - 1];
+    const done = campaign.research[researchCount - 1];
+    if (
+      cluesSeen.current !== null &&
+      clueCount === cluesSeen.current + 1 &&
+      clue
+    )
+      setNotice({
+        title: `단서를 찾았다 · ${CLUE_NAMES[clue] ?? clue}`,
+        ...(clueCount === 4
+          ? { note: "단서가 다 모였다. 기술 공방에서 연구할 수 있다" }
+          : {}),
+        key: Date.now(),
+      });
+    else if (
+      researchSeen.current !== null &&
+      researchCount === researchSeen.current + 1 &&
+      done
+    )
+      setNotice({
+        title: `연구를 마쳤다 · ${RESEARCH_NAMES[done]}`,
+        key: Date.now(),
+      });
+    cluesSeen.current = clueCount;
+    researchSeen.current = researchCount;
+  }, [clueCount, researchCount, campaign]);
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(null), 7000);
@@ -663,6 +726,25 @@ export function App() {
   const foundCount = SCOUT_SITES.filter(
     (site) => scouts[site.id]?.status === "found",
   ).length;
+  // 돌아온 정찰대 수를 계산 쪽에 알림 (캠페인 1단계의 목표)
+  const scoutsKnown = campaign?.scouts;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 수가 늘 때만 알리면 됨
+  useEffect(() => {
+    if (scoutsKnown !== undefined && foundCount > scoutsKnown)
+      commandPlay({ type: "campaign-scouts", count: foundCount });
+  }, [foundCount, scoutsKnown]);
+  const nowAbs = playState ? absMinute(playState.day, playState.minute) : 0;
+  const forecast = campaign ? coldForecast(campaign, nowAbs) : null;
+  const researchNext = campaign ? nextResearch(campaign) : null;
+  const workshopBuilt = !!works?.built.includes(PLOTS.indexOf("BLD_WORKSHOP"));
+  const researchRule = researchNext
+    ? CAMPAIGN_RULES.research[researchNext]
+    : null;
+  const researchAfford =
+    !!playState &&
+    !!researchRule &&
+    playState.resources.RES_WOOD >= researchRule.wood * AMOUNT_SCALE &&
+    playState.resources.RES_METAL >= researchRule.metal * AMOUNT_SCALE;
 
   const leftHours = (id: string) => {
     const site = SCOUT_SITES.find((x) => x.id === id),
@@ -1080,6 +1162,114 @@ export function App() {
           </div>
           <b>{foundCount > 0 ? `찾은 곳 ${foundCount}` : ""}</b>
         </button>
+        {/* 캠페인: 단계 번호는 알리지 않고, 지금 할 일과 다가오는 일만 의뢰 줄로 보여 줌 */}
+        {campaign && campaign.stage === 2 ? (
+          <div className="g-quest">
+            <img src="/ui/cmd/economy.png" alt="" />
+            <span className="g-quest__body">
+              <span>이웃 마을과 끊긴 길을 잇자</span>
+            </span>
+            <b />
+          </div>
+        ) : null}
+        {campaign && campaign.stage === 3 ? (
+          <div className="g-quest">
+            <img src="/ui/cmd/map.png" alt="" />
+            <span className="g-quest__body">
+              <span>한양에서 소식이 내려온다</span>
+            </span>
+            <b />
+          </div>
+        ) : null}
+        {forecast ? (
+          <div className="g-quest">
+            <img src="/ui/cmd/ondol.png" alt="" />
+            <span className="g-quest__body">
+              <span>
+                {forecast.phase === "prep"
+                  ? "장영실의 예보 · 큰 혹한이 온다"
+                  : "큰 혹한을 버티는 중"}
+              </span>
+              <span className="g-bar" aria-hidden="true">
+                <i
+                  style={{
+                    width: `${Math.round((forecast.phase === "prep" ? 1 - forecast.day / forecast.of : forecast.day / forecast.of) * 100)}%`,
+                  }}
+                />
+              </span>
+            </span>
+            <b>
+              {forecast.phase === "prep"
+                ? `${forecast.day}일 뒤`
+                : `${forecast.day}일째`}
+            </b>
+          </div>
+        ) : null}
+        {campaign?.route && playState ? (
+          <div className="g-quest">
+            <img src="/ui/cmd/residents.png" alt="" />
+            <span className="g-quest__body">
+              <span>
+                {campaign.route === "coexist"
+                  ? "충녕과 함께 복홀을 지킨다"
+                  : "양녕의 지휘로 복홀을 지킨다"}
+              </span>
+              <span className="g-bar" aria-hidden="true">
+                <i
+                  style={{
+                    width: `${Math.min(100, Math.round(((nowAbs - (campaign.routeAt ?? nowAbs)) / (GAME_RULES.campaign.stage5MinimumDays * 1440)) * 100))}%`,
+                  }}
+                />
+              </span>
+            </span>
+            <b>
+              {Math.min(
+                GAME_RULES.campaign.stage5MinimumDays,
+                Math.floor((nowAbs - (campaign.routeAt ?? nowAbs)) / 1440),
+              )}
+              일
+            </b>
+          </div>
+        ) : null}
+        {campaign?.researching ? (
+          <div className="g-quest">
+            <img src="/ui/cmd/research.png" alt="" />
+            <span className="g-quest__body">
+              <span>연구 중 · {RESEARCH_NAMES[campaign.researching.id]}</span>
+              <span className="g-bar" aria-hidden="true">
+                <i
+                  style={{
+                    width: `${Math.round((campaign.researching.done / CAMPAIGN_RULES.research[campaign.researching.id].workMinutes) * 100)}%`,
+                  }}
+                />
+              </span>
+            </span>
+            <b>{workshopBuilt ? "" : "공방 없음"}</b>
+          </div>
+        ) : researchNext && researchRule ? (
+          <button
+            type="button"
+            className="g-quest g-quest--btn"
+            disabled={!workshopBuilt || !researchAfford}
+            onClick={() => commandPlay({ type: "research", id: researchNext })}
+          >
+            <img src="/ui/cmd/research.png" alt="" />
+            <span className="g-quest__body">
+              <span>연구 시작 · {RESEARCH_NAMES[researchNext]}</span>
+              <small>
+                {workshopBuilt
+                  ? `${[
+                      researchRule.wood ? `목재 ${researchRule.wood}` : "",
+                      researchRule.metal ? `철재 ${researchRule.metal}` : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}${researchAfford ? "" : " · 모자람"}`
+                  : "기술 공방을 먼저 지어야 한다"}
+              </small>
+            </span>
+            <b />
+          </button>
+        ) : null}
         {/* 전량 검수 중인 목재: 들어올 때까지 남은 시간 (사건·정책 선택) */}
         {woodLeft !== null ? (
           <div className="g-quest">
@@ -1865,12 +2055,26 @@ export function App() {
       <StoryNotice notice={notice} />
       {STORY ? (
         <StoryChoice id={STORY} />
+      ) : campaign?.outcome && playState ? (
+        <Ending
+          outcome={campaign.outcome}
+          day={playState.day}
+          onRestart={() => commandPlay({ type: "new-game" })}
+        />
       ) : storyDue ? (
         <StoryChoice
           key={storyDue}
           id={storyDue}
           onPick={(side) =>
             commandPlay({ type: "story-pick", id: storyDue, side })
+          }
+        />
+      ) : campaignDue ? (
+        <StoryChoice
+          key={campaignDue}
+          id={`c-${campaignDue}`}
+          onPick={(side) =>
+            commandPlay({ type: "campaign-pick", id: campaignDue, side })
           }
         />
       ) : null}

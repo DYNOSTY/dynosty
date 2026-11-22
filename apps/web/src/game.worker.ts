@@ -2,6 +2,8 @@
 import {
   advanceDay,
   advanceToStory,
+  commandResearch,
+  commandScouts,
   commandSiteCrew,
   createExampleSave,
   createInitialState,
@@ -15,6 +17,7 @@ import {
   type PlayState,
   parseExampleSave,
   parsePlaySave,
+  pickCampaign,
   pickStory,
   setPlayPaused,
   setZoneHeat,
@@ -82,6 +85,12 @@ self.onmessage = (event: MessageEvent<GameCommand>) => {
           play = commandSiteCrew(play, command.site, command.on);
         else if (command.type === "build")
           play = startBuilding(play, command.plot);
+        else if (command.type === "campaign-pick")
+          play = pickCampaign(play, command.id, command.side);
+        else if (command.type === "campaign-scouts")
+          play = commandScouts(play, command.count);
+        else if (command.type === "research")
+          play = commandResearch(play, command.id);
         else if (command.type === "set-heat")
           play = {
             ...play,

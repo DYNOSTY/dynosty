@@ -44,7 +44,17 @@ export type PlayCommand =
       readonly site: import("./works.js").SiteId;
       readonly on: boolean;
     }
-  | { readonly type: "build"; readonly plot: number };
+  | { readonly type: "build"; readonly plot: number }
+  | {
+      readonly type: "campaign-pick";
+      readonly id: import("./campaign.js").CampaignEventId;
+      readonly side: import("./story.js").StorySide;
+    }
+  | { readonly type: "campaign-scouts"; readonly count: number }
+  | {
+      readonly type: "research";
+      readonly id: import("./campaign.js").ResearchId;
+    };
 export type GameCommand =
   | { readonly type: "play-command"; readonly command: PlayCommand }
   | { readonly type: "request-play-save"; readonly requestId: number }
@@ -105,6 +115,7 @@ export function advanceDay(state: GameState): GameState {
   return { ...state, day: state.day + 1 };
 }
 
+export * from "./campaign.js";
 export * from "./exchange.js";
 export * from "./labor.js";
 export {
@@ -112,6 +123,8 @@ export {
   advancePlayMinutes,
   advanceToStory,
   type Citizen,
+  commandResearch,
+  commandScouts,
   commandSiteCrew,
   createPlaySave,
   createPlayScene,
@@ -130,6 +143,7 @@ export {
   parsePlaySave,
   parsePlayState,
   parseRules,
+  pickCampaign,
   pickStory,
   RESOURCE_IDS,
   type ResourceId,

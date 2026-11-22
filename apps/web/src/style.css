@@ -5299,6 +5299,63 @@ body,
   border-image: url(/ui/kit/btn.png) 56 fill / 12px / 2px stretch;
   background: var(--jjok);
 }
+/* 그림이 아직 없는 사건: 글만 있는 칸 (먹빛 한지) */
+.story-quest.is-plain {
+  background: linear-gradient(160deg, #2b2620, #15171d);
+}
+.story-quest.is-plain .story-quest__text {
+  position: static;
+  padding: 44px 40px 32px;
+  background: none;
+}
+.story-head p:not(.story-kicker) {
+  margin: 8px 0 0;
+  font-size: 19px;
+  color: var(--hanji);
+}
+.story-side.is-plain {
+  background: linear-gradient(160deg, #332c24, #17191f);
+}
+.story-side.is-plain .story-side__shade {
+  display: none;
+}
+.story-split:has(.is-plain) {
+  height: min(380px, 56vh);
+}
+/* 엔딩 화면 */
+.ending__card {
+  width: min(760px, 92vw);
+  padding: 48px 44px 40px;
+  text-align: center;
+  border-radius: 10px;
+  background: rgb(14 16 22 / 82%);
+  box-shadow:
+    0 0 0 2px #c79a3a,
+    0 0 0 6px var(--ottchil),
+    0 18px 40px rgb(0 0 0 / 60%);
+}
+.ending.is-failure .ending__card {
+  box-shadow:
+    0 0 0 2px #a8322d,
+    0 0 0 6px var(--ottchil),
+    0 18px 40px rgb(0 0 0 / 60%);
+}
+.ending__card p:not(.story-kicker) {
+  margin: 16px auto 0;
+  max-width: 30em;
+  font-size: 20px;
+  line-height: 1.6;
+  color: var(--hanji);
+  word-break: keep-all;
+  text-wrap: pretty;
+}
+.ending__card .ending__days {
+  font-size: 16px;
+  color: #d9c79f;
+}
+.ending__card .story-next {
+  margin-top: 28px;
+}
 /* 인물 초상은 머리가 잘리지 않게 위쪽 기준 */
 .story.is-ending .story-side img {
   object-position: 50% 8%;

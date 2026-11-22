@@ -1,3 +1,17 @@
+import {
+  CAMPAIGN_RULES,
+  type CampaignEventId,
+  type CampaignState,
+  createCampaign,
+  nextResearch,
+  parseCampaign,
+  pendingCampaignEvent,
+  pickCampaignEvent,
+  type ResearchId,
+  reportScouts,
+  startResearch,
+  stepCampaign,
+} from "./campaign.js";
 import raw from "./game-data.json" with { type: "json" };
 import { isRecord } from "./save.js";
 import type { SceneEntity, SceneSnapshot } from "./scene.js";
@@ -257,7 +271,11 @@ export interface PlayState {
   readonly story: StoryState;
   /** 자원 터의 일꾼과 건물 공사 (works.ts) — 옛 저장에는 없어서 불러올 때 '다 지은 마을'로 채움 */
   readonly works: WorksState;
+  /** 단계·사건·연구·엔딩 (campaign.ts) — 옛 저장에는 없어서 불러올 때 처음 상태로 채움 */
+  readonly campaign: CampaignState;
 }
+/** 기술 공방의 부지 번호 (연구는 공방이 서 있어야 나아감) */
+const WORKSHOP_PLOT = PLOTS.indexOf("BLD_WORKSHOP");
 // 벌목장 B02 (온돌 UI v0.4 표): 정원6 · 목재18/일 → 1단계 초기 배치 4명 = 하루 12, 낮 9~18시에만
 export const LOGGING = { woodPerDay: 12, from: 9, to: 18 } as const;
 export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
@@ -303,6 +321,7 @@ export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
     work: { woodCarry: 0 },
     story: createStoryState(),
     works: createWorks(AMOUNT_SCALE),
+    campaign: createCampaign(),
   };
 }
 export function parsePlayState(
@@ -423,6 +442,13 @@ export function parsePlayState(
         fail();
       }
     })(),
+    campaign: (() => {
+      try {
+        return parseCampaign(value.campaign);
+      } catch {
+        fail();
+      }
+    })(),
   };
 }
 export function dailyFoodDemand(
@@ -466,6 +492,8 @@ export function advancePlayMinutes(
   let wMinute = state.minute;
   let woodCarry = state.work.woodCarry;
   let works = state.works;
+  let campaign = state.campaign;
+  const tradeDone = !!state.story.picked.trade && state.story.woodDue === null;
   const workMinutes = (LOGGING.to - LOGGING.from) * 60;
   let left = minutes;
   while (left > 0) {
@@ -513,6 +541,40 @@ export function advancePlayMinutes(
       wDay += 1;
     }
     left -= chunk;
+    campaign = stepCampaign(campaign, {
+      now: absMinute(wDay, wMinute),
+      minutes: chunk,
+      workMinutes: logging ? chunk : 0,
+      pessimism,
+      optimism,
+      tradeDone,
+      workshop: works.built.includes(WORKSHOP_PLOT),
+      endingAPessimism: rules.endings.endingAPessimism,
+    });
+  }
+  // 엔딩 판정: 실패가 먼저, 그다음 노선에 따른 엔딩 (evaluateOutcome)
+  if (!campaign.outcome) {
+    const outcome = evaluateOutcome(
+      {
+        admitted: citizens.length,
+        dead: citizens.filter((c) => !c.alive).length,
+        pessimism,
+        optimism,
+        pessimismExtremeMinutes: campaign.pessimismExtremeMinutes,
+        optimismZeroMinutes: campaign.optimismZeroMinutes,
+        stage5Minutes:
+          campaign.routeAt === null
+            ? 0
+            : absMinute(wDay, wMinute) - campaign.routeAt,
+        lowPessimismMinutes: campaign.lowPessimismMinutes,
+        route: campaign.route,
+        clues: campaign.clues,
+        research: campaign.research,
+        mech2: campaign.research.includes("MECH2"),
+      },
+      rules,
+    );
+    if (outcome !== "continue") campaign = { ...campaign, outcome };
   }
   const elapsed = state.minute + minutes;
   const day = state.day + Math.floor(elapsed / rules.time.minutesPerDay);
@@ -540,6 +602,72 @@ export function advancePlayMinutes(
     winter,
     work: { woodCarry },
     works,
+    campaign,
+  };
+}
+/** 캠페인 사건이 떠 있거나 엔딩이 났으면 시간은 서 있다 */
+function campaignHolds(state: PlayState) {
+  return (
+    state.campaign.outcome !== null ||
+    pendingCampaignEvent(state.campaign, absMinute(state.day, state.minute)) !==
+      null
+  );
+}
+/** 캠페인 사건에서 한쪽을 고름 (가 = a, 나 = b). 수치는 campaign.ts CAMPAIGN_RULES(임시 값) */
+export function pickCampaign(
+  input: PlayState,
+  id: CampaignEventId,
+  side: StorySide,
+): PlayState {
+  const state = parsePlayState(input);
+  const { campaign, delta } = pickCampaignEvent(
+    state.campaign,
+    id,
+    side,
+    absMinute(state.day, state.minute),
+  );
+  const resources = { ...state.resources };
+  for (const [res, n] of Object.entries(delta.resources ?? {}))
+    resources[res as ResourceId] = Math.max(
+      0,
+      resources[res as ResourceId] + n * AMOUNT_SCALE,
+    );
+  const clamp = (n: number) => Math.min(100, Math.max(0, n));
+  return {
+    ...state,
+    paused: false,
+    campaign,
+    resources,
+    pessimism: clamp(state.pessimism + (delta.pessimism ?? 0)),
+    optimism: clamp(state.optimism + (delta.optimism ?? 0)),
+  };
+}
+/** 돌아온 정찰대 수를 알림 (정찰은 아직 화면 쪽에서 셈) */
+export function commandScouts(input: PlayState, count: number): PlayState {
+  number(count, 0, 1000, true);
+  const state = parsePlayState(input);
+  return { ...state, campaign: reportScouts(state.campaign, count) };
+}
+/** 연구를 시작: 기술 공방이 서 있어야 하고, 나무·철을 바로 쓴다 */
+export function commandResearch(input: PlayState, id: ResearchId): PlayState {
+  const state = parsePlayState(input);
+  const rule = CAMPAIGN_RULES.research[id];
+  const { RES_WOOD: wood, RES_METAL: metal } = state.resources;
+  if (
+    nextResearch(state.campaign) !== id ||
+    !state.works.built.includes(WORKSHOP_PLOT) ||
+    wood < rule.wood * AMOUNT_SCALE ||
+    metal < rule.metal * AMOUNT_SCALE
+  )
+    fail();
+  return {
+    ...state,
+    campaign: startResearch(state.campaign, id),
+    resources: {
+      ...state.resources,
+      RES_WOOD: wood - rule.wood * AMOUNT_SCALE,
+      RES_METAL: metal - rule.metal * AMOUNT_SCALE,
+    },
   };
 }
 /** 자원 터에 일꾼 한 조를 보내거나 불러들임 */
@@ -597,10 +725,14 @@ export function advanceToStory(
   rules: RuleSet = GAME_RULES,
 ): PlayState {
   const state = parsePlayState(input, rules);
+  if (campaignHolds(state)) return { ...state, paused: true };
   const until = minutesUntilStory(state.story, state.day, state.minute);
-  if (until === null || minutes < until)
-    return advancePlayMinutes(state, minutes, rules);
-  return { ...advancePlayMinutes(state, until, rules), paused: true };
+  const next =
+    until === null || minutes < until
+      ? advancePlayMinutes(state, minutes, rules)
+      : { ...advancePlayMinutes(state, until, rules), paused: true };
+  // ponytail: 캠페인 사건은 이번에 흐른 시간 끝에서 멈춘다 ('하루 진행'이면 하루까지 늦게 뜰 수 있음)
+  return campaignHolds(next) ? { ...next, paused: true } : next;
 }
 /** 떠 있는 사건에서 한쪽을 고름 (가 = a, 나 = b). 수치는 story.ts STORY_RULES(임시 값) */
 export function pickStory(
