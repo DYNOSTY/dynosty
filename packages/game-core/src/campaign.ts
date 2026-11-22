@@ -128,8 +128,10 @@ export function convoyLoad(s: TimberState, item: keyof typeof CONVOY_GOALS) {
   );
 }
 // Four six-hour store deliveries cover the manifest; allow two more shifts for loading.
+export const CAPITAL_MINUTES = 36 * 60;
 export function capitalMinutesLeft(s: TimberState) {
-  return Math.max(0, 36 * 60 - (s.elapsed - campaignOf(s).since));
+  const c = campaignOf(s);
+  return Math.max(0, (c.capitalDue ?? c.since + CAPITAL_MINUTES) - s.elapsed);
 }
 export function convoyReady(s: TimberState) {
   return s.campaign?.departures === 3;
@@ -139,6 +141,8 @@ export interface Campaign {
   departures?: number;
   evacuees?: number;
   storeBatches?: number;
+  /** Elapsed minute at which the capital's north gate falls. */
+  capitalDue?: number;
   victoryQuotes?: number[];
   beat: Beat;
   since: number;
@@ -212,6 +216,8 @@ export function campaignValid(c: unknown, elapsed: number) {
     (c.evacuees === undefined || integer(c.evacuees, 1000)) &&
     (c.departures === undefined || integer(c.departures, 3)) &&
     (c.storeBatches === undefined || integer(c.storeBatches, 4)) &&
+    (c.capitalDue === undefined ||
+      integer(c.capitalDue, elapsed + CAPITAL_MINUTES)) &&
     (c.victoryQuotes === undefined ||
       (Array.isArray(c.victoryQuotes) &&
         c.victoryQuotes.length === CHAPTERS.length &&

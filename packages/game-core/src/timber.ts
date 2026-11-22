@@ -11,6 +11,7 @@ import {
 } from "./bokhol.js";
 import {
   actCampaign,
+  CAPITAL_MINUTES,
   type Campaign,
   type CampaignCommand,
   campaignOf,
@@ -676,6 +677,7 @@ export function createCapital(s: TimberState): TimberState {
       ...history,
       beat: "capital",
       since: s.elapsed,
+      capitalDue: s.elapsed + CAPITAL_MINUTES,
       petitionDay: 0,
     },
     town: {
@@ -2790,6 +2792,12 @@ export function parseTimberState(value: unknown): TimberState {
       fail("처리 기록이 올바르지 않습니다.");
     previous = h.minute;
   }
+  // Saves from before the capital deadline start its clock when first loaded.
+  if (s.campaign?.beat === "capital" && s.campaign.capitalDue === undefined)
+    return {
+      ...s,
+      campaign: { ...s.campaign, capitalDue: s.elapsed + CAPITAL_MINUTES },
+    };
   return s;
 }
 const merchantGoods = [
