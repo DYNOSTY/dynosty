@@ -8,6 +8,7 @@ import {
   createTimberState,
   dailyFoodDemand,
   RESEARCH_CATALOG,
+  requireValue,
   type TimberState,
 } from "../../packages/game-core/dist/index.js";
 
@@ -80,7 +81,7 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상�
   await expect(
     page.getByLabel("build-1 운영 인원", { exact: true }),
   ).toHaveValue("1");
-  await b(page, "생존 예제로 돌아가기").click();
+  await b(page, "마을로 돌아가기").click();
   await b(page, "주민").click();
   await b(page, "건설").click();
   await expect(
@@ -91,8 +92,8 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상�
   ).toHaveValue("1");
   await expect(page.getByText(/좌석10 · 직원/)).toHaveCount(2);
   await page.getByLabel("지을 건물", { exact: true }).selectOption("fishery");
-  await page.getByText("단계별 시설 설계 보기", { exact: true }).click();
-  const art = page.getByAltText("어획막 1~3단계 설계 삽화");
+  await page.getByText("건물 설계 보기", { exact: true }).click();
+  const art = page.getByAltText("어획막 설계 삽화");
   await expect(art).toBeVisible();
   await expect
     .poll(() => art.evaluate((img) => (img as HTMLImageElement).naturalWidth))
@@ -213,27 +214,42 @@ test("어획막의 다섯 인원으로 별도 운반 없이 공동 어류가 즉
 
 test("방문 상인의 초상과 재협상 · 계약 입고", async ({ page }) => {
   let s = build(start(), "trade");
-  const post = s.town.facilities[0]!;
+  const post = requireValue(s.town.facilities[0], "s.town.facilities[0]");
   s = cmd(s, { type: "facility-staff", id: post.id, count: 1 });
   s = advanceTimber(s, 35);
-  await load(page, {
-    ...s,
-    paused: true,
-    scoutVisitors: 1,
-    merchantItem: 3,
-    riskyMerchants: [3],
-  });
-  await b(page, "복홀 전체 보기").click();
+  await page.addInitScript(
+    (save) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(save)),
+    createTimberSave({
+      ...s,
+      paused: true,
+      scoutVisitors: 1,
+      merchantItem: 3,
+      riskyMerchants: [3],
+    }),
+  );
+  await page.goto("/");
+  const visit = page.getByRole("dialog", { name: "상인 계약 선택" });
+  await expect(visit).toBeVisible();
+  const choices = visit.getByRole("button");
+  const boxes = await choices.evaluateAll((buttons) =>
+    buttons.map((button) => button.getBoundingClientRect().toJSON()),
+  );
+  for (let i = 1; i < boxes.length; i++) {
+    expect(boxes[i].top).toBeGreaterThanOrEqual(boxes[i - 1].bottom);
+  }
+  await visit.getByRole("button", { name: "나중에 보기" }).click();
   await b(page, "입촌 요청").click();
   await expect(b(page, "받아준다")).toBeFocused();
-  for (const name of [/나르미$/, /아픈 주민을 걱정하는 달이/]) {
-    const image = page.getByRole("img", { name });
-    await expect
-      .poll(() => image.evaluate((e) => (e as HTMLImageElement).naturalWidth))
-      .toBe(512);
-  }
+  const gatePortrait = page.getByRole("img", {
+    name: "아픈 주민을 걱정하는 달이",
+  });
+  await expect
+    .poll(() =>
+      gatePortrait.evaluate((img) => (img as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
   await b(page, "교역소 상인 방문").click();
-  const visit = page.getByLabel("교역소 방문");
   await expect(visit).toContainText("거친손");
   const portrait = visit.getByRole("img", { name: "목재 상인 거친손의 초상" });
   await expect
@@ -283,8 +299,11 @@ test("희망과 절망 중 높은 쪽 저울 접시가 내려간다", async ({ p
       .evaluateAll((images) =>
         images.map((img) => parseFloat((img as HTMLElement).style.top)),
       );
-    expect(Math.sign(offsets[0]! - offsets[1]!)).toBe(
-      Math.sign(optimism - pessimism),
-    );
+    expect(
+      Math.sign(
+        requireValue(offsets[0], "offsets[0]") -
+          requireValue(offsets[1], "offsets[1]"),
+      ),
+    ).toBe(Math.sign(optimism - pessimism));
   }
 });

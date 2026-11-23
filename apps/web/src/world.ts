@@ -1,3 +1,4 @@
+import { VILLAGE_POND as POND } from "@dynosty/game-core";
 // 본진 세상: 운석 뒤 혹한(기획서) — 눈보라 속 떠 있는 땅, 베어 낸 숲, 무너진 집터, 따뜻한 불빛만 남은 마을
 import "@babylonjs/core/Particles/particleSystemComponent";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
@@ -20,7 +21,8 @@ import { SCOUT_SITES } from "./scout-sites.js";
 export const ISLAND_RADIUS = 70;
 /** 미니맵 한 변(m) */
 export const MAP_SPAN = (ISLAND_RADIUS + 1) * 2;
-export const POND = { x: 17, z: 15, r: 3.6 };
+export { VILLAGE_POND as POND } from "@dynosty/game-core";
+
 const LAKE = { x: 40, z: -26, r: 10 };
 
 const smooth = (a: number, b: number, v: number) => {
@@ -383,11 +385,8 @@ export function buildWorld(
     }
   const colors: number[] = [];
   const noise = rng(7);
-  for (let i = 0; i < pos.length; i += 3) {
-    const x = pos[i] ?? 0,
-      z = pos[i + 2] ?? 0,
-      d = Math.hypot(x, z);
-    pos[i + 1] = elevation(x, z) - smooth(R - 0.8, R, d) * 0.4;
+  const groundColor = (x: number, z: number) => {
+    const d = Math.hypot(x, z);
     const g =
       0.5 +
       0.5 * Math.sin(x * 0.31 + Math.cos(z * 0.27) * 2) * Math.cos(z * 0.17) +
@@ -409,6 +408,14 @@ export function buildWorld(
         (0.8 + noise() * 0.2) *
         (1 - smooth(40, 62, d) * 0.6),
     );
+    return c;
+  };
+  for (let i = 0; i < pos.length; i += 3) {
+    const x = pos[i] ?? 0,
+      z = pos[i + 2] ?? 0,
+      d = Math.hypot(x, z);
+    pos[i + 1] = elevation(x, z) - smooth(R - 0.8, R, d) * 0.4;
+    let c = groundColor(x, z);
     c = mix(c, P.lip, smooth(R - 1.4, R, Math.min(d, R)));
     colors.push(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, 1);
   }
@@ -726,7 +733,7 @@ export function buildWorld(
     [52, 18],
     [-20, -46],
     [18, -50],
-  ].forEach(([cx = 0, cz = 0], i) => {
+  ].forEach(([cx = 0, cz = 0]) => {
     const yaw = ruinR() * Math.PI;
     for (let k = 0; k < 4; k++) {
       const side = k % 2 ? 1 : -1,
@@ -878,5 +885,28 @@ export function buildWorld(
   const followSnow = (x: number, z: number) => {
     if (snow) (snow.emitter as Vector3).set(x + 8, 26, z - 4);
   };
-  return { shadow, setTime, glow, warmMat, followSnow };
+  // The campaign supplies its own graded terrain, forests and mineral deposits.
+  const previewScenery = [
+    ground,
+    ...pines,
+    ...deadTrees,
+    ...rocks,
+    stump,
+    wall,
+    beam,
+    blobFlat,
+  ];
+  const showPreviewTerrain = (visible: boolean) => {
+    for (const mesh of previewScenery) mesh.setEnabled(visible);
+    scene.getMeshByName("island-cliff")?.setEnabled(visible);
+  };
+  return {
+    shadow,
+    setTime,
+    glow,
+    warmMat,
+    followSnow,
+    showPreviewTerrain,
+    groundColor,
+  };
 }

@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import { createPlayState, type FoodId } from "./play.js";
+import { requireValue } from "./require-value.js";
 import {
   advanceTimber,
   commandTimber,
@@ -16,6 +17,8 @@ import {
   type BuildingKind,
   buildingIssue,
   buildingPower,
+  connectedDeposits,
+  salvageMaterials,
 } from "./town.js";
 
 let id = 0;
@@ -56,7 +59,7 @@ it("무자원은 접수 거부, 자재 확보 후 무인력은 대기하고 1명
   const before = s.world.resources.RES_WOOD;
   s = plan(s, "home");
   s = advanceTimber(s, 10);
-  expect(s.world.resources.RES_WOOD).toBe(before - 200000);
+  expect(s.world.resources.RES_WOOD).toBe(before - 500000);
   expect(s.town.orders[0]?.crew).toHaveLength(0);
   const worker = s.residents.find(
     (r) => s.world.citizens.find((c) => c.id === r.id)?.species === "R03",
@@ -73,14 +76,14 @@ it("무자원은 접수 거부, 자재 확보 후 무인력은 대기하고 1명
   expect(s.town.orders[0]?.crew).toHaveLength(1);
   s = finish(s);
   expect(s.homes).toHaveLength(7);
-  expect(s.world.resources.RES_WOOD).toBe(before - 200000);
+  expect(s.world.resources.RES_WOOD).toBe(before - 500000);
 });
 it("여러 부지는 즉시 자재 확보하며 겹침 거부, 순차 완공, 저장 복원도 동일하다", () => {
   let s = plan(start(), "home");
   expect(() => plan(s, "farm")).toThrow();
   s = plan(s, "storage", { ...pose, position: { x: 0, z: 16 } });
   expect(s.town.orders).toHaveLength(2);
-  expect(s.world.resources.RES_WOOD).toBe(2680000);
+  expect(s.world.resources.RES_WOOD).toBe(2200000);
   s = advanceTimber(s, 20);
   const loaded = parseTimberSave(createTimberSave(s)).state;
   expect(advanceTimber(loaded, 120)).toEqual(advanceTimber(s, 120));
@@ -233,7 +236,7 @@ it("건설 인력의 질병은 교대하고 정찰대 사망·회복 사건도 �
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
 
-it("대기 부지의 입구나 주민이 서 있는 곳을 덮는 배치를 거부한다", () => {
+it("주민은 공터에서 비켜서고 이웃 건물의 출입구는 보호한다", () => {
   let s = start();
   s = {
     ...s,
@@ -241,14 +244,17 @@ it("대기 부지의 입구나 주민이 서 있는 곳을 덮는 배치를 거�
       i === 0 ? { ...r, position: pose.position, insideHome: false } : r,
     ),
   };
-  expect(buildingIssue(s, "home", pose)).toContain("주민");
+  expect(buildingIssue(s, "home", pose)).toBeNull();
+  const ordered = plan(s, "home", pose);
+  expect(ordered.residents[0]?.position).not.toEqual(pose.position);
+  expect(ordered.town.orders[0]?.crew.length).toBeGreaterThan(0);
   s = plan(start(), "storage", {
-    position: { x: -16, z: 8 },
+    position: { x: 20, z: -12 },
     headingRadians: 0,
   });
   expect(
     buildingIssue(s, "storage", {
-      position: { x: -16, z: 13.3 },
+      position: { x: 20, z: -6.7 },
       headingRadians: 0,
     }),
   ).toContain("출입구");
@@ -268,7 +274,7 @@ it("식당 대기 중인 유휴 인력은 명령 즉시 좌석을 놓고 건설�
     },
     "home",
   );
-  const crew = s.town.orders[0]!.crew;
+  const crew = requireValue(s.town.orders[0], "s.town.orders[0]").crew;
   expect(crew).toHaveLength(4);
   for (const r of s.residents.filter((r) => crew.includes(r.id)))
     expect(r).toMatchObject({
@@ -301,4 +307,129 @@ it("새 마을의 첫 식당은 공사 인부가 배식을 맡고 주민이 식�
         r.workplaceId === null && r.lastMeal !== null && r.routine !== "eating",
     ),
   ).toBe(true);
+});
+
+it("기존 가격으로 접수한 현장에 이어 새 공사는 새 건설비로 한 번만 정산한다", () => {
+  const saved = plan(start(), "home");
+  delete requireValue(saved.town.orders[0], "saved.town.orders[0]")
+    .priceVersion;
+  const refund = 30;
+  const legacy = {
+    ...saved,
+    woodSpent: saved.woodSpent - refund,
+    world: {
+      ...saved.world,
+      resources: {
+        ...saved.world.resources,
+        RES_WOOD: saved.world.resources.RES_WOOD + refund * 10000,
+      },
+    },
+    town: { ...saved.town, spent: { ...saved.town.spent, RES_WOOD: 20 } },
+  };
+  const resumed = parseTimberSave(createTimberSave(legacy)).state;
+  const next = plan(resumed, "storage", { ...pose, position: { x: 0, z: 16 } });
+  expect(next.town.spent.RES_WOOD).toBe(50);
+  expect(parseTimberSave(createTimberSave(next)).state).toEqual(next);
+});
+
+it("물 보유량으로 농장 착공을 제한하고 물을 받기 전의 옛 건설 기록도 복원한다", () => {
+  const village = createVillageGame();
+  const dry = {
+    ...village,
+    world: {
+      ...village.world,
+      resources: { ...village.world.resources, RES_WATER: 0 },
+    },
+  };
+  for (const kind of ["farm", "ranch"] as const)
+    expect(buildingIssue(dry, kind, pose)).toMatch(/물/);
+  const farm = plan(village, "farm");
+  const current = farm.world.resources.RES_WATER;
+  expect(current).toBe(19 * 10000);
+  const old = parseTimberSave(createTimberSave(farm)).state;
+  requireValue(old.town.orders[0], "old.town.orders[0]").priceVersion = 2;
+  delete old.town.spent.RES_WATER;
+  const priorWood = 125;
+  const woodDifference = priorWood - (old.town.spent.RES_WOOD ?? 0);
+  old.town.spent.RES_WOOD = priorWood;
+  const previous = {
+    ...old,
+    woodSpent: old.woodSpent + woodDifference,
+    world: {
+      ...old.world,
+      resources: {
+        ...old.world.resources,
+        RES_WOOD: old.world.resources.RES_WOOD - woodDifference * 10000,
+        RES_WATER: current + 10000,
+      },
+    },
+  };
+  expect(
+    parseTimberSave(createTimberSave(previous)).state.world.resources.RES_WATER,
+  ).toBe(20 * 10000);
+});
+
+it("건설 중에는 정지 상태를 유지하고 완공 뒤 한 번만 자재의 90%를 돌려준다", () => {
+  let s = plan({ ...start(), paused: true }, "storage");
+  expect(s.paused).toBe(true);
+  s = finish(s);
+  const f = requireValue(s.town.facilities[0], "완공된 저장소");
+  const wood = s.world.resources.RES_WOOD;
+  expect(salvageMaterials(s, f.id).RES_WOOD).toBe(27);
+  s = cmd(s, { type: "demolish-building", id: f.id });
+  expect(s.world.resources.RES_WOOD).toBe(wood + 270000);
+  expect(s.town.facilities).toHaveLength(0);
+  expect(() => cmd(s, { type: "demolish-building", id: f.id })).toThrow();
+  expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
+});
+it("중앙 광장과 관아, 물웅덩이를 건설에서 제외한다", () => {
+  const s = start();
+  for (const [x, z] of [
+    [0, 0],
+    [0, -16],
+    [20, 16],
+  ] as const)
+    expect(
+      buildingIssue(s, "home", { position: { x, z }, headingRadians: 0 }),
+    ).toBeTruthy();
+});
+
+it("둥지를 철거하면 거주지를 재배정하고 빈 마을도 저장할 수 있다", () => {
+  let s = start();
+  for (const id of s.homes.map((h) => h.id))
+    s = cmd(s, { type: "demolish-building", id });
+  expect(s.residents.every((r) => r.homeId === null)).toBe(true);
+  expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
+});
+
+it("제재소는 벌목권 안의 숲을 차례로 쓰고 고갈한 숲을 다시 차감하지 않는다", () => {
+  let s = finish(
+    plan(start(), "logging", {
+      position: { x: -44, z: -32 },
+      headingRadians: 0,
+    }),
+  );
+  const mill = requireValue(s.town.facilities[0], "제재소");
+  const forests = connectedDeposits(s, "logging", mill.position);
+  expect(forests.length).toBeGreaterThan(1);
+  const first = requireValue(forests[0], "첫 번째 숲").siteId;
+  const second = requireValue(forests[1], "두 번째 숲").siteId;
+  const original = requireValue(forests[0], "첫 번째 숲").remaining;
+  // Only one log remains in the first forest when the next shift arrives.
+  s = {
+    ...s,
+    logging:
+      s.logging.siteId === first ? { ...s.logging, remaining: 1 } : s.logging,
+    loggingSites: s.loggingSites.map((site) =>
+      site.siteId === first ? { ...site, remaining: 1 } : site,
+    ),
+    town: { ...s.town, extracted: { ...s.town.extracted, [first]: 120 - 1 } },
+  };
+  expect(original).toBeGreaterThan(0);
+  s = advanceTimber(s, 100);
+  const after = connectedDeposits(s, "logging", mill.position);
+  expect(after.find((l) => l.siteId === first)?.remaining).toBe(0);
+  expect(after.find((l) => l.siteId === second)?.remaining).toBeLessThan(120);
+  expect(s.town.extracted[first]).toBe(120);
+  expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });

@@ -27,15 +27,15 @@ const pose = {
   headingRadians: Math.PI + Math.PI / 12,
 };
 const idle = () => advanceTimber(createTimberState(), 120);
-it("평탄한 임의 부지에 회전 배치하고 가까운 유휴 주민이 목재20을 나눠 운반한 뒤 완공한다", () => {
+it("평탄한 임의 부지에 회전 배치하고 가까운 유휴 주민이 목재50을 나눠 운반한 뒤 완공한다", () => {
   let s = idle();
   expect(homePlacementIssue(s, pose)).toBeNull();
   const before = s.world.resources.RES_WOOD;
   s = command(s, { type: "build-home", ...pose });
-  expect(s.world.resources.RES_WOOD).toBe(before - 200000);
+  expect(s.world.resources.RES_WOOD).toBe(before - 500000);
   const crew = s.construction?.crew;
   expect(crew).toHaveLength(3);
-  expect(crew?.reduce((n, w) => n + w.amount, 0)).toBe(20);
+  expect(crew?.reduce((n, w) => n + w.amount, 0)).toBe(50);
   expect(s.construction?.finishAt).toBeNull();
   let carrying = false;
   for (let i = 0; i < 80 && s.construction; i++) {
@@ -85,14 +85,13 @@ it("기존 주민의 고정 잠자리는 유지하고 빈 둥지에 합류 주�
   const saved = parseTimberSave(createTimberSave(s)).state;
   expect(saved).toEqual(s);
 });
-it("건물 겹침·숲·광맥·경사·지도 밖·자원 부족을 거부하고 재고를 차감하지 않는다", () => {
+it("건물 겹침·숲·광맥·지도 밖·자원 부족을 거부하고 재고를 차감하지 않는다", () => {
   const s = idle();
   for (const position of [
     { x: 0, z: -1 },
     { x: -40, z: -8 },
     { x: -150, z: -40 },
     { x: 251, z: 250 },
-    { x: 50, z: 20 },
   ]) {
     expect(homePlacementIssue(s, { ...pose, position })).not.toBeNull();
     expect(() =>
@@ -100,6 +99,9 @@ it("건물 겹침·숲·광맥·경사·지도 밖·자원 부족을 거부하�
     ).toThrow();
     expect(s.world.resources.RES_WOOD).toBe(1200000);
   }
+  expect(
+    homePlacementIssue(s, { ...pose, position: { x: 50, z: 20 } }),
+  ).toBeNull();
   const world = createPlayState();
   const poor = advanceTimber(
     createTimberState({
@@ -154,7 +156,7 @@ it("자재 운반 중 질병으로 교대해도 목재를 재차 지불하지 �
   });
   s = advanceTimber(s, 80);
   expect(s.homes).toHaveLength(7);
-  expect(s.world.resources.RES_WOOD).toBe(1000000);
+  expect(s.world.resources.RES_WOOD).toBe(700000);
 });
 it("공사 중 저장 재개가 동일하며 중복 잠자리·위조된 자재 합계는 거부한다", () => {
   let s = command(idle(), { type: "build-home", ...pose });

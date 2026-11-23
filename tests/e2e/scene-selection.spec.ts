@@ -197,7 +197,9 @@ test("마당의 시설과 주민, 게시판을 눌러도 하단 콘솔이 움직
         .sort(
           (a, b) => b.extendSizeWorld.length() - a.extendSizeWorld.length(),
         );
-      const { x, y, z } = bounds[0]!.centerWorld;
+      const largest = bounds[0];
+      if (!largest) throw Error(model + " 모형이 없습니다.");
+      const { x, y, z } = largest.centerWorld;
       return [x, y, z] as const;
     }, model);
     const point = await worldPoint(page, position, false);

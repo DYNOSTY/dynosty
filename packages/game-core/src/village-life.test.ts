@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { applyCitizenEvent } from "./play.js";
+import { applyCitizenEvent, FOOD_IDS } from "./play.js";
 import {
   advanceTimber,
   commandTimber,
@@ -38,7 +38,7 @@ it("식당 건설만 지시하면 인력이 이동·건설하고 배고픈 주�
   let s = commandTimber(initial, { type: "build-restaurant" }, "build");
   expect(s.restaurantBuilt).toBe(false);
   expect(s.construction).not.toBeNull();
-  expect(s.world.resources.RES_WOOD).toBe(1000000);
+  expect(s.world.resources.RES_WOOD).toBe(700000);
   s = advanceTimber(s, 40);
   expect(s.restaurantBuilt).toBe(true);
   expect(s.construction).toBeNull();
@@ -48,9 +48,9 @@ it("식당 건설만 지시하면 인력이 이동·건설하고 배고픈 주�
     s.residents.some((r, i) => r.hunger < (initial.residents[i]?.hunger ?? -1)),
   ).toBe(true);
   expect(s.residents.some((r) => r.lastMeal !== null)).toBe(true);
-  expect(s.world.resources.RES_PLANT).toBeLessThan(
-    initial.world.resources.RES_PLANT,
-  );
+  expect(
+    FOOD_IDS.some((id) => s.world.resources[id] < initial.world.resources[id]),
+  ).toBe(true);
   expect(s.buildingHealth).toBe(100);
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
@@ -271,7 +271,7 @@ it("식당 건설 시간 변조는 거부하고 건설 인력이 아프면 유�
   expect(s.construction?.workerId).not.toBe(old);
   s = advanceTimber(s, 40);
   expect(s.restaurantBuilt).toBe(true);
-  expect(s.world.resources.RES_WOOD).toBe(1000000);
+  expect(s.world.resources.RES_WOOD).toBe(700000);
 });
 
 it("교대 인력이 없으면 작업만 대기하고 다른 주민의 허기·생활은 계속된다", () => {

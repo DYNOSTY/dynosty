@@ -1,3 +1,4 @@
+export { requireValue } from "./require-value.js";
 export {
   createSceneExample,
   type SceneEntity,
@@ -115,12 +116,14 @@ export {
   createPlaySave,
   createPlayScene,
   createPlayState,
+  type Difficulty,
   dailyFoodDemand,
   evaluateOutcome,
   FOOD_IDS,
   type FoodId,
   foodWarnings,
   GAME_RULES,
+  isDifficulty,
   type OutcomeFacts,
   PlayDataError,
   type PlaySave,

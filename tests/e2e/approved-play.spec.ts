@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { requireValue } from "../../packages/game-core/dist/index.js";
 import { clickExample } from "./scene-picking.js";
 
 async function ready(page: Page) {
@@ -329,20 +330,24 @@ test("저울 설명은 가리킬 때 나타나고 상단 재고는 같은 간격
         return range.getBoundingClientRect().right;
       });
     expect(summary).toBeLessThan(
-      (await page.locator(".g-top__frame img").nth(2).boundingBox())!.x,
+      requireValue(
+        await page.locator(".g-top__frame img").nth(2).boundingBox(),
+        "화면 위치",
+      ).x,
     );
     const frame = page.locator(".g-top__frame img.grow");
-    const left = await frame.first().boundingBox();
-    const right = await frame.last().boundingBox();
-    const plant = await page
-      .locator(".resource-card img")
-      .first()
-      .boundingBox();
-    const coal = await page.getByTestId("resource-RES_COAL").boundingBox();
-    expect(plant!.x).toBeGreaterThanOrEqual(left!.x + 8);
-    expect(coal!.x + coal!.width).toBeLessThanOrEqual(
-      right!.x + right!.width - 8,
+    const left = requireValue(await frame.first().boundingBox(), "화면 위치");
+    const right = requireValue(await frame.last().boundingBox(), "화면 위치");
+    const plant = requireValue(
+      await page.locator(".resource-card img").first().boundingBox(),
+      "화면 위치",
     );
+    const coal = requireValue(
+      await page.getByTestId("resource-RES_COAL").boundingBox(),
+      "화면 위치",
+    );
+    expect(plant.x).toBeGreaterThanOrEqual(left.x + 8);
+    expect(coal.x + coal.width).toBeLessThanOrEqual(right.x + right.width - 8);
   }
   await expect(hope).toBeHidden();
 });

@@ -85,10 +85,6 @@ export function SiteProgress({
           완료 알림 닫기
         </button>
       ) : null}
-      <p className="hint">
-        기존 체험용 개발값 · 진행량은 게임 시간 기준입니다. 본편 품질
-        점수·불량률·위약금·신뢰도는 미정입니다.
-      </p>
     </section>
   );
 }

@@ -1,8 +1,10 @@
 import {
+  AMOUNT_SCALE,
   BUILDING_RULES,
   CHAPTERS,
   campaignOf,
   canPay,
+  capitalMinutesLeft,
   capitalReady,
   capitalRoad,
   emergencyRation,
@@ -21,14 +23,14 @@ import {
 
 export const PATROL_NAMES = ["돌쇠", "여울쇠", "덕순이", "길룡"] as const;
 export const PATROL_REQUESTS = [
-  "고리 나리, 어제 받은 풀은 항아리 바닥에 벌써 물이 고였습니다. 마른 것부터 먹이라 하셨지요? 오늘만큼은 젖은 단부터 풀게 해 주십시오.",
-  "고리님, 물고기는 제가 잡을게요. 나루에 불 하나만 남겨 주세요. 밤배가 들어오다 얼음턱에 걸리면 여기선 손 흔드는 것도 안 보여요.",
-  "나리, 우리 애는 고기를 삼키질 못해요. 앞집 애는 풀을 못 먹고요. 둘이 그릇을 바꿨다고 장부에 두 번 받아 간 걸로 적지는 말아 주세요.",
-  "지휘관님, 왼발을 접질렸어도 고삐는 잡습니다. 오늘 하루만 수레 위에서 일하게 해 주십시오. 제 줄을 아예 지워 버리진 마시고요.",
+  "공자님, 어제 받은 풀은 항아리 바닥에 벌써 물이 고였습니다. 마른 것부터 먹이라 하셨지요? 오늘만큼은 젖은 단부터 풀게 해 주십시오.",
+  "공자님, 물고기는 제가 잡을게요. 나루에 불 하나만 남겨 주세요. 밤배가 들어오다 얼음턱에 걸리면 여기선 손 흔드는 것도 안 보여요.",
+  "공자님, 우리 애는 고기를 삼키질 못해요. 앞집 애는 풀을 못 먹고요. 둘이 그릇을 바꿨다고 장부에 두 번 받아 간 걸로 적지는 말아 주세요.",
+  "공자님, 왼발을 접질렸어도 고삐는 잡습니다. 오늘 하루만 수레 위에서 일하게 해 주십시오. 제 줄을 아예 지워 버리진 마시고요.",
 ] as const;
 type Choice = { action: string; label: string; disabled?: boolean };
 type Line = [speaker: string, words: string];
-const victoryQuotes: Line[] = [
+const victoryQuotes: [Line, ...Line[]] = [
   [
     "공자 · 『논어』 옹야",
     "어진 이는 자기가 서고자 하면 남도 서게 한다. — 己欲立而立人",
@@ -69,9 +71,12 @@ export interface ScenePage {
   title: string;
   music: string;
   clip?: string;
+  resultQuote?: Line;
+  nextStage?: number | "escort";
   frames?: { image: string; words: string }[];
   illustration?: string;
   laterIllustration?: { from: number; image: string; alt: string };
+  lineImages?: Record<number, { image: string; alt: string }>;
   lineIllustration?: { at: number; image: string; alt: string };
   lines: Line[];
   choices: Choice[];
@@ -107,20 +112,12 @@ export function moraleAdvice(s: TimberState): Line | undefined {
   const limits = GAME_RULES.endings;
   if (s.campaign?.ending || pessimism < limits.concernPessimism) return;
   const day = minute >= 360 && minute < 1080;
-  if (s.campaign?.beat === "capital") {
-    const words =
-      pessimism > limits.urgentPessimism
-        ? "전하, 군량을 나르던 수레까지 멈췄습니다. 지금 배급령을 고쳐 주십시오."
-        : pessimism > limits.warningPessimism
-          ? "전하, 남문 교대에 응한 이가 없습니다. 성안의 청을 들어 주십시오."
-          : "전하, 구호소 앞에 빈 그릇을 놓고 그냥 돌아가는 이들이 늘었습니다.";
-    return [day ? "나르미" : "달이", words];
-  }
+  if (s.campaign?.beat === "capital") return;
   if (pessimism > limits.urgentPessimism)
     return day
       ? [
           "나르미",
-          "고리님, 창고지기마저 열쇠를 내려놨어요. 지금 배급령을 고쳐 주세요. 제가 사람들과 여기서 기다릴게요.",
+          "고리야, 창고지기마저 열쇠를 내려놨어요. 지금 배급령을 고쳐 주세요. 제가 사람들과 여기서 기다릴게요.",
         ]
       : [
           "달이",
@@ -139,7 +136,7 @@ export function moraleAdvice(s: TimberState): Line | undefined {
   return day
     ? [
         "나르미",
-        "고리님, 오늘은 누가 말을 꺼내려다 곁사람 눈치부터 보더라고요. 무슨 일인지 걱정돼요. 배식 끝날 때 저랑 잠깐 들러 주실래요?",
+        "고리야, 오늘은 누가 말을 꺼내려다 곁사람 눈치부터 보더라고요. 무슨 일인지 걱정돼요. 배식 끝날 때 저랑 잠깐 들러 주실래요?",
       ]
     : [
         "달이",
@@ -147,6 +144,53 @@ export function moraleAdvice(s: TimberState): Line | undefined {
       ];
 }
 
+export function firstVillageTask(s: TimberState) {
+  if (
+    !s.rebuilding ||
+    (s.chapter ?? 1) !== 1 ||
+    campaignOf(s).beat !== "patrol"
+  )
+    return null;
+  const building =
+    s.town.orders.some((o) => o.kind === "restaurant") ||
+    s.construction?.kind === "restaurant";
+  if (!s.restaurantBuilt && !building)
+    return {
+      step: "restaurant" as const,
+      words: "솥은 건져 뒀어요. 건설에서 공동 식당을 골라 터를 잡아 주세요.",
+    };
+  if (!s.residents.some((r) => r.workplaceId === "gate") && !s.firstRationSet)
+    return {
+      step: "gate" as const,
+      words:
+        "일꾼들이 솥을 걸 동안 성문을 살펴봐 주세요. 성문을 누르면 보초를 세울 수 있어요.",
+    };
+  if (!s.restaurantBuilt)
+    return {
+      step: "wait" as const,
+      words:
+        "식당 지붕을 올리고 있어요. 일꾼들이 마무리할 때까지 기다려 주세요.",
+    };
+  if (s.restaurantWorkerTarget === 0)
+    return {
+      step: "staff" as const,
+      words:
+        "식당이 다 지어졌어요. 공동 식당을 눌러 밥을 지을 분을 배치해 주세요.",
+    };
+  if (!s.firstRationSet)
+    return {
+      step: "policy" as const,
+      words:
+        "이제 솥에 불이 들었어요. 배급 정책에서 주민들에게 한 끼를 얼마나 나눌지 정해 주세요.",
+    };
+  if (s.homes.length <= 2 && !s.town.orders.some((o) => o.kind === "home"))
+    return {
+      step: "home" as const,
+      words:
+        "밤이 오면 지붕 아래 자리가 모자라요. 온돌 둥지를 한 채 더 지어 주세요.",
+    };
+  return null;
+}
 export function villageAdvice(
   s: TimberState,
   daylight: boolean,
@@ -157,16 +201,18 @@ export function villageAdvice(
     return daylight
       ? "전하, 의원이 밤새 돌본 이들의 명부를 올렸습니다. 남문으로 올 짐수레도 장부와 대조하고 있습니다."
       : "전하, 성벽 아래서 울음소리가 납니다. 성안에서 붉은 눈을 봤다는 골목에는 벌써 포졸이 갔습니다.";
+  const firstTask = firstVillageTask(s);
+  if (firstTask) return firstTask.words;
   if (merchant)
     return daylight
-      ? `고리님, 교역소에 상인이 왔어요. ${merchant}의 짐을 같이 보실래요?`
+      ? `고리야, 교역소에 상인이 왔어요. ${merchant}의 짐을 같이 보실래요?`
       : `교역소에 불이 켜졌어. ${merchant}도 막 도착했대. 무얼 싣고 왔는지 보러 가자.`;
   const report = returnedScouts(s).find(([id]) => !c.reports.includes(id));
   if (c.beat === "patrol" && report) {
     if (report[0] === lostPatrol(s))
       return daylight
         ? "성문에서 급한 전갈이 왔어요. 셋째 조 소식이래요. 같이 들으러 가요."
-        : "망을 보던 길룡이 왔어. 셋째 조 소식은 고리 네게 먼저 전하겠대.";
+        : "망을 보던 길룡이 왔어. 셋째 조 소식은 네게 먼저 전하겠대.";
     return daylight
       ? "정찰대가 막 돌아왔어요. 성문에서 기다린대요. 보고를 들어 보실래요?"
       : "정찰대가 돌아왔어. 짐도 내려놓기 전에 널 찾더라. 가서 얘길 들어 보자.";
@@ -186,7 +232,7 @@ export function villageAdvice(
     optimism - pessimism >= 25
   )
     return daylight
-      ? "고리님이 배식 줄에서 끝까지 얘길 들어 주셨잖아요. 오늘은 주민들이 먼저 곁에 자리를 내주네요. 잘하셨어요."
+      ? "고리야, 네가 배식 줄에서 끝까지 얘길 들어 주셨잖아요. 오늘은 주민들이 먼저 곁에 자리를 내주네요. 잘하셨어요."
       : "오늘 사람들이 네 곁으로 의자를 당겨 앉더라. 고리야, 네가 한 일이야. 잘했어.";
   if (s.rebuilding && !s.restaurantBuilt)
     return daylight
@@ -259,6 +305,26 @@ export function villageAdvice(
     : "등불이 하나둘 켜지네. 주민 명단을 펴 봐. 오늘 잘 곳을 찾은 이들부터 같이 짚어 보자.";
 }
 
+export const filmMusic = {
+  opening: "00",
+  one: "09",
+  "ending-1": "01",
+  two: "08",
+  "ending-2": "08",
+  three: "12",
+  "ending-3": "10",
+  escort: "13",
+  four: "11",
+  "ending-4": "04",
+  five: "14",
+  hope: "A",
+  escape: "B",
+  "mechanical-late": "B",
+  order: "C",
+  collapse: "C",
+  "king-palace-night": "C",
+} as const;
+
 export function campaignPage(s: TimberState): ScenePage {
   const c = campaignOf(s),
     chapter = s.chapter ?? 1,
@@ -266,10 +332,10 @@ export function campaignPage(s: TimberState): ScenePage {
     days = Math.floor(age / 1440);
   const found = returnedScouts(s);
   const quote =
-    victoryQuotes[c.victoryQuotes?.[chapter - 1] ?? 0] ?? victoryQuotes[0]!;
+    victoryQuotes[c.victoryQuotes?.[chapter - 1] ?? 0] ?? victoryQuotes[0];
   const page: ScenePage = {
     key: c.beat,
-    title: CHAPTERS[chapter - 1]!,
+    title: CHAPTERS[chapter - 1] ?? CHAPTERS[0],
     music: "01",
     lines: [],
     choices: [],
@@ -280,6 +346,7 @@ export function campaignPage(s: TimberState): ScenePage {
   const choice = (action: string, label: string, disabled = false) =>
     page.choices.push({ action, label, disabled });
   const complete = (next: string, action = "next") => {
+    page.nextStage = chapter + 1;
     page.title = chapter + "단계 완료 · " + CHAPTERS[chapter - 1];
     page.goal = chapter + "단계 완료";
     if (chapter !== 3)
@@ -289,7 +356,7 @@ export function campaignPage(s: TimberState): ScenePage {
               {
                 image: "end-1",
                 words:
-                  "달이야, 저기 좀 봐. 예전 장터만큼은 아니어도 오늘은 저녁 연기가 골목 끝까지 이어져. 고리님이 다시 살린 마을이에요.",
+                  "달이야, 저기 좀 봐. 예전 장터만큼은 아니어도 오늘은 저녁 연기가 골목 끝까지 이어져. 고리가 다시 살린 마을이야.",
               },
             ]
           : chapter === 2
@@ -302,7 +369,7 @@ export function campaignPage(s: TimberState): ScenePage {
                 {
                   image: "end-2b",
                   words:
-                    "빈 수레를 끌고 나갔던 이들이 짐을 싣고 돌아왔다. 고리님, 저 환호 들려요? 닫힌 길을 다시 잇겠다는 약속을 지키셨어요.",
+                    "빈 수레를 끌고 나갔던 이들이 짐을 싣고 돌아왔다. 고리야, 저 환호 들려요? 닫힌 길을 다시 잇겠다는 약속을 지키셨어요.",
                 },
               ]
             : [
@@ -316,9 +383,10 @@ export function campaignPage(s: TimberState): ScenePage {
   };
   switch (c.beat) {
     case "opening":
+      page.nextStage = 1;
       page.title = "별이 진 뒤, 복홀";
       page.clip = "opening";
-      page.music = "00";
+      page.music = filmMusic["opening"];
       line(
         "나르미",
         "운석이 떨어지기 전엔 고려 강가에 장이 섰대요. 아버진 그때 들은 소리를 아직도 흉내 내셨어요. 빈 수레가 다리를 건너는 소리요.",
@@ -329,18 +397,19 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line("고리", "들어가자. 아버지 방에 불은 켜 두고.");
       page.goal =
-        "난이도를 고르세요. 불안이 한계에 닿으면 보통은 하루 동안 수습할 수 있고, 어려움은 즉시 추방됩니다.";
+        "난이도를 고르세요. 불안이 한계에 닿으면 쉬움과 보통은 하루 동안 수습할 수 있고, 어려움은 즉시 추방됩니다.";
+      choice("easy", "쉬움 · 복홀 성문으로");
       choice("next", "보통 · 복홀 성문으로");
       choice("hard", "어려움 · 복홀 성문으로");
       break;
     case "departure":
       page.title = "귀족들이 출문을 청했다";
       page.clip = "one";
-      page.music = "09";
-      page.goal = `출문 전 · 주민 ${s.residents.length}명 · 자원별 10,000`;
+      page.music = filmMusic["one"];
+      page.goal = `출문 전 · 주민 ${s.residents.length}명 · 물 ${(s.world.resources.RES_WATER / AMOUNT_SCALE).toLocaleString("ko-KR")} · 나머지 자원별 10,000`;
       line(
         "가솔을 이끄는 귀족",
-        "상중에 하직을 고하오니 면목이 없소이다. 허나 고른 공을 시해한 자가 그 처소 문턱을 어찌 넘었는지, 아직 아무도 모르지 않소. 오늘 밤 우리 집 아이들의 문 앞에는 누가 서 주겠소?",
+        "상중에 하직을 고하니 면목 없소이다.\n허나 고른 공을 시해한 자가 그 처소 문턱을 어찌 넘었는지, 아직 아무도 모르지 않소.\n오늘 밤 우리 집 아이들의 문 앞에는 누가 서 주겠소?",
       );
       line(
         "고리",
@@ -348,12 +417,17 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line(
         "노귀족",
-        "공자께서는 밤새 그 문을 지키실 분이오. 그래서 더 두렵소. 동문에서도 살려 달라 부르면, 어느 문을 비우실 테요?",
+        "공자님께서는 밤새 그 문을 지키실 분이오. 그래서 더 두렵소. 동문에서도 살려 달라 부르면, 어느 문을 비우실 테요?",
       );
       line(
         "가솔을 이끄는 귀족",
         "운석이 고려의 지붕을 앗아 갔을 때 단의 깃발 아래 든 집들은 족보라도 건졌소이다. 쥬신 조정에 문서를 올릴 길이 있을 적에 가겠소. 가솔과 사창의 짐을 내주시오.",
       );
+      page.lineIllustration = {
+        at: page.lines.length,
+        image: "mokjin-exodus",
+        alt: "고른 사후, 복홀을 떠나는 귀족들의 수레 사이로 걷는 목진",
+      };
       line(
         "달이",
         "고리야, 저 수레 밑을 봐. 고른 어른이 겨울 몫이라고 적어 놓은 독까지 실었어.",
@@ -365,21 +439,21 @@ export function campaignPage(s: TimberState): ScenePage {
       line(
         "돌쇠",
         s.restaurantBuilt
-          ? "나리! 식당 처마에 불이 붙었습니다. 불씨가 둥지 지붕으로 넘어갑니다!"
-          : "나리! 둥지 지붕에 불이 붙었습니다!",
+          ? "공자님! 식당 처마에 불이 붙었습니다. 불씨가 둥지 지붕으로 넘어갑니다!"
+          : "공자님! 둥지 지붕에 불이 붙었습니다!",
       );
       choice("leave", "성문을 열고 남은 장부 확인");
       break;
     case "after":
       page.title = "마지막 수레가 나간 자리";
-      page.goal = "출문 뒤 · 주민 60명 · 자원별 1,000";
+      page.goal = `출문 뒤 · 주민 60명 · 물 ${(s.world.resources.RES_WATER / AMOUNT_SCALE).toLocaleString("ko-KR")} · 나머지 자원별 1,000`;
       line(
         "나르미",
-        "장부 끝까지 이름을 불렀어요. 예순 분이 대답했어요. 곳간도 칸마다 천씩 남았고요. 고리님, 그만 물동이 놓으세요. 손이 다 까졌어요.",
+        "장부 끝까지 이름을 불렀어요. 예순 분이 대답했어요. 곳간도 칸마다 천씩 남았고요. 고리야, 그만 물동이 놓으세요. 손이 다 까졌어요.",
       );
       line(
         "돌쇠",
-        "나리, 문빗장을 다시 걸까요? 저잣거리의 큰 수레들은 벌써 귀족들의 뒤를 따라갔습니다.",
+        "공자님, 문빗장을 다시 걸까요? 저잣거리의 큰 수레들은 벌써 귀족들의 뒤를 따라갔습니다.",
       );
       line(
         "고리",
@@ -401,10 +475,6 @@ export function campaignPage(s: TimberState): ScenePage {
         "나르미",
         "식당 지붕이 내려앉았어요. 솥은 건졌으니 식당부터 다시 지어요. 오늘 저녁엔 다들 앉아서 따뜻한 걸 먹게요.",
       );
-      line(
-        "달이",
-        "온돌에 불이 드는 둥지도 둘뿐이야. 오늘 밤 지붕 아래서 잘 자리도 같이 마련하자.",
-      );
       choice("next", "남은 예순 명과 시작");
       break;
     case "patrol": {
@@ -419,6 +489,7 @@ export function campaignPage(s: TimberState): ScenePage {
             "나르미",
             "마지막 수레에서 내린 분이 고른 어른의 장부를 알아보셨어요. 귀족들을 따라갔다 돌아온 집이에요. 이번엔 우리가 이야기를 들으러 갈까요?",
           );
+          page.music = filmMusic["ending-1"];
           complete("2단계로 넘어갈까요? · 다섯 마을로");
         } else {
           line(
@@ -433,7 +504,8 @@ export function campaignPage(s: TimberState): ScenePage {
         }
         break;
       }
-      const site = SCOUT_SITES.find((q) => q.id === id)!;
+      const site = SCOUT_SITES.find((q) => q.id === id);
+      if (!site) break;
       const idx = c.patrolOrder.indexOf(id);
       page.key = "report-" + id;
       page.title = site.name + " · 정찰 결과";
@@ -468,7 +540,8 @@ export function campaignPage(s: TimberState): ScenePage {
         choice("remember", "추가 파견을 멈추고 두 이름을 추모 장부에");
         break;
       }
-      const who = PATROL_NAMES[Math.max(0, idx) % 4]!;
+      const who =
+        PATROL_NAMES[Math.max(0, idx) % PATROL_NAMES.length] ?? PATROL_NAMES[0];
       const reports: Record<string, Line[]> = {
         reed: [
           [
@@ -521,7 +594,7 @@ export function campaignPage(s: TimberState): ScenePage {
           ],
         ],
       };
-      page.lines = reports[id]!;
+      page.lines = reports[id] ?? [];
       if (c.reports.length === 4)
         line(
           "달이",
@@ -532,7 +605,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     }
     case "roads": {
-      page.music = "08";
+      page.music = filmMusic["two"];
       page.goal = `교섭 회복 ${c.treaties.length} / 5`;
       page.key = "roads-" + c.treaties.length;
       const receipt = c.treaties.at(-1);
@@ -559,7 +632,8 @@ export function campaignPage(s: TimberState): ScenePage {
             "쇳덩이를 싣고 자갈길을 세 번이나 돌았소. 덜컹거려도 짐이 쏠리지 않았지. 다음 장에 내 수레로 가리다.",
           ],
         ];
-        page.lines.push(replies[receipt]!);
+        const reply = replies[receipt];
+        if (reply) page.lines.push(reply);
       }
       if (c.treaties.length === 2) {
         page.clip = "two";
@@ -573,34 +647,41 @@ export function campaignPage(s: TimberState): ScenePage {
           "두 표를 포개서 보내시오. 잘못 받은 곳도, 못 받은 곳도 같이 보게.",
         );
       } else if (c.treaties.length === 5) {
+        page.music = filmMusic["ending-2"];
         complete("3단계로 넘어갈까요? · 도성으로");
+        page.lineIllustration = {
+          at: page.lines.length,
+          image: "mokjin-return",
+          alt: "다친 목진이 정찰대원의 어깨에 기대 복홀 성문으로 돌아온다.",
+        };
         line(
           "정찰대원",
-          "지휘관님, 돌아오는 길에 바람 막으려고 수레바퀴 뒤에 웅크린 이를 봤습니다. 가까이 가 보니 목진 공이었습니다. 귀족들 나가던 날 함께 성문을 나섰다는데, 그 뒤론 가는 데마다 문전에서 쫓겨났답니다. 여기까지 저희가 부축해 왔습니다.",
+          "공자님, 돌아오는 길에 바람 막으려고 수레바퀴 뒤에 웅크린 이를 봤습니다. 가까이 가 보니 목진 공이었습니다. 귀족들 나가던 날 함께 성문을 나섰다는데, 그 뒤론 가는 데마다 문전에서 쫓겨났답니다. 여기까지 저희가 부축해 왔습니다.",
         );
         line(
           "고리",
-          "발이 저 지경인데 예까지 걸어왔단 말이오? 이리 주시오. 의원까지는 내가 업겠소.",
+          "고생했소. 의원에 자리를 마련해 뒀으니 그리로 모셔 주시오.",
         );
         line(
           "의원",
-          "며칠 품 들인 보람이 있나 했지요. 어제는 혼자 마당도 돌았거든요. 그런데 공주 마마가 남쪽 길에 계시단 말을 듣더니 새벽에 나가 버렸습니다. 오늘 갈아 주려고 삶아 둔 붕대가 저기 그대로예요.",
+          "이쪽에 누이세요. 발에 감은 천이 얼어붙었어요. 더운물부터 좀 주세요.",
         );
         break;
       } else if (!c.treaties.length) {
         line(
           "백초 아범",
-          "예전엔 이 길로 수레가 열 대씩 다녔소. 이젠 내 지게 하나가 전부요. 나리, 이번에는 받을 집 이름을 내 앞에서 적어 주시겠소?",
+          "예전엔 이 길로 수레가 열 대씩 다녔소. 이젠 내 지게 하나가 전부요. 공자님, 이번에는 받을 집 이름을 내 앞에서 적어 주시겠소?",
         );
         line(
           "나르미",
           "당성은 들보가 먼저고, 새금은 지난번 깨져 온 화덕돌을 기다려요. 먼저 지킬 수 있는 약속 하나를 골라요.",
         );
       }
-      if (c.caravan)
+      const destination = c.caravan && SETTLEMENTS[c.caravan.village];
+      if (destination)
         line(
           "달이",
-          `${SETTLEMENTS[c.caravan.village]!.name}에 간 수레는 아직이야. 돌아오는 대로 여기서 짐꾼들한테 무슨 일이 있었는지 물어볼게.`,
+          `${destination.name}에 간 수레는 아직이야. 돌아오는 대로 여기서 짐꾼들한테 무슨 일이 있었는지 물어볼게.`,
         );
       for (const [i, v] of SETTLEMENTS.entries())
         if (!c.treaties.includes(i))
@@ -644,10 +725,10 @@ export function campaignPage(s: TimberState): ScenePage {
         break;
       }
       page.title = "쥬신 왕의 어전 · 도성 남문";
-      page.music = "10";
-      const road = capitalRoad(s);
+      page.music = filmMusic["ending-3"];
       if (capitalReady(s)) {
         page.key = "capital-ready";
+        page.nextStage = "escort";
         page.title = "3단계 완료 · 남문에 남은 왕";
         page.auto = true;
         page.goal = "3단계 완료";
@@ -668,6 +749,7 @@ export function campaignPage(s: TimberState): ScenePage {
         choice("next", "먼저 남하한 충녕의 소식");
         break;
       }
+      const road = capitalRoad(s);
       if (s.bokhol && !c.relief) {
         line(
           "호조 관리",
@@ -678,10 +760,11 @@ export function campaignPage(s: TimberState): ScenePage {
           "평소의 배급은 그대로 시행하라. 각 관아는 지금 손에 있는 것으로 어느 일까지 맡을 수 있는지 아뢰라.",
         );
       }
-      page.goal = `남문 피난 명부 ${c.evacuees ?? 0}/200명 · 교역로 ${road === "closed" ? "두절" : road === "slow" ? "지연" : "통행 가능"} · 앓거나 다친 주민 ${s.residents.filter((r) => r.health !== "healthy" && r.health !== "dead").length}명 · 성안 변종 습격 부상 ${(s.world.citizenEvents ?? []).filter((id) => id.startsWith("mutant-") && Number(id.split("-").at(-1)) >= c.since).length}명`;
+      const left = capitalMinutesLeft(s);
+      page.goal = `북문이 버틸 시간 ${Math.floor(left / 60)}시간 ${left % 60}분 · 남문 피난 명부 ${c.evacuees ?? 0}/200명 · 교역로 ${road === "closed" ? "두절" : road === "slow" ? "지연" : "통행 가능"} · 앓거나 다친 주민 ${s.residents.filter((r) => r.health !== "healthy" && r.health !== "dead").length}명 · 성안 변종 습격 부상 ${(s.world.citizenEvents ?? []).filter((id) => id.startsWith("mutant-") && Number(id.split("-").at(-1)) >= c.since).length}명`;
       line(
         "수문장",
-        "전하, 북문 밖에서 변종이 성벽을 긁고 있습니다. 안에서도 하나가 눈을 붉히자 순라 돌던 포졸들이 그 골목으로 달려갔습니다.",
+        "전하, 북문 밖에 변종이 자꾸 모여듭니다. 문짝에 버팀목을 덧대도 하루 반이 고작입니다. 그 안에 남문 수레에 짐을 실어 마지막 행렬까지 내보내야 합니다.",
       );
       line(
         "왕",
@@ -712,32 +795,51 @@ export function campaignPage(s: TimberState): ScenePage {
     }
     case "seal":
       page.clip = "three";
-      page.music = "12";
+      page.music = filmMusic["three"];
       page.title = "두 번 접힌 봉서";
-      line(
-        "충녕",
-        "접힌 곳까지 읽으세요. ‘고려의 후손을 도성으로 데려오라. 거역하면 처단하라.’ 공자를 뒤쫓게 한 것도 접니다.",
-      );
-      line("고리", "그 말을 어찌 믿겠소? 어제까지 내 뒤에 붙었던 발자국인데.");
-      line(
-        "충녕",
-        "그래서 봉서를 드리는 거예요. 거기에 제 이름으로 왕명을 거둔다고 썼습니다. 남쪽 길에서 만난 이들이 복홀에 닿을 때까지 이 종이는 공자께 맡기겠습니다.",
-      );
+      page.lineIllustration = {
+        at: 0,
+        image: "mokjin-night",
+        alt: "밤중에 붕대를 감은 목진이 홀로 복홀의 작은 성문을 빠져나간다.",
+      };
+      page.lineImages = {
+        1: {
+          image: "palace-letter",
+          alt: "도성 궁궐의 회랑에서 양녕이 봉서를 든 충녕에게 말을 건넨다.",
+        },
+        2: {
+          image: "road-letter",
+          alt: "남하길에서 충녕이 봉서를 접는다. 곁에 선 호위무사가 어깨너머로 바라본다.",
+        },
+      };
+      line("", "");
+      line("", "");
+      line("호위무사", "공주마마, 복홀에 닿으면 그 봉서를 먼저 전할까요?");
+      line("충녕", "아직은요. 그분을 먼저 만나 보고 싶어요.");
       choice("next", "남하 호송에 동행할까요?");
       break;
     case "escort":
+      page.nextStage = 4;
       page.clip = "escort";
-      page.music = "13";
+      page.music = filmMusic["escort"];
       page.title = "길가에서 기다린 목진";
       line(
         "목진",
-        "공주 마마, 저도 데려가 주십시오. 고른 공의 아들은 아직 어립니다. 그 애가 성문을 지키라 한들 누가 듣겠습니까. 마마께서 한 말씀 하시니 저 많은 이가 길을 내지 않습니까.",
+        "공주마마, 복홀에서 왔습니다. 부디 저를 곁에 두어 주십시오.",
       );
       line(
         "충녕",
-        "그 청은 받지 않겠습니다. 발에 감은 건 복홀 의원의 붕대지요? 공자님은 그 발로 걷지 못하는 그대를 업고 가셨지요. 나는 그분께 가는 길입니다. 길을 비켜 주세요.",
+        "복홀에서요? 우린 그리로 가는데, 어쩌다 반대편에서 오셨어요?",
       );
-      line("복홀의 기록", "행렬이 지나간 뒤에도 목진은 한참 길가에 서 있었다.");
+      line(
+        "목진",
+        "마마께서 이 길로 오신다기에…… 성안 사정이라면 제가 좀 압니다.",
+      );
+      line(
+        "충녕",
+        "그 발로 여기까지 오셨어요? 뒤에 자리가 있어요. 걸음이 더딘 이들과 같이 오세요.",
+      );
+      line("충녕", "오늘 저녁은 저분 몫도 한 그릇 더 떠 주세요.");
       line(
         "덕순이",
         "마마, 저희더러 따라오라 하시면 걸을 수는 있어요. 도중에 저 아이가 처져도 이름 한 번만 더 불러 주세요.",
@@ -775,7 +877,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     case "winter":
       page.clip = "four";
-      page.music = "11";
+      page.music = filmMusic["four"];
       page.title = "밤새 식지 않은 그릇";
       page.goal = `혹한 ${Math.min(15, days)} / 15일`;
       line(
@@ -792,7 +894,7 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       break;
     case "thaw":
-      page.music = "04";
+      page.music = filmMusic["ending-4"];
       line(
         "장영실",
         "오늘은 얼음이 늘지 않았습니다. 저기 보세요. 나루 밑으로 물이 한 줄 갑니다.",
@@ -801,16 +903,16 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     case "summit":
       page.clip = "five";
-      page.music = "14";
+      page.music = filmMusic["five"];
       page.title = "두 그릇을 놓고";
       page.goal = "복홀에 들어온 이들의 첫 배급";
       line(
         "나르미",
-        "고리님, 성문 좀 더 열어 주세요. 마지막 수레에 어린 것들이 타고 있어요.",
+        "고리야, 성문 좀 더 열어 주세요. 마지막 수레에 어린 것들이 타고 있어요.",
       );
       line(
         "양녕",
-        "포야, 혜야. 이제 내려와라. 고리, 내 아들들이다. 셋 다 세 번째 행렬에 태웠는데, 이 문까지 온 건 둘뿐이다.",
+        "포야, 혜야. 이제 내려와라. 내 아들들이다. 네 녀석도 봐 두어라. 셋 다 세 번째 행렬에 태웠는데, 이 문까지 온 건 둘뿐이다.",
       );
       line(
         "복홀의 기록",
@@ -860,8 +962,8 @@ export function campaignPage(s: TimberState): ScenePage {
         "고리",
         "다들 들었소. 내 이름으로 장부에 쓰겠소. 무슨 일이 생기든, 그 이름부터 찾으시오.",
       );
-      choice("coexist", "충녕 · 식성별 배급과 공동 보호");
-      choice("control", "양녕 · 지휘권을 합치고 징발 허용");
+      choice("coexist", "충녕 · 먹는 것과 필요한 양에 맞춰 배급한다");
+      choice("control", "양녕 · 식단마다 하루 배급의 상한을 정한다");
       break;
     case "forecast":
       page.auto = false;
@@ -891,16 +993,23 @@ export function campaignPage(s: TimberState): ScenePage {
       page.title = usesCoupRules(c)
         ? "혹한 닷새 전 · 배반자의 외침"
         : "곳간 앞에 내려놓은 일삯패";
-      if (usesCoupRules(c))
+      if (usesCoupRules(c)) {
         line(
           "목진",
           c.coupGateRaided
-            ? "지금이오! 성문에 붉은 눈이 들이닥쳤소. 어서 빗장을 드시오. 양녕 마마의 깃발 아래 서시오!"
-            : "창고에서 나와 약조한 이들, 내 목소리 들리시오? 양녕 마마의 깃발을 보시오. 지금 빗장을 드시오!",
+            ? "지금이오! 성문에 붉은 눈이 들이닥쳤소. 어서 빗장을 드시오. 왕자 마마의 깃발 아래 서시오!"
+            : "창고에서 나와 약조한 이들, 내 목소리 들리시오? 왕자 마마의 깃발을 보시오. 지금 빗장을 드시오!",
         );
+        line(
+          "양녕",
+          "내 깃발을 세워라. 남문에서 나와 함께 온 자들은 이리 와라. 오늘부터 내가 창고 열쇠를 맡겠다.",
+        );
+      }
       line(
         "길룡",
-        "오늘은 수레 안 끕니다. 저기 쌓인 패가 보이시지요? 저만 나온 게 아닙니다. 문빗장을 걸기 전에 우리 말도 한 번 들으십시오.",
+        c.side === "control"
+          ? "공자님, 첫날 정한 몫이 제 몸엔 모자랍니다. 그 말씀 드리러 이 다리로 예까지 왔습니다. 그런데 왜 창고 열쇠 이야기가 나옵니까?"
+          : "공자님, 어느 집에 뭐가 필요한지 적어 오라셨지요. 제 이웃들 몫도 적어 왔습니다. 이걸 왜 왕자 마마 쪽에 내야 합니까?",
       );
       line(
         "목진",
@@ -908,7 +1017,7 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line(
         "덕순이",
-        "그 손 치우시오. 내 몫 달라는 말을 당신 좋으라고 한 줄 아시오? 고리님, 여기 우리랑 한 끼 앉아 주시겠어요?",
+        "그 손 치우시오. 내 몫 달라는 말을 당신 좋으라고 한 줄 아시오? 공자님, 여기 우리랑 한 끼 앉아 주시겠어요?",
       );
       if (usesCoupRules(c)) {
         choice("resist", "양녕의 반란에 맞선다");
@@ -928,7 +1037,7 @@ export function campaignPage(s: TimberState): ScenePage {
       const life =
         story.route || route === "flight" ? story.chungnyeong : "dead";
       const legacyDeath =
-        "고리님, 충녕 마마가 돌아가셨어요. 성문 앞 소란 사이에 누가 마마를 살해했어요.";
+        "고리야, 공주마마께서 돌아가셨어요. 성문 앞 소란 사이에 누가 마마를 살해했어요.";
       page.illustration = "gate";
       page.title = c.uprising
         ? "성문 빗장이 들리던 밤"
@@ -967,9 +1076,9 @@ export function campaignPage(s: TimberState): ScenePage {
             "나르미",
             life === "dead"
               ? usesCoupRules(c)
-                ? "고리님, 의원이 오기도 전에 충녕 마마가 돌아가셨어요. 성안에서 붕대를 감고 있던 이의 눈이 붉어졌어요. 마마가 새끼를 밀어내는 사이에 그이가 덮쳤어요. 길룡 씨가 손을 놓지 못해요."
+                ? "고리야, 의원이 오기도 전에 공주마마께서 돌아가셨어요. 성안에서 붕대를 감고 있던 이의 눈이 붉어졌어요. 마마께서 새끼를 밀어내시는 사이에 그이가 덮쳤어요. 길룡 씨가 손을 놓지 못해요."
                 : legacyDeath
-              : "고리님, 충녕 마마는 무사하세요. 어린 공룡들을 데리고 식당에 계세요.",
+              : "고리야, 공주마마께서는 무사하세요. 어린 공룡들을 데리고 식당에 계세요.",
           );
         line(
           "목진",
@@ -995,17 +1104,17 @@ export function campaignPage(s: TimberState): ScenePage {
         };
         line(
           "양녕",
-          "내 깃발만 보면 다들 빗장을 들 거라 여겼느냐. 고리가 어려 보여서 버린 놈이 내가 약해 보이면 어찌할지 뻔하구나. 다들 잘 보아라.",
+          "내 깃발만 보면 다들 빗장을 들 거라 여겼느냐. 어려 보인다고 제 주인을 버린 놈이 내가 약해 보이면 어찌할지 뻔하구나. 다들 잘 보아라.",
         );
       }
       if (route === "dictatorship") {
         line("양녕", "성문을 닫아라. 이 백성들은 나의 것이다.");
-        line("포졸", "충녕 마마께서 돌아가셨습니다.");
+        line("포졸", "공주마마께서 돌아가셨습니다.");
       } else if (!c.uprising && life === "dead") {
         line(
           "나르미",
           usesCoupRules(c)
-            ? "고리님, 충녕 마마가 돌아가셨어요. 성안에서 변한 이가 마마를 덮쳤어요."
+            ? "고리야, 공주마마께서 돌아가셨어요. 성안에서 변한 이가 마마를 덮쳤어요."
             : legacyDeath,
         );
       }
@@ -1044,13 +1153,13 @@ export function campaignPage(s: TimberState): ScenePage {
         line(
           "영실",
           completed.includes("R18")
-            ? "고리님, 이제 마마를 모실 몸을 지어야 합니다. 공방에서 메카 2단계 연구를 이어가게 해 주십시오."
+            ? "공자님, 이제 마마를 모실 몸을 지어야 합니다. 연구소에서 메카2 연구를 이어가게 해 주십시오."
             : completed.includes("R17")
-              ? "기록을 맞춰 보았습니다. 이제 의식을 옮길 장치를 만들 차례입니다."
-              : "아직 대조하지 못한 기록이 있습니다. 고리님, 공방에서 마저 살펴보게 해 주십시오.",
+              ? "기록을 맞춰 보았습니다. 이제 연구소에서 의식 이전 장치를 만들 수 있습니다."
+              : "공자님, 연구소에 옛 기록이 남아 있습니다. 유산 기록 대조부터 제게 맡겨 주십시오.",
         );
       } else {
-        line("영실", "고리님, 의원에 함께 가 주시겠습니까?");
+        line("영실", "공자님, 의원에 함께 가 주시겠습니까?");
       }
       {
         const ration = emergencyRation(s);
@@ -1061,7 +1170,7 @@ export function campaignPage(s: TimberState): ScenePage {
             trade ? "나르미" : "양녕",
             trade
               ? "압해 수레가 왔어요. 마른 고기를 싣고 왔는데 돌아가는 길엔 땔감을 싣고 싶대요. 우리 몫의 나무를 내줄까요?"
-              : "고기 장부를 보았다. 초식이든 우리처럼 고기를 먹는 혈족이든 예외는 없다. 주민 하나를 군량으로 돌리겠다. 고리, 네 인장을 찍겠느냐?",
+              : "고기 장부를 보았다. 초식이든 우리처럼 고기를 먹는 혈족이든 예외는 없다. 주민 하나를 군량으로 돌리겠다. 네 녀석도 인장을 찍겠느냐?",
           );
           choice(
             `ration:${s.world.day}:${ration}`,
@@ -1082,6 +1191,10 @@ export function campaignPage(s: TimberState): ScenePage {
     case "ending":
     case "finished": {
       const end = c.ending ?? "collapse";
+      if (end === "collapse") {
+        if (chapter !== 3) page.illustration = "gori-exile";
+        else page.illustration = "king-palace-night";
+      }
       if (end !== "collapse")
         page.clip =
           end === "escape" && c.revivalPrepared === false
@@ -1092,10 +1205,10 @@ export function campaignPage(s: TimberState): ScenePage {
           "복홀의 기록",
           "긴 추위를 지나 다시 이웃의 이름을 부를 수 있게 되었습니다. 당신이 우리 곁을 지켜 준 덕입니다.",
         );
-        line(...quote);
+        page.resultQuote = quote;
       }
       page.key = c.beat + end;
-      page.music = end === "hope" ? "A" : end === "escape" ? "B" : "C";
+      page.music = filmMusic[end];
       page.goal = c.beat === "ending" ? "결말 확인" : "캠페인 종료";
       page.title =
         end === "hope"
@@ -1107,7 +1220,7 @@ export function campaignPage(s: TimberState): ScenePage {
               : "아무도 깨우지 않는 아침";
       if (end === "hope") {
         line("충녕", "공자님, 손 좀 내어 주실래요?");
-        line("고리", "네, 공주 마마. ……내려갈 때도 이렇게 가도 될까요?");
+        line("고리", "네, 공주마마. ……내려갈 때도 이렇게 가도 될까요?");
         line("충녕", "저도 그 말을 하려던 참이었어요.");
       } else if (end === "escape") {
         line("고리", "공주마마?");
@@ -1115,19 +1228,20 @@ export function campaignPage(s: TimberState): ScenePage {
       } else if (end === "order") {
         line(
           "고리",
-          "명부를 가져오시오. 오늘부터 양녕의 인장이 찍힌 명만 받으시오.",
+          "명부를 가져오시오. 오늘부터 왕자 마마의 인장이 찍힌 명만 받으시오.",
         );
+      } else if (chapter === 3) {
+        line("", "");
       } else {
         line(
           "달이",
           "성문 열쇠를 받으러 온 건 군졸이 아니었어. 함께 줄을 서던 이웃들이었어. 고리야, 이제 내려놓자.",
         );
-        line(
-          "고리",
-          "장부는 두고 가겠소. 죽은 이들의 이름까지 가져갈 권리는 내게 없소.",
-        );
       }
-      if (c.beat === "ending")
+      if (c.beat === "ending" && chapter === 3 && end === "collapse") {
+        page.title = "3단계 실패 · 도성 함락";
+        choice("retry-capital", "다시 시작");
+      } else if (c.beat === "ending")
         choice(
           "finish",
           end === "collapse"
@@ -1138,7 +1252,6 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     }
   }
-  const closingFrame = page.frames?.at(-1);
-  if (closingFrame) closingFrame.words += `\n\n“${quote[1]}” — ${quote[0]}`;
+  if (page.frames?.length) page.resultQuote = quote;
   return page;
 }

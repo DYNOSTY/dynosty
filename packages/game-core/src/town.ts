@@ -3,8 +3,9 @@ import {
   BOKHOL_MAP,
   BOKHOL_MINERALS,
   BOKHOL_WATERS,
-  bokholElevation,
+  fixedBuildingAt,
   type ProductionSiteId,
+  reservedVillageLand,
 } from "./bokhol.js";
 import {
   advanceDevelopment,
@@ -26,6 +27,7 @@ import {
   upgradeTarget,
 } from "./development.js";
 import {
+  clearBuildingFootprint,
   type HomePlacement,
   homeEntrance,
   homeObstacle,
@@ -33,9 +35,19 @@ import {
   rotatedPoint,
 } from "./home-placement.js";
 import { advanceHospital, hospitalValid, type Patient } from "./hospital.js";
-import { loggingSites, productionSites, setLoggingSite } from "./logging.js";
+import {
+  loggingSiteRules,
+  productionSites,
+  setLoggingSite,
+} from "./logging.js";
 import { usableHomes } from "./mutants.js";
-import { AMOUNT_SCALE, type FoodId, type ResourceId } from "./play.js";
+import {
+  AMOUNT_SCALE,
+  type FoodId,
+  GAME_RULES,
+  productionMultiplier,
+  type ResourceId,
+} from "./play.js";
 import {
   type GroundPoint,
   moveOnGround,
@@ -45,7 +57,12 @@ import { workplaceOpen } from "./resident-routine.js";
 import { isRecord } from "./save.js";
 import { storageRoom, warehouseDoor } from "./storage.js";
 import { capitalRoad, type TimberState } from "./timber.js";
-import { assignHomes, speciesRule, VILLAGE_RULES } from "./village-services.js";
+import {
+  assignHomes,
+  nextDwellingId,
+  speciesRule,
+  VILLAGE_RULES,
+} from "./village-services.js";
 
 export const waterAt = (p: GroundPoint, margin = 0) =>
   BOKHOL_WATERS.find(
@@ -68,110 +85,141 @@ export type BuildingKind =
   | "hospital";
 type Cost = Partial<Record<ResourceId, number>>;
 // C1 승인 개발용 정량. 실제 밸런스 확정 근거는 docs/BUILDING_RULES.md 참조.
-export const BUILDING_RULES: Record<
+const previousBuildingRules: Record<
   BuildingKind,
   { name: string; cost: Cost; work: number; staff: number; site: string }
 > = {
   hospital: {
     name: "병원",
-    cost: { RES_WOOD: 30, RES_METAL: 4 },
+    cost: { RES_WOOD: 150, RES_METAL: 20 },
     work: 240,
     staff: 2,
-    site: "평탄한 빈 땅 · 의료 인원 배치 · 병상5/15/25개",
+    site: "빈 육지 · 의료 인원 배치 · 병상5/15/25개",
   },
   workshop: {
     name: "연구소",
-    cost: { RES_WOOD: 16, RES_METAL: 6 },
+    cost: { RES_WOOD: 80, RES_METAL: 30 },
     work: 240,
     staff: 2,
-    site: "평탄한 빈 땅 · 연구원 배치 · 연구소마다 동시1건",
+    site: "빈 육지 · 연구원 배치 · 연구소마다 동시1건",
   },
   home: {
     name: "온돌 둥지",
-    cost: { RES_WOOD: 20 },
+    cost: { RES_WOOD: 100 },
     work: 180,
     staff: 0,
-    site: "평탄한 빈 땅",
+    site: "빈 육지",
   },
   restaurant: {
     name: "공동 식당",
-    cost: { RES_WOOD: 30, RES_METAL: 2 },
+    cost: { RES_WOOD: 150, RES_METAL: 10 },
     work: 240,
     staff: 2,
-    site: "평탄한 빈 땅 · 여러 곳 건설 가능 · 좌석10/20/40",
+    site: "빈 육지 · 여러 곳 건설 가능 · 좌석10/20/40",
   },
   logging: {
     name: "제재소",
-    cost: { RES_WOOD: 15, RES_METAL: 2 },
+    cost: { RES_WOOD: 75, RES_METAL: 10 },
     work: 180,
     staff: 4,
     site: "잔량이 있는 숲 반경26 안의 빈 땅",
   },
   storage: {
     name: "공동 저장소",
-    cost: { RES_WOOD: 12 },
+    cost: { RES_WOOD: 60 },
     work: 180,
     staff: 0,
-    site: "평탄한 빈 땅 · 가까운 하역 거점",
+    site: "빈 육지 · 가까운 하역 거점",
   },
   coal: {
     name: "석탄광",
-    cost: { RES_WOOD: 25, RES_METAL: 4 },
+    cost: { RES_WOOD: 125, RES_METAL: 20 },
     work: 300,
     staff: 4,
     site: "석탄 광맥 주변",
   },
   iron: {
     name: "철광산",
-    cost: { RES_WOOD: 30, RES_METAL: 6 },
+    cost: { RES_WOOD: 150, RES_METAL: 30 },
     work: 300,
     staff: 4,
     site: "철광석 광맥 주변 · 제련 전 원료",
   },
   quarry: {
     name: "채석장",
-    cost: { RES_WOOD: 18, RES_METAL: 3 },
+    cost: { RES_WOOD: 90, RES_METAL: 15 },
     work: 240,
     staff: 4,
     site: "돌이 많은 암반 주변",
   },
   fishery: {
     name: "어획막",
-    cost: { RES_WOOD: 18, RES_METAL: 2 },
+    cost: { RES_WOOD: 90, RES_METAL: 10 },
     work: 180,
     staff: 5,
     site: "물고기 못의 육지 쪽 물가 · 결빙 낚시 가능",
   },
   farm: {
     name: "온상 재배소",
-    cost: { RES_WOOD: 25, RES_METAL: 2 },
+    cost: { RES_WATER: 1, RES_WOOD: 125, RES_METAL: 10 },
     work: 240,
     staff: 4,
     site: "빈 육지 · 구릉에도 배치 · 물 필요 · 결빙기 석탄 필요",
   },
   ranch: {
     name: "목축장",
-    cost: { RES_WOOD: 25, RES_STONE: 4 },
+    cost: { RES_WATER: 1, RES_WOOD: 125, RES_STONE: 20 },
     work: 240,
     staff: 4,
     site: "빈 육지 · 구릉에도 배치 · 풀·물로 가축 사육",
   },
   scout: {
     name: "정찰 거점",
-    cost: { RES_WOOD: 15 },
+    cost: { RES_WOOD: 75 },
     work: 180,
     staff: 2,
-    site: "평탄한 빈 땅 · 배치 인력2명 파견 · 맵에 한 곳",
+    site: "빈 육지 · 배치 인력2명 파견 · 맵에 한 곳",
   },
   trade: {
     name: "교역소",
-    cost: { RES_WOOD: 25, RES_METAL: 2 },
+    cost: { RES_WOOD: 125, RES_METAL: 10 },
     work: 240,
     staff: 1,
-    site: "평탄한 빈 땅 · 교역 인력1명 배치 · 맵에 한 곳",
+    site: "빈 육지 · 교역 인력1명 배치 · 맵에 한 곳",
   },
 };
+// Save the price edition on each order so refunds and old ledgers use what was paid.
+export const BUILDING_RULES = Object.fromEntries(
+  Object.entries(previousBuildingRules).map(([kind, rule]) => [
+    kind,
+    {
+      ...rule,
+      cost: {
+        ...rule.cost,
+        RES_WOOD: Math.ceil((rule.cost.RES_WOOD ?? 0) / 2),
+      },
+    },
+  ]),
+) as typeof previousBuildingRules;
+export function constructionCost(kind: BuildingKind, version: 1 | 2 | 3 | 4) {
+  if (version === 4) return BUILDING_RULES[kind].cost;
+  if (version === 3) return previousBuildingRules[kind].cost;
+  return historicalBuildingCost(kind, version);
+}
+
+// Existing capital buildings and older saves were funded at their original prices.
+export function originalBuildingCost(kind: BuildingKind): Cost {
+  return historicalBuildingCost(kind, 1);
+}
+function historicalBuildingCost(kind: BuildingKind, version: 1 | 2): Cost {
+  return Object.fromEntries(
+    Object.entries(previousBuildingRules[kind].cost)
+      .filter(([id]) => id !== "RES_WATER")
+      .map(([id, amount]) => [id, version === 1 ? amount / 5 : amount]),
+  );
+}
 export interface BuildingOrder extends HomePlacement {
+  priceVersion?: 2 | 3 | 4;
   id: string;
   kind: BuildingKind;
   sourceId: ProductionSiteId | null;
@@ -182,6 +230,7 @@ export interface BuildingOrder extends HomePlacement {
   upgradeLevel?: 2 | 3;
 }
 export interface Facility extends HomePlacement {
+  priceVersion?: 2 | 3 | 4;
   id: string;
   kind: Exclude<BuildingKind, "home">;
   sourceId: ProductionSiteId | null;
@@ -197,12 +246,27 @@ export interface Facility extends HomePlacement {
     stage: "pickup" | "store" | "return";
   } | null;
 }
+export const individualWorkplaces = [
+  "logging",
+  "workshop",
+  "hospital",
+  "fishery",
+  "farm",
+  "quarry",
+  "coal",
+  "iron",
+] as const;
+export function canDirectStaff(kind: BuildingKind) {
+  return individualWorkplaces.some((k) => k === kind);
+}
 export const facilityStaffLimit = (f: Pick<Facility, "kind" | "level">) =>
-  f.kind === "restaurant" || f.kind === "hospital"
+  f.kind === "restaurant"
     ? ([2, 4, 6][f.level - 1] ?? 2)
     : f.kind === "fishery"
       ? ([5, 10, 20][f.level - 1] ?? 5)
-      : BUILDING_RULES[f.kind].staff;
+      : canDirectStaff(f.kind)
+        ? BUILDING_RULES[f.kind].staff * (f.level + 1)
+        : BUILDING_RULES[f.kind].staff;
 export interface Expedition {
   id: string;
   facilityId: string;
@@ -265,32 +329,45 @@ export const townObstacles = (s: TimberState) => [
     halfDepth: w.radius,
   })),
 ];
+const resourceDeposits = [
+  ...BOKHOL_FORESTS.map((f) => ({ ...f, kind: "logging" })),
+  ...BOKHOL_MINERALS.map((m) => ({
+    ...m,
+    kind: m.kind === "stone" ? "quarry" : m.kind,
+  })),
+];
+export function connectedDeposits(
+  s: TimberState,
+  kind: BuildingKind,
+  p: GroundPoint,
+) {
+  const sites = productionSites(s);
+  return resourceDeposits
+    .filter((d) => d.kind === kind && Math.hypot(p.x - d.x, p.z - d.z) <= 26)
+    .sort(
+      (a, b) =>
+        Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(p.x - b.x, p.z - b.z),
+    )
+    .map((d) => sites.find((l) => l.siteId === d.id) ?? invalidTown());
+}
+export function mineralWorksites(s: TimberState, siteId: ProductionSiteId) {
+  return (
+    s.town.facilities.filter((f) => f.sourceId === siteId).length +
+    s.town.orders.filter((o) => !o.upgradeTarget && o.sourceId === siteId)
+      .length +
+    Number(!!productionSites(s).find((site) => site.siteId === siteId)?.built) +
+    Number(
+      s.construction?.kind === "logging" && s.construction.siteId === siteId,
+    )
+  );
+}
 export function buildingSource(
   s: TimberState,
   kind: BuildingKind,
   p: GroundPoint,
 ): ProductionSiteId | null {
-  const candidates = productionSites(s)
-    .filter((l) => l.remaining > 0)
-    .filter((l) => {
-      const d = [
-        ...BOKHOL_FORESTS.map((f) => ({ ...f, kind: "logging" })),
-        ...BOKHOL_MINERALS.map((m) => ({
-          ...m,
-          kind: m.kind === "stone" ? "quarry" : m.kind,
-        })),
-      ].find((d) => d.id === l.siteId);
-      return d?.kind === kind && Math.hypot(p.x - d.x, p.z - d.z) <= 26;
-    });
   return (
-    candidates.sort((a, b) => {
-      const all = [...BOKHOL_FORESTS, ...BOKHOL_MINERALS],
-        x = all.find((f) => f.id === a.siteId) ?? invalidTown(),
-        y = all.find((f) => f.id === b.siteId) ?? invalidTown();
-      return (
-        Math.hypot(p.x - x.x, p.z - x.z) - Math.hypot(p.x - y.x, p.z - y.z)
-      );
-    })[0]?.siteId ?? null
+    connectedDeposits(s, kind, p).find((l) => l.remaining > 0)?.siteId ?? null
   );
 }
 export function buildingIssue(
@@ -318,6 +395,8 @@ export function buildingIssue(
     [...s.town.facilities, ...s.town.orders].some((f) => f.kind === kind)
   )
     return "정찰 거점과 교역소는 맵에 각각 한 곳만 건설할 수 있어요.";
+  const protectedLand = reservedVillageLand(p.position, !!s.rebuilding);
+  if (protectedLand) return protectedLand;
   const rect = { ...p, halfWidth: 2.25, halfDepth: 2.25 };
   const samples = [-1, 0, 1].flatMap((x) =>
     [-1, 0, 1].map((z) => rotatedPoint(p, x * 2.25, z * 2.25)),
@@ -360,17 +439,16 @@ export function buildingIssue(
   )
     return "공동 식당과 겹쳐요.";
   for (const l of productionSites(s)) {
-    const d =
-      [...BOKHOL_FORESTS, ...BOKHOL_MINERALS].find((d) => d.id === l.siteId) ??
-      invalidTown();
+    const { workshopPlot, storagePlot } = loggingSiteRules(l.siteId);
     if (
       l.built &&
-      Math.hypot(p.position.x - (d.x + 13), p.position.z - d.z) < 7
+      Math.hypot(p.position.x - workshopPlot.x, p.position.z - workshopPlot.z) <
+        7
     )
       return "기존 작업장과 겹쳐요.";
     if (
       l.storageBuilt &&
-      Math.hypot(p.position.x - (d.x + 13), p.position.z - (d.z + 10)) < 5
+      Math.hypot(p.position.x - storagePlot.x, p.position.z - storagePlot.z) < 5
     )
       return "기존 저장소와 겹쳐요.";
   }
@@ -389,6 +467,11 @@ export function buildingIssue(
     !buildingSource(s, kind, p.position)
   )
     return "해당 자원이 남아 있는 숲·광맥·암반 가까이에 지어 주세요.";
+  if (kind === "coal" || kind === "iron" || kind === "quarry") {
+    const source = buildingSource(s, kind, p.position);
+    if (source && mineralWorksites(s, source) >= 2)
+      return "이 광맥에는 건설 중인 곳을 포함해 채굴 시설을 두 곳까지 지을 수 있어요.";
+  }
   if (kind === "fishery" && !waterAt(p.position, 7))
     return "물고기가 모이는 물가에만 어획막을 지을 수 있어요.";
   if (
@@ -397,17 +480,6 @@ export function buildingIssue(
     )
   )
     return "채굴할 암반·광맥 자체를 건물로 덮을 수 없어요.";
-  const amounts = Object.fromEntries(
-    loggingSites(s).map((l) => [l.siteId, l.remaining]),
-  );
-  const heights = samples.map((q) => bokholElevation(q.x, q.z, amounts));
-  if (
-    !["coal", "iron", "quarry", "fishery", "logging", "farm", "ranch"].includes(
-      kind,
-    ) &&
-    Math.max(...heights) - Math.min(...heights) > 0.12
-  )
-    return "건물 바닥 전체가 평탄한 땅을 골라 주세요.";
   const door = facilityDoor(p);
   if (
     !residentPath(door, door, townObstacles(s)).length ||
@@ -423,27 +495,16 @@ export function buildingIssue(
     )
   )
     return "출입구와 접근 공간을 비워 주세요.";
-  if (
-    s.residents.some(
-      (r) =>
-        r.health !== "dead" &&
-        !r.insideHome &&
-        rectanglesOverlap(rect, {
-          position: r.position,
-          headingRadians: 0,
-          halfWidth: 0.35,
-          halfDepth: 0.35,
-        }),
-    )
-  )
-    return "주민이 서 있는 자리예요. 이동한 뒤 배치해 주세요.";
-  for (const [resource, amount] of Object.entries(BUILDING_RULES[kind].cost))
-    if (
-      s.world.resources[resource as ResourceId] -
-        (resource === "RES_WOOD" ? s.reservedWood * AMOUNT_SCALE : 0) <
-      amount * AMOUNT_SCALE
-    )
-      return "자원이 부족하면 건설 대기를 접수할 수 없어요.";
+  if (fixedBuildingAt(p.position, !!s.rebuilding))
+    return "기존 시설이 차지한 구획이에요.";
+  for (const [resource, amount] of Object.entries(BUILDING_RULES[kind].cost)) {
+    const id = resource as ResourceId;
+    const available =
+      Math.floor(s.world.resources[id] / AMOUNT_SCALE) -
+      (id === "RES_WOOD" ? s.reservedWood : 0);
+    if (available < amount)
+      return `${GAME_RULES.resources[id].name} 부족 · 필요 ${amount}, 사용 가능 ${available}`;
+  }
   return null;
 }
 export function payTown(s: TimberState, cost: Cost): TimberState {
@@ -479,23 +540,29 @@ export function planBuilding(
 ): TimberState {
   const issue = buildingIssue(s, kind, pose);
   if (issue) throw Error(issue);
-  const n = payTown(s, BUILDING_RULES[kind].cost);
+  const n = clearBuildingFootprint(
+    payTown(s, BUILDING_RULES[kind].cost),
+    pose,
+    2.25,
+    facilityDoor(pose),
+    townObstacles(s),
+  );
   const order: BuildingOrder = {
     ...pose,
     id: `build-${n.town.nextId}`,
+    priceVersion: 4,
     kind,
     sourceId: buildingSource(s, kind, pose.position),
     crew: [],
     stage: "waiting",
     workDone: 0,
   };
-  if (!n.construction && townShiftOpen(n, order.id)) {
+  if (townShiftOpen(n, order.id)) {
     order.crew = freeTownResidents(n, facilityDoor(order), 4);
     if (order.crew.length) order.stage = "collect";
   }
   return {
     ...n,
-    paused: false,
     residents: n.residents.map((r) =>
       order.crew.includes(r.id)
         ? {
@@ -516,23 +583,29 @@ export function planBuilding(
     },
   };
 }
+export function idleTownResidents(s: TimberState) {
+  const children = new Set(
+    s.world.citizens.filter((c) => c.age === "child").map((c) => c.id),
+  );
+  return s.residents.filter(
+    (r) =>
+      r.health === "healthy" &&
+      !children.has(r.id) &&
+      !r.workplaceId &&
+      !r.task &&
+      !r.nextWork &&
+      r.routine !== "eating" &&
+      !s.workerIds.includes(r.id) &&
+      !s.town.trips.some((t) => t.ids.includes(r.id)),
+  );
+}
 export function freeTownResidents(
   s: TimberState,
   p: GroundPoint,
   count: number,
 ): string[] {
   if (count <= 0) return [];
-  return s.residents
-    .filter(
-      (r) =>
-        r.health === "healthy" &&
-        !r.workplaceId &&
-        !r.task &&
-        !r.nextWork &&
-        r.routine !== "eating" &&
-        !s.workerIds.includes(r.id) &&
-        !s.town.trips.some((t) => t.ids.includes(r.id)),
-    )
+  return idleTownResidents(s)
     .map((r) => ({
       id: r.id,
       path: residentPath(r.position, p, townObstacles(s)),
@@ -562,7 +635,6 @@ export function advanceTown(input: TimberState, minutes: number): TimberState {
     const open = first ? townShiftOpen(s, first.id) : false;
     if (
       first &&
-      !s.construction &&
       (open ||
         s.residents.some(
           (r) => r.health === "healthy" && isMechanical(s, r.id),
@@ -675,7 +747,8 @@ export function advanceTown(input: TimberState, minutes: number): TimberState {
           const homes = [
             ...s.homes,
             {
-              id: `dwelling-${s.homes.length + 1}`,
+              id: nextDwellingId(s.homes),
+              ...(o.priceVersion && { priceVersion: o.priceVersion }),
               position: o.position,
               headingRadians: o.headingRadians,
               capacity: VILLAGE_RULES.homeSpace,
@@ -717,6 +790,13 @@ export function advanceTown(input: TimberState, minutes: number): TimberState {
           const firstRestaurant =
             f.kind === "restaurant" &&
             !s.town.facilities.some((site) => site.kind === "restaurant");
+          if (
+            firstRestaurant &&
+            s.rebuilding &&
+            !s.chapter &&
+            !s.firstRationSet
+          )
+            f.target = 0;
           const retained = o.crew.slice(0, f.target);
           residents = residents.map((r) =>
             retained.includes(r.id)
@@ -766,6 +846,160 @@ export const facilityResource = (f: Facility): ResourceId | null =>
       ranch: "RES_MEAT",
     }) as Partial<Record<BuildingKind, ResourceId>>
   )[f.kind] ?? null;
+export function salvageMaterials(s: TimberState, id: string): Cost {
+  const building = upgradeTarget(s, id);
+  if (!building) return {};
+  const cost: Cost =
+    building.kind === "home" && building.timberCost !== undefined
+      ? { RES_WOOD: building.timberCost }
+      : { ...constructionCost(building.kind, building.priceVersion ?? 1) };
+  for (let level = 1; level < building.level; level++) {
+    for (const [key, n] of Object.entries(
+      upgradeCost({ kind: building.kind, level }),
+    )) {
+      const r = key as ResourceId;
+      cost[r] = (cost[r] ?? 0) + n;
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(cost).map(([r, n]) => [r, Math.floor(n * 0.9)]),
+  );
+}
+export function demolishBuilding(s: TimberState, id: string): TimberState {
+  const b = upgradeTarget(s, id);
+  if (!b) throw Error("철거할 건물이 없습니다.");
+  const dev = s.town.development;
+  if (
+    s.town.orders.some((o) => o.upgradeTarget === id) ||
+    s.town.trips.some((t) => t.facilityId === id) ||
+    dev.research.some((job) => job.facility === id) ||
+    s.town.patients.some((p) => p.hospital === id)
+  )
+    throw Error("진행 중인 개량·파견·연구·치료를 마친 뒤 철거할 수 있습니다.");
+  if (b.kind !== "home" && b.haul)
+    throw Error("운반 중인 수레가 돌아오면 철거할 수 있습니다.");
+  if (id === "example-building-1" && s.repairWorkerId)
+    throw Error("보수 공사가 진행 중입니다.");
+  const refund = salvageMaterials(s, id);
+  if (b.kind !== "home" && b.buffer) {
+    const r = facilityResource(b);
+    if (r) s = deposit(s, r, b.buffer);
+  }
+  const homes = s.homes.filter((h) => h.id !== id);
+  const facilities = s.town.facilities.filter((f) => f.id !== id);
+  const primary = s.town.facilities.find((f) => f.kind === "restaurant");
+  const nextRestaurant = facilities.find((f) => f.kind === "restaurant");
+  const residents = s.residents.map((r) => {
+    const workplaceId =
+      r.workplaceId === `facility:${id}` ||
+      (primary?.id === id && r.workplaceId === "restaurant")
+        ? null
+        : primary?.id === id &&
+            nextRestaurant &&
+            r.workplaceId === `facility:${nextRestaurant.id}`
+          ? "restaurant"
+          : r.workplaceId;
+    if (b.kind === "restaurant" && r.diningSeat !== null)
+      return {
+        ...r,
+        workplaceId,
+        eatingUntil: null,
+        diningSeat: null,
+        routine: "idle" as const,
+      };
+    return workplaceId !== r.workplaceId ? { ...r, workplaceId } : r;
+  });
+  const damage = { ...s.mutantDamage };
+  delete damage[id];
+  s = {
+    ...s,
+    homes,
+    residents:
+      b.kind === "home"
+        ? assignHomes(residents, s.world.citizens, usableHomes(s, homes))
+        : residents,
+    mutantDamage: damage,
+    restaurantBuilt: primary?.id === id ? !!nextRestaurant : s.restaurantBuilt,
+    restaurantWorkerTarget:
+      primary?.id === id
+        ? (nextRestaurant?.target ?? 0)
+        : s.restaurantWorkerTarget,
+    world: {
+      ...s.world,
+      buildings: s.world.buildings.filter((h) => h.id !== id),
+    },
+    town: {
+      ...s.town,
+      facilities,
+      development: {
+        ...dev,
+        electrical: dev.electrical.filter((x) => x !== id),
+        overtime: dev.overtime.filter((o) => o.target !== id),
+        grandfathered: dev.grandfathered.filter((x) => !x.startsWith(id + ":")),
+      },
+    },
+  };
+  for (const [r, n] of Object.entries(refund))
+    s = deposit(s, r as ResourceId, n);
+  return s;
+}
+export function directStaff(
+  s: TimberState,
+  residentId: string,
+  destination: string | null,
+): TimberState {
+  const r = s.residents.find((r) => r.id === residentId);
+  const citizen = s.world.citizens.find((c) => c.id === residentId);
+  const previous = s.town.facilities.find(
+    (f) => "facility:" + f.id === r?.workplaceId,
+  );
+  const next = s.town.facilities.find((f) => f.id === destination);
+  if (
+    !r ||
+    !citizen?.alive ||
+    citizen.age === "child" ||
+    r.health !== "healthy" ||
+    r.task ||
+    r.nextWork ||
+    r.routine === "eating" ||
+    s.workerIds.includes(r.id) ||
+    s.town.trips.some((t) => t.ids.includes(r.id)) ||
+    (r.workplaceId && (!previous || !canDirectStaff(previous.kind))) ||
+    (destination !== null && (!next || !canDirectStaff(next.kind)))
+  )
+    throw Error("지금은 이 주민을 배치할 수 없습니다.");
+  if (next?.id === previous?.id) return s;
+  const assigned = (id: string) =>
+    s.residents.filter((r) => r.workplaceId === "facility:" + id).length;
+  if (
+    next &&
+    (assigned(next.id) >= facilityStaffLimit(next) ||
+      !residentPath(r.position, facilityDoor(next), townObstacles(s)).length)
+  )
+    throw Error("근무지의 빈자리와 이동 경로를 확인해 주세요.");
+  return {
+    ...s,
+    residents: s.residents.map((q) =>
+      q.id === residentId
+        ? {
+            ...q,
+            workplaceId: next ? "facility:" + next.id : null,
+            insideHome: false,
+          }
+        : q,
+    ),
+    town: {
+      ...s.town,
+      facilities: s.town.facilities.map((f) =>
+        f.id === previous?.id
+          ? { ...f, target: Math.max(0, f.target - 1) }
+          : f.id === next?.id
+            ? { ...f, target: Math.max(f.target, assigned(f.id) + 1) }
+            : f,
+      ),
+    },
+  };
+}
 export function setFacilityStaff(
   s: TimberState,
   id: string,
@@ -876,8 +1110,18 @@ function advanceTownProduction(
     )
       ? workers.reduce((n, r) => n + buildingPower(s, r.id), 0)
       : 0;
-    f.progress += power * minutes * collectionRate(s, f);
-    while (power > 0 && f.progress >= 30 && f.buffer < 20) {
+    f.progress =
+      Math.round(
+        (f.progress +
+          power *
+            (f.sourceId ? 30 : 1) *
+            minutes *
+            collectionRate(s, f) *
+            productionMultiplier(s.campaign?.difficulty)) *
+          1000,
+      ) / 1000;
+    const unitWork = 30;
+    while (power > 0 && f.progress >= unitWork && f.buffer < 20) {
       let amount = f.kind === "farm" ? 3 : f.kind === "ranch" ? 2 : 1;
       const yieldUnits = amount * 6 + f.yieldRemainder;
       const extraYield =
@@ -899,10 +1143,20 @@ function advanceTownProduction(
       )
         break;
       if (f.sourceId) {
-        const l =
-          productionSites(s).find((l) => l.siteId === f.sourceId) ??
-          invalidTown();
-        if (!l.remaining) break;
+        let l = productionSites(s).find((site) => site.siteId === f.sourceId);
+        if (!l?.remaining) {
+          l =
+            f.kind !== "logging"
+              ? undefined
+              : connectedDeposits(s, f.kind, f.position).find(
+                  (site) => site.remaining > 0,
+                );
+          if (!l) {
+            f.progress = 0;
+            break;
+          }
+          f.sourceId = l.siteId;
+        }
         amount = Math.min(amount, l.remaining);
         s = setLoggingSite(s, { ...l, remaining: l.remaining - amount });
         s = {
@@ -918,10 +1172,10 @@ function advanceTownProduction(
       }
       s = payTown(s, cost);
       if (extraYield) f.yieldRemainder = yieldUnits % 5;
-      f.progress -= 30;
+      f.progress -= unitWork;
       f.buffer += Math.min(amount, 20 - f.buffer);
     }
-    f.progress = Math.min(f.progress, 30);
+    f.progress = Math.min(f.progress, unitWork);
     const destination = warehouseDoor(s, f.position) ?? { x: 4.5, z: 0.6 };
     if (f.kind === "fishery") {
       const amount = Math.min(f.buffer, storageRoom(s, resource));
@@ -1088,7 +1342,7 @@ export function dispatchFood(
   };
   n = {
     ...n,
-    paused: false,
+    paused: s.campaign ? s.paused : false,
     town: {
       ...n.town,
       nextId: n.town.nextId + 1,
@@ -1157,7 +1411,10 @@ function advanceTrips(input: TimberState, minutes: number): TimberState {
           t.progress +
             t.ids.reduce((n, id) => n + buildingPower(s, id), 0) *
               minutes *
-              levelProductionRate(f),
+              levelProductionRate(f) *
+              (t.kind === "hunt"
+                ? productionMultiplier(s.campaign?.difficulty)
+                : 1),
         );
         if (t.progress >= 60) {
           t.cargo =
@@ -1273,6 +1530,10 @@ export function townValid(s: TimberState): boolean {
         typeof q.id !== "string" ||
         !/^build-\d+$/.test(q.id) ||
         !Object.hasOwn(BUILDING_RULES, q.kind) ||
+        (q.priceVersion !== undefined &&
+          q.priceVersion !== 2 &&
+          q.priceVersion !== 3 &&
+          q.priceVersion !== 4) ||
         !pose(q) ||
         !sourceValid(q),
     )
@@ -1330,7 +1591,7 @@ export function townValid(s: TimberState): boolean {
     for (const [r, n] of Object.entries(
       "upgradeTarget" in q && q.upgradeTarget
         ? upgradeCost(upgradeTarget(s, q.upgradeTarget) ?? invalidTown())
-        : BUILDING_RULES[q.kind].cost,
+        : constructionCost(q.kind, q.priceVersion ?? 1),
     ))
       minimum[r as ResourceId] = (minimum[r as ResourceId] ?? 0) + n;
   if (

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { campaignOf } from "./campaign.js";
 import { advanceMutants, mutantRepairCost } from "./mutants.js";
 import { AMOUNT_SCALE } from "./play.js";
+import { requireValue } from "./require-value.js";
 import {
   advanceTimber,
   commandTimber,
@@ -48,7 +50,7 @@ describe("변종 야습", () => {
     const s = bitten(0);
     const city = {
       ...s,
-      campaign: { ...s.campaign!, beat: "capital" as const },
+      campaign: { ...campaignOf(s), beat: "capital" as const },
     };
     expect(advanceMutants(city, () => 0.99).mutants).toHaveLength(0);
     const hit = advanceMutants(
@@ -132,7 +134,13 @@ describe("변종 야습", () => {
     expect(
       commandTimber(
         responded,
-        { type: "contain-mutant", resident: s.mutants![0]!.id },
+        {
+          type: "contain-mutant",
+          resident: requireValue(
+            requireValue(s.mutants, "s.mutants")[0],
+            "s.mutants[0]",
+          ).id,
+        },
         "contain",
       ).mutants,
     ).toHaveLength(0);
@@ -142,14 +150,17 @@ describe("변종 야습", () => {
       ),
     ).toHaveLength(2);
     let hit = advanceMutants(waiting, () => 0.99);
-    const id = Object.keys(hit.mutantDamage!)[0]!;
+    const id = requireValue(
+      Object.keys(requireValue(hit.mutantDamage, "hit.mutantDamage"))[0],
+      "Object.keys(hit.mutantDamage)[0]",
+    );
     expect(hit.mutantDamage?.[id]).toBe(25);
     for (let i = 0; i < 3; i++)
       hit = advanceMutants({ ...hit, elapsed: hit.elapsed + 30 }, () => 0.99);
     expect(hit.mutantDamage?.[id]).toBe(100);
     expect(hit.residents.some((r) => r.homeId === id)).toBe(false);
     const cost = mutantRepairCost(hit, id);
-    expect(cost.RES_WOOD + cost.RES_STONE).toBe(20);
+    expect(cost.RES_WOOD + cost.RES_STONE).toBe(50);
     const repaired = commandTimber(
       hit,
       { type: "repair-mutant", building: id },

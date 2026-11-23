@@ -1,23 +1,25 @@
+import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
+import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import {
+  BUILDING_RULES,
   type BuildingKind,
   buildingIssue,
+  constructionPlot,
   HOME_PLACEMENT_RULES,
   type HomePlacement,
   homePlacementIssue,
+  PLOT_STEP,
+  requireValue,
   type TimberState,
 } from "@dynosty/game-core";
 import { facilityModel } from "./facility-model.js";
-import {
-  buildModel,
-  type ModelAsset,
-  type ModelVisual,
-} from "./model-assets.js";
+import { buildModel, type ModelVisual } from "./model-assets.js";
 import type { GlbVisual } from "./village.js";
 
 export function createHomePlacementVisual(
@@ -38,16 +40,26 @@ export function createHomePlacementVisual(
   root.isPickable = false;
   root.isVisible = false;
   root.material = material;
-  const footprint = CreateBox(
+  const footprint = CreateGround(
     "home-placement-footprint",
-    { width: 3.3, height: 0.03, depth: 3 },
+    {
+      width: 1,
+      height: 1,
+      subdivisions: 4,
+      updatable: true,
+    },
     scene,
   );
-  footprint.parent = root;
-  footprint.position.y = -0.7;
+  const plane = requireValue(
+    footprint.getVerticesData(VertexBuffer.PositionKind),
+    "건설 부지 꼭짓점",
+  );
+  const corners = plane.slice();
+  footprint.setEnabled(false);
   footprint.material = material;
   footprint.isPickable = false;
-  material.alpha = 0.35;
+  material.alpha = 0.6;
+  material.disableLighting = true;
   root.setEnabled(false);
   let visual: ModelVisual | null = null,
     active = false,
@@ -74,8 +86,7 @@ export function createHomePlacementVisual(
       syncNest();
     })
     .catch(() => {});
-  let kind: BuildingKind | null = null,
-    homeAsset: ModelAsset | null = null;
+  let kind: BuildingKind | null = null;
   const issueFor = (s: TimberState, p: HomePlacement) =>
     kind ? buildingIssue(s, kind, p) : homePlacementIssue(s, p);
   let confirm: ((pose: HomePlacement) => void) | null = null,
@@ -83,6 +94,7 @@ export function createHomePlacementVisual(
   function update() {
     if (!active || !position) {
       root.setEnabled(false);
+      footprint.setEnabled(false);
       return;
     }
     const s = state();
@@ -98,34 +110,47 @@ export function createHomePlacementVisual(
       position.z,
     );
     root.rotation.y = heading;
-    material.diffuseColor = color;
+    material.emissiveColor = color;
+    // The footprint covers the three survey cells centred on the selected plot.
+    const width = 3 * PLOT_STEP;
+    for (let i = 0; i < plane.length; i += 3) {
+      const dx = corners[i],
+        dz = corners[i + 2];
+      if (dx === undefined || dz === undefined)
+        throw Error("건설 부지 좌표가 불완전합니다.");
+      const x = position.x + dx * width,
+        z = position.z + dz * width;
+      plane[i] = x;
+      plane[i + 1] = elevation(x, z) + 0.16;
+      plane[i + 2] = z;
+    }
+    footprint.updateVerticesData(VertexBuffer.PositionKind, plane, true);
+    footprint.setEnabled(true);
     for (const m of visual?.meshes ?? []) {
       m.outlineColor = color;
       m.renderOutline = true;
     }
     feedback?.(
-      `${pending ? "건설 명령 확인 중" : (issue ?? "배치 가능")} · 방향 ${Math.round((heading * 180) / Math.PI)}°`,
+      `${BUILDING_RULES[kind ?? "home"].name} · ${pending ? "건설 명령 확인 중" : (issue ?? "배치 가능")} · 방향 ${Math.round((heading * 180) / Math.PI)}°`,
       true,
     );
   }
+  let cursor: { x: number; y: number } | null = null;
   function pointer(x: number, y: number) {
     if (!active || pending) return;
-    const rect = canvas.getBoundingClientRect();
-    const picked = scene.pick(
-      (x * canvas.width) / rect.width,
-      (y * canvas.height) / rect.height,
-      (m) => m === ground,
-    )?.pickedPoint;
-    position = picked
-      ? { x: Math.round(picked.x * 4) / 4, z: Math.round(picked.z * 4) / 4 }
-      : null;
+    cursor = { x, y };
+    const picked = scene.pick(x, y, (m) => m === ground)?.pickedPoint;
+    position = picked ? constructionPlot(picked) : null;
     update();
   }
   function cancel() {
+    if (!active) return;
     active = false;
+    cursor = null;
     pending = false;
     position = null;
     root.setEnabled(false);
+    footprint.setEnabled(false);
     feedback?.("건물 배치를 취소했습니다.", false);
   }
   const key = (event: KeyboardEvent) => {
@@ -163,59 +188,44 @@ export function createHomePlacementVisual(
     get active() {
       return active;
     },
-    setModel(asset: ModelAsset) {
-      homeAsset = asset;
-      visual?.dispose();
-      visual = buildModel(scene, root, material, asset);
-      for (const m of visual.meshes) {
-        m.isPickable = false;
-        if (m.material) m.material.alpha = 0.65;
-      }
-    },
     begin(
       onConfirm: (p: HomePlacement) => void,
       onFeedback: (message: string, active: boolean) => void,
       buildingKind?: BuildingKind,
+      site?: HomePlacement["position"],
     ) {
       kind = buildingKind ?? null;
-      if (homeAsset) {
-        visual?.dispose();
-        visual = buildModel(
-          scene,
-          root,
-          material,
-          facilityModel(kind ?? "home"),
-        );
-        for (const m of visual.meshes) {
-          m.isPickable = false;
-          if (m.material) m.material.alpha = 0.65;
-        }
-      }
-      if (!visual) {
-        onFeedback(
-          "둥지 모델을 준비하고 있습니다. 잠시 후 다시 선택해 주세요.",
-          false,
-        );
-        return;
+      canvas.focus({ preventScroll: true });
+      visual?.dispose();
+      visual = buildModel(scene, root, material, facilityModel(kind ?? "home"));
+      for (const m of visual.meshes) {
+        m.isPickable = false;
+        if (m.material) m.material.alpha = 0.65;
       }
       active = true;
       syncNest();
       pending = false;
-      position = null;
+      cursor = null;
+      position = site ? constructionPlot(site) : null;
       heading = Math.PI;
       confirm = onConfirm;
       feedback = onFeedback;
-      feedback(
-        visual
-          ? "지도 위로 커서를 옮겨 주세요. ←→ 회전 · 클릭 배치 · Esc 취소"
-          : "건물 모델을 불러오는 중입니다.",
-        true,
-      );
+      update();
+      if (!site) {
+        feedback(
+          "지도 위로 커서를 옮겨 주세요. ←→ 회전 · 클릭 배치 · Esc 취소",
+          true,
+        );
+      }
     },
     pointer,
     refresh: update,
+    cameraMoved() {
+      if (cursor) pointer(cursor.x, cursor.y);
+    },
     leave() {
       if (active && !pending) {
+        cursor = null;
         position = null;
         update();
       }
@@ -239,6 +249,7 @@ export function createHomePlacementVisual(
       visual?.dispose();
       round?.dispose();
       nest.dispose();
+      footprint.dispose();
       root.dispose();
       material.dispose();
     },

@@ -2,6 +2,7 @@ import {
   BOKHOL_FORESTS,
   BOKHOL_MAP,
   BOKHOL_MINERALS,
+  constructionPlot,
   inBokholForest,
 } from "./bokhol.js";
 import {
@@ -15,41 +16,41 @@ export type RationPolicy = "needs" | "cap";
 export const VILLAGE_RULES = {
   maxRestaurantStaff: 6,
   homeSpace: 20,
-  constructionWood: 20,
+  constructionWood: 50,
   constructionMinutes: 30,
   species: {
-    R02: { food: "RES_PLANT", portion: 5000, space: 2 },
-    R03: { food: "RES_MEAT", portion: 2500, space: 1 },
-    SPINO: { food: "RES_FISH", portion: 5000, space: 2 },
+    R02: { food: "RES_PLANT", portion: 50000, space: 2 },
+    R03: { food: "RES_MEAT", portion: 25000, space: 1 },
+    SPINO: { food: "RES_FISH", portion: 50000, space: 2 },
   },
 } as const;
 const startingPlots: GroundPoint[] = [
-  { x: 0, z: -1 },
-  { x: -9, z: -7 },
-  { x: -3, z: -9 },
-  { x: 4, z: -9 },
+  { x: -6, z: -2 },
+  { x: -10, z: -8 },
+  { x: -4, z: -10 },
+  { x: 4, z: -10 },
   { x: 10, z: -4 },
-  { x: 10, z: 5 },
-  { x: -11, z: 12 },
+  { x: 10, z: 6 },
+  { x: -12, z: 12 },
   { x: -4, z: 14 },
   { x: 4, z: 14 },
-  { x: 12, z: 13 },
+  { x: 12, z: 14 },
   { x: -16, z: -4 },
-  { x: 17, z: -5 },
-  { x: -17, z: 6 },
-  { x: -15, z: -13 },
-  { x: -8, z: -15 },
+  { x: 18, z: -6 },
+  { x: -18, z: 6 },
+  { x: -16, z: -14 },
+  { x: -8, z: -16 },
   { x: 0, z: -16 },
   { x: 8, z: -16 },
-  { x: 17, z: 3 },
+  { x: 18, z: 4 },
 ];
-// shortcut: 자유 배치 전까지 확장용 지정 부지100곳을 사용한다.
+// 주거 후보지와 초기 주민 배치에 쓰는 목록. 건설 격자는 지도 전체에 이어진다.
 export const HOME_PLOTS: readonly GroundPoint[] = (() => {
   const plots = [
     ...startingPlots,
-    { x: -39, z: -8 },
-    { x: -39, z: 0 },
-    ...BOKHOL_FORESTS.slice(1).map((f) => ({ x: f.x, z: f.z })),
+    { x: -40, z: -8 },
+    { x: -40, z: 0 },
+    ...BOKHOL_FORESTS.slice(1).map(constructionPlot),
   ];
   const candidates: GroundPoint[] = [];
   for (let x = -64; x <= 64; x += 8)
@@ -81,8 +82,15 @@ export interface VillageHome {
   readonly id: string;
   readonly position: GroundPoint;
   readonly capacity: number;
+  readonly priceVersion?: 2 | 3 | 4;
+  readonly timberCost?: number;
   readonly level?: 1 | 2 | 3;
   readonly headingRadians?: number;
+}
+export function nextDwellingId(homes: readonly VillageHome[]) {
+  let number = homes.length + 1;
+  while (homes.some((h) => h.id === `dwelling-${number}`)) number++;
+  return `dwelling-${number}`;
 }
 export const initialHomes = (): VillageHome[] =>
   HOME_PLOTS.slice(0, 6).map((position, i) => ({
@@ -204,7 +212,7 @@ export function mealPlan(
 ): MealPlan {
   if (citizen.mechanicalFrom) return { amount: 0, foods: {}, relief: 0 };
   const rule = speciesRule(citizen.species),
-    portion = policy === "cap" ? 2500 : rule.portion;
+    portion = policy === "cap" ? 25000 : rule.portion;
   let remaining = Math.max(0, Math.min(portion, portion * 4 - used));
   const foods: Partial<Record<FoodId, number>> = {};
   const choices: FoodId[] =
@@ -222,5 +230,5 @@ export function mealPlan(
   return { amount, foods, relief: Math.floor((amount * 360) / rule.portion) };
 }
 export const rationLimit = (species: string, policy: RationPolicy) =>
-  (policy === "cap" ? 2500 : speciesRule(species).portion) * 4;
+  (policy === "cap" ? 25000 : speciesRule(species).portion) * 4;
 export const formatRation = (amount: number) => String(amount / AMOUNT_SCALE);

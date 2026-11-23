@@ -75,7 +75,15 @@ it("퇴근 시 공사를 보존하고 귀가해 불을 켜며 다음날 재출�
   expect(s.world.resources.RES_WOOD).toBe(wood);
 });
 it("식당과 작업장에 도착하면 숨고 퇴근 뒤 다시 나와 귀가한다", () => {
-  let s = cmd(start(540), { type: "build-restaurant" });
+  const world = createPlayState();
+  let s = cmd(
+    createTimberState({
+      ...world,
+      minute: 540,
+      resources: { ...world.resources, RES_WOOD: 3000000 },
+    }),
+    { type: "build-restaurant" },
+  );
   s = advanceTimber(s, 60);
   s = cmd(s, { type: "set-restaurant-workers", count: 2 });
   s = cmd(s, { type: "build-logging" });
@@ -139,5 +147,5 @@ it("식당 공사도 퇴근하면 멈추고 다음날 현장으로 돌아와 남
   expect(s.restaurantBuilt).toBe(false);
   s = advanceTimber(s, 60);
   expect(s.restaurantBuilt).toBe(true);
-  expect(s.world.resources.RES_WOOD).toBe(1000000);
+  expect(s.world.resources.RES_WOOD).toBe(700000);
 });

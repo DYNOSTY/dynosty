@@ -16,7 +16,16 @@ import {
 let seq = 0;
 const cmd = (s: TimberState, c: TimberCommand) =>
   commandTimber(s, c, `hospital-test-${++seq}`);
-const start = () => createTimberState({ ...createPlayState(), minute: 540 });
+const start = () =>
+  createTimberState({
+    ...createPlayState(),
+    minute: 540,
+    resources: {
+      ...createPlayState().resources,
+      RES_WOOD: 3000000,
+      RES_METAL: 1000000,
+    },
+  });
 const ids = (s: TimberState, count = 1) =>
   s.residents.slice(0, count).map((r) => r.id);
 function build(s = start()) {

@@ -25,7 +25,7 @@ export function OfferComparison({
       <h4>공급 제안 비교</h4>
       <section className="quality-table-scroll" aria-label="공급 조건 비교표">
         <table>
-          <caption>기존 체험용 고정 조건 · 운송 시간은 출발 기준</caption>
+          <caption>운송 시간은 출발 기준</caption>
           <thead>
             <tr>
               <th scope="col">조건</th>
@@ -54,7 +54,7 @@ export function OfferComparison({
               ))}
             </tr>
             <tr>
-              <th scope="row">체험의 고정 품질 조건</th>
+              <th scope="row">납품 품질</th>
               {(["A", "B"] as const).map((o) => (
                 <td key={o}>
                   정상{TIMBER_RULES.requested - TIMBER_RULES.offers[o].wet} ·

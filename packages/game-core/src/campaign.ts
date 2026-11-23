@@ -5,6 +5,7 @@ import {
   evictionDelay,
   foodWarnings,
   GAME_RULES,
+  isDifficulty,
   type ResourceId,
 } from "./play.js";
 import { isRecord } from "./save.js";
@@ -126,8 +127,18 @@ export function convoyLoad(s: TimberState, item: keyof typeof CONVOY_GOALS) {
     ),
   );
 }
+// Four six-hour store deliveries cover the manifest; allow two more shifts for loading.
+export const CAPITAL_MINUTES = 36 * 60;
+export function capitalMinutesLeft(s: TimberState) {
+  const c = campaignOf(s);
+  return Math.max(0, (c.capitalDue ?? c.since + CAPITAL_MINUTES) - s.elapsed);
+}
 export function convoyReady(s: TimberState) {
   return s.campaign?.departures === 3;
+}
+/** Only the populated capital map has a convoy that can beat the deadline. */
+export function capitalFallen(s: TimberState) {
+  return !!s.bokhol && capitalMinutesLeft(s) === 0 && !convoyReady(s);
 }
 export function capitalReady(s: TimberState) {
   const c = s.campaign;
@@ -142,6 +153,8 @@ export interface Campaign {
   departures?: number;
   evacuees?: number;
   storeBatches?: number;
+  /** Elapsed minute at which the capital's north gate falls. */
+  capitalDue?: number;
   victoryQuotes?: number[];
   beat: Beat;
   since: number;
@@ -215,13 +228,13 @@ export function campaignValid(c: unknown, elapsed: number) {
     (c.evacuees === undefined || integer(c.evacuees, 1000)) &&
     (c.departures === undefined || integer(c.departures, 3)) &&
     (c.storeBatches === undefined || integer(c.storeBatches, 4)) &&
+    (c.capitalDue === undefined ||
+      integer(c.capitalDue, elapsed + CAPITAL_MINUTES)) &&
     (c.victoryQuotes === undefined ||
       (Array.isArray(c.victoryQuotes) &&
         c.victoryQuotes.length === CHAPTERS.length &&
         c.victoryQuotes.every((n) => integer(n, 9)))) &&
-    (c.difficulty === undefined ||
-      c.difficulty === "normal" ||
-      c.difficulty === "hard") &&
+    (c.difficulty === undefined || isDifficulty(c.difficulty)) &&
     (c.recoveryDue == null || integer(c.recoveryDue, 144000000)) &&
     integer(c.since, elapsed) &&
     integer(c.lastHigh, elapsed) &&
@@ -323,6 +336,7 @@ export function verdictRoute(s: TimberState) {
 }
 export function campaignOutcome(s: TimberState): Campaign["ending"] {
   const c = campaignOf(s);
+  if (c.beat === "capital") return capitalFallen(s) ? "collapse" : null;
   const delay = evictionDelay(c.difficulty);
   if (
     s.world.pessimism >= GAME_RULES.endings.evictionPessimism &&
@@ -391,7 +405,7 @@ export function updateCampaign(s: TimberState): TimberState {
   if (!c || c.ending) return s;
   const rules = GAME_RULES.endings;
   const pessimismExtremeSince =
-    s.world.pessimism >= rules.evictionPessimism
+    c.beat !== "capital" && s.world.pessimism >= rules.evictionPessimism
       ? (c.pessimismExtremeSince ?? s.elapsed)
       : null;
   const optimismZeroSince =
@@ -467,7 +481,12 @@ export function updateCampaign(s: TimberState): TimberState {
     return { ...s, campaign: { ...c, lastHigh: s.elapsed } };
   return s;
 }
-export type CampaignCommand = { type: "campaign"; beat: Beat; action: string };
+export type CampaignCommand = {
+  type: "campaign";
+  beat: Beat;
+  action: string;
+  difficulty?: Difficulty;
+};
 export function policyWait(s: TimberState) {
   const c = campaignOf(s);
   return c.lastPolicyAt === undefined
@@ -493,6 +512,7 @@ export function actCampaign(
   const c = campaignOf(s),
     action = command.action;
   if (command.beat !== c.beat) throw Error("이미 지난 장면입니다.");
+  if (c.beat === "capital" && capitalFallen(s)) return updateCampaign(s);
   const change = (
     beat: Beat,
     patch: Partial<Campaign> = {},
@@ -540,9 +560,9 @@ export function actCampaign(
   }
   switch (c.beat) {
     case "opening":
-      if (action === "next" || action === "hard")
+      if (action === "next" || isDifficulty(action))
         return change("departure", {
-          difficulty: action === "hard" ? "hard" : "normal",
+          difficulty: isDifficulty(action) ? action : "normal",
         });
       break;
     case "departure":
@@ -554,7 +574,8 @@ export function actCampaign(
         };
       break;
     case "after":
-      if (action === "next") return change("patrol");
+      if (action === "next")
+        return change("patrol", {}, { ...s, paused: false });
       break;
     case "patrol": {
       const report = returnedScouts(s).find(
@@ -578,6 +599,9 @@ export function actCampaign(
         const crew = send ? recoveryCrew(s) : [];
         if (send && crew.length < SCOUT_CREW)
           throw Error("수습대에 나설 주민 두 명이 필요합니다.");
+        const site = SCOUT_SITES.find((entry) => entry.id === report);
+        const run = site && scoutRun(s, site);
+        if (send && !run) throw Error("정찰대의 행군 기록이 없습니다.");
         const base = action === "recover" ? pay("RES_MEAT", 6) : s;
         const loss = dead.length
           ? commandTimber(
@@ -593,11 +617,7 @@ export function actCampaign(
           "patrol",
           {
             reports: [...c.reports, report],
-            recoveryDue: send
-              ? s.elapsed +
-                scoutRun(s, SCOUT_SITES.find((site) => site.id === report)!)!
-                  .minutes
-              : null,
+            recoveryDue: send && run ? s.elapsed + run.minutes : null,
             memorial: action === "recover" ? "recover" : "remember",
           },
           {
@@ -857,7 +877,7 @@ export function actCampaign(
       const supplied = deposit(base, "RES_MEAT", 8);
       return {
         ...supplied,
-        campaign: { ...supplied.campaign!, emergencyDay: s.world.day },
+        campaign: { ...campaignOf(supplied), emergencyDay: s.world.day },
         world: {
           ...supplied.world,
           pessimism: Math.max(
@@ -868,6 +888,26 @@ export function actCampaign(
       };
     }
     case "ending":
+      if (s.chapter === 3 && c.ending === "collapse") {
+        if (action === "retry-capital") {
+          const village = s.bokhol ?? {
+            ...createVillageGame(),
+            chapter: 2 as const,
+            campaign: {
+              ...newCampaign("roads"),
+              treaties: SETTLEMENTS.map((_, i) => i),
+            },
+          };
+          return createCapital({
+            ...village,
+            campaign: {
+              ...campaignOf(village),
+              difficulty: c.difficulty ?? "normal",
+            },
+          });
+        }
+        break;
+      }
       if (action === "finish") return change("finished");
       break;
   }

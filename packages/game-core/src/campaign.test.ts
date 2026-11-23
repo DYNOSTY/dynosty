@@ -1,5 +1,6 @@
 import { expect, it, vi } from "vitest";
 import {
+  CAPITAL_MINUTES,
   CONVOY_ITEMS,
   campaignOf,
   campaignOutcome,
@@ -14,6 +15,7 @@ import {
 } from "./campaign.js";
 import { RESEARCH_CATALOG } from "./development.js";
 import { AMOUNT_SCALE, PlayDataError } from "./play.js";
+import { requireValue } from "./require-value.js";
 import { SCOUT_SITES } from "./scout-sites.js";
 import {
   advanceTimber,
@@ -156,11 +158,11 @@ it.each([
   ).toThrow();
 });
 
-it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹한과 열흘 평가를 이어 저장한다", () => {
+it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 엔딩을 끝까지 진행한다", () => {
   let s = restore(createVillageGame(true));
   expect(s.residents).toHaveLength(600);
   expect(new Set(Object.values(s.world.resources))).toEqual(
-    new Set([10000 * AMOUNT_SCALE]),
+    new Set([10000 * AMOUNT_SCALE, 200 * AMOUNT_SCALE]),
   );
   s = restore(act(s, "next"));
   s = act(s, "leave");
@@ -168,7 +170,7 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(s.homes).toHaveLength(2);
   expect(s.residents).toHaveLength(60);
   expect(new Set(Object.values(s.world.resources))).toEqual(
-    new Set([1000 * AMOUNT_SCALE]),
+    new Set([1000 * AMOUNT_SCALE, 20 * AMOUNT_SCALE]),
   );
   s = act(s, "next");
   s = commandTimber(
@@ -221,7 +223,12 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
     expect(workingDay.logging.buffer).toBe(before.logging.buffer);
     const lastMinute = later(
       workingDay,
-      s.campaign!.recoveryDue! - workingDay.elapsed - 1,
+      requireValue(
+        requireValue(s.campaign, "s.campaign").recoveryDue,
+        "s.campaign.recoveryDue",
+      ) -
+        workingDay.elapsed -
+        1,
     );
     expect(
       lastMinute.residents.filter((r) => r.task === "patrol-recovery"),
@@ -251,9 +258,10 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(s.town.facilities.length).toBeGreaterThan(10);
   expect(s.town.development.completed).toContain("UPGRADE_HOSPITAL_2");
   const city = restore(s);
-  const hospital = city.town.facilities.find(
-    (f) => f.kind === "hospital" && f.level === 2,
-  )!;
+  const hospital = requireValue(
+    city.town.facilities.find((f) => f.kind === "hospital" && f.level === 2),
+    "병원",
+  );
   expect(() =>
     act({ ...city, mutantDamage: { [hospital.id]: 100 } }, "share"),
   ).toThrow("병원");
@@ -316,70 +324,117 @@ it("출문 전후의 실제 장부와 정찰 희생, 교섭, 호송, 보름 혹�
   expect(s.world.citizens.filter((p) => p.alive)).toHaveLength(188);
   expect(s.town.received.RES_COAL).toBeGreaterThanOrEqual(1800);
   s = restore(s);
-  let hope = act(
-    act(
-      later(
-        act({ ...s, world: { ...s.world, optimism: 70 } }, "coexist"),
-        5 * 1440,
-      ),
-      "resist",
-    ),
-    "next",
-  );
-  expect(hope.campaign?.uprising).toBe(false);
-  hope = later(hope, 6 * 1440 - 1);
-  expect(campaignOutcome(hope)).toBeNull();
-  hope = later(hope, 1);
-  expect(restore(act(hope, "finish")).campaign?.ending).toBe("hope");
-  let control = act(
-    withResearch({ ...s, world: { ...s.world, pessimism: 55 } }, ["R17"]),
-    "control",
-  );
-  expect(control.campaign?.beat).toBe("forecast");
-  control = later(
-    {
-      ...control,
-      mutants: [
-        { id: control.residents[0]!.id, due: control.elapsed + 5 * 1440 },
-      ],
+  const command = (
+    state: TimberState,
+    cmd: Parameters<typeof commandTimber>[1],
+  ) => commandTimber(state, cmd, "run-" + state.processed.length);
+  const day = (state: TimberState) =>
+    command(state, { type: "advance", minutes: 1440 });
+  const roll = vi.spyOn(Math, "random").mockReturnValue(0.99);
+  try {
+    // Hold nightly incidents constant to compare the three choices on the same arriving convoy.
+    s = act(s, "coexist");
+    for (
+      let d = 0;
+      d < 6 && minutesUntilCoup(s) > 1 && s.campaign?.beat === "forecast";
+      d++
+    ) {
+      s = command(s, {
+        type: "advance",
+        minutes: Math.min(1440, minutesUntilCoup(s) - 1),
+      });
+    }
+    expect(minutesUntilCoup(s)).toBe(1);
+    for (const [optimism, action, ending] of [
+      [69, "resist", "escape"],
+      [70, "resist", "hope"],
+      [70, "ally", "order"],
+    ] as const) {
+      const rally = restore(
+        command(
+          { ...s, world: { ...s.world, optimism } },
+          { type: "advance", minutes: 1 },
+        ),
+      );
+      let run = act(act(rally, action), "next");
+      if (ending === "escape") {
+        expect(run.town.development.story.chungnyeong).toBe("dead");
+        run = command(run, {
+          type: "plan-building",
+          kind: "workshop",
+          position: { x: 12, z: 12 },
+          headingRadians: Math.PI,
+        });
+        for (
+          let d = 0;
+          d < 3 && !run.town.facilities.some((f) => f.kind === "workshop");
+          d++
+        )
+          run = day(run);
+        const lab = requireValue(
+          run.town.facilities.find((f) => f.kind === "workshop"),
+          "시나리오 대상",
+        );
+        run = command(run, { type: "facility-staff", id: lab.id, count: 2 });
+        for (const tech of ["R17", "R18", "TECH_MECHA2"]) {
+          expect(run.campaign?.ending).toBeNull();
+          run = restore(command(run, { type: "start-research", tech }));
+          for (
+            let d = 0;
+            d < 10 && !run.town.development.completed.includes(tech);
+            d++
+          )
+            run = day(run);
+          expect(run.town.development.completed).toContain(tech);
+        }
+      }
+      for (let d = 0; d < 12 && !run.campaign?.ending; d++) run = day(run);
+      expect(restore(run).campaign?.ending).toBe(ending);
+    }
+  } finally {
+    roll.mockRestore();
+  }
+}, 120_000);
+
+it("도성은 민심과 관계없이 세 번째 수레를 보내지 못한 채 36시간이 지나면 함락된다", () => {
+  const base = createVillageGame();
+  const city: TimberState = {
+    ...base,
+    bokhol: { ...base, campaign: { ...campaignOf(base), beat: "roads" } },
+    chapter: 3,
+    elapsed: 300,
+    campaign: {
+      ...newCampaign("capital", 300),
+      capitalDue: 300 + CAPITAL_MINUTES,
+      difficulty: "hard",
     },
-    5 * 1440,
-  );
-  expect(control.campaign?.beat).toBe("rally");
-  expect(() => act(control, "next")).toThrow();
-  control = act(control, "listen");
-  expect(control.town.development.story.route).toBe("mechanical");
-  control = act(control, "next");
-  expect(control.town.development.story.chungnyeong).toBe("dead");
-  control = later(control, 10 * 1440);
-  expect(campaignOutcome(control)).toBeNull();
-  control = payTown(control, { RES_WOOD: 60, RES_METAL: 54, RES_COAL: 16 });
-  const development = control.town.development;
-  const awakened = updateCampaign({
-    ...control,
-    town: {
-      ...control.town,
-      development: {
-        ...development,
-        completed: ["R17", "R18", "TECH_MECHA2", "R19"],
-        story: { ...development.story, chungnyeong: "mechanical" },
-      },
-    },
-  });
-  expect(awakened.campaign?.beat).toBe("ending");
-  const ending = awakened;
-  expect(restore(ending).campaign?.ending).toBe("escape");
+    world: { ...base.world, pessimism: 100 },
+  };
+  const before = restore(later(city, 36 * 60 - 1));
+  expect(before.campaign?.ending).toBeNull();
+  expect(later(before, 1).campaign?.ending).toBe("collapse");
   expect(
-    restore(
-      updateCampaign({
-        ...control,
-        world: { ...control.world, pessimism: 91 },
-      }),
-    ).campaign?.ending,
+    later({ ...before, campaign: { ...campaignOf(before), departures: 3 } }, 1)
+      .campaign?.ending,
   ).toBeNull();
 });
-
-it.each([1, 2, 3, 4, 5] as const)(
+it("도성 기한 이전의 저장은 불러온 때부터 36시간을 주고, 이후 저장은 기한을 유지한다", () => {
+  const base = createVillageGame();
+  const legacy: TimberState = {
+    ...base,
+    bokhol: { ...base, campaign: { ...campaignOf(base), beat: "roads" } },
+    chapter: 3,
+    elapsed: 300 + 3 * 1440,
+    campaign: newCampaign("capital", 300),
+  };
+  const loaded = restore(legacy);
+  expect(campaignOf(loaded).capitalDue).toBe(legacy.elapsed + CAPITAL_MINUTES);
+  expect(later(loaded, 1).campaign?.ending).toBeNull();
+  const halfway = restore(later(loaded, CAPITAL_MINUTES / 2));
+  expect(campaignOf(halfway).capitalDue).toBe(legacy.elapsed + CAPITAL_MINUTES);
+  expect(later(halfway, CAPITAL_MINUTES / 2).campaign?.ending).toBe("collapse");
+});
+it.each([1, 2, 4, 5] as const)(
   "단계 %i에서 99는 버티고 100에 닿으면 난이도에 따라 추방된다",
   (chapter) => {
     const base = createVillageGame();
@@ -387,9 +442,12 @@ it.each([1, 2, 3, 4, 5] as const)(
       ...base,
       ...(chapter === 1 ? {} : { chapter }),
       campaign: newCampaign(
-        (["patrol", "roads", "capital", "winter", "vigil"] as const)[
-          chapter - 1
-        ]!,
+        requireValue(
+          (["patrol", "roads", "capital", "winter", "vigil"] as const)[
+            chapter - 1
+          ],
+          "(['patrol', 'roads', 'capital', 'winter', 'vigil'] as c",
+        ),
       ),
       world: { ...base.world, pessimism: 99 },
     });
@@ -409,7 +467,7 @@ it.each([1, 2, 3, 4, 5] as const)(
     });
     expect(later(relapse, 1).campaign?.ending).toBeNull();
     const end = act(
-      { ...s, campaign: { ...s.campaign!, difficulty: "hard" } },
+      { ...s, campaign: { ...campaignOf(s), difficulty: "hard" } },
       "reserve",
     );
     expect(end.elapsed).toBe(s.elapsed);
@@ -554,6 +612,15 @@ it("온돌 연료를 매시간 결제하고 성문 전투 결과와 삽화를 �
   );
   expect(gateRaid(s, () => 0)).toBe(s);
   s = { ...s, world: { ...s.world, minute: 1260 } };
+  for (const [difficulty, threshold] of [
+    ["easy", 0.075],
+    ["normal", 0.15],
+    ["hard", 0.75],
+  ] as const) {
+    const state = { ...s, campaign: { ...campaignOf(s), difficulty } };
+    expect(gateRaid(state, () => threshold)).toBe(state);
+    expect(gateRaid(state, () => threshold - 0.0001).raid).toBeDefined();
+  }
   const safe = restore(
     gateRaid(s, vi.fn().mockReturnValueOnce(0).mockReturnValue(0.99)),
   );
@@ -808,6 +875,21 @@ it("닷새째 밤 습격 기록은 저장하거나 성문 보고를 닫아도 �
       roll.mockRestore();
     }
   }
+});
+
+it("첫 배급령이 기존 배급 방식과 같아도 방과 주민 반응을 한 번만 기록한다", () => {
+  const start = createVillageGame();
+  const policy = {
+    type: "set-ration-policy",
+    policy: start.rationPolicy,
+  } as const;
+  const first = commandTimber(start, policy, "first-decree");
+  expect(first.decree?.title).toBe("필요량에 따른 배급");
+  expect(first.decree?.serial).toBe(1);
+  expect(first.world.optimism).toBe(start.world.optimism + 1);
+  const again = commandTimber(restore(first), policy, "same-decree");
+  expect(again.decree).toEqual(first.decree);
+  expect(again.world.optimism).toBe(first.world.optimism);
 });
 
 it("자동 화재와 추방이 같은 분에 일어나면 그 분에서 멈춘다", () => {
@@ -1070,4 +1152,19 @@ it("재건 표시가 없는 기존 저장에서도 포졸 배치가 일일 화�
   } finally {
     random.mockRestore();
   }
+});
+
+it("복홀에서 도성 단계를 하던 기존 저장은 도성 함락 기한으로 끝나지 않는다", () => {
+  const base = createVillageGame(false, true);
+  expect(base.bokhol).toBeUndefined();
+  const { capitalDue: _due, ...legacy } = campaignOf(base);
+  const loaded = restore({
+    ...base,
+    chapter: 3,
+    campaign: { ...legacy, beat: "capital", since: 0, relief: "ward" },
+  });
+  const passed = later(loaded, 37 * 60);
+  expect(campaignOf(passed).ending ?? null).toBeNull();
+  expect(campaignOf(passed).beat).toBe("capital");
+  expect(act(passed, "next").campaign?.ending ?? null).toBeNull();
 });

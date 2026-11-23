@@ -3,14 +3,20 @@ import {
   BOKHOL_FOREST,
   BOKHOL_MAP,
   bokholElevation,
+  constructionPlot,
   inBokholForest,
+  reservedVillageLand,
   sawmillHasForest,
+  VILLAGE_LAYOUT,
 } from "./bokhol.js";
 import { LOGGING_RULES, loggingWorkplace } from "./logging.js";
 import { applyCitizenEvent, createPlayState, parsePlayState } from "./play.js";
+import { requireValue } from "./require-value.js";
 import {
   commandTimber,
+  createCapital,
   createTimberState,
+  createVillageGame,
   parseTimberState,
   timberScene,
 } from "./timber.js";
@@ -139,4 +145,71 @@ it("숲이 남아 있는 부지는 건설 후보에서 제외하고 고갈 뒤 �
   expect(inBokholForest(after.construction?.position ?? { x: 0, z: 0 })).toBe(
     true,
   );
+});
+
+it("복홀과 도성의 초기 건물은 겹치지 않는 측량 구획에 놓인다", () => {
+  for (const [, x, z] of VILLAGE_LAYOUT)
+    expect(constructionPlot({ x, z })).toEqual({ x, z });
+  const village = createVillageGame(true);
+  for (const s of [
+    village,
+    createVillageGame(false, true),
+    createCapital(village),
+  ]) {
+    const buildings = [...s.homes, ...s.town.facilities];
+    for (const [i, b] of buildings.entries()) {
+      expect(constructionPlot(b.position)).toEqual(b.position);
+      expect(reservedVillageLand(b.position, !!s.rebuilding)).toBeNull();
+      expect(
+        buildings
+          .slice(0, i)
+          .some(
+            (other) =>
+              Math.abs(other.position.x - b.position.x) < 4.5 &&
+              Math.abs(other.position.z - b.position.z) < 4.5,
+          ),
+      ).toBe(false);
+    }
+  }
+});
+it("같은 구획에 내린 명령은 한 부지만 쓰고 기존 저장의 위치는 보존한다", () => {
+  const s = commandTimber(
+    createVillageGame(),
+    {
+      type: "plan-building",
+      kind: "home",
+      position: { x: 12.68, z: 11.15 },
+      headingRadians: Math.PI,
+    },
+    "plot",
+  );
+  expect(s.town.orders[0]?.position).toEqual({ x: 12, z: 12 });
+  expect(() =>
+    commandTimber(
+      s,
+      {
+        type: "plan-building",
+        kind: "storage",
+        position: { x: 11.4, z: 12.6 },
+        headingRadians: 0,
+      },
+      "again",
+    ),
+  ).toThrow();
+  const old = {
+    ...s,
+    town: {
+      ...s.town,
+      orders: [
+        {
+          ...requireValue(s.town.orders[0], "s.town.orders[0]"),
+          position: { x: 12.25, z: 12.5 },
+        },
+      ],
+    },
+  };
+  expect(parseTimberState(old).town.orders[0]?.position).toEqual({
+    x: 12.25,
+    z: 12.5,
+  });
 });

@@ -70,14 +70,6 @@ export function PlayPanel({
             type="button"
             className="quiet-button"
             disabled={busy}
-            onClick={() => onCommand({ type: "advance-day" })}
-          >
-            1일 진행
-          </button>
-          <button
-            type="button"
-            className="quiet-button"
-            disabled={busy}
             onClick={() => setConfirm(true)}
           >
             새 게임
@@ -141,8 +133,8 @@ export function PlayPanel({
           .join(" · ")}
       </p>
       <p className="play-baseline-note" hidden={compact}>
-        승인 개발 기준 v1 · {state.paused ? "일시정지" : "시간 진행 중"} · 1초 =
-        게임 1분 · 탭을 벗어나면 일시정지
+        {state.paused ? "일시정지" : "시간 진행 중"} · 1초 = 게임 1분 · 탭을
+        벗어나면 일시정지
       </p>
       {warnings.length ? (
         <div className="food-warnings" role="alert" data-testid="food-warnings">

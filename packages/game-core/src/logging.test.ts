@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { LOGGING_RULES, loggingStaff, loggingWorkplace } from "./logging.js";
-import { AMOUNT_SCALE } from "./play.js";
+import { AMOUNT_SCALE, createPlayState } from "./play.js";
 import {
   advanceTimber,
   commandTimber,
@@ -13,10 +13,17 @@ import {
 } from "./timber.js";
 
 let serial = 0;
+function fundedTown() {
+  const world = createPlayState();
+  return createTimberState({
+    ...world,
+    resources: { ...world.resources, RES_WOOD: 4500000 },
+  });
+}
 const command = (s: TimberState, c: TimberCommand) =>
   commandTimber(s, c, `logging-${++serial}`);
 function build(storage = true) {
-  let s = command(advanceTimber(createTimberState(), 120), {
+  let s = command(advanceTimber(fundedTown(), 120), {
     type: "build-logging",
   });
   s = advanceTimber(s, 50);
@@ -122,7 +129,7 @@ it("일시정지 중 운반 인력의 질병·즉시 회복도 저장 가능한 
   expect(advanceTimber(s, 60).logging.delivered).toBeGreaterThan(0);
 });
 it("자원 증식·유령 인력·임의 좌표·건설 완료 위조 저장을 거부한다", () => {
-  const building = command(advanceTimber(createTimberState(), 120), {
+  const building = command(advanceTimber(fundedTown(), 120), {
     type: "build-logging",
   });
   expect(() =>

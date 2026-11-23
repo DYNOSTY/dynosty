@@ -294,9 +294,6 @@
   gap: 8px;
   padding: 0 16px;
 }
-.h-res__item + .h-res__item {
-  border-left: 1px solid var(--hanji-line);
-}
 .h-res__item img {
   object-fit: contain;
 }
@@ -526,10 +523,6 @@
   display: flex;
   gap: 8px;
 }
-.b-band .c-cmd {
-  width: 68px;
-  height: 60px;
-}
 .b-band__mood {
   width: 260px;
   color: var(--hanji);
@@ -552,6 +545,10 @@
   justify-content: center;
   gap: 2px;
   padding: 0;
+}
+.b-band .c-cmd {
+  width: 68px;
+  height: 60px;
 }
 .c-cmd img {
   width: 40px;
@@ -612,13 +609,6 @@
   inset: auto 0 0;
   height: calc(var(--v) * 1%);
 }
-.m-obj--hope .m-slot i {
-  background: linear-gradient(#ffe2a0, #f0a24a);
-  box-shadow: 0 0 12px #ffcf7a;
-}
-.m-obj--despair .m-slot i {
-  background: #1b1714;
-}
 .m-obj--hope img {
   filter: drop-shadow(0 0 calc(var(--v) * 0.25px) rgb(255 196 110 / 85%));
 }
@@ -632,29 +622,12 @@
   gap: 6px;
   white-space: nowrap;
 }
-.m-obj figcaption small {
-  font-size: var(--fs-sub);
-  color: var(--meok-sub);
-}
-.m-obj figcaption b {
-  font: 700 24px / 1 var(--font-title);
-  font-variant-numeric: tabular-nums;
-}
-.c-mood .m-scale {
-  height: 100%;
-}
-.c-mood .m-scale {
-  --rs: 0.2;
-}
 .c-mood {
   grid-template-columns: 1fr;
   align-items: center;
 }
 .c-mood .m-jars {
   padding-bottom: 32px;
-}
-.c-mood .m-obj {
-  height: 132px;
 }
 
 /* 희망·절망 나: 저울 */
@@ -728,6 +701,15 @@
 .m-scale {
   gap: 8px;
 }
+.c-mood .m-scale {
+  height: 100%;
+}
+.c-mood .m-scale {
+  --rs: 0.2;
+}
+.c-mood .m-obj {
+  height: 132px;
+}
 
 /* 위 막대: 옻칠 들보 그림 (원본 270px 높이 × 0.444) */
 .h-top {
@@ -789,8 +771,15 @@
 .h-res__item {
   padding: 0 12px;
 }
+.h-res__item + .h-res__item {
+  border-left: 1px solid var(--hanji-line);
+}
 .h-res__item small {
   font-size: var(--fs-sub);
+}
+.m-obj figcaption small {
+  font-size: var(--fs-sub);
+  color: var(--meok-sub);
 }
 .h-res__sub {
   margin: 0;
@@ -813,11 +802,22 @@
 .h-top__time b {
   font-size: 22px;
 }
+.m-obj figcaption b {
+  font: 700 24px / 1 var(--font-title);
+  font-variant-numeric: tabular-nums;
+}
 .h-speed {
   margin: 0;
 }
 .h-speed i {
   border-color: var(--hanji-line);
+}
+.m-obj--hope .m-slot i {
+  background: linear-gradient(#ffe2a0, #f0a24a);
+  box-shadow: 0 0 12px #ffcf7a;
+}
+.m-obj--despair .m-slot i {
+  background: #1b1714;
 }
 .h-speed i.on {
   background: var(--jjok);

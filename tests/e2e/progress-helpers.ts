@@ -1,12 +1,13 @@
 import { expect, type Page } from "@playwright/test";
+import { openLaborPanel } from "./workspace.js";
 export const progressButton = (p: Page, name: string) =>
   p.getByRole("button", { name, exact: true });
 export const progressCard = (p: Page, id: string) =>
   p.getByTestId(`progress-site-${id}`);
 export async function enterProgress(p: Page) {
   await p.goto("/");
-  await progressButton(p, "마른 목재20 조달 체험하기").click();
-  await progressButton(p, "일손 배치·배급 체험하기").click();
+  await progressButton(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 }
 export async function receiveProgress(p: Page) {

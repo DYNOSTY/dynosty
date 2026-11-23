@@ -5,6 +5,7 @@ import {
   receiveProgress,
   siteAction,
 } from "./progress-helpers.js";
+import { openLaborPanel } from "./workspace.js";
 
 const flow = (p: import("@playwright/test").Page, k: string) =>
   p.getByTestId(`flow-${k}`);
@@ -49,14 +50,14 @@ test("품질흐름: 배분과 보완 재고를 중복 없이 표시하고 저장
   await expect(flow(p, "allocated")).toContainText("16개");
   await siteAction(p, "격리품", "현장 보완 인원 배정");
   await b(p, "일손 1시간 진행").click();
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );
@@ -74,7 +75,7 @@ test("품질흐름: 배분과 보완 재고를 중복 없이 표시하고 저장
   await p.evaluate(() =>
     localStorage.setItem("dynosty.labor.saves", "{invalid"),
   );
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByRole("alert")).toBeVisible();
   await expect(flow(p, "used")).toContainText("20개");
   expect(
@@ -95,14 +96,14 @@ test("품질흐름: 교환 처리4와 정상 배분16을 분리하고 예약·�
   await expect(flow(p, "transit")).toContainText("4개");
   await expect(flow(p, "quarantine")).toContainText("0개");
   await expect(report(p)).toContainText("실제 철재 사용5");
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );

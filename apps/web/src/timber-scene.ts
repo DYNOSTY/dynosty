@@ -8,7 +8,10 @@ import {
   builderWorkPosition,
   CONVOY_GOALS,
   CONVOY_ITEMS,
+  constructionPlot,
   homeWorkPosition,
+  loggingSiteRules,
+  requireValue,
   TIMBER_RULES,
   type TimberState,
   timberCartPosition,
@@ -17,11 +20,6 @@ import {
 } from "@dynosty/game-core";
 import { createLoggingVisual } from "./logging-scene.js";
 import { terrainElevation } from "./terrain.js";
-
-export const RESTAURANT_CENTER = {
-  x: TIMBER_RULES.restaurant.x + 1.2,
-  z: TIMBER_RULES.restaurant.z + 1.2,
-};
 
 export function createTimberVisual(scene: Scene) {
   const loggingVisual = createLoggingVisual(scene);
@@ -68,11 +66,12 @@ export function createTimberVisual(scene: Scene) {
   const convoyCarts = CONVOY_ITEMS.map((item, index) => {
     const cart = base.clone("south-gate-" + item);
     cart.position.set(-6 + index * 3, 0.42, 25);
-    const load = cart
-      .getChildMeshes()
-      .find((mesh) => mesh.name.endsWith(cargo.name))!;
+    const load = requireValue(
+      cart.getChildMeshes().find((mesh) => mesh.name.endsWith(cargo.name)),
+      "수레 화물 모형",
+    );
     for (const part of [cart, ...cart.getChildMeshes()])
-      part.metadata = { villageTarget: "village:BLD_GATE:0:23" };
+      part.metadata = { villageTarget: "village:BLD_GATE:0:24" };
     cart.setEnabled(false);
     return { cart, load, item };
   });
@@ -97,7 +96,11 @@ export function createTimberVisual(scene: Scene) {
     { width: 4.5, height: 0.18, depth: 4.5 },
     scene,
   );
-  restaurant.position.set(RESTAURANT_CENTER.x, 0.15, RESTAURANT_CENTER.z);
+  const diningPlot = constructionPlot({
+    x: TIMBER_RULES.restaurant.x + 1.2,
+    z: TIMBER_RULES.restaurant.z + 1.2,
+  });
+  restaurant.position.set(diningPlot.x, 0.15, diningPlot.z);
   restaurant.material = brown;
   parts.push(restaurant);
   const mealTable = CreateBox(
@@ -105,7 +108,7 @@ export function createTimberVisual(scene: Scene) {
     { width: 3.6, height: 0.6, depth: 0.6 },
     scene,
   );
-  mealTable.position.set(RESTAURANT_CENTER.x, 0.55, RESTAURANT_CENTER.z);
+  mealTable.position.set(diningPlot.x, 0.55, diningPlot.z);
   mealTable.material = dry;
   parts.push(mealTable);
   const buildSite = new TransformNode("village-construction", scene);
@@ -301,15 +304,23 @@ export function createTimberVisual(scene: Scene) {
           );
         }
       }
-      if (s?.construction)
+      if (s?.construction) {
+        const build = s.construction;
+        const rules = loggingSiteRules(build.siteId);
+        const plot =
+          build.kind === "restaurant"
+            ? diningPlot
+            : build.kind === "logging"
+              ? rules.workshopPlot
+              : build.kind === "storage"
+                ? rules.storagePlot
+                : build.position;
         buildSite.position.set(
-          s.construction.position.x,
-          terrainElevation(s)(
-            s.construction.position.x,
-            s.construction.position.z,
-          ),
-          s.construction.position.z,
+          plot.x,
+          terrainElevation(s)(plot.x, plot.z),
+          plot.z,
         );
+      }
       if (!s) return;
       restaurant.setEnabled(
         (s.restaurantBuilt &&

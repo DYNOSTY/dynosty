@@ -10,7 +10,11 @@ import {
 } from "./resident-path.js";
 import { workplaceOpen } from "./resident-routine.js";
 import type { TimberState } from "./timber.js";
-import { assignHomes, VILLAGE_RULES } from "./village-services.js";
+import {
+  assignHomes,
+  nextDwellingId,
+  VILLAGE_RULES,
+} from "./village-services.js";
 
 export interface HomeBuilder {
   readonly id: string | null;
@@ -23,7 +27,7 @@ export function createHomeCrew(
   ids: readonly string[],
   slots: readonly number[] = [1, 0, 2],
 ): HomeBuilder[] {
-  let remaining = 20;
+  let remaining: number = VILLAGE_RULES.constructionWood;
   return ids.map((id, i) => {
     const amount = Math.ceil(remaining / (ids.length - i));
     remaining -= amount;
@@ -117,6 +121,7 @@ export function advanceHomeConstruction(
     );
     return { ...w, phase: nextPhase } satisfies HomeBuilder;
   });
+  const total = crew.reduce((n, w) => n + w.amount, 0);
   const delivered = crew
     .filter((w) => w.phase === "build")
     .reduce((n, w) => n + w.amount, 0);
@@ -134,7 +139,7 @@ export function advanceHomeConstruction(
   });
   let next: TimberState = { ...s, residents, construction: { ...b, crew } };
   if (
-    delivered === 20 &&
+    delivered === total &&
     !working &&
     b.finishAt !== null &&
     b.crew.some((w) =>
@@ -150,7 +155,7 @@ export function advanceHomeConstruction(
         finishAt: b.finishAt + minutes,
       },
     };
-  if (delivered < 20 || !working)
+  if (delivered < total || !working)
     return {
       ...next,
       construction: { ...b, crew, startedAt: null, finishAt: null },
@@ -167,7 +172,8 @@ export function advanceHomeConstruction(
     };
   if (s.elapsed < b.finishAt) return next;
   const home = {
-    id: `dwelling-${s.homes.length + 1}`,
+    id: nextDwellingId(s.homes),
+    timberCost: crew.reduce((sum, w) => sum + w.amount, 0),
     position: { ...b.position },
     headingRadians: pose.headingRadians,
     capacity: VILLAGE_RULES.homeSpace,

@@ -210,9 +210,6 @@ h1 {
 .play-status p {
   margin: 0;
 }
-.play-status p span {
-  color: var(--ink-sub);
-}
 .play-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -279,9 +276,6 @@ h1 {
 .workspace-panel .panel {
   padding: 1rem;
   margin: 1rem 0 0;
-}
-.workspace-panel .panel h2 {
-  font-size: 1rem;
 }
 .workspace-panel button {
   margin: 0.2rem 0;
@@ -593,9 +587,6 @@ h1 {
 .timber-tools .timber-offers {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.timber-tools .timber-heading {
-  display: block;
-}
 .timber-tools .timber-title {
   margin-bottom: 0.7rem;
 }
@@ -680,10 +671,6 @@ h1 {
   font-size: 0.8rem;
   margin: 0.6rem 0;
 }
-.labor-demo .labor-stock > span {
-  padding: 0.35rem;
-  border-left: 1px solid var(--line);
-}
 .labor-demo .timber-offers {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -746,13 +733,6 @@ h1 {
 .site-panel dl {
   margin: 0.7rem 0;
 }
-.site-panel dl > div {
-  display: grid;
-  grid-template-columns: 7rem minmax(0, 1fr);
-  gap: 0.5rem;
-  padding: 0.3rem 0;
-  border-bottom: 1px solid #375a4c;
-}
 .site-panel dd {
   margin: 0;
   overflow-wrap: anywhere;
@@ -769,10 +749,6 @@ h1 {
   padding: 0.6rem;
   border: 1px solid #6b957f;
   border-radius: 8px;
-}
-.site-panel .site-crew > div {
-  padding: 0.4rem 0;
-  border-bottom: 1px solid #375a4c;
 }
 .site-action {
   margin-top: 0.4rem;
@@ -937,13 +913,6 @@ h1 {
   border: 1px solid #486e5a;
   border-radius: 0.5rem;
 }
-.quality-report dl > div {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid #375a4c;
-}
 .quality-report dd {
   margin: 0;
   overflow-wrap: anywhere;
@@ -1073,8 +1042,7 @@ h1 {
     overflow: hidden;
   }
   /* 3D가 화면 전체 */
-  .play-workspace,
-  .play-workspace.has-tools {
+  .play-workspace {
     display: block;
   }
   .play-scene {
@@ -1099,7 +1067,6 @@ h1 {
   .play-header,
   .resource-strip,
   .play-controls,
-  .settlement-heading > div:first-child,
   .play-status,
   .selection-actions,
   .new-game-confirm,
@@ -1123,9 +1090,6 @@ h1 {
   .play-brand h1 {
     font-size: 1.25rem;
     letter-spacing: 0.14em;
-  }
-  .play-brand .eyebrow {
-    display: none;
   }
   .play-time {
     display: flex;
@@ -1193,13 +1157,6 @@ h1 {
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
     min-width: 3ch;
-  }
-  /* 왼쪽 위: 마을 상태 */
-  .settlement-heading > div:first-child {
-    top: 88px;
-    left: 12px;
-    padding: 10px 16px;
-    border-radius: 12px;
   }
   .play-baseline-note {
     position: absolute;
@@ -1299,8 +1256,8 @@ h1 {
     box-shadow: var(--hud-shadow);
   }
 }
-/* 자원 막대가 위 막대 양끝과 겹치는 폭: 한 줄 아래로 */
 @media (min-width: 761px) and (max-width: 1399px) {
+  /* 자원 막대가 위 막대 양끝과 겹치는 폭: 한 줄 아래로 */
   .resource-strip {
     top: 88px;
     height: 56px;
@@ -1309,7 +1266,6 @@ h1 {
     box-shadow: var(--hud-shadow);
     border-radius: 14px;
   }
-  .settlement-heading > div:first-child,
   .food-warnings,
   .workspace-tools {
     top: 156px;
@@ -1318,8 +1274,8 @@ h1 {
     top: 218px;
   }
 }
-/* 아래 막대 세 개가 겹치는 폭: 시점 버튼은 한 칸 위, 임무는 오른쪽 위 */
 @media (min-width: 761px) and (max-width: 1099px) {
+  /* 아래 막대 세 개가 겹치는 폭: 시점 버튼은 한 칸 위, 임무는 오른쪽 위 */
   .selection-actions {
     bottom: 92px;
   }
@@ -1423,20 +1379,6 @@ h1 {
   }
   .play-time strong {
     font: 700 22px / 1.1 var(--font-title);
-  }
-  /* 왼쪽 칸: 복홀 현황 */
-  .settlement-heading > div:first-child {
-    top: 31px;
-    left: 36px;
-    width: var(--inset-w);
-    height: 56px;
-    padding: 0 16px;
-    display: grid;
-    align-content: center;
-    background: none;
-    border: 0;
-    box-shadow: none;
-    border-radius: 0;
   }
   .settlement-title {
     font: 700 22px / 1.1 var(--font-title);
@@ -1700,16 +1642,6 @@ h1 {
     font-family: var(--font-body);
     font-size: 14px;
   }
-  .g-console .selection-facts {
-    display: grid;
-    grid-template-columns: repeat(3, auto);
-    gap: 0 24px;
-    justify-content: start;
-  }
-  .g-console .selection-facts div {
-    padding: 0;
-    border: 0;
-  }
   .g-console .selection-facts dt {
     font-size: 14px;
   }
@@ -1840,8 +1772,8 @@ h1 {
     z-index: 2;
   }
 }
-/* 1600px 미만: 양쪽 칸을 줄이고 자원 이름은 숨김 (아이콘과 숫자만) */
 @media (min-width: 761px) and (max-width: 1599px) {
+  /* 1600px 미만: 양쪽 칸을 줄이고 자원 이름은 숨김 (아이콘과 숫자만) */
   :root {
     --inset-w: 272px;
   }
@@ -1912,12 +1844,6 @@ h1 {
   }
   .play-time strong {
     font-size: 18px;
-  }
-  .settlement-heading > div:first-child {
-    top: 22px;
-    left: 25px;
-    height: 39px;
-    padding: 0 12px;
   }
   .settlement-title {
     font-size: 16px;
@@ -2149,10 +2075,6 @@ h1 {
     border-image-outset: 4px;
     padding: 0;
   }
-  .play-menu.g-console__cmd {
-    justify-content: stretch;
-    gap: 4px;
-  }
   .play-menu.g-console__cmd .g-cmd {
     padding: 0;
     font-size: inherit;
@@ -2229,26 +2151,16 @@ body {
     padding: 0;
     box-shadow: 0 0 0 100vmax rgb(24 18 14 / 45%);
   }
-  .workspace-tools[hidden] {
-    display: none;
-  }
   .workspace-panel,
   .timber-demo {
     margin: 0;
-  }
-  /* 긴 조달 체험 창은 두 단으로 펼쳐 한 화면에 */
-  .timber-tools .timber-demo {
-    column-count: 2;
-    column-gap: 40px;
-    column-fill: balance;
   }
   .timber-tools .timber-demo > * {
     break-inside: avoid;
   }
 }
-
-/* 뜨는 창 뒤 어둡게: 창 상자 밖 화면 전체 */
 @media (min-width: 761px) {
+  /* 뜨는 창 뒤 어둡게: 창 상자 밖 화면 전체 */
   .workspace-tools {
     box-shadow: none;
   }
@@ -2267,9 +2179,8 @@ body {
     padding: 4px 8px 16px;
   }
 }
-
-/* 혹한 하늘 + 글자 배치(doc-layout): 한국어 단어 안 끊기, 꼬리 줄 방지, 버튼 줄바꿈 금지 */
 @media (min-width: 761px) {
+  /* 혹한 하늘 + 글자 배치(doc-layout): 한국어 단어 안 끊기, 꼬리 줄 방지, 버튼 줄바꿈 금지 */
   .play-scene::before {
     background-image:
       url(/ui/kit/sky_dystopia.jpg), linear-gradient(#cfcbd6, #a9a4b4);
@@ -2299,8 +2210,7 @@ body {
   text-wrap: balance;
 }
 .play-shell button,
-.play-shell kbd,
-.play-shell .resource-card strong {
+.play-shell kbd {
   white-space: nowrap;
 }
 
@@ -2322,12 +2232,6 @@ body {
   }
   .play-time strong {
     font-size: 16px;
-  }
-  .settlement-heading > div:first-child {
-    top: 17px;
-    left: 19px;
-    height: 30px;
-    padding: 0 10px;
   }
   .settlement-title {
     position: absolute;
@@ -2389,18 +2293,9 @@ body {
     padding: 0;
     border: 0;
   }
-  .g-console .selection-info .workspace-panel-heading h2 {
-    font-size: 13px;
-  }
   .g-console .selection-name {
     margin: 0 0 4px;
     font-size: 18px;
-  }
-  .g-console .selection-facts dt {
-    font-size: 13px;
-  }
-  .g-console .selection-facts dd {
-    font-size: 14px;
   }
   .g-mood {
     --rs: 0.12;
@@ -2467,6 +2362,9 @@ body {
     margin: 0 0 4px;
     font: 700 18px / 1.3 var(--font-title);
   }
+  .g-console .selection-info .workspace-panel-heading h2 {
+    font-size: 13px;
+  }
   .g-quest {
     display: flex;
     justify-content: space-between;
@@ -2509,12 +2407,6 @@ body {
     text-decoration: underline;
     text-underline-offset: 3px;
     text-shadow: inherit;
-  }
-  .play-status .timber-entry-link::before {
-    content: "조달 · " / "";
-    color: var(--meok);
-    text-decoration: none;
-    display: inline-block;
   }
   .play-status p {
     font-size: 14px;
@@ -2577,9 +2469,15 @@ body {
     color: var(--meok-sub);
     font-size: 14px;
   }
+  .g-console .selection-facts dt {
+    font-size: 13px;
+  }
   .g-scout__facts dd {
     margin: 0;
     font-weight: 600;
+  }
+  .g-console .selection-facts dd {
+    font-size: 14px;
   }
   .g-scout__find {
     margin: 0 0 12px;
@@ -2621,9 +2519,8 @@ body {
     --rs: 0.11;
   }
 }
-
-/* 의뢰 글자: 어두운 하늘 위에서도 읽히게 밝은 글자 + 먹 테두리 */
 @media (min-width: 761px) {
+  /* 의뢰 글자: 어두운 하늘 위에서도 읽히게 밝은 글자 + 먹 테두리 */
   .g-quests {
     color: var(--hanji);
     text-shadow:
@@ -2636,12 +2533,6 @@ body {
   }
   .play-status .timber-entry-link {
     color: #e7c98a;
-  }
-  .play-status .timber-entry-link::before {
-    color: var(--hanji);
-  }
-  .g-pin[hidden] {
-    display: none;
   }
 }
 
@@ -2661,9 +2552,8 @@ body {
 .g-fps.is-low {
   color: #f2a99a;
 }
-
-/* 의뢰 목록: 투명 바탕 · 줄 · 3D 아이콘 · 진행 표시 */
 @media (min-width: 761px) {
+  /* 의뢰 목록: 투명 바탕 · 줄 · 3D 아이콘 · 진행 표시 */
   .g-quests {
     width: 320px;
   }
@@ -2710,9 +2600,6 @@ body {
   }
   .g-quest--btn:hover {
     background: rgb(239 230 210 / 10%);
-  }
-  .g-quest.is-found b {
-    color: #bfe3c8;
   }
   .g-pips {
     display: flex;
@@ -2761,9 +2648,6 @@ body {
     background: url(/ui/cmd/economy.png) center / contain no-repeat;
     filter: drop-shadow(0 1px 2px rgb(0 0 0 / 60%));
   }
-  .play-status .timber-entry-link {
-    justify-self: start;
-  }
 }
 
 /* 자원 아이콘 + 숫자 (글 대신) */
@@ -2790,23 +2674,12 @@ body {
   align-items: center;
   gap: 4px 6px;
 }
-.g-quest .g-res img {
-  width: 18px;
-  height: 18px;
-}
 .offer-trade {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 6px 0 8px;
   font-size: 18px;
-}
-.offer-trade .g-res img {
-  width: 30px;
-  height: 30px;
-}
-.offer-trade > span[aria-hidden] {
-  color: var(--meok-sub);
 }
 .offer-time {
   margin-left: auto;
@@ -2845,16 +2718,6 @@ body {
 }
 .offer-facts dd {
   margin: 0;
-}
-
-/* 명령 콘솔 위 파견 중인 정찰대 */
-.g-console > .g-scout-faces {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  right: 16px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
 }
 .g-console > .g-scout-faces:empty {
   display: none;
@@ -2900,13 +2763,6 @@ body {
   --hud-t2: 15px;
   --hud-num: 16px;
   --hud-t3: 13px;
-}
-/* 글자가 바뀌는 버튼은 폭 고정 */
-@media (min-width: 761px) {
-  .play-controls button:first-child {
-    width: 76px;
-    text-align: center;
-  }
 }
 .toggle-label {
   display: inline-block;
@@ -2994,13 +2850,8 @@ body {
   .g-console .selection-facts dd {
     font-size: var(--hud-t2);
   }
-  .g-console .selection-facts dt,
-  .g-console .selection-info .workspace-panel-heading h2,
   .g-mood__v small {
     font-size: var(--hud-t3);
-  }
-  .g-console .selection-facts {
-    gap: 0 24px;
   }
   .g-mood__v b {
     font-size: var(--hud-t1);
@@ -3008,6 +2859,9 @@ body {
   /* 뜨는 창 */
   .workspace-panel-heading h2 {
     font-size: var(--hud-t1);
+  }
+  .g-console .selection-info .workspace-panel-heading h2 {
+    font-size: var(--hud-t3);
   }
   .workspace-panel-heading {
     padding: 0 0 8px;
@@ -3019,6 +2873,9 @@ body {
     font-size: var(--hud-t2);
   }
   .g-scout__facts dt {
+    font-size: var(--hud-t3);
+  }
+  .g-console .selection-facts dt {
     font-size: var(--hud-t3);
   }
   .g-scout__find {
@@ -3073,6 +2930,67 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.timber-tools .timber-heading {
+  display: block;
+}
+@media (min-width: 761px) {
+  .play-workspace.has-tools {
+    display: block;
+  }
+  .play-brand .eyebrow {
+    display: none;
+  }
+}
+@media (min-width: 761px) {
+  .g-console .selection-facts {
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    gap: 0 24px;
+    justify-content: start;
+  }
+}
+@media (min-width: 761px) {
+  .play-menu.g-console__cmd {
+    justify-content: stretch;
+    gap: 4px;
+  }
+}
+@media (min-width: 761px) {
+  .workspace-tools[hidden] {
+    display: none;
+  }
+  /* 긴 조달 체험 창은 두 단으로 펼쳐 한 화면에 */
+  .timber-tools .timber-demo {
+    column-count: 2;
+    column-gap: 40px;
+    column-fill: balance;
+  }
+}
+@media (min-width: 761px) {
+  .g-pin[hidden] {
+    display: none;
+  }
+}
+@media (min-width: 761px) {
+  .play-status .timber-entry-link {
+    justify-self: start;
+  }
+}
+
+/* 명령 콘솔 위 파견 중인 정찰대 */
+.g-console > .g-scout-faces {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+@media (min-width: 761px) {
+  .g-console .selection-facts {
+    gap: 0 24px;
+  }
 }
 .workspace-panel-heading h2,
 .timber-heading > div {
@@ -3202,8 +3120,8 @@ body {
 .g-next:hover {
   color: var(--meok);
 }
-/* 저장 2단계: 두 단 */
 @media (min-width: 761px) {
+  /* 저장 2단계: 두 단 */
   .workspace-tools:has(.g-save-file:not([hidden])) {
     width: min(980px, calc(100vw - 64px));
   }
@@ -3219,10 +3137,6 @@ body {
     background: none;
     border: 0;
     box-shadow: none;
-  }
-  .g-save-file .panel h2 {
-    margin: 0 0 8px;
-    font: 700 16px / 1.3 var(--font-title);
   }
   .g-save-file .panel p {
     margin: 0 0 8px;
@@ -3248,8 +3162,8 @@ body {
   border-radius: 4px;
   box-shadow: 0 0 0 1px var(--hanji-line);
 }
-.g-scout__facts {
-  margin-top: 0 !important;
+.g-scout .g-scout__facts {
+  margin-top: 0;
 }
 .g-scout__find,
 .g-scout .hint {
@@ -3258,8 +3172,8 @@ body {
 .g-scout__actions {
   align-self: end;
 }
-.g-scout .hint {
-  margin: 16px 0 0 !important;
+.g-scout p.hint {
+  margin: 16px 0 0;
 }
 
 /* 화면 밖 정찰 거점: 가장자리에 붙고 방향 화살표 */
@@ -3301,10 +3215,6 @@ body,
   align-items: center;
   gap: 12px;
 }
-.timber-demo .timber-heading > div {
-  flex: 1;
-  min-width: 0;
-}
 @media (min-width: 761px) {
   /* 조달·일손·개발 도구: 위 막대 아래부터 화면 끝까지 */
   .workspace-tools.timber-tools,
@@ -3330,23 +3240,19 @@ body,
     background: none;
     box-shadow: none;
   }
-  .workspace-panel .panel h2 {
-    font: 700 16px / 1.3 var(--font-title);
-    margin: 0 0 8px;
-  }
   /* 정찰 창 */
   .workspace-tools:has(.g-scout) {
     width: min(640px, calc(100vw - 64px));
   }
-  .g-scout__facts {
-    grid-template-columns: 72px 1fr !important;
+  .g-scout .g-scout__facts {
+    grid-template-columns: 72px 1fr;
   }
   .g-scout__facts dd {
     white-space: nowrap;
   }
 }
-/* 조달·일손: 닫기는 판 오른쪽 위 모서리 · 일손은 세 단 · 개발 도구는 세 단 */
 @media (min-width: 761px) {
+  /* 조달·일손: 닫기는 판 오른쪽 위 모서리 · 일손은 세 단 · 개발 도구는 세 단 */
   .timber-tools .timber-demo {
     position: relative;
   }
@@ -3376,9 +3282,8 @@ body,
     scrollbar-width: none;
   }
 }
-
-/* 조달 현장: 새 게임 HUD를 유지하면서 3D 선택과 작업 패널을 함께 조작한다. */
 @media (min-width: 761px) {
+  /* 조달 현장: 새 게임 HUD를 유지하면서 3D 선택과 작업 패널을 함께 조작한다. */
   .scene-viewport {
     height: 100%;
   }
@@ -3690,10 +3595,6 @@ body,
     left 0.6s,
     top 0.6s;
 }
-.g-mood .g-mood__v small {
-  font-weight: 800;
-  color: var(--meok);
-}
 .play-controls[hidden] {
   display: none;
 }
@@ -3709,10 +3610,6 @@ body,
   overflow-y: auto;
   padding-right: 28px;
   box-sizing: border-box;
-}
-.g-console .selection-info ul {
-  margin: 0;
-  padding-left: 1.2em;
 }
 .g-console .selection-clear {
   position: absolute;
@@ -3759,17 +3656,12 @@ body,
     --population-width: 205px;
     --controls-width: 174px;
   }
-  .g-top__frame img.inset:nth-child(2),
-  .settlement-heading > div:first-child {
+  .g-top__frame img.inset:nth-child(2) {
     width: var(--population-width);
   }
   .g-top__frame img.inset:nth-child(8),
   .play-controls {
     width: var(--controls-width);
-  }
-  .settlement-heading > div:first-child {
-    padding-inline: 4px;
-    white-space: nowrap;
   }
   .play-controls {
     padding-inline: 2px;
@@ -3827,14 +3719,6 @@ body,
   color: #382719;
   padding: 1px 3px;
 }
-.g-console__info > .g-mood .g-mood__v small {
-  font-size: 10px;
-  color: inherit;
-}
-.g-console__info > .g-mood .g-mood__v b {
-  font-size: 11px;
-}
-/* 일손 현장은 위의 스크롤 가능한 2단 레이아웃을 유지한다. */
 @media (min-width: 761px) {
   .is-procurement:not(.is-labor) .play-workspace.has-tools {
     inset: 55px 0 175px;
@@ -3932,7 +3816,7 @@ body,
 }
 .guide-toggle:has(+ .g-console:not(.console-folded)),
 .guide-report:has(~ .g-console:not(.console-folded)) {
-  bottom: 170px;
+  bottom: max(202px, calc(clamp(140px, 23dvh, 210px) + 12px));
 }
 .g-console__info:has(.building-shelf) > :not(.building-shelf) {
   display: none;
@@ -3959,8 +3843,8 @@ body,
 .building-shelf img {
   display: block;
   width: 100%;
-  height: 56px;
-  object-fit: cover;
+  height: clamp(48px, 7vh, 86px);
+  object-fit: contain;
 }
 .building-shelf small,
 .building-shelf b {
@@ -4003,18 +3887,6 @@ body,
   > :not(.timber-heading) {
   display: none;
 }
-.play-shell[data-section="거주지"] .timber-demo > [aria-label="거주지"],
-.play-shell[data-section="배급 정책"] .timber-demo > [aria-label="배급 정책"],
-.play-shell[data-section="연구와 교역망"]
-  .timber-demo
-  > [aria-label="건설과 식량 수급"] {
-  display: block;
-}
-.play-shell[data-section="연구와 교역망"]
-  [aria-label="건설과 식량 수급"]
-  > :not([aria-label="연구와 교역망"]) {
-  display: none;
-}
 .scout-all {
   background: #f8e9ca;
   color: #362717;
@@ -4052,12 +3924,10 @@ body,
   z-index: 6;
 }
 .play-shell:has(.g-console:not(.console-folded)) > .g-scout-faces {
-  bottom: 180px;
+  bottom: max(202px, calc(clamp(140px, 23dvh, 210px) + 12px));
 }
 @media (max-width: 760px) {
-  .play-shell .g-quests > .scout-all,
-  .play-shell .g-quests > small,
-  .play-shell .g-quests > .g-quest:first-of-type {
+  .play-shell .g-quests > .scout-all {
     display: block;
   }
   .play-shell > .g-console__map {
@@ -4085,16 +3955,6 @@ body,
 .research-icons button {
   position: relative;
 }
-.research-icons button > b {
-  position: absolute;
-  right: 4px;
-  top: 4px;
-  border-radius: 2px;
-  background: #7d3929;
-  color: #fff4d9;
-  padding: 2px 3px;
-  font-size: 10px;
-}
 
 .guide-toggle,
 .guide-report {
@@ -4116,6 +3976,19 @@ body,
 }
 .guide-toggle b {
   font-size: 24px;
+}
+.research-icons button > b {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  border-radius: 2px;
+  background: #7d3929;
+  color: #fff4d9;
+  padding: 2px 3px;
+  font-size: 10px;
+}
+.g-console__info > .g-mood .g-mood__v b {
+  font-size: 11px;
 }
 @media (max-width: 760px) {
   /* 모바일 조달에서 접힌 명령 버튼이 개발 도구(왼쪽 8px + 너비 72px)를 덮지 않게 한다. */
@@ -4160,11 +4033,6 @@ body,
   font-weight: 700;
   line-height: 1.45;
 }
-.g-console .guide-lines small {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-}
 .trade-deck .guide-lines {
   flex-basis: 100%;
 }
@@ -4202,4 +4070,967 @@ body,
 }
 span.capital-gate {
   pointer-events: none;
+}
+
+.facility-art .facility-reference {
+  height: auto;
+  max-height: 35vh;
+  width: 100%;
+  object-fit: contain;
+}
+.play-shell .campaign-quest {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  max-width: 100%;
+}
+.play-shell[data-prologue="true"]
+  :is(
+    .g-console,
+    .g-console__map,
+    .g-pins,
+    .guide-toggle,
+    .guide-report,
+    .workspace-tools,
+    .play-controls,
+    .play-status,
+    .g-scout-faces,
+    .g-quests > h2,
+    .g-fps
+  ) {
+  display: none;
+}
+.play-shell[data-prologue="true"]
+  .campaign-quest
+  > :not(dialog):not(.scout-all) {
+  display: none;
+}
+.play-shell[data-prologue="true"]
+  .campaign-quest:has(dialog[open])
+  > .scout-all {
+  display: none;
+}
+.play-shell:has(dialog.scene-bubble[open]) .guide-toggle {
+  visibility: hidden;
+}
+.play-shell .scene-bubble {
+  position: fixed;
+  inset: auto auto max(12px, env(safe-area-inset-bottom)) 12px;
+  margin: 0;
+  box-sizing: border-box;
+  width: min(430px, calc(100vw - 24px));
+  max-height: 48dvh;
+  padding: 10px 14px;
+  pointer-events: auto;
+  z-index: 15;
+}
+.scene-bubble .campaign-speech {
+  padding: 4px 0 8px;
+  font-size: 14px;
+}
+.scene-bubble .campaign-still {
+  max-height: 18vh;
+  object-fit: contain;
+}
+.campaign-quest > .village-advice {
+  position: fixed;
+  bottom: 100px;
+  left: 12px;
+  max-width: min(420px, 90vw);
+}
+.research-tree nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.research-tree nav [aria-pressed="true"] {
+  outline: 2px solid #85603b;
+}
+.research-tree ul {
+  list-style: none;
+  padding: 0 0 0 1em;
+  margin: 0.4em 0 0.4em 0.35em;
+  border-left: 1px solid #a68e65;
+}
+.research-tree li {
+  position: relative;
+  margin: 0.35em 0;
+}
+.research-tree li::before {
+  content: "";
+  position: absolute;
+  top: 1em;
+  left: -1em;
+  width: 1em;
+  border-top: 1px solid #a68e65;
+}
+.research-tree li [aria-pressed="true"] {
+  outline: 2px solid #876a43;
+}
+
+.play-shell .g-quests:has(.scene-bubble[open]) {
+  z-index: 21;
+  pointer-events: none;
+}
+
+.research-tree > ul > li:has(> ul) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+}
+.research-tree > ul > li > ul {
+  margin-left: 0;
+}
+.g-console .selection-info ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+#campaign-dialogue-dock:empty {
+  display: none;
+}
+.play-shell .g-console:has(#campaign-dialogue-dock dialog[open]) {
+  display: grid;
+  visibility: visible;
+  transform: none;
+  z-index: 20;
+}
+.g-console:has(#campaign-dialogue-dock dialog[open]):not(:has(.building-shelf))
+  > :is(.g-console__info, .docked-portrait, .dock-close) {
+  visibility: hidden;
+}
+.g-console #campaign-dialogue-dock {
+  position: absolute;
+  inset: 10% 2%;
+  z-index: 2;
+  pointer-events: none;
+}
+#campaign-dialogue-dock .scene-bubble {
+  position: relative;
+  inset: auto;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #342319;
+  overflow: auto;
+  cursor: pointer;
+  text-shadow: none;
+}
+#campaign-dialogue-dock .village-advice {
+  display: none;
+}
+#campaign-dialogue-dock .campaign-speech {
+  min-height: 64%;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 3vw, 52px);
+  padding: 0 3%;
+  font:
+    500 clamp(14px, 1.2vw, 19px) / 1.55 Batang,
+    "바탕",
+    serif;
+}
+#campaign-dialogue-dock .patrol-portrait {
+  width: clamp(44px, 6vw, 86px);
+  height: clamp(44px, 6vw, 86px);
+  object-fit: cover;
+}
+#campaign-dialogue-dock footer {
+  justify-content: flex-end;
+  margin: 0;
+  padding-right: 2%;
+}
+.g-console:has(.building-shelf) #campaign-dialogue-dock {
+  inset: auto auto calc(100% + 8px) 12px;
+  width: min(560px, 90vw);
+  padding: 10px;
+  background: #f6e7ce;
+  border: 1px solid #805f41;
+}
+.office-decree,
+.office-decree strong,
+.office-decree small {
+  text-shadow: none;
+  font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+  -webkit-font-smoothing: auto;
+}
+.play-shell .resource-card strong {
+  white-space: nowrap;
+}
+.mission-entry label,
+.mission-entry select {
+  color: #f7e7bf;
+  background: #282018;
+  border: 1px solid #ad946a;
+  font: inherit;
+}
+.mission-entry select {
+  padding: 0.35em 0.7em;
+}
+
+.story-face {
+  display: inline-block;
+  flex: none;
+  width: clamp(44px, 6vw, 86px);
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background-repeat: no-repeat;
+}
+.story-face.gori {
+  background-image: url("/story/campaign/gate.webp");
+  background-position: 29% 12%;
+  background-size: 390%;
+}
+.story-face.noble,
+.story-face.elder {
+  background-image: url("/story/campaign/mokjin-exodus.webp");
+  background-size: 800%;
+}
+.story-face.noble {
+  background-position: 4% 51%;
+}
+.story-face.elder {
+  background-position: 31% 50%;
+}
+#campaign-dialogue-dock .campaign-speech {
+  font-family: var(--font-title);
+}
+@media (max-width: 760px) {
+  .play-shell
+    .g-console:has(#campaign-dialogue-dock dialog[open]):not(
+      :has(.building-shelf)
+    ) {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: clamp(140px, 23dvh, 210px);
+    background: var(--hanji, #f6e7ce);
+    border-top: 4px solid #775b3b;
+  }
+}
+
+.play-shell[data-prologue="true"] .g-console__cmd {
+  visibility: hidden;
+  pointer-events: none;
+}
+.play-shell:not([data-prologue="true"])
+  .g-console:not(:has(.building-shelf))
+  #campaign-dialogue-dock {
+  right: clamp(122px, 12%, 230px);
+}
+@media (max-width: 760px) {
+  .play-shell
+    .g-console:has(#campaign-dialogue-dock dialog[open]):not(
+      :has(.building-shelf)
+    )
+    .g-console__cmd {
+    display: none;
+  }
+  .play-shell:not([data-prologue="true"])
+    .g-console:not(:has(.building-shelf))
+    #campaign-dialogue-dock {
+    right: 2%;
+  }
+}
+.g-console .shelf-guide {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  bottom: calc(100% + 5px);
+  left: 12px;
+  width: min(450px, 88vw);
+  padding: 7px 12px;
+  background: #f4e4c7;
+  border: 1px solid #8a6846;
+  border-radius: 5px;
+  color: #33251b;
+  pointer-events: none;
+}
+.shelf-guide > img {
+  width: 46px;
+  height: 46px;
+  object-fit: cover;
+}
+.g-console:has(#campaign-dialogue-dock dialog[open]) > .shelf-guide {
+  display: none;
+}
+#campaign-dialogue-dock .scene-bubble header:has(button) {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: block;
+}
+dialog.film-gallery:has(.campaign-film) .campaign-film {
+  height: calc(100% - 130px);
+}
+.film-gallery:has(.campaign-film) .gallery-caption {
+  bottom: 1.5rem;
+}
+
+@media (min-width: 761px) {
+  .play-shell
+    .g-console:not(:has(.building-shelf))
+    #campaign-dialogue-dock:not(:empty) {
+    position: relative;
+    inset: auto;
+    grid-area: 1 / 1 / 2 / 3;
+    align-self: stretch;
+    display: grid;
+    grid-template-columns: subgrid;
+  }
+  .g-console:not(:has(.building-shelf)) #campaign-dialogue-dock dialog[open],
+  .g-console:not(:has(.building-shelf))
+    #campaign-dialogue-dock
+    .campaign-speech {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+    padding: 0;
+  }
+  .g-console:not(:has(.building-shelf)) #campaign-dialogue-dock dialog[open] {
+    grid-template-rows: minmax(0, 1fr) auto;
+    overflow: auto;
+  }
+  .g-console:not(:has(.building-shelf))
+    #campaign-dialogue-dock
+    .campaign-speech {
+    grid-row: 1 / 3;
+    align-self: stretch;
+  }
+  .g-console:not(:has(.building-shelf))
+    #campaign-dialogue-dock
+    .campaign-speech
+    > :first-child:not(div) {
+    justify-self: center;
+    max-width: 80%;
+  }
+  .g-console:not(:has(.building-shelf))
+    #campaign-dialogue-dock
+    .campaign-speech
+    > div {
+    grid-column: 2;
+    padding-bottom: 24px;
+  }
+  .g-console:not(:has(.building-shelf)) #campaign-dialogue-dock footer {
+    grid-area: 2 / 2;
+    z-index: 1;
+  }
+}
+
+.village-slider {
+  display: grid;
+  gap: 0.5rem;
+  margin: 12px 0;
+}
+.village-slider input {
+  width: 100%;
+  accent-color: #caac73;
+  cursor: pointer;
+}
+.village-slider span {
+  display: flex;
+  justify-content: space-between;
+}
+.play-status p span {
+  color: var(--ink-sub);
+}
+.labor-demo .labor-stock > span {
+  padding: 0.35rem;
+  border-left: 1px solid var(--line);
+}
+.village-slider i {
+  font-style: normal;
+  font-size: 0.82em;
+}
+.village-census {
+  text-shadow: none;
+  line-height: 1.45;
+  color: #382c20;
+  background: #efe1c8;
+  border: 1px solid #806548;
+  border-radius: 5px;
+  max-width: 100%;
+}
+.village-census button {
+  width: 100%;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  border: 0;
+  padding: 0.4em;
+}
+.village-census dl {
+  margin: 0.5rem;
+}
+.village-census dd {
+  margin-left: 1em;
+  font-variant-numeric: tabular-nums;
+}
+.village-bulletin {
+  position: fixed;
+  z-index: 24;
+  inset: auto 1rem 24vh auto;
+  width: min(420px, 92vw);
+  max-height: 65dvh;
+  overflow: auto;
+  background: #29241ff5;
+  border: 1px solid #b49b6b;
+  color: #fff1d6;
+  box-shadow: 0 8px 30px #201c1680;
+}
+.village-bulletin img {
+  width: 100%;
+  max-height: 17vh;
+  object-fit: cover;
+  display: block;
+}
+.village-bulletin > div {
+  padding: 1rem;
+}
+.site-panel dl > div {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #375a4c;
+}
+.quality-report dl > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #375a4c;
+}
+.village-census dl div {
+  display: flex;
+  justify-content: space-between;
+}
+.site-panel .site-crew > div {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #375a4c;
+}
+@media (min-width: 761px) {
+  .settlement-heading > div:first-child {
+    position: absolute;
+    z-index: 2;
+    background: var(--card);
+    border: 1px solid var(--line);
+    box-shadow: var(--hud-shadow);
+  }
+  /* 왼쪽 위: 마을 상태 */
+  .settlement-heading > div:first-child {
+    top: 88px;
+    left: 12px;
+    padding: 10px 16px;
+    border-radius: 12px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1399px) {
+  .settlement-heading > div:first-child {
+    top: 156px;
+  }
+}
+@media (min-width: 761px) {
+  /* 왼쪽 칸: 복홀 현황 */
+  .settlement-heading > div:first-child {
+    top: 31px;
+    left: 36px;
+    width: var(--inset-w);
+    height: 56px;
+    padding: 0 16px;
+    display: grid;
+    align-content: center;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  .g-console .selection-facts div {
+    padding: 0;
+    border: 0;
+  }
+}
+@media (min-width: 761px) {
+  .settlement-heading > div:first-child {
+    top: 22px;
+    left: 25px;
+    height: 39px;
+    padding: 0 12px;
+  }
+}
+@media (min-width: 761px) {
+  .settlement-heading > div:first-child {
+    top: 17px;
+    left: 19px;
+    height: 30px;
+    padding: 0 10px;
+  }
+  .play-status .timber-entry-link::before {
+    content: "조달 · " / "";
+    color: var(--meok);
+    text-decoration: none;
+    display: inline-block;
+  }
+}
+@media (min-width: 761px) {
+  .play-status .timber-entry-link::before {
+    color: var(--hanji);
+  }
+}
+@media (min-width: 761px) {
+  .g-quest.is-found b {
+    color: #bfe3c8;
+  }
+}
+.offer-trade > span[aria-hidden] {
+  color: var(--meok-sub);
+}
+@media (min-width: 761px) {
+  /* 글자가 바뀌는 버튼은 폭 고정 */
+  .play-controls button:first-child {
+    width: 76px;
+    text-align: center;
+  }
+}
+.timber-demo .timber-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+.g-mood .g-mood__v small {
+  font-weight: 800;
+  color: var(--meok);
+}
+@media (min-width: 1100px) {
+  .settlement-heading > div:first-child {
+    width: var(--population-width);
+  }
+  .settlement-heading > div:first-child {
+    padding-inline: 4px;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 760px) {
+  .play-shell .g-quests > small {
+    display: block;
+  }
+}
+.g-console .guide-lines small {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+.g-console__info > .g-mood .g-mood__v small {
+  font-size: 10px;
+  color: inherit;
+}
+.village-bulletin h3 {
+  font-family: var(--font-title);
+  margin: 0.35em 0;
+}
+.village-bulletin p {
+  margin: 0.55em 0;
+  line-height: 1.5;
+}
+.village-bulletin button {
+  padding: 0.5em 0.75em;
+  margin-right: 0.3em;
+  background: #51402c;
+  color: #fff2d9;
+  border: 1px solid #a68c65;
+}
+.scene-bubble footer button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.research-tree nav button {
+  font-size: 12px;
+  white-space: normal;
+}
+.research-tree li button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px 7px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
+  font-size: 12px;
+  line-height: 1.35;
+  background: #ddd7ce;
+  color: #514b42;
+  border: 1px solid #999083;
+}
+.building-shelf button:has(img) {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  align-items: end;
+}
+.mission-entry label select,
+.bokhol-title nav > button {
+  font-family: var(--font-title);
+}
+.play-shell .campaign-quest > button {
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+  text-align: start;
+}
+.research-tree li [data-available="true"] {
+  background: #fff0cb;
+  color: #382617;
+  border-color: #aa7840;
+  box-shadow: 0 0 4px #c49b50;
+}
+.village-service:has(.research-tree) select {
+  max-width: 100%;
+}
+
+.play-shell[data-loading="true"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #100f0d;
+}
+#campaign-dialogue-dock .campaign-speech strong {
+  display: block;
+  margin: 0 0 0.28em;
+  text-indent: 0;
+}
+@media (min-width: 761px) {
+  .g-console:not(:has(.building-shelf))
+    #campaign-dialogue-dock
+    .campaign-speech
+    > :first-child:not(div) {
+    width: calc(100% - 18px);
+    height: calc(100% - 10px);
+    margin-inline-start: 12px;
+    max-width: 100%;
+    max-height: 100%;
+    min-height: 0;
+    aspect-ratio: auto;
+    align-self: center;
+    object-fit: cover;
+  }
+  .g-console:not(:has(.building-shelf))
+    #campaign-dialogue-dock
+    .campaign-speech
+    > div {
+    padding: 10px 0.5em 12px;
+    min-width: 0;
+  }
+}
+
+.research-folio {
+  margin: 12px 0;
+  padding: 14px 16px;
+  background: #f3e6c9;
+  border-left: 3px solid #916a39;
+  color: #35281b;
+}
+.research-folio h4 {
+  font: 700 1.25rem var(--font-title);
+  margin: 0.25rem 0;
+}
+.research-folio p {
+  margin: 0.45em 0;
+}
+#campaign-dialogue-dock .campaign-speech p {
+  white-space: pre-line;
+  margin: 0;
+  text-indent: 0;
+  line-height: 1.35;
+}
+.research-tree li button[aria-pressed="true"] {
+  outline: 2px solid #9d6d29;
+  outline-offset: 1px;
+}
+
+.region-map[open] {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  box-sizing: border-box;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  padding: clamp(12px, 3vw, 42px);
+  background: #211d17;
+  color: #f1dfbc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.region-map header {
+  width: min(100%, 1500px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#campaign-dialogue-dock .scene-bubble header {
+  display: none;
+}
+.play-shell[data-prologue="true"] #campaign-dialogue-dock .scene-bubble header {
+  display: none;
+}
+.region-map h2 {
+  font-family: serif;
+  margin: 0;
+}
+.scene-bubble header h2 {
+  font-size: 15px;
+}
+.scene-cinema header h2,
+.film-gallery header h2 {
+  color: #fff4db;
+}
+.workspace-panel .panel h2 {
+  font-size: 1rem;
+}
+@media (min-width: 761px) {
+  .g-save-file .panel h2 {
+    margin: 0 0 8px;
+    font: 700 16px / 1.3 var(--font-title);
+  }
+}
+@media (min-width: 761px) {
+  .workspace-panel .panel h2 {
+    font: 700 16px / 1.3 var(--font-title);
+    margin: 0 0 8px;
+  }
+}
+.campaign-dialog.mission-entry h2 {
+  font:
+    600 clamp(28px, 4.4vw, 70px) / 1.25 Batang,
+    "바탕",
+    serif;
+  letter-spacing: 0.045em;
+  text-shadow: 0 2px 12px #080808;
+}
+#campaign-dialogue-dock header h2 {
+  display: none;
+}
+.region-sheet {
+  position: relative;
+  width: min(100%, calc((100dvh - 116px) * 1.7778));
+}
+.region-sheet > img {
+  width: 100%;
+  display: block;
+}
+.research-tree li img {
+  width: 24px;
+  height: 24px;
+  filter: grayscale(1);
+  opacity: 0.65;
+}
+.research-tree li img {
+  object-fit: contain;
+  flex: none;
+}
+.building-shelf button img {
+  height: clamp(64px, 11vh, 130px);
+  max-height: 100%;
+  min-height: 0;
+  object-position: center bottom;
+}
+.g-quest .g-res img {
+  width: 18px;
+  height: 18px;
+}
+.offer-trade .g-res img {
+  width: 30px;
+  height: 30px;
+}
+.research-tree li [data-available="true"] img {
+  filter: none;
+  opacity: 1;
+}
+#campaign-dialogue-dock .campaign-speech img {
+  width: clamp(44px, 6vw, 86px);
+  height: clamp(44px, 6vw, 86px);
+  object-fit: cover;
+}
+.region-place,
+.region-scout {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: clamp(10px, 1vw, 15px);
+  border: 1px solid #805d36;
+  border-radius: 3px;
+  padding: 3px 6px;
+  background: #f6e3bd;
+  color: #372519;
+  white-space: nowrap;
+}
+.region-scout {
+  background: #463825;
+  color: #fff4cf;
+  transform: translate(-50%, 5%);
+}
+.mineral-pin {
+  font-size: 11px;
+  background: #302920;
+  color: #ffedc4;
+}
+.timber-demo:is(
+    [data-service="완공 시설"],
+    [data-service="일터 배치"],
+    [data-service="다음 임무"]
+  )
+  > :where(:not(.timber-heading):not([role="alert"])) {
+  display: none;
+}
+.timber-demo:is([data-service="완공 시설"], [data-service="일터 배치"])
+  > [aria-label="건설과 식량 수급"],
+.timber-demo[data-service="일터 배치"] > [aria-label="생산지 일손 배치"],
+.timber-demo[data-service="다음 임무"] > [data-testid="next-mission"] {
+  display: block;
+}
+.play-shell[data-section="거주지"] .timber-demo > [aria-label="거주지"],
+.play-shell[data-section="배급 정책"] .timber-demo > [aria-label="배급 정책"],
+.play-shell[data-section="연구와 교역망"]
+  .timber-demo
+  > [aria-label="건설과 식량 수급"] {
+  display: block;
+}
+.play-shell[data-section="연구와 교역망"]
+  [aria-label="건설과 식량 수급"]
+  > :not([aria-label="연구와 교역망"]) {
+  display: none;
+}
+@media (max-width: 760px) {
+  .play-shell .g-quests > .g-quest:first-of-type {
+    display: block;
+  }
+}
+.play-shell[data-prologue="true"] .g-quests .play-status {
+  display: none;
+}
+.timber-demo:is([data-service="완공 시설"], [data-service="일터 배치"])
+  > [aria-label="건설과 식량 수급"]
+  > :not(.facility-list):not([aria-label="병원 치료 현황"]) {
+  display: none;
+}
+.timber-demo[data-service="일터 배치"] .facility-list > :is(summary, p),
+.timber-demo[data-service="일터 배치"] .facility-list:not(:has(article)) {
+  display: none;
+}
+
+.map-clue {
+  position: absolute;
+  left: 1em;
+  bottom: 0;
+  padding: 0.4em 0.7em;
+  background: #382b1f;
+  color: #f5e6c9;
+}
+
+.village-visitor-marker:is(.mineral-pin, .gate-pin, .capital-gate) {
+  width: max-content;
+  height: auto;
+  padding: 4px 10px;
+  border: 1px solid #cda976;
+  border-radius: 4px;
+  font:
+    600 13px / 1.3 "Malgun Gothic",
+    sans-serif;
+  white-space: nowrap;
+  box-shadow: 0 1px 5px #17130de0;
+}
+.village-visitor-marker:is(.mineral-pin, .gate-pin, .capital-gate)::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: calc(50% - 4px);
+  border: 4px solid transparent;
+  border-top-color: #cda976;
+}
+
+.building-shelf button[data-cost] {
+  position: relative;
+}
+.building-shelf button[data-cost]:is(:hover, :focus-visible)::after {
+  content: attr(data-cost);
+  position: absolute;
+  left: 50%;
+  bottom: 1.6rem;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 3px;
+  background: #2b211cec;
+  color: #ffedc9;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.resident-ledger {
+  max-height: 50dvh;
+  overflow: auto;
+  padding: 0.6rem;
+  text-align: left;
+}
+.resident-ledger ul {
+  list-style: none;
+  padding: 0;
+}
+.resident-ledger li {
+  padding: 0.5rem 0;
+  border-top: 1px solid #b89a70;
+}
+.resident-ledger small,
+.resident-ledger select {
+  display: block;
+}
+.ration-choices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.4rem;
+}
+.ration-choices button {
+  width: 100%;
+  white-space: normal;
+  word-break: keep-all;
+}
+.village-bulletin {
+  inset: auto auto 23vh 1rem;
+}
+
+.village-completion-line:not(:empty) {
+  position: fixed;
+  z-index: 16;
+  bottom: calc(clamp(140px, 23dvh, 210px) + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 92vw;
+  padding: 0.35rem 0.9rem;
+  background: #30271e;
+  color: #fff1d4;
+  border: 1px solid #a98b5d;
+  border-radius: 4px;
+  pointer-events: none;
+  text-align: center;
+}
+.play-shell:has(.console-folded) .village-completion-line {
+  bottom: 1rem;
 }

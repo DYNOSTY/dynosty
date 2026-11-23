@@ -1,4 +1,4 @@
-import { type ReactNode, useId, useRef, useState } from "react";
+import { type ReactNode, useId, useRef } from "react";
 import { useAudio } from "./AudioProvider.js";
 
 // 게임 콘솔에서는 명령 칸 모양(children)으로 그린다. 접근 이름은 '설정' 그대로
@@ -9,27 +9,9 @@ export function SettingsMenu({
   className?: string;
   children?: ReactNode;
 } = {}) {
-  const { settings, warning, saveStatus, audioRef, updateSettings } =
-    useAudio();
-  const [previewStatus, setPreviewStatus] = useState("");
-  const [startingPreview, setStartingPreview] = useState(false);
+  const { settings, warning, saveStatus, updateSettings } = useAudio();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-
-  async function preview() {
-    setPreviewStatus("");
-    setStartingPreview(true);
-    try {
-      if (await audioRef.current?.preview())
-        setPreviewStatus("확인음을 재생했습니다.");
-    } catch {
-      setPreviewStatus(
-        "확인음을 재생하지 못했습니다. 브라우저의 소리 재생 권한을 확인해 주세요.",
-      );
-    } finally {
-      setStartingPreview(false);
-    }
-  }
 
   return (
     <>
@@ -58,11 +40,11 @@ export function SettingsMenu({
             dialogRef.current?.close();
         }}
         onKeyDown={(event) => {
-          if (event.key === "Escape") dialogRef.current?.close();
-        }}
-        onClose={() => {
-          audioRef.current?.stopPreview();
-          setPreviewStatus("");
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            dialogRef.current?.close();
+          }
         }}
       >
         <div className="settings-heading">
@@ -117,25 +99,8 @@ export function SettingsMenu({
           소리 끄기
         </label>
         <p className="hint">변경한 설정은 이 브라우저에 자동으로 저장됩니다.</p>
-        <button
-          type="button"
-          onClick={() => void preview()}
-          disabled={
-            startingPreview || settings.muted || settings.masterVolume === 0
-          }
-        >
-          확인음 듣기
-        </button>
-        <p className="hint">
-          {settings.muted || settings.masterVolume === 0
-            ? "소리가 꺼져 있습니다. 음량을 높이고 소리 끄기를 해제하면 확인음을 들을 수 있습니다."
-            : "짧은 확인음으로 음량을 확인합니다."}
-        </p>
         <p aria-live="polite" data-testid="settings-save-status">
           {saveStatus}
-        </p>
-        <p aria-live="polite" data-testid="audio-preview-status">
-          {previewStatus}
         </p>
         {warning ? <p role="alert">{warning}</p> : null}
       </dialog>

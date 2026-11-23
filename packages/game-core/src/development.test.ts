@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { newCampaign } from "./campaign.js";
 import {
   advanceDevelopment,
   productionRate,
@@ -399,4 +400,20 @@ it("최고 온상과 연구가 겹쳐도 생산2배를 넘지 않고 정찰2단�
   };
   expect(scoutSpeedRate(s)).toBe(2);
   expect(parseTimberState(s)).toEqual(s);
+});
+
+it("같은 어장의 한 분 생산 진척이 난이도 배율을 따른다", () => {
+  const base = staffed(build(start(), "fishery", 46, 32), "build-1", 1);
+  const before = first(base).progress;
+  const work = (difficulty: "easy" | "normal" | "hard") => {
+    const state = advanceTimber(
+      { ...base, campaign: { ...newCampaign("patrol"), difficulty } },
+      1,
+    );
+    return (first(state).progress - before + 30) % 30;
+  };
+  const normal = work("normal");
+  expect(normal).toBeGreaterThan(0);
+  expect(work("easy")).toBeCloseTo(normal * 1.2);
+  expect(work("hard")).toBeCloseTo(normal * 0.8);
 });

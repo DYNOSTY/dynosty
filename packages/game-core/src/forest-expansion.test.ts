@@ -9,6 +9,7 @@ import {
   loggingWorkId,
   setLoggingSite,
 } from "./logging.js";
+import { createPlayState } from "./play.js";
 import {
   advanceTimber,
   commandTimber,
@@ -21,6 +22,13 @@ import {
 } from "./timber.js";
 
 let sequence = 0;
+function fundedTown() {
+  const world = createPlayState();
+  return createTimberState({
+    ...world,
+    resources: { ...world.resources, RES_WOOD: 4500000 },
+  });
+}
 const command = (s: TimberState, c: TimberCommand) =>
   commandTimber(s, c, `forest-${++sequence}`);
 function build(s: TimberState, id: ForestId) {
@@ -56,7 +64,7 @@ it("중앙·외곽·구석 숲9곳의 자원을 따로 보존하고 각 권역�
   ).toBe(true);
 });
 it("제재소 두 곳이 주민을 중복 고용하지 않고 자기 숲만 줄이며 공동 재고에 각각 입고한다", () => {
-  let s = build(createTimberState(), "west");
+  let s = build(fundedTown(), "west");
   s = build(s, "central");
   s = command(s, { type: "set-logging-workers", siteId: "west", count: 2 });
   s = command(s, { type: "set-logging-workers", siteId: "central", count: 2 });
@@ -72,11 +80,11 @@ it("제재소 두 곳이 주민을 중복 고용하지 않고 자기 숲만 줄�
       .every((r) => r.workplaceId !== loggingWorkId("central")),
   ).toBe(true);
   const delivered = loggingSites(s).reduce((sum, l) => sum + l.delivered, 0);
-  expect(s.world.resources.RES_WOOD).toBe((120 - 80 + delivered) * 10000);
+  expect(s.world.resources.RES_WOOD).toBe((450 - 200 + delivered) * 10000);
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
 it("한 숲이 고갈되어도 다른 숲과 지형은 남고 다음 권역에 별도 시설을 건설한다", () => {
-  let s = command(build(createTimberState(), "west"), {
+  let s = command(build(fundedTown(), "west"), {
     type: "set-logging-workers",
     count: 4,
   });
@@ -93,7 +101,7 @@ it("한 숲이 고갈되어도 다른 숲과 지형은 남고 다음 권역에 �
   expect(loggingSite(s, "central").built).toBe(true);
 });
 it("외곽 운반·두 곳 동시 진행도 저장 재개 결과가 같으며 잘못된 권역·중복 운반자를 거부한다", () => {
-  let s = build(createTimberState(), "southeast");
+  let s = build(fundedTown(), "southeast");
   s = command(s, {
     type: "set-logging-workers",
     siteId: "southeast",

@@ -5,8 +5,11 @@ import {
   createPlayState,
   createTimberSave,
   createTimberState,
+  createVillageGame,
+  requireValue,
   type TimberState,
 } from "../../packages/game-core/dist/index.js";
+import { advanceVillageDay, readVillage } from "./read-village.js";
 
 const button = (page: Page, name: string) =>
   page.getByRole("button", { name, exact: true });
@@ -26,7 +29,7 @@ async function fixture(page: Page, s: TimberState) {
       ),
     createTimberSave(s),
   );
-  await button(page, "마른 목재20 조달 체험하기").click();
+  await button(page, "마른 목재 20 조달").click();
   await expect(page.getByTestId("timber-clock")).toBeVisible();
   await button(page, "저장").click();
   await button(page, "진행 불러오기").click();
@@ -35,68 +38,88 @@ async function fixture(page: Page, s: TimberState) {
   );
   await button(page, "저장").click();
 }
-async function cursor(page: Page, x: number, z: number) {
-  const box = await page.locator("canvas").boundingBox();
-  if (!box) throw Error("장면 없음");
-  const scale =
-    box.height / (2 * Math.tan(0.4) * (32 + z * Math.sin(Math.PI / 3)));
-  const point = {
-    x: box.x + box.width / 2 + x * scale,
-    y: box.y + box.height / 2 - z * Math.cos(Math.PI / 3) * scale,
-  };
-  await page.mouse.move(point.x, point.y);
-  return point;
-}
 test("시설 완성 모습으로 회전 배치하고 자재를 확보한 두 공사를 저장·재개해 완공한다", async ({
   page,
 }) => {
-  test.setTimeout(90000);
-  await fixture(page, start());
-  for (const [kind, x, z] of [
-    ["farm", 12, 12],
-    ["storage", 0, 16],
-  ] as const) {
-    await page.getByLabel("지을 건물", { exact: true }).selectOption(kind);
-    await button(page, "완성 모습으로 배치").click();
-    const p = await cursor(page, x, z);
-    await expect(page.getByTestId("home-placement-status")).toContainText(
-      "배치 가능",
+  const state = createVillageGame();
+  await page.addInitScript((save) => {
+    if (!localStorage.getItem("dynosty.village.resume"))
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(save));
+  }, createTimberSave(state));
+  const read = () => page.evaluate(readVillage);
+  await page.goto("/");
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+  );
+  await page.keyboard.press("b");
+  const shelf = page.getByRole("region", { name: "건물 목록" });
+  // Choose the same cards and page arrows available during normal play.
+  for (const [i, [name, x, z]] of (
+    [
+      ["공동 저장소", 0, 16],
+      ["온상 재배소", 12, 12],
+    ] as const
+  ).entries()) {
+    const card = shelf.getByRole("button", { name, exact: true });
+    while (!(await card.count())) {
+      await shelf.getByRole("button", { name: "다음 건물" }).click();
+    }
+    await card.click();
+    await page.evaluate(
+      ([x, z]) => {
+        const scene = (
+          window as unknown as {
+            __scene: import("@babylonjs/core/scene").Scene;
+          }
+        ).__scene;
+        const camera =
+          scene.activeCamera as import("@babylonjs/core/Cameras/arcRotateCamera").ArcRotateCamera;
+        const target = camera.target.clone();
+        target.set(x, 0, z);
+        camera.setTarget(target);
+        camera.radius = 36;
+      },
+      [x, z] as const,
     );
+    const box = requireValue(
+      await page.locator("canvas").first().boundingBox(),
+      "화면 위치",
+    );
+    const px = box.x + box.width / 2,
+      py = box.y + box.height / 2;
+    await page.mouse.move(px, py);
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByTestId("home-placement-status")).toContainText(
-      "195°",
-    );
-    await page.mouse.click(p.x, p.y);
+    await expect(
+      page.getByText(new RegExp(name + " · 배치 가능 · 방향 195°")).first(),
+    ).toBeVisible();
+    await page.mouse.click(px, py);
+    await expect
+      .poll(async () => (await read()).town.orders.length)
+      .toBe(i + 1);
   }
-  await expect(page.getByTestId("building-queue")).toContainText(
-    "건설 대기 2곳",
+  const ordered = await read();
+  expect(ordered.world.resources.RES_WOOD).toBe(
+    state.world.resources.RES_WOOD - (30 + 63) * 10000,
   );
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("83");
-  await button(page, "일시정지").click();
-  await button(page, "저장").click();
-  await button(page, "진행 저장").click();
-  await expect(page.getByTestId("timber-save-status")).toContainText(
-    "저장했습니다",
+  await page.keyboard.press("Escape");
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "저장하기", exact: true }).click();
+  const pausedOrders = (await read()).town.orders;
+  await dialog.getByRole("button", { name: /슬롯 1 ·/ }).click();
+  await expect(dialog).toContainText("슬롯 1에 저장했습니다");
+  await dialog.getByRole("button", { name: "뒤로" }).click();
+  await dialog.getByRole("button", { name: "불러오기" }).click();
+  await dialog.getByRole("button", { name: /슬롯 1 ·/ }).click();
+  await expect
+    .poll(async () => (await read()).town.orders)
+    .toEqual(pausedOrders);
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
   );
-  await button(page, "진행 불러오기").click();
-  await expect(page.getByTestId("building-queue")).toContainText(
-    "건설 대기 2곳",
-  );
-  await button(page, "저장").click();
-  await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
-  await button(page, "시간 재개").click();
-  await expect(page.getByText("완공 시설 2곳", { exact: true })).toBeVisible({
-    timeout: 65000,
-  });
-  await page.getByText("완공 시설 2곳", { exact: true }).click();
-  await page.getByLabel("build-1 운영 인원", { exact: true }).selectOption("4");
-  await expect(
-    page.getByLabel("build-1 운영 인원", { exact: true }),
-  ).toHaveValue("4");
-  await page.screenshot({
-    path: test.info().outputPath("자유배치_시설과_건설대기열.png"),
-    fullPage: true,
-  });
+  await advanceVillageDay(page);
+  await expect
+    .poll(async () => (await read()).town.facilities.map((f) => f.kind).sort())
+    .toEqual(["farm", "storage"]);
 });
 test("결빙 수역과 어획막을 표시하고 물가의 직원이 어류를 계속 입고한다", async ({
   page,

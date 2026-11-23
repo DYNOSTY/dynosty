@@ -1,5 +1,54 @@
 import type { GroundPoint } from "./resident-path.js";
 
+// Land survey in metres. The origin is the centre of a plot on every playable map.
+export const PLOT_STEP = 2;
+export function constructionPlot(p: GroundPoint): GroundPoint {
+  if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) return p;
+  return {
+    x: Math.floor(p.x / PLOT_STEP + 0.5) * PLOT_STEP,
+    z: Math.floor(p.z / PLOT_STEP + 0.5) * PLOT_STEP,
+  };
+}
+
+export const VILLAGE_LAYOUT: ReadonlyArray<readonly [string, number, number]> =
+  [
+    ["BLD_OFFICE", 0, -16],
+    ["BLD_NEST", -12, -10],
+    ["BLD_NEST", 12, -10],
+    ["BLD_WAREHOUSE", -16, 2],
+    ["BLD_WORKSHOP", 16, 0],
+    ["BLD_FORAGE", -12, 14],
+    ["BLD_GREENHOUSE", -6, 22],
+    ["BLD_WATER", 10, 18],
+    ["BLD_FISHERY", 20, 8],
+    ["BLD_WATCH", -22, -16],
+    ["BLD_CLINIC", -8, -20],
+    ["BLD_SALVAGE", 10, -20],
+    ["BLD_GATE", 0, 24],
+  ];
+
+export function fixedBuildingAt(p: GroundPoint, rebuilding: boolean) {
+  return VILLAGE_LAYOUT.some(
+    ([id, x, z]) =>
+      id !== "BLD_NEST" &&
+      !(rebuilding && (id === "BLD_WORKSHOP" || id === "BLD_CLINIC")) &&
+      Math.abs(x - p.x) < 4.5 &&
+      Math.abs(z - p.z) < 4.5,
+  );
+}
+
+export function reservedVillageLand(p: GroundPoint, rebuilding: boolean) {
+  if (fixedBuildingAt(p, rebuilding)) return "기존 시설이 차지한 구획이에요.";
+  if (Math.abs(p.x) <= 4 && Math.abs(p.z) <= 4)
+    return "중앙 광장은 비워 두어야 해요.";
+  if (
+    Math.hypot(p.x - VILLAGE_POND.x, p.z - VILLAGE_POND.z) <
+    VILLAGE_POND.r + 3.2
+  )
+    return "물 위에는 지을 수 없어요.";
+  return null;
+}
+export const VILLAGE_POND = { x: 20, z: 16, r: 3.6 };
 export const BOKHOL_WATERS = [
   { id: "east-pond", name: "동쪽 물고기 못", x: 60, z: 32, radius: 10 },
   { id: "south-pond", name: "남쪽 물고기 못", x: 30, z: 65, radius: 12 },
@@ -80,6 +129,42 @@ export const BOKHOL_MINERALS = [
     z: -40,
     initial: 240,
   },
+  {
+    id: "coal-bokhol",
+    name: "복홀 서쪽 석탄층",
+    kind: "coal",
+    resource: "RES_COAL",
+    x: -76,
+    z: 17,
+    initial: 180,
+  },
+  {
+    id: "iron-bokhol",
+    name: "복홀 북쪽 철광맥",
+    kind: "iron",
+    resource: "RES_IRON_ORE",
+    x: 46,
+    z: -44,
+    initial: 160,
+  },
+  {
+    id: "stone-bokhol-west",
+    name: "복홀 서북쪽 암반",
+    kind: "stone",
+    resource: "RES_STONE",
+    x: -53,
+    z: -46,
+    initial: 240,
+  },
+  {
+    id: "stone-bokhol-south",
+    name: "복홀 남쪽 암반",
+    kind: "stone",
+    resource: "RES_STONE",
+    x: 9,
+    z: 48,
+    initial: 240,
+  },
 ] as const;
 export const BOKHOL_PRODUCTION_SITES = [
   ...BOKHOL_FORESTS.map((f) => ({
@@ -149,12 +234,18 @@ function landscape(x: number, z: number, forest: ForestAmounts): number {
   for (const site of BOKHOL_MINERALS) {
     const distance = Math.hypot(x - site.x, z - site.z);
     height -=
-      (site.kind === "stone" ? 4 : 7) * (1 - smooth((distance - 7) / 13));
+      (site.kind === "stone" && !site.id.includes("bokhol") ? 4 : 7) *
+      (1 - smooth((distance - 7) / 13));
   }
   for (const w of BOKHOL_WATERS) {
     const distance = Math.hypot(x - w.x, z - w.z);
     if (distance < w.radius + 7)
       height = -1 + (height + 1) * smooth((distance - w.radius) / 7);
+  }
+  for (const site of BOKHOL_MINERALS) {
+    if (!site.id.includes("bokhol")) continue;
+    const distance = Math.hypot(x - (site.x + 15), z - site.z);
+    if (distance < 10) height *= smooth((distance - 6) / 4);
   }
   return height;
 }
@@ -170,7 +261,7 @@ export function bokholElevation(
     levels = 0;
   for (const p of foundations) {
     const distance = Math.hypot(x - p.x, z - p.z);
-    const weight = 1 - smooth((distance - 3.5) / 1.5);
+    const weight = 1 - smooth((distance - 5) / 2);
     if (weight === 0) continue;
     total += weight;
     levels += landscape(p.x, p.z, forest) * weight;

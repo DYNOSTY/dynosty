@@ -3,12 +3,13 @@ import {
   BOKHOL_MAP,
   BOKHOL_MINERALS,
   BOKHOL_PRODUCTION_SITES,
+  constructionPlot,
   type ProductionSiteId,
   productionSiteDefinition,
   sawmillHasForest,
 } from "./bokhol.js";
 import { residentShiftOpen, resourceRate } from "./development.js";
-import { AMOUNT_SCALE } from "./play.js";
+import { AMOUNT_SCALE, productionMultiplier } from "./play.js";
 import { type GroundPoint, residentPath } from "./resident-path.js";
 import { workplaceOpen } from "./resident-routine.js";
 import { isRecord } from "./save.js";
@@ -22,7 +23,8 @@ export const LOGGING_RULES = {
   pickup: { x: -24, z: -7 },
   maxWorkers: 4,
   forest: 120,
-  minutesPerWood: 10,
+  treesPerForest: 32,
+  workPerUnit: 10,
   buffer: 20,
   batch: 5,
   speed: 2,
@@ -110,6 +112,8 @@ export function loggingSiteRules(id: ProductionSiteId = "west") {
   if (!f) throw new RangeError("알 수 없는 숲 권역입니다.");
   return {
     ...LOGGING_RULES,
+    workshopPlot: constructionPlot({ x: f.x + 13, z: f.z }),
+    storagePlot: constructionPlot({ x: f.x + 13, z: f.z + 10 }),
     workshop: { x: f.x + 13, z: f.z },
     storage: { x: f.x + 16, z: f.z + 10 },
     pickup: { x: f.x + 16, z: f.z + 1 },
@@ -279,9 +283,17 @@ function advanceOneLogging(
     work
   ) {
     const total =
-      l.progress + work * minutes * resourceRate(s, definition.resource);
+      Math.round(
+        (l.progress +
+          work *
+            LOGGING_RULES.workPerUnit *
+            minutes *
+            resourceRate(s, definition.resource) *
+            productionMultiplier(s.campaign?.difficulty)) *
+          1000,
+      ) / 1000;
     const made = Math.min(
-      Math.floor(total / LOGGING_RULES.minutesPerWood),
+      Math.floor(total / LOGGING_RULES.workPerUnit),
       l.remaining,
       LOGGING_RULES.buffer - l.buffer,
     );
@@ -289,7 +301,7 @@ function advanceOneLogging(
       ...l,
       remaining: l.remaining - made,
       buffer: l.buffer + made,
-      progress: total % LOGGING_RULES.minutesPerWood,
+      progress: total % LOGGING_RULES.workPerUnit,
     };
   }
   if (!l.haul && l.storageBuilt && l.buffer && workplaceOpen(s.world.minute)) {
@@ -493,7 +505,10 @@ function oneLoggingValid(s: TimberState): boolean {
     !integer(l.target, 4) ||
     !integer(l.remaining, definition.initial) ||
     !integer(l.buffer, 20) ||
-    !integer(l.progress, 9) ||
+    typeof l.progress !== "number" ||
+    !Number.isFinite(l.progress) ||
+    l.progress < 0 ||
+    l.progress >= LOGGING_RULES.workPerUnit ||
     !integer(l.delivered, definition.initial)
   )
     return false;

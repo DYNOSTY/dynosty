@@ -17,35 +17,17 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
-import {
-  DEPARTURE_SURVIVING_HOME_COUNT,
-  initialHomes,
-} from "@dynosty/game-core";
+import { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
 import { loadSceneAsset as load } from "./scene-assets.js";
-import { RESTAURANT_CENTER } from "./timber-scene.js";
 import { elevation, rng, type Season } from "./world.js";
 
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
 export const BUILDING_SCALE = 0.75; // 둥지 지붕 1.85m = 목재 체험 보수 표시 높이
-export const RESIDENT_SCALE = 0.5;
+export const RESIDENT_SCALE = 0.75;
 const OUTLINE = new Color3(0.3, 0.9, 1); // 현장과 대표 모델의 공통 선택색
 
-// [건물, x, z] — 입구(+Z)가 마당을 향함. 가운데 반경 9m는 체험 소품 자리로 비워 둠
-export const LAYOUT: Array<[string, number, number]> = [
-  ["BLD_OFFICE", 0, -14],
-  ["BLD_NEST", -11, -9],
-  ["BLD_NEST", 11, -9],
-  ["BLD_WAREHOUSE", -15, 1],
-  ["BLD_WORKSHOP", 15, 0],
-  ["BLD_FORAGE", -11, 11],
-  ["BLD_GREENHOUSE", -3, 16],
-  ["BLD_WATER", 9, 16],
-  ["BLD_FISHERY", 20, 7],
-  ["BLD_WATCH", -20, -8],
-  ["BLD_CLINIC", -7, -20],
-  ["BLD_SALVAGE", 9, -20],
-  ["BLD_GATE", 0, 23],
-];
+export { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
+
 // 공룡마다 원래 몸집 차이는 살리되, 가장 큰 브라키오사우루스도 둥지 문(약 1.38m) 안으로 들어가게
 // [게임 안 키(m), 모델 키] — 모델은 종과 상관없이 비슷한 크기로 만들어져 있어 종별로 따로 줄임
 const RESIDENT_HEIGHT: Record<string, [number, number]> = {
@@ -335,14 +317,39 @@ export function createVillage(
         haul: { ...role, state: "work", timer: 2 + r() * 3 },
       });
     }
+    return node;
   };
   const face = (x: number, z: number) => Math.atan2(-x, -z); // +Z가 마당 쪽
-  const jobs: Array<Promise<void>> = LAYOUT.filter(
+  const lostQuarter = new Set<TransformNode>();
+  let exodusVisible = false;
+  let previewResidentsVisible = true;
+  const jobs: Array<Promise<unknown>> = LAYOUT.filter(
     ([id]) => id !== "BLD_NEST",
   ).map(([id, x, z]) =>
     place(id, x, z, id === "BLD_GATE" ? Math.PI : face(x, z), BUILDING_SCALE),
   );
 
+  for (const [row, z] of [-28, -14, 0, 14, 28].entries()) {
+    for (const [col, x] of [-30, 30].entries()) {
+      const model = ["BLD_NEST", "BLD_WAREHOUSE", "BLD_WORKSHOP"][
+        (row + col) % 3
+      ];
+      jobs.push(
+        place(
+          `/models/buildings/${model}.glb`,
+          x,
+          z,
+          face(x, z),
+          BUILDING_SCALE,
+        ).then((node) => {
+          if (node) {
+            lostQuarter.add(node);
+            node.setEnabled(exodusVisible);
+          }
+        }),
+      );
+    }
+  }
   // 등에 지는 짐 (모델 단위: 주민 0.5배 안에서 등 높이)
   const propMat = (name: string, hex: string) => {
     const m = new StandardMaterial(name, scene);
@@ -458,14 +465,18 @@ export function createVillage(
   puff.update();
   puff.hasAlpha = true;
   const fires = [
-    { ...RESTAURANT_CENTER, height: 0.55 },
-    ...initialHomes()
-      .slice(DEPARTURE_SURVIVING_HOME_COUNT)
-      .map(({ position }) => ({ ...position, height: 1.8 })),
-  ].map(({ x, z, height }, i) => {
+    [-30, 0],
+    [30, -14],
+    [-8, -20],
+    [16, 0],
+    [-10, -8],
+  ].map(([x = 0, z = 0], i) => {
     const fire = new ParticleSystem("처마 불길-" + i, 90, scene);
     fire.particleTexture = puff;
-    fire.emitter = new Vector3(x, elevation(x, z) + height, z);
+    fire.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    fire.minScaleY = 1.2;
+    fire.maxScaleY = 1.9;
+    fire.emitter = new Vector3(x, elevation(x, z) + 1.8, z);
     fire.minEmitBox = new Vector3(-1, 0, -0.5);
     fire.maxEmitBox = new Vector3(1, 0, 0.5);
     fire.direction1 = new Vector3(-0.4, 1.8, -0.2);
@@ -475,9 +486,10 @@ export function createVillage(
     fire.minSize = 0.4;
     fire.maxSize = 1.2;
     fire.emitRate = 55;
-    fire.color1 = new Color4(1, 0.65, 0.08, 1);
-    fire.color2 = new Color4(0.9, 0.22, 0.02, 1);
-    fire.colorDead = new Color4(0.2, 0.12, 0.09, 0);
+    fire.addColorGradient(0, new Color4(1, 0.72, 0.13, 1));
+    fire.addColorGradient(0.36, new Color4(0.94, 0.26, 0.04, 0.9));
+    fire.addColorGradient(0.72, new Color4(0.24, 0.17, 0.14, 0.64));
+    fire.addColorGradient(1, new Color4(0.18, 0.17, 0.16, 0));
     return fire;
   });
   const CHIMNEY: Record<string, number> = {
@@ -575,6 +587,7 @@ export function createVillage(
     z: number;
     start: number;
     hours: number;
+    due: number;
   };
   type Party = {
     m: Mission;
@@ -599,7 +612,11 @@ export function createVillage(
         parties.delete(id);
       }
     for (const m of list) {
-      if (parties.has(m.id)) continue;
+      const underway = parties.get(m.id);
+      if (underway) {
+        underway.m = m;
+        continue;
+      }
       const dir = new Vector3(m.x, 0, m.z).normalize();
       const party: Party = {
         m,
@@ -643,8 +660,8 @@ export function createVillage(
       let t = -1,
         out = true;
       if (e >= 0 && e < travel) t = e / travel;
-      else if (e >= total - travel && e < total) {
-        t = 1 - (e - (total - travel)) / travel;
+      else if (gameMin >= p.m.due - travel && gameMin < p.m.due) {
+        t = (p.m.due - gameMin) / travel;
         out = false;
       }
       const dx = p.to.x - p.from.x,
@@ -751,7 +768,7 @@ export function createVillage(
       if (delivery === 1) delivery = -1;
     }
     animateRisers(dt);
-    if (!running) return;
+    if (!running && !exodusVisible) return;
     for (const w of walkers) {
       const h = w.haul;
       if (h) {
@@ -895,15 +912,26 @@ export function createVillage(
       herald.setEnabled(false);
       writ.setEnabled(false);
     },
-    setDepartureFire(burning: boolean, restaurantBuilt: boolean) {
-      for (const [i, fire] of fires.entries()) {
-        const active = burning && (i > 0 || restaurantBuilt);
-        if (active && !fire.isStarted()) fire.start();
-        if (!active && fire.isStarted()) fire.stop();
+    setFireDamage(burned: boolean, burning: boolean) {
+      exodusVisible = burning;
+      for (const w of walkers)
+        if (w.haul) w.node.setEnabled(burning || previewResidentsVisible);
+      for (const node of lostQuarter) node.setEnabled(burning);
+      for (const fire of fires) {
+        if (burning && !fire.isStarted()) fire.start();
+        if (!burning && fire.isStarted()) fire.stop();
       }
+      for (const node of nodes)
+        if (
+          !lostQuarter.has(node) &&
+          ["BLD_CLINIC.glb", "BLD_WORKSHOP.glb"].includes(node.name)
+        )
+          node.setEnabled(!burned);
     },
     setPreviewResidentsVisible(visible: boolean) {
-      for (const walker of walkers) walker.node.setEnabled(visible);
+      previewResidentsVisible = visible;
+      for (const walker of walkers)
+        walker.node.setEnabled(visible || (exodusVisible && !!walker.haul));
     },
     targets,
     mark,

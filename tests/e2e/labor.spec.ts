@@ -1,11 +1,12 @@
 import { expect, type Page, test } from "@playwright/test";
+import { openLaborPanel } from "./workspace.js";
 
 const b = (p: Page, n: string) =>
   p.getByRole("button", { name: n, exact: true });
 async function enter(p: Page) {
   await p.goto("/");
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 }
 async function start(p: Page, offer = "A") {
@@ -60,14 +61,14 @@ test("재배치는 중복 없이 보완을 멈추고 저장·새로고침 후 �
   await prepareA(p);
   await b(p, "일손 1시간 진행").click();
   await move(p, 2, "prep");
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );
@@ -107,7 +108,7 @@ test("손상 저장 거부 시 현재 배정과 저장 원문을 모두 보존�
 }) => {
   await enter(p);
   await prepareA(p);
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
@@ -118,10 +119,10 @@ test("손상 저장 거부 시 현재 배정과 저장 원문을 모두 보존�
     localStorage.setItem("dynosty.labor.saves", text);
     return text;
   });
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByRole("alert")).toContainText("중복");
   await expect(p.getByTestId("crew-2-job")).toHaveText("목재 보완");
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByRole("alert")).toContainText("중복");
   expect(
     await p.evaluate(() => localStorage.getItem("dynosty.labor.saves")),
@@ -137,21 +138,21 @@ test("기존 저장과 이전 일손 저장을 보존하고 다른 체험으로 
     localStorage.setItem("dynosty.timber.saves", "keep timber");
     localStorage.setItem("dynosty.play.saves", "keep survival");
   });
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await b(p, "일손 1시간 진행").click();
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
-  await b(p, "이전 일손 체험 불러오기").click();
+  await b(p, "이전 일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
   await b(p, "일손 시간 시작").click();
-  await b(p, "기존 목재 체험 보기").click();
+  await b(p, "목재 조달 보기").click();
   await p.waitForTimeout(1200);
-  await b(p, "일손 배치·배급 체험하기").click();
+  await openLaborPanel(p);
   await expect(b(p, "일손 시간 시작")).toBeVisible();
   const clock = await p.getByTestId("labor-clock").textContent();
   await p.waitForTimeout(1200);
@@ -182,12 +183,12 @@ test("일손 저장 쓰기 실패는 현재 진행과 최근·이전 저장을 �
 }) => {
   await enter(p);
   await prepareA(p);
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await b(p, "일손 1시간 진행").click();
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
@@ -202,7 +203,7 @@ test("일손 저장 쓰기 실패는 현재 진행과 최근·이전 저장을 �
       original.call(this, key, value);
     };
   });
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByRole("alert")).toContainText("기존 원본은 유지");
   expect(
     await p.evaluate(() => localStorage.getItem("dynosty.labor.saves")),
@@ -248,7 +249,7 @@ for (const kind of ["prep-at-open", "repair-paused"] as const) {
     await enter(p);
     await prepareA(p);
     if (kind === "repair-paused") await move(p, 2, "prep");
-    await b(p, "일손 체험 저장").click();
+    await b(p, "일손 배치 저장").click();
     await expect(p.getByTestId("labor-save-status")).toContainText(
       "저장했습니다",
     );
@@ -260,7 +261,7 @@ for (const kind of ["prep-at-open", "repair-paused"] as const) {
       localStorage.setItem("dynosty.labor.saves", text);
       return text;
     }, kind);
-    await b(p, "일손 체험 불러오기").click();
+    await b(p, "일손 배치 불러오기").click();
     await expect(p.getByRole("alert")).toContainText("경과 시간");
     await expect(p.getByTestId("labor-clock")).toContainText("8시간 0분");
     await expect(p.getByTestId("labor-repair")).toContainText("0/240");
@@ -271,7 +272,7 @@ for (const kind of ["prep-at-open", "repair-paused"] as const) {
     expect(
       await p.evaluate(() => localStorage.getItem("dynosty.labor.saves")),
     ).toBe(raw);
-    await b(p, "일손 체험 저장").click();
+    await b(p, "일손 배치 저장").click();
     await expect(p.getByRole("alert")).toContainText("경과 시간");
     expect(
       await p.evaluate(() => localStorage.getItem("dynosty.labor.saves")),

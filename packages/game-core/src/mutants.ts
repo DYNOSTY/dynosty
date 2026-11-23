@@ -1,4 +1,5 @@
 import { isMechanical, upgradeCost } from "./development.js";
+import { requireValue } from "./require-value.js";
 import {
   applyAutomaticCitizenEvent,
   note,
@@ -71,7 +72,11 @@ export function repairMutantDamage(s: TimberState, id: string) {
       },
       "온돌 둥지를 다시 쓸 수 있습니다.",
     );
-  return note(repaired, mutantStructure(s, id)!.name + " 수리를 마쳤습니다.");
+  return note(
+    repaired,
+    requireValue(mutantStructure(s, id), "수리할 건물").name +
+      " 수리를 마쳤습니다.",
+  );
 }
 function policeAvailable(s: TimberState) {
   return (
@@ -85,7 +90,8 @@ function policeAvailable(s: TimberState) {
   );
 }
 export function mutantWound(s: TimberState, id: string, random: () => number) {
-  if (s.mutants?.some((m) => m.id === id) || random() >= 0.2) return s;
+  if (random() >= 0.2) return s;
+  if (s.mutants?.some((m) => m.id === id)) return s;
   return note(
     {
       ...s,
@@ -113,7 +119,7 @@ export function advanceMutants(
 ): TimberState {
   for (const m of s.mutants ?? []) {
     if (!s.world.citizens.find((c) => c.id === m.id)?.alive) {
-      s = { ...s, mutants: s.mutants!.filter((q) => q.id !== m.id) };
+      s = { ...s, mutants: (s.mutants ?? []).filter((q) => q.id !== m.id) };
       continue;
     }
     const responding = policeAvailable(s);
@@ -135,7 +141,8 @@ export function advanceMutants(
         r.task !== "patrol-recovery",
     );
     if (residents.length && (!targets.length || random() < 0.5)) {
-      const victim = residents[Math.floor(random() * residents.length)]!;
+      const victim = residents[Math.floor(random() * residents.length)];
+      if (!victim) continue;
       const key = "mutant-" + m.id + "-" + s.elapsed;
       s = applyAutomaticCitizenEvent(s, {
         id: key,
@@ -148,11 +155,12 @@ export function advanceMutants(
         "주민: 날 못 알아보더니 그대로 덮쳤어. 의원 좀 불러 줘!",
       );
     } else if (targets.length) {
-      const target = targets[Math.floor(random() * targets.length)]!;
+      const target = targets[Math.floor(random() * targets.length)];
+      if (!target) continue;
       const damage = Math.min(100, (s.mutantDamage?.[target.id] ?? 0) + 25);
       s = note(
         { ...s, mutantDamage: { ...s.mutantDamage, [target.id]: damage } },
-        mutantStructure(s, target.id)!.name +
+        BUILDING_RULES["kind" in target ? target.kind : "home"].name +
           (damage === 100 ? "이 무너졌습니다." : " 기둥이 부러졌습니다."),
       );
       if (damage === 100 && s.homes.some((h) => h.id === target.id))
@@ -168,7 +176,7 @@ export function advanceMutants(
     }
     s = {
       ...s,
-      mutants: s.mutants!.map((q) =>
+      mutants: (s.mutants ?? []).map((q) =>
         q.id === m.id ? { ...q, due: s.elapsed + 30 } : q,
       ),
     };

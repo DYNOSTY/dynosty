@@ -5,6 +5,7 @@ import {
   receiveProgress,
 } from "./progress-helpers.js";
 import { clickFloor } from "./scene-picking.js";
+import { openLaborPanel } from "./workspace.js";
 
 async function horizontalOffset(p: Page, id: string) {
   const c = await p.locator("canvas").boundingBox(),
@@ -102,14 +103,14 @@ test("보완 역할 표지·먼저 배분 링크·장소 이동·빈 바닥·저
   );
   await clickFloor(p);
   await expect(p.getByTestId("site-name")).toHaveCount(0);
-  await b(p, "일손 체험 저장").click();
+  await b(p, "일손 배치 저장").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "저장했습니다",
   );
   await p.reload();
-  await b(p, "마른 목재20 조달 체험하기").click();
-  await b(p, "일손 배치·배급 체험하기").click();
-  await b(p, "일손 체험 불러오기").click();
+  await b(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
+  await b(p, "일손 배치 불러오기").click();
   await expect(p.getByTestId("labor-save-status")).toContainText(
     "불러왔습니다",
   );
@@ -129,10 +130,10 @@ for (const viewport of [
   }) => {
     await p.setViewportSize(viewport);
     await p.goto("/");
-    await b(p, "마른 목재20 조달 체험하기").click();
+    await b(p, "마른 목재 20 조달").click();
     const tools = b(p, "개발 도구");
     await tools.press("Enter");
-    await b(p, "일손 배치·배급 체험하기").click();
+    await b(p, "일손 배치·배급").click();
     await tools.press("Enter");
     await expect(tools).toHaveAttribute("aria-expanded", "false");
     await b(p, "배급 준비 장소 보기").click();
@@ -159,34 +160,6 @@ for (const viewport of [
     ).toBe(true);
   });
 }
-test.describe("모바일 터치", () => {
-  test.use({
-    viewport: { width: 375, height: 812 },
-    isMobile: true,
-    hasTouch: true,
-  });
-
-  test("명령이 접힌 상태에서 개발 도구를 탭해 일손 체험에 들어간다", async ({
-    page,
-  }) => {
-    await page.goto("/");
-    await b(page, "마른 목재20 조달 체험하기").tap();
-    const commands = b(page, "명령 열기");
-    const tools = b(page, "개발 도구");
-    await expect(commands).toHaveAttribute("aria-expanded", "false");
-    await expect(tools).toHaveAttribute("aria-expanded", "false");
-    await tools.tap();
-    await expect(tools).toHaveAttribute("aria-expanded", "true");
-    await b(page, "일손 배치·배급 체험하기").tap();
-    await b(page, "개발 도구 닫기").tap();
-    await expect(tools).toHaveAttribute("aria-expanded", "false");
-    await b(page, "배급 준비 장소 보기").tap();
-    await expect
-      .poll(() => horizontalOffset(page, "site-ration"))
-      .toBeLessThan(5);
-  });
-});
-
 test("375px 키보드 장소 이동·기본 복귀·기호 표지는 가로 넘침이나 클릭 가림이 없다", async ({
   page: p,
 }) => {

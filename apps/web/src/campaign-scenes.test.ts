@@ -1,6 +1,8 @@
 import {
   AMOUNT_SCALE,
+  campaignOf,
   commandTimber,
+  createCapital,
   createTimberSave,
   createVillageGame,
   parseTimberSave,
@@ -11,6 +13,7 @@ import {
 import { expect, it } from "vitest";
 import {
   campaignPage,
+  firstVillageTask,
   gatheringRumor,
   moraleAdvice,
   villageAdvice,
@@ -63,7 +66,7 @@ it("legacy control verdict opens the mechanization route, not Yangnyeong's order
     "판결을 기록하고 의원으로",
   );
   expect(campaignPage(verdict).lines.flat().join(" ")).toContain(
-    "충녕 마마가 돌아가셨어요",
+    "공주마마께서 돌아가셨어요",
   );
   expect(campaignPage(next).title).toBe("의원의 등잔");
   expect(
@@ -198,7 +201,7 @@ it("달이는 출문 뒤 처음 한 번 저울을 소개하고 이후 지지의 
   const s = createVillageGame();
   const page = campaignPage({
     ...s,
-    campaign: { ...s.campaign!, beat: "after" },
+    campaign: { ...campaignOf(s), beat: "after" },
   });
   expect(
     page.lines
@@ -252,7 +255,7 @@ it("안내는 도착한 상인과 주민, 돌아온 조와 아직 부족한 식�
   expect(villageAdvice(scout, false)).toContain("정찰대가 돌아왔어");
   expect(
     villageAdvice(
-      { ...scout, campaign: { ...s.campaign!, reports: ["reed"] } },
+      { ...scout, campaign: { ...campaignOf(s), reports: ["reed"] } },
       false,
     ),
   ).not.toContain("돌아왔어");
@@ -270,7 +273,7 @@ it("기계 충녕은 결말에서만 처음 인사한다", () => {
       ...s,
       chapter: 5,
       campaign: {
-        ...s.campaign!,
+        ...campaignOf(s),
         beat: "ending",
         ending: "escape",
         revivalPrepared: prepared,
@@ -296,7 +299,7 @@ it("배급 정책과 민심에 따라 창고 이야기를 달리 전하고 혹�
       ...base,
       elapsed: day * 1440,
       rationPolicy,
-      campaign: { ...base.campaign!, beat: "forecast", since: 0 },
+      campaign: { ...campaignOf(base), beat: "forecast", since: 0 },
       world: { ...base.world, minute: 360, optimism, pessimism },
     });
   expect(rumor(2, "needs", 50, 50)?.[1]).toContain("푸른 보자기");
@@ -322,7 +325,7 @@ it("성문에서 주민이 배급을 기억하고 민심에 따라 빗장을 들
       ...base,
       chapter: 5,
       rationPolicy,
-      campaign: { ...base.campaign!, beat: "verdict", uprising },
+      campaign: { ...campaignOf(base), beat: "verdict", uprising },
     });
     expect(page.lines[1]).toEqual([
       "푸른 보자기를 맨 주민",
@@ -339,7 +342,7 @@ it("목진은 반란 당일 성문 습격 기록이 있을 때만 붉은 눈을 
         ...base,
         chapter: 5,
         campaign: {
-          ...base.campaign!,
+          ...campaignOf(base),
           beat,
           revivalPrepared: false,
           ...(coupGateRaided === undefined ? {} : { coupGateRaided }),
@@ -352,15 +355,63 @@ it("목진은 반란 당일 성문 습격 기록이 있을 때만 붉은 눈을 
   }
 });
 
-it("메카 연구가 남으면 영실이 공방 연구를 권한다", () => {
+it("메카 연구가 남으면 영실이 첫 연구의 이름을 알려 준다", () => {
   const s = createVillageGame();
   s.town.development.story.chungnyeong = "dead";
   const p = campaignPage({
     ...s,
     chapter: 5,
-    campaign: { ...s.campaign!, beat: "vigil", revivalPrepared: false },
+    campaign: { ...campaignOf(s), beat: "vigil", revivalPrepared: false },
   });
-  expect(p.lines[0]).toEqual(["영실", expect.stringContaining("공방")]);
+  expect(p.lines[0]).toEqual([
+    "영실",
+    expect.stringContaining("유산 기록 대조"),
+  ]);
+});
+
+it("도성에서 실패하면 도성 삽화를 보여 주고 고리의 추방 대사는 나오지 않는다", () => {
+  const city = createCapital(createVillageGame());
+  const page = campaignPage({
+    ...city,
+    campaign: { ...campaignOf(city), beat: "ending", ending: "collapse" },
+  });
+  expect(page.illustration).toBe("king-palace-night");
+  expect(page.lines).toEqual([["", ""]]);
+  expect(page.choices.map((choice) => choice.action)).toEqual([
+    "retry-capital",
+  ]);
+});
+
+it("복홀의 첫 명령은 식당 착공부터 보초·완공·일손·배급·둥지 순으로 한 가지씩 안내한다", () => {
+  const s = createVillageGame(false, true);
+  expect(firstVillageTask(s)?.step).toBe("restaurant");
+  const digging = {
+    ...s,
+    construction: {
+      kind: "restaurant" as const,
+      position: { x: 12, z: 12 },
+      workerId: s.residents[0]?.id ?? "",
+      startedAt: 0,
+      finishAt: 20,
+    },
+  };
+  expect(firstVillageTask(digging)?.step).toBe("gate");
+  const guarded = {
+    ...digging,
+    residents: digging.residents.map((r, i) =>
+      i === 0 ? { ...r, workplaceId: "gate" } : r,
+    ),
+  };
+  expect(firstVillageTask(guarded)?.step).toBe("wait");
+  const ready = { ...guarded, construction: null, restaurantBuilt: true };
+  expect(firstVillageTask(ready)?.step).toBe("staff");
+  const staffed = { ...ready, restaurantWorkerTarget: 1 };
+  expect(firstVillageTask(staffed)?.step).toBe("policy");
+  const fed = { ...staffed, firstRationSet: true };
+  expect(firstVillageTask(fed)?.step).toBe("home");
+  expect(
+    firstVillageTask({ ...fed, homes: createVillageGame().homes }),
+  ).toBeNull();
 });
 
 it.each([
@@ -400,7 +451,7 @@ it.each([
     expect(next.town.development.story.chungnyeong).toBe(health);
     expect(
       campaignPage(restored).lines.some(([, words]) =>
-        words.includes("충녕 마마가 돌아가셨어요"),
+        words.includes("공주마마께서 돌아가셨어요"),
       ),
     ).toBe(assassinated);
   },

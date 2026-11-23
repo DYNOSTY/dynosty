@@ -4,6 +4,7 @@ import {
   BOKHOL_MAP,
   BOKHOL_MINERALS,
   BOKHOL_PRODUCTION_SITES,
+  BUILDING_RULES,
   type BuildingKind,
   createLogging,
   dailyFoodDemand,
@@ -13,6 +14,7 @@ import {
   HAUL_PHASE_NAMES,
   type HomePlacement,
   homeUsage,
+  idleTownResidents,
   type LaborState,
   LOGGING_RULES,
   loggingSite,
@@ -37,10 +39,12 @@ import {
   workplaceOpen,
 } from "@dynosty/game-core";
 import { useEffect, useRef, useState } from "react";
+import { EndingMenu } from "./EndingMenu.js";
 import { LaborDemo } from "./LaborDemo.js";
 import { MerchantOffers, merchantCards } from "./MerchantOffers.js";
 import { residentName } from "./resident-names.js";
 import type { SiteId } from "./site-targets.js";
+import { saveStageStart } from "./stage-replay.js";
 import { buildingCost, TownPanel } from "./TownPanel.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
@@ -51,7 +55,7 @@ const phaseNames = {
   relief: "유휴 주민이 업무 교대하러 이동",
   "crew-wait": "교대할 유휴 인력 대기",
   approaching: "운송 주민 자동 배정",
-  transport: "입고 장소로 운송",
+  transport: "야적장으로 운반",
   parking: "수레 내려놓기",
   releasing: "손잡이에서 물러나기",
   unloading: "자동 하역",
@@ -72,10 +76,10 @@ type Props = {
   onLaborModeChange: (mode: boolean) => void;
   selectedSite: SiteId | null;
   onClearSelection: () => void;
-  selectedHospital?: string | null;
+  selectedWorkplace?: string | null;
   showDevTools?: boolean;
   saveOpen?: boolean;
-  onState: (state: TimberState) => void;
+  onState: (state: TimberState, lines?: string[], reset?: boolean) => void;
   world: PlayState | null;
   onExit: (world: PlayState) => void;
   onOverview: () => void;
@@ -95,7 +99,7 @@ export function TimberDemo({
   onLaborModeChange,
   selectedSite: selectedLaborSite,
   onClearSelection,
-  selectedHospital = null,
+  selectedWorkplace = null,
   onState,
   onExit,
   onView,
@@ -107,6 +111,7 @@ export function TimberDemo({
   world,
 }: Props) {
   const [laborMode, setLaborMode] = useState(false);
+  const [slotPicker, setSlotPicker] = useState(false);
   useEffect(() => onLaborModeChange(laborMode), [laborMode, onLaborModeChange]);
   const [placingKind, setPlacingKind] = useState<BuildingKind>("home");
   const [placingHome, setPlacingHome] = useState(false);
@@ -195,9 +200,26 @@ export function TimberDemo({
       type: "module",
     });
     worker.current = w;
+    let previousChapter: number | undefined;
     w.onmessage = (e: MessageEvent<TimberResponse>) => {
       const m = e.data;
       if (m.type === "state") {
+        const stage = m.state.chapter ?? 1;
+        const campaign = m.state.campaign;
+        if (
+          campaign &&
+          stage !== previousChapter &&
+          campaign.since === m.state.elapsed &&
+          campaign.beat ===
+            ["opening", "roads", "capital", "arrival", "summit"][stage - 1] &&
+          (stage !== 2 || (!campaign.caravan && !campaign.treaties.length)) &&
+          (stage !== 3 || !campaign.relief)
+        ) {
+          void saveStageStart(m.state).catch(() =>
+            setError("단계 시작 기록을 저장하지 못했습니다."),
+          );
+        }
+        previousChapter = stage;
         try {
           localStorage.setItem(
             "dynosty.village.resume",
@@ -211,7 +233,7 @@ export function TimberDemo({
           setError("자동 저장 공간을 확인해 주세요.");
         }
         setState(m.state);
-        onState(m.state);
+        onState(m.state, m.completions, m.resetNotices);
       } else if (m.type === "exited") {
         exitCallback.current(m.world);
       } else if (m.type === "error") {
@@ -224,8 +246,8 @@ export function TimberDemo({
         try {
           if (m.type === "saved") {
             saveTimber(localStorage, m.save);
-            setSaveStatus("체험판을 저장했습니다.");
-          } else setSaveStatus("체험판을 불러왔습니다. 일시정지 상태입니다.");
+            setSaveStatus("마을 진행을 저장했습니다.");
+          } else setSaveStatus("마을 진행을 불러왔습니다.");
         } catch (err) {
           setError(timberSaveError(err));
         } finally {
@@ -235,9 +257,7 @@ export function TimberDemo({
       }
     };
     w.onerror = () => {
-      setError(
-        "체험판 계산 연결을 확인하지 못했습니다. 기존 저장은 유지됩니다.",
-      );
+      setError("마을 진행 상태를 확인하지 못했습니다. 기존 저장은 유지됩니다.");
       pending.current = null;
       setBusy(false);
     };
@@ -274,25 +294,22 @@ export function TimberDemo({
   function command(c: TimberCommand) {
     if (busy || !worker.current) return;
     setError(null);
+    if (c.type === "restart") {
+      setLaborMode(false);
+      setSlotPicker(false);
+      setRestart(false);
+      setPlacementStatus("");
+      setPlacingHome(false);
+      setPlacingKind("home");
+      setSelectedSiteId("west");
+      setSaveStatus("");
+    }
     worker.current.postMessage({
       type: "command",
       id: `${session.current}-${++counter.current}`,
       command: c,
     } satisfies TimberRequest);
   }
-  useEffect(() => {
-    const pause = () => {
-      if (document.hidden || laborMode)
-        worker.current?.postMessage({
-          type: "command",
-          id: `${session.current}-${++counter.current}`,
-          command: { type: "pause", paused: true },
-        } satisfies TimberRequest);
-    };
-    pause();
-    document.addEventListener("visibilitychange", pause);
-    return () => document.removeEventListener("visibilitychange", pause);
-  }, [laborMode]);
   function placeBuilding(kind: BuildingKind) {
     setError(null);
     setPlacingKind(kind);
@@ -350,28 +367,44 @@ export function TimberDemo({
     (stock.RES_PLANT < demand.RES_PLANT ||
       stock.RES_MEAT + stock.RES_FISH < demand.RES_MEAT + demand.RES_FISH);
   const metal = (state?.world.resources.RES_METAL ?? 0) / AMOUNT_SCALE;
+  const chosenFacility = state?.town.facilities.find(
+    (f) => f.id === selectedWorkplace,
+  );
+  const chosenSource = BOKHOL_PRODUCTION_SITES.find(
+    (site) => site.id === selectedWorkplace,
+  );
+  const service = focusSection?.label ?? "교역소 방문";
   const classic = (
     <section
       hidden={!active || laborMode}
       className="timber-demo"
-      aria-label="마른 목재20 체험판"
+      data-service={showDevTools ? undefined : service}
+      aria-label="목재 조달"
     >
       <button
         hidden={!showDevTools}
         type="button"
         onClick={() => setLaborMode(true)}
       >
-        일손 배치·배급 체험하기
+        일손 배치·배급
       </button>
       <div className="timber-heading">
         <div>
           <p className="eyebrow">복홀 · 업무 지휘</p>
-          <h2 className="timber-title">복홀 마을 운영</h2>
+          <h2 className="timber-title">
+            {showDevTools
+              ? "복홀 마을 운영"
+              : chosenFacility && service === "일터 배치"
+                ? BUILDING_RULES[chosenFacility.kind].name
+                : chosenSource && service === "일터 배치"
+                  ? chosenSource.name
+                  : service}
+          </h2>
         </div>
         <button
           type="button"
           className="g-knob g-knob--close"
-          aria-label="생존 예제로 돌아가기"
+          aria-label="마을로 돌아가기"
           onClick={() => state && onExit(state.world)}
         />
       </div>
@@ -397,22 +430,13 @@ export function TimberDemo({
             </span>
             <span data-testid="timber-iron">공동 철재 {metal}</span>
             <span data-testid="timber-workers">
-              유휴 일손{" "}
-              {
-                state.residents.filter(
-                  (r) =>
-                    r.health === "healthy" &&
-                    r.workplaceId === null &&
-                    r.task === null &&
-                    r.nextWork === null &&
-                    r.routine !== "eating" &&
-                    !state.workerIds.includes(r.id),
-                ).length
-              }
-              /{state.residents.length}
+              유휴 일손 {idleTownResidents(state).length}/
+              {state.residents.length}
             </span>
             <strong data-testid="timber-phase">
-              {phaseNames[state.phase]}
+              {state.phase === "transport" && warehouseDoor(state)
+                ? "저장소로 운반"
+                : phaseNames[state.phase]}
             </strong>
           </div>
           <div className="timber-controls">
@@ -449,9 +473,37 @@ export function TimberDemo({
               처리가 필요합니다.
             </p>
           ) : null}
+          {service === "일터 배치" && chosenSource && (
+            <section aria-label="생산지 일손 배치">
+              <p>남은 자원 {loggingSite(state, chosenSource.id).remaining}</p>
+              <label>
+                운영 인원{" "}
+                <select
+                  value={loggingSite(state, chosenSource.id).target}
+                  onChange={(e) =>
+                    command({
+                      type: "set-logging-workers",
+                      siteId: chosenSource.id,
+                      count: Number(e.target.value),
+                    })
+                  }
+                >
+                  {[0, 1, 2, 3, 4].map((n) => (
+                    <option key={n} value={n}>
+                      {n}명
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+          )}
           <TownPanel
+            mode={showDevTools ? undefined : service}
+            facilityId={chosenFacility?.id}
             state={state}
-            selectedHospital={selectedHospital}
+            selectedHospital={
+              chosenFacility?.kind === "hospital" ? chosenFacility.id : null
+            }
             showDevTools={showDevTools}
             command={command}
             place={placeBuilding}
@@ -565,23 +617,30 @@ export function TimberDemo({
             open={focusSection?.label === "배급 정책" || undefined}
           >
             <summary>종별 배급</summary>
-            <label>
-              배급 방식{" "}
-              <select
-                aria-label="배급 방식"
-                disabled={!!state.campaign && policyWait(state) > 0}
-                value={state.rationPolicy}
-                onChange={(e) =>
-                  command({
-                    type: "set-ration-policy",
-                    policy: e.target.value as "needs" | "cap",
-                  })
-                }
-              >
-                <option value="needs">필요량 배급</option>
-                <option value="cap">식단별 상한</option>
-              </select>
-            </label>
+            <fieldset className="ration-choices" aria-label="배급 방식">
+              {(["needs", "cap"] as const).map((policy) => (
+                <button
+                  key={policy}
+                  type="button"
+                  aria-pressed={
+                    state.firstRationSet && state.rationPolicy === policy
+                  }
+                  disabled={
+                    busy ||
+                    (state.firstRationSet && state.rationPolicy === policy) ||
+                    (!!state.campaign &&
+                      policyWait(state) > 0 &&
+                      policy !== state.rationPolicy)
+                  }
+                  onClick={() => command({ type: "set-ration-policy", policy })}
+                >
+                  {policy === "needs" ? "필요량 배급" : "식단별 상한"}
+                  {state.firstRationSet && state.rationPolicy === policy
+                    ? " · 시행 중"
+                    : ""}
+                </button>
+              ))}
+            </fieldset>
             <table data-testid="ration-table">
               <thead>
                 <tr>
@@ -594,7 +653,7 @@ export function TimberDemo({
                 {Object.entries(VILLAGE_RULES.species).map(
                   ([species, rule]) => {
                     const portion =
-                      state.rationPolicy === "cap" ? 2500 : rule.portion;
+                      state.rationPolicy === "cap" ? 25000 : rule.portion;
                     return (
                       <tr key={species}>
                         <th>
@@ -631,7 +690,7 @@ export function TimberDemo({
                 }
                 alt={foodShortage ? "걱정스러운 나르미" : "평상시의 나르미"}
               />{" "}
-              {foodShortage && "고리님, 오늘 먹일 식량이 모자랍니다. "}
+              {foodShortage && "고리야, 오늘 먹일 식량이 모자랍니다. "}
               나르미 · 하루 필요량 / 공동 재고{" "}
               {(["RES_PLANT", "RES_MEAT", "RES_FISH"] as const)
                 .map(
@@ -645,7 +704,7 @@ export function TimberDemo({
                 .join(" · ")}
             </p>
           )}
-          {merchant && (
+          {showDevTools && merchant && (
             <aside aria-label="교역소 방문" className="village-service">
               <h3>
                 ❗ 교역소 · {merchant[1]} 상인 {merchant[2]} 방문
@@ -706,7 +765,7 @@ export function TimberDemo({
               }
               onClick={() => placeBuilding("home")}
             >
-              온돌 둥지 증설 · 목재20
+              온돌 둥지 증설 · 목재{VILLAGE_RULES.constructionWood}
             </button>
             {placingHome ? (
               <div role="status" data-testid="home-placement-status">
@@ -726,7 +785,12 @@ export function TimberDemo({
                 {state.construction.crew
                   ?.filter((w) => w.phase === "build")
                   .reduce((sum, w) => sum + w.amount, 0) ?? 20}
-                /20 ·{" "}
+                /
+                {state.construction.crew?.reduce(
+                  (sum, w) => sum + w.amount,
+                  0,
+                ) ?? 20}{" "}
+                ·{" "}
                 {!workplaceOpen(state.world.minute)
                   ? "퇴근 · 09:00에 공사를 재개합니다"
                   : state.construction.finishAt === null
@@ -951,14 +1015,14 @@ export function TimberDemo({
                           : selectedSite.buffer >= LOGGING_RULES.buffer
                             ? "현장 적재 공간이 가득 차 생산을 멈췄습니다."
                             : !selectedSite.storageBuilt
-                              ? "저장소가 없으면 현장에만 쌓입니다."
+                              ? "저장소를 짓기 전에는 현장 야적장에 쌓입니다."
                               : "운반할 자원과 유휴 인력을 기다립니다."}
             </p>
             <p className="hint">
               작업장에 배치하면 09–18시 출근한 인원만큼 해당 자원지의 잔량이
               줄어듭니다. 고갈된 숲만 평탄화하며 광산의 함지와 채석장은
               남습니다. 운반은 별도의 유휴 주민 1명이 자동 담당하며, 하역 후
-              공동 재고에 입고하고 빈 수레를 정리합니다. 개발용: 인당 10분에
+              공동 재고에 입고하고 빈 수레를 정리합니다. 일꾼 한 명이 10분에
               자원1, 수레 최대5. 철광석은 제련 전 원료입니다.
             </p>
           </section>
@@ -1033,6 +1097,112 @@ export function TimberDemo({
                   {state.paused ? "일시정지" : "자동 업무 진행 중"} · 주민을
                   개별 선택할 필요가 없습니다.
                 </p>
+                {state.phase === "transport" && state.due !== null && (
+                  <section className="convoy-road" aria-label="조달 수레 운송">
+                    <span
+                      className="convoy-road-cart"
+                      style={{
+                        left: `${Math.max(0, Math.min(100, 100 - ((state.due - state.elapsed) * 100) / TIMBER_RULES.offers[state.offer ?? "A"].travel))}%`,
+                      }}
+                    >
+                      <svg
+                        viewBox="0 0 72 44"
+                        width="72"
+                        height="44"
+                        aria-hidden="true"
+                      >
+                        <rect
+                          x="14"
+                          y="2"
+                          width="34"
+                          height="8"
+                          rx="4"
+                          fill="#c2905f"
+                        />
+                        <rect
+                          x="9"
+                          y="10"
+                          width="44"
+                          height="8"
+                          rx="4"
+                          fill="#b17e4d"
+                        />
+                        <rect
+                          x="6"
+                          y="18"
+                          width="50"
+                          height="8"
+                          rx="4"
+                          fill="#a06d3e"
+                        />
+                        <circle
+                          cx="48"
+                          cy="6"
+                          r="4"
+                          fill="#ecd2a6"
+                          stroke="#6e4a2a"
+                          strokeWidth="1.2"
+                        />
+                        <circle
+                          cx="53"
+                          cy="14"
+                          r="4"
+                          fill="#ecd2a6"
+                          stroke="#6e4a2a"
+                          strokeWidth="1.2"
+                        />
+                        <circle
+                          cx="56"
+                          cy="22"
+                          r="4"
+                          fill="#ecd2a6"
+                          stroke="#6e4a2a"
+                          strokeWidth="1.2"
+                        />
+                        <path
+                          d="M22 2v25M38 2v25"
+                          stroke="#3f2a18"
+                          strokeWidth="1.6"
+                        />
+                        <rect
+                          x="2"
+                          y="26"
+                          width="58"
+                          height="5"
+                          rx="1.5"
+                          fill="#55381f"
+                        />
+                        <path
+                          d="M60 28h10"
+                          stroke="#55381f"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                        {[16, 46].map((cx) => (
+                          <g key={cx} className="tm-road__wheel">
+                            <circle
+                              cx={cx}
+                              cy="35"
+                              r="7.5"
+                              fill="#d2b382"
+                              stroke="#33200f"
+                              strokeWidth="3"
+                            />
+                            <path
+                              d={`M${cx} 28v14M${cx - 7} 35h14M${cx - 5} 30l10 10M${cx + 5} 30l-10 10`}
+                              stroke="#33200f"
+                              strokeWidth="1.2"
+                            />
+                            <circle cx={cx} cy="35" r="1.8" fill="#33200f" />
+                          </g>
+                        ))}
+                      </svg>
+                    </span>
+                    <span>
+                      도착까지 {Math.max(0, state.due - state.elapsed)}분
+                    </span>
+                  </section>
+                )}
                 <section className="timber-stock" aria-label="이번 계약 물량">
                   {(
                     [
@@ -1056,7 +1226,9 @@ export function TimberDemo({
                 </section>
                 <p>
                   도착지는{" "}
-                  {warehouseDoor(state) ? "공동 저장소" : "임시 야적장"}
+                  {warehouseDoor(state)
+                    ? "공동 저장소"
+                    : "야적장 · 오래 둔 식량은 상할 수 있습니다"}
                   입니다. 합격 물자는 즉시 공동 재고에 더하며 건물마다 배분하지
                   않습니다.
                 </p>
@@ -1077,8 +1249,9 @@ export function TimberDemo({
               </p>
             </section>
           ) : null}
-          {state.mission === "register-policy" ||
-          (state.scoutVisitors ?? 0) > 0 ? (
+          {!state.campaign &&
+          (state.mission === "register-policy" ||
+            (state.scoutVisitors ?? 0) > 0) ? (
             <section aria-label="다음 임무" data-testid="next-mission">
               <h3>❗ 마을 문에 주민 3명이 도착했습니다</h3>
               <p>
@@ -1159,6 +1332,21 @@ export function TimberDemo({
           )}
           {saveOpen ? (
             <div className="timber-controls">
+              <button type="button" onClick={() => setSlotPicker(true)}>
+                슬롯에 저장하기
+              </button>
+              {slotPicker && (
+                <EndingMenu
+                  state={state}
+                  initialView="save"
+                  limit={(state.chapter ?? 1) - 1}
+                  resume={() => setSlotPicker(false)}
+                  restart={() => {
+                    setSlotPicker(false);
+                    command({ type: "restart" });
+                  }}
+                />
+              )}
               <button
                 type="button"
                 disabled={busy}
@@ -1210,7 +1398,7 @@ export function TimberDemo({
                 5분 진행
               </button>
               <button type="button" onClick={() => setRestart(true)}>
-                체험 초기화
+                마을 다시 시작
               </button>
               <button type="button" onClick={() => onExit(state.world)}>
                 마을 현황으로
@@ -1218,8 +1406,7 @@ export function TimberDemo({
               {restart ? (
                 <>
                   <p>
-                    체험과 마을을 초기 시작값으로 바꿀까요? 기존 저장은
-                    유지됩니다.
+                    마을을 초기 시작값으로 바꿀까요? 기존 저장은 유지됩니다.
                   </p>
                   <button
                     type="button"
