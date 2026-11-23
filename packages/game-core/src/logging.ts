@@ -10,8 +10,7 @@ import {
 } from "./bokhol.js";
 import { residentShiftOpen, resourceRate } from "./development.js";
 import { AMOUNT_SCALE, productionMultiplier } from "./play.js";
-import { type GroundPoint, residentPath } from "./resident-path.js";
-import { workplaceOpen } from "./resident-routine.js";
+import type { GroundPoint } from "./resident-path.js";
 import { isRecord } from "./save.js";
 import type { TimberState } from "./timber.js";
 
@@ -224,26 +223,6 @@ function staffOneLogging(s: TimberState, choose: Choose): TimberState {
   }
   return next;
 }
-function walk(
-  from: GroundPoint,
-  to: GroundPoint,
-  minutes: number,
-  obstacles: readonly GroundPoint[],
-) {
-  let position = { ...from },
-    budget = minutes * LOGGING_RULES.speed;
-  for (const point of residentPath(from, to, obstacles)) {
-    const length = distance(position, point);
-    if (length > budget)
-      return {
-        x: position.x + ((point.x - position.x) * budget) / length,
-        z: position.z + ((point.z - position.z) * budget) / length,
-      };
-    position = { ...point };
-    budget -= length;
-  }
-  return position;
-}
 export function loggingHandle(l: LoggingState): GroundPoint {
   const h = l.haul;
   const cart = h?.cart ?? loggingSiteRules(l.siteId).pickup;
@@ -253,201 +232,63 @@ export function loggingHandle(l: LoggingState): GroundPoint {
     z: cart.z + (returning ? -1 : 1) * LOGGING_RULES.pullOffset,
   };
 }
-export function advanceLogging(
-  s: TimberState,
-  minutes: number,
-  choose: Choose,
-  obstacles: readonly GroundPoint[],
-) {
-  return mapLogging(s, (context) =>
-    advanceOneLogging(context, minutes, choose, obstacles),
-  );
-}
-function advanceOneLogging(
-  input: TimberState,
-  minutes: number,
-  choose: Choose,
-  obstacles: readonly GroundPoint[],
-): TimberState {
-  if (minutes === 0) return input;
-  const rules = loggingSiteRules(input.logging.siteId);
-  const haulTask = loggingHaulTask(input.logging.siteId);
-  const definition = productionSiteDefinition(input.logging.siteId);
-  let s = input,
-    l = s.logging;
-  const work = loggingStaff(s).working;
-  if (
-    l.built &&
-    (definition.kind !== "forest" || sawmillHasForest(rules.workshop)) &&
-    l.remaining > 0 &&
-    l.buffer < LOGGING_RULES.buffer &&
-    work
-  ) {
-    const total =
+export function advanceLogging(input: TimberState, minutes: number) {
+  if (!minutes) return input;
+  return mapLogging(input, (s) => {
+    const l = s.logging;
+    const def = productionSiteDefinition(l.siteId);
+    const working =
+      l.built &&
+      l.remaining > 0 &&
+      (def.kind !== "forest" ||
+        sawmillHasForest(loggingSiteRules(l.siteId).workshop))
+        ? loggingStaff(s).working
+        : 0;
+    const work =
       Math.round(
         (l.progress +
-          work *
+          working *
             LOGGING_RULES.workPerUnit *
             minutes *
-            resourceRate(s, definition.resource) *
+            resourceRate(s, def.resource) *
             productionMultiplier(s.campaign?.difficulty)) *
           1000,
       ) / 1000;
     const made = Math.min(
-      Math.floor(total / LOGGING_RULES.workPerUnit),
       l.remaining,
-      LOGGING_RULES.buffer - l.buffer,
+      Math.floor(work / LOGGING_RULES.workPerUnit),
     );
-    l = {
-      ...l,
-      remaining: l.remaining - made,
-      buffer: l.buffer + made,
-      progress: total % LOGGING_RULES.workPerUnit,
-    };
-  }
-  if (!l.haul && l.storageBuilt && l.buffer && workplaceOpen(s.world.minute)) {
-    const workerId = choose(s, rules.pickup, 1)[0];
-    if (workerId) {
-      const cargo = Math.min(LOGGING_RULES.batch, l.buffer);
-      l = {
-        ...l,
-        buffer: l.buffer - cargo,
-        haul: {
-          workerId,
-          cargo,
-          cart: { ...rules.pickup },
-          phase: "pickup",
-          wait: 0,
-          relief: false,
-        },
-      };
-      s = {
-        ...s,
-        residents: s.residents.map((r) =>
-          r.id === workerId
-            ? {
-                ...r,
-                task: haulTask,
-                nextWork: null,
-                eatingUntil: null,
-                diningSeat: null,
-                insideHome: false,
-                request: null,
-                routine: "working",
-              }
-            : r,
-        ),
-      };
-    }
-  }
-  let h = l.haul;
-  if (!h) return { ...s, logging: l };
-  let worker = s.residents.find((r) => r.id === h?.workerId);
-  if (worker?.health !== "healthy") {
-    s = {
+    const received = made + l.buffer + (l.haul?.cargo ?? 0);
+    if (!received && !l.haul && !working) return s;
+    return {
       ...s,
-      residents: s.residents.map((r) =>
-        r.id === h?.workerId ? { ...r, task: null } : r,
-      ),
-    };
-    const workerId = choose(s, loggingHandle(l), 1)[0] ?? null;
-    h = { ...h, workerId, relief: true };
-    worker = s.residents.find((r) => r.id === workerId);
-  }
-  if (!worker) return { ...s, logging: { ...l, haul: h } };
-  let position = worker.position;
-  const go = (goal: GroundPoint) => {
-    position = walk(position, goal, minutes, obstacles);
-    return distance(position, goal) < 0.001;
-  };
-  if (h.relief) {
-    if (go(loggingHandle({ ...l, haul: h }))) h = { ...h, relief: false };
-  } else if (h.phase === "pickup") {
-    if (go(loggingHandle(l))) h = { ...h, phase: "outbound" };
-  } else if (h.phase === "outbound" || h.phase === "inbound") {
-    const outbound = h.phase === "outbound";
-    const goal = outbound ? rules.storage : rules.pickup;
-    const cart = walk(h.cart, goal, minutes, obstacles);
-    position = {
-      x: cart.x,
-      z: cart.z + (outbound ? 1 : -1) * LOGGING_RULES.pullOffset,
-    };
-    h = {
-      ...h,
-      cart,
-      ...(distance(cart, goal) < 0.001
+      world: received
         ? {
-            phase: outbound ? ("park" as const) : ("park-home" as const),
-            wait: 2,
-          }
-        : {}),
-    };
-  } else if (h.phase === "park" || h.phase === "park-home") {
-    const wait = Math.max(0, h.wait - minutes);
-    h = {
-      ...h,
-      wait,
-      ...(wait === 0
-        ? {
-            phase:
-              h.phase === "park" ? ("unload" as const) : ("release" as const),
-            wait: h.phase === "park" ? 3 : 0,
-          }
-        : {}),
-    };
-  } else if (h.phase === "unload") {
-    if (go({ x: h.cart.x + 2.5, z: h.cart.z })) {
-      h = { ...h, wait: Math.max(0, h.wait - minutes) };
-      if (!h.wait) {
-        s = {
-          ...s,
-          world: {
             ...s.world,
             resources: {
               ...s.world.resources,
-              [definition.resource]:
-                s.world.resources[definition.resource] + h.cargo * AMOUNT_SCALE,
+              [def.resource]:
+                s.world.resources[def.resource] + received * AMOUNT_SCALE,
             },
-          },
-        };
-        l = { ...l, delivered: l.delivered + h.cargo };
-        h = { ...h, cargo: 0, phase: "turn" };
-      }
-    }
-  } else if (h.phase === "turn") {
-    if (go(loggingHandle(l))) h = { ...h, phase: "inbound" };
-  } else if (go({ x: h.cart.x + 2.5, z: h.cart.z })) {
-    return {
-      ...s,
-      logging: { ...l, haul: null },
-      residents: s.residents.map((r) =>
-        r.id === worker?.id
-          ? { ...r, position, task: null, routine: "idle", insideHome: false }
-          : r,
-      ),
-    };
-  }
-  return {
-    ...s,
-    logging: { ...l, haul: h },
-    residents: s.residents.map((r) =>
-      r.id === worker?.id
-        ? {
-            ...r,
-            position,
-            task: haulTask,
-            routine:
-              ["pickup", "turn", "release"].includes(h.phase) || h.relief
-                ? "to-work"
-                : "working",
-            insideHome: false,
-            request: null,
-            eatingUntil: null,
-            diningSeat: null,
           }
-        : r,
-    ),
-  };
+        : s.world,
+      residents: l.haul
+        ? s.residents.map((r) =>
+            r.id === l.haul?.workerId && r.task === loggingHaulTask(l.siteId)
+              ? { ...r, task: null, routine: "idle" }
+              : r,
+          )
+        : s.residents,
+      logging: {
+        ...l,
+        remaining: l.remaining - made,
+        delivered: l.delivered + received,
+        buffer: 0,
+        haul: null,
+        progress: work % LOGGING_RULES.workPerUnit,
+      },
+    };
+  });
 }
 export function loggingValid(s: TimberState): boolean {
   if (
@@ -520,7 +361,7 @@ function oneLoggingValid(s: TimberState): boolean {
           definition.initial ||
         l.buffer ||
         l.progress)) ||
-    (!l.storageBuilt && (l.haul || l.delivered))
+    (!l.storageBuilt && l.haul)
   )
     return false;
   const staff = s.residents.filter(

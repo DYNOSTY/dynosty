@@ -31,13 +31,10 @@ for (const siteId of ["coal-west", "iron-north", "stone-east"] as const) {
       { type: "set-logging-workers", siteId, count: 2 },
       "staff",
     );
-    for (
-      let i = 0;
-      i < 250 && loggingSite(s, siteId).haul?.phase !== "outbound";
-      i++
-    )
+    for (let i = 0; i < 250 && loggingSite(s, siteId).delivered === 0; i++)
       s = advanceTimber(s, 1);
-    expect(loggingSite(s, siteId).haul?.phase).toBe("outbound");
+    expect(loggingSite(s, siteId).delivered).toBeGreaterThan(0);
+    expect(loggingSite(s, siteId).haul).toBeNull();
     const resource = productionSiteDefinition(siteId).resource,
       initial = s.world.resources[resource] / 10000;
     await enter(page);
@@ -199,7 +196,7 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   await expect(page.getByTestId("housing-status")).toContainText("둥지 7곳");
 });
 
-test("제재소·저장소의 인원 지정으로 자동 운반·입고하고 저장 후 이어진다", async ({
+test("제재소의 인원 지정으로 생산 즉시 입고하고 저장 후 이어진다", async ({
   page,
 }) => {
   let s = commandTimber(
@@ -343,16 +340,16 @@ test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각
   // 건설·직원 이동·식사를 실제 시간으로 기다리는 연속 시나리오다.
   test.setTimeout(180_000);
   await enter(page);
-  await loadFixture(
-    page,
-    createTimberSave(advanceTimber(createTimberState(), 120)),
+  const hungry = advanceTimber(
+    advanceTimber(createTimberState(), 1440),
+    10 * 60,
   );
+  await loadFixture(page, createTimberSave(hungry));
   await expect(page.getByTestId("village-population")).toContainText(
     "주민 60명",
   );
-  await expect(page.getByTestId("resident-requests")).toContainText(
+  await expect(page.getByTestId("resident-requests")).not.toContainText(
     "식당을 지어 주세요",
-    { timeout: 5000 },
   );
   await expect(button(page, "식사 필요 검사")).toHaveCount(0);
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
@@ -385,7 +382,7 @@ test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각
   });
   await page.getByText("주민 생활 동선", { exact: true }).click();
   await expect(page.getByTestId("resident-routines")).toContainText("식사 중", {
-    timeout: 10000,
+    timeout: 65000,
   });
   await expect(page.getByTestId("resource-RES_PLANT")).not.toHaveText("120");
   await button(page, "일시정지").click();
@@ -691,7 +688,11 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
     ...s,
     restaurantBuilt: true,
     restaurantWorkerTarget: 1,
-    world: { ...s.world, resources: { ...s.world.resources, RES_MEAT: 0 } },
+    world: {
+      ...s.world,
+      minute: 1080,
+      resources: { ...s.world.resources, RES_MEAT: 0 },
+    },
     residents: s.residents.map((r) =>
       r.id === employee.id
         ? {
@@ -702,7 +703,7 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
               z: TIMBER_RULES.restaurant.z + 4.4,
             },
             routine: "working",
-            hunger: 400,
+            hunger: 1440,
             insideHome: false,
           }
         : { ...r, hunger: 0 },
@@ -713,14 +714,14 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
   await expect(page.getByTestId("housing-status")).toContainText(
     "둥지 6곳 · 입주 60/60명",
   );
-  await expect(page.getByTestId("timber-clock")).toContainText("현재 07:00");
+  await expect(page.getByTestId("timber-clock")).toContainText("현재 18:00");
   await page.getByText("종별 배급", { exact: true }).click();
   await expect(page.getByTestId("ration-table")).toContainText("0.5");
   await page.getByLabel("배급 방식", { exact: true }).selectOption("cap");
   await expect(page.getByTestId("ration-table")).not.toContainText("0.5");
   await page.getByLabel("배급 방식", { exact: true }).selectOption("needs");
   await button(page, "시간 재개").click();
-  await expect(page.getByTestId("resource-RES_FISH")).toHaveText("119.75", {
+  await expect(page.getByTestId("resource-RES_FISH")).toHaveText("117.5", {
     timeout: 5000,
   });
   await button(page, "일시정지").click();
@@ -799,7 +800,7 @@ test("주민의 느낌표에 마우스를 올리면 요구 사유를 읽을 수 
             ...r,
             position: { x: 0, z: -6 },
             insideHome: false,
-            hunger: 400,
+            hunger: 1440,
             request: "no-restaurant",
             routine: "home",
           }

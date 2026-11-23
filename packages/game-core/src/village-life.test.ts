@@ -29,8 +29,8 @@ it("60명 전원이 실제 표시되고 개별 허기로 식당 건설을 요구
   expect(
     timberScene(next).entities.filter((e) => e.kind === "resident"),
   ).toHaveLength(60);
-  expect(new Set(next.residents.map((r) => r.hunger)).size).toBeGreaterThan(20);
-  expect(next.residents.some((r) => r.request === "no-restaurant")).toBe(true);
+  expect(next.residents.every((r) => r.hunger === 2)).toBe(true);
+  expect(next.residents.some((r) => r.request === "no-restaurant")).toBe(false);
   expect(next.world.resources).toEqual(s.world.resources);
 });
 it("식당 건설만 지시하면 인력이 이동·건설하고 배고픈 주민이 각자 먹고 귀가한다", () => {
@@ -43,7 +43,8 @@ it("식당 건설만 지시하면 인력이 이동·건설하고 배고픈 주�
   expect(s.restaurantBuilt).toBe(true);
   expect(s.construction).toBeNull();
   s = commandTimber(s, { type: "set-restaurant-workers", count: 1 }, "staff");
-  s = advanceTimber(s, 40);
+  s = advanceTimber(s, 1440);
+  s = advanceTimber(s, 1140 - s.world.minute);
   expect(
     s.residents.some((r, i) => r.hunger < (initial.residents[i]?.hunger ?? -1)),
   ).toBe(true);
@@ -55,8 +56,13 @@ it("식당 건설만 지시하면 인력이 이동·건설하고 배고픈 주�
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
 it("식당이 닫혀 있거나 먹이가 없으면 먹지 않고 요구를 전달한다", () => {
-  const base = createTimberState();
-  for (const minute of [23 * 60, 2 * 60]) {
+  const start = createTimberState();
+  const base = {
+    ...start,
+    world: { ...start.world, minute: 1080 },
+    residents: start.residents.map((r) => ({ ...r, hunger: 1440 })),
+  };
+  for (const minute of [22 * 60, 23 * 60]) {
     const s = advanceTimber(
       { ...base, restaurantBuilt: true, world: { ...base.world, minute } },
       3,
@@ -99,13 +105,13 @@ it("식당은 개인별로 이용하며 근무 중인 주민은 작업장을 이
       residents: base.residents.map((r) => ({
         ...r,
         workplaceId: "mill",
-        hunger: 400,
+        hunger: 1440,
       })),
     },
     20,
   );
   expect(
-    s.residents.every((r) => r.routine === "working" && r.hunger === 420),
+    s.residents.every((r) => r.routine === "working" && r.hunger === 1460),
   ).toBe(true);
   expect(s.world.resources.RES_PLANT).toBe(base.world.resources.RES_PLANT);
   const after = advanceTimber(
@@ -342,4 +348,23 @@ it("보수 중 화재로 파괴되면 작업을 취소하고 자동 복구하지
     false,
   );
   expect(s.world.resources.RES_WOOD).toBe(1400000);
+});
+
+it("닷새째 중환자로 등록되고 계속 굶으면 열흘째 사망한다", () => {
+  const base = createTimberState();
+  const id = base.residents[0]!.id;
+  const hungry = (s: TimberState, minutes: number) => ({
+    ...s,
+    residents: s.residents.map((r) =>
+      r.id === id ? { ...r, hunger: minutes } : r,
+    ),
+  });
+  const sick = advanceTimber(hungry(base, 7199), 1);
+  expect(sick.town.patients.find((p) => p.resident === id)?.severity).toBe(
+    "major",
+  );
+  const saved = parseTimberSave(createTimberSave(hungry(sick, 14398))).state;
+  const before = advanceTimber(saved, 1);
+  expect(before.residents[0]?.health).toBe("sick");
+  expect(advanceTimber(before, 1).residents[0]?.health).toBe("dead");
 });

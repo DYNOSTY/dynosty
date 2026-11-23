@@ -11,21 +11,21 @@ import {
   facilityStaffLimit,
   formatRation,
   GAME_RULES,
-  HAUL_PHASE_NAMES,
   type HomePlacement,
   homeUsage,
   idleTownResidents,
   type LaborState,
-  LOGGING_RULES,
   loggingSite,
   loggingSiteRules,
   loggingSites,
   loggingStaff,
+  loggingWorkId,
   type PlayState,
   type ProductionSiteId,
   policyWait,
   productionSiteDefinition,
   productionSites,
+  productionWorkers,
   RESIDENT_REQUEST_TEXT,
   restaurantOpen,
   restaurantSeats,
@@ -45,7 +45,7 @@ import { MerchantOffers, merchantCards } from "./MerchantOffers.js";
 import { residentName } from "./resident-names.js";
 import type { SiteId } from "./site-targets.js";
 import { saveStageStart } from "./stage-replay.js";
-import { buildingCost, TownPanel } from "./TownPanel.js";
+import { buildingCost, TownPanel, WorkplaceHeat } from "./TownPanel.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
 
@@ -162,14 +162,7 @@ export function TimberDemo({
               r.workplaceId === `facility:${selectedFacility.id}` &&
               r.health === "healthy",
           ).length,
-          working: townShiftOpen(state, selectedFacility.id)
-            ? state.residents.filter(
-                (r) =>
-                  r.workplaceId === `facility:${selectedFacility.id}` &&
-                  r.routine === "working" &&
-                  r.health === "healthy",
-              ).length
-            : 0,
+          working: productionWorkers(state, selectedFacility).length,
         }
       : state
         ? loggingStaff(state, selectedSiteId)
@@ -475,6 +468,13 @@ export function TimberDemo({
           ) : null}
           {service === "일터 배치" && chosenSource && (
             <section aria-label="생산지 일손 배치">
+              {loggingSite(state, chosenSource.id).built && (
+                <WorkplaceHeat
+                  state={state}
+                  command={command}
+                  id={loggingWorkId(chosenSource.id)}
+                />
+              )}
               <p>남은 자원 {loggingSite(state, chosenSource.id).remaining}</p>
               <label>
                 운영 인원{" "}
@@ -516,6 +516,14 @@ export function TimberDemo({
               1배: 게임 1시간 = 실제 1분 · 09~18시 9분 · 건물별 공사 시간 + 자재
               운반
             </p>
+            {state.restaurantBuilt &&
+              !state.town.facilities.some((f) => f.kind === "restaurant") && (
+                <WorkplaceHeat
+                  state={state}
+                  command={command}
+                  id="restaurant"
+                />
+              )}
             <p data-testid="restaurant-status">
               {state.restaurantBuilt
                 ? !restaurantOpen(state.world.minute)
@@ -675,7 +683,8 @@ export function TimberDemo({
             </table>
             <p>
               초식 주민은 풀, 육식·어식 주민은 선호 먹이부터 배급하고 고기·어류
-              부족분을 서로 대체합니다. 상한으로 부족한 영양은 허기로 남습니다.
+              부족분을 서로 대체합니다. 하루 동안 먹지 못한 주민은 퇴근 후
+              식당을 찾습니다.
             </p>
           </details>
           {demand && (
@@ -920,9 +929,7 @@ export function TimberDemo({
               {selectedDefinition.kind === "forest"
                 ? "숲의 목재"
                 : resourceName}{" "}
-              {selectedSite.remaining} · 현장 적재 {selectedSite.buffer}/
-              {LOGGING_RULES.buffer} · 운반 중 {selectedSite.haul?.cargo ?? 0} ·
-              누적 입고 {selectedSite.delivered}
+              {selectedSite.remaining} · 누적 입고 {selectedSite.delivered}
             </p>
             {(["logging", "storage"] as const).map((kind) => (
               <button
@@ -962,6 +969,17 @@ export function TimberDemo({
             ["logging", "storage"].includes(state.construction.kind) ? (
               <p>유휴 주민이 현장으로 이동해 건설합니다.</p>
             ) : null}
+            {selectedSite.built && (
+              <WorkplaceHeat
+                state={state}
+                command={command}
+                id={
+                  selectedFacility
+                    ? "facility:" + selectedFacility.id
+                    : loggingWorkId(selectedSiteId)
+                }
+              />
+            )}
             <label>
               작업 인원
               <select
@@ -998,32 +1016,24 @@ export function TimberDemo({
             <p>
               {!selectedSite.built
                 ? `${selectedName} 건설이 필요합니다.`
-                : selectedSite.haul
-                  ? `${HAUL_PHASE_NAMES[selectedSite.haul.phase]}${selectedSite.haul.workerId === null ? " · 유휴 인력 대기" : ""}`
-                  : !selectedSite.remaining
-                    ? selectedDefinition.kind === "forest"
-                      ? "이 숲의 목재를 모두 채취했습니다."
-                      : "이 광맥의 자원을 모두 채취했습니다."
-                    : !(selectedFacility
-                          ? townShiftOpen(state, selectedFacility.id)
-                          : workplaceOpen(state.world.minute))
-                      ? "퇴근 시간입니다. 작업장은 09:00–18:00에 운영합니다."
-                      : selectedSite.target === 0
-                        ? "작업 인원을 배치해 주세요."
-                        : selectedStaff.working === 0
-                          ? "배치된 직원이 출근하고 있습니다."
-                          : selectedSite.buffer >= LOGGING_RULES.buffer
-                            ? "현장 적재 공간이 가득 차 생산을 멈췄습니다."
-                            : !selectedSite.storageBuilt
-                              ? "저장소를 짓기 전에는 현장 야적장에 쌓입니다."
-                              : "운반할 자원과 유휴 인력을 기다립니다."}
+                : !selectedSite.remaining
+                  ? selectedDefinition.kind === "forest"
+                    ? "이 숲의 목재를 모두 채취했습니다."
+                    : "이 광맥의 자원을 모두 채취했습니다."
+                  : !(selectedFacility
+                        ? townShiftOpen(state, selectedFacility.id)
+                        : workplaceOpen(state.world.minute))
+                    ? "퇴근 시간입니다. 작업장은 09:00–18:00에 운영합니다."
+                    : selectedSite.target === 0
+                      ? "작업 인원을 배치해 주세요."
+                      : selectedStaff.working === 0
+                        ? "배치된 직원이 출근하고 있습니다."
+                        : "생산 즉시 공동 재고에 입고합니다."}
             </p>
             <p className="hint">
               작업장에 배치하면 09–18시 출근한 인원만큼 해당 자원지의 잔량이
               줄어듭니다. 고갈된 숲만 평탄화하며 광산의 함지와 채석장은
-              남습니다. 운반은 별도의 유휴 주민 1명이 자동 담당하며, 하역 후
-              공동 재고에 입고하고 빈 수레를 정리합니다. 일꾼 한 명이 10분에
-              자원1, 수레 최대5. 철광석은 제련 전 원료입니다.
+              남습니다. 생산품은 바로 입고됩니다. 철광석은 제련 전 원료입니다.
             </p>
           </section>
           <section

@@ -1,6 +1,7 @@
 import {
   applyCitizenEvent,
   incidentChance,
+  moraleLoss,
   productionMultiplier,
   type ResourceId,
 } from "./play.js";
@@ -200,6 +201,7 @@ export function setOvertime(
   const old = s.town.development.overtime.find(
     (o) => o.target === target && o.day === s.world.day,
   );
+  if (!enabled && !old) return s;
   overtime.push({
     ...old,
     target,
@@ -209,6 +211,7 @@ export function setOvertime(
   });
   return {
     ...s,
+    world: enabled && !old ? moraleLoss(s.world, 5) : s.world,
     town: { ...s.town, development: { ...s.town.development, overtime } },
   };
 }
@@ -410,18 +413,7 @@ export function advanceDevelopment(
             : false),
     );
     if (!actors.length) return p;
-    const old = Math.floor(p.minutes / 60),
-      total = p.minutes + minutes;
-    s = {
-      ...s,
-      world: {
-        ...s.world,
-        pessimism: Math.min(
-          100,
-          s.world.pessimism + Math.floor(total / 60) - old,
-        ),
-      },
-    };
+    const total = p.minutes + minutes;
     for (const actor of actors) {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
       // 시간당 부상 확률을 이번 작업 시간에 맞게 환산한다.

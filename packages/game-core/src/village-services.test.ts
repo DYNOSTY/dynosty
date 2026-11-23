@@ -68,7 +68,13 @@ it("종별 정량·하루 상한을 지키며 덜 배급받은 큰 주민의 허
   });
 });
 it("식당은 건물만 있어서는 배급하지 않고 직원이 도착한 뒤 운영한다", () => {
-  let s = { ...createTimberState(), restaurantBuilt: true };
+  const start = createTimberState();
+  let s: ReturnType<typeof createTimberState> = {
+    ...start,
+    world: { ...start.world, minute: 1080 },
+    residents: start.residents.map((r) => ({ ...r, hunger: 1440 })),
+    restaurantBuilt: true,
+  };
   s = advanceTimber(s, 30);
   expect(s.world.resources.RES_PLANT).toBe(1200000);
   expect(s.residents.some((r) => r.request === "no-staff")).toBe(true);
@@ -96,9 +102,10 @@ it("직원은 영업 중 자기 식당에서 먹고 배급 기록은 저장 복�
   if (!employee) throw Error("직원 없음");
   s = {
     ...s,
+    world: { ...s.world, minute: 1080 },
     residents: s.residents.map((r) =>
       r.id === employee.id
-        ? { ...r, hunger: 400, rationUsed: 0, lastMeal: null }
+        ? { ...r, hunger: 1440, rationUsed: 0, lastMeal: null }
         : r,
     ),
   };

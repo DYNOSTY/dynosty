@@ -1,7 +1,7 @@
 import { type GroundPoint, residentPath } from "./resident-path.js";
 
 export const RESIDENT_ROUTINE_RULES = {
-  hungryAt: 360,
+  hungryAt: 1440,
   eatingMinutes: 5,
   workOpens: 9 * 60,
   workCloses: 18 * 60,
@@ -71,6 +71,7 @@ export function afterWorkDestination(
     places.restaurant &&
     places.restaurantStaffed !== false &&
     places.rationAvailable !== false &&
+    places.minute >= RESIDENT_ROUTINE_RULES.workCloses &&
     restaurantOpen(places.minute)
   )
     return places.restaurant;
@@ -113,7 +114,9 @@ export function advanceResidentRoutine<T extends ResidentRoutine>(
       r = { ...r, eatingUntil: null, routine: "idle" };
     else return r;
   }
-  const hungry = r.hunger >= RESIDENT_ROUTINE_RULES.hungryAt;
+  const hungry =
+    places.minute >= RESIDENT_ROUTINE_RULES.workCloses &&
+    r.hunger >= RESIDENT_ROUTINE_RULES.hungryAt;
   const request =
     workFirst || !hungry
       ? null
@@ -204,10 +207,7 @@ export function advanceResidentRoutine<T extends ResidentRoutine>(
               ),
             )
           : null,
-      hunger:
-        foodAvailable && places.seatAvailable !== false
-          ? Math.max(0, r.hunger - (places.hungerRelief ?? 360))
-          : r.hunger,
+      hunger: foodAvailable && places.seatAvailable !== false ? 0 : r.hunger,
       request: !foodAvailable
         ? "no-food"
         : places.seatAvailable === false

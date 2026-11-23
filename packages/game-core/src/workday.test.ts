@@ -100,6 +100,8 @@ it("식당과 작업장에 도착하면 숨고 퇴근 뒤 다시 나와 귀가�
     expect(e?.visible).toBe(false);
     expect(e?.kind === "resident" && e.indoors).toBe(true);
   }
+  s = advanceTimber(s, 1440);
+  s = advanceTimber(s, 1080 - s.world.minute);
   let ate = false;
   for (let i = 0; i < 120; i++) {
     s = advanceTimber(s, 1);

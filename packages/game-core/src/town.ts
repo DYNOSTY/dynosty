@@ -6,6 +6,7 @@ import {
   type ProductionSiteId,
   reservedVillageLand,
   VILLAGE_LAYOUT,
+  VILLAGE_POND,
 } from "./bokhol.js";
 import {
   advanceDevelopment,
@@ -76,6 +77,7 @@ export type BuildingKind =
   | "coal"
   | "iron"
   | "quarry"
+  | "waterworks"
   | "fishery"
   | "farm"
   | "ranch"
@@ -152,6 +154,13 @@ const previousBuildingRules: Record<
     staff: 4,
     site: "돌이 많은 암반 주변",
   },
+  waterworks: {
+    name: "취수장",
+    cost: { RES_WOOD: 90, RES_METAL: 10 },
+    work: 180,
+    staff: 3,
+    site: "수원지 옆 육지에서 물을 길어 저장소로 운반",
+  },
   fishery: {
     name: "어획막",
     cost: { RES_WOOD: 90, RES_METAL: 10 },
@@ -164,14 +173,14 @@ const previousBuildingRules: Record<
     cost: { RES_WATER: 1, RES_WOOD: 125, RES_METAL: 10 },
     work: 240,
     staff: 4,
-    site: "빈 육지 · 구릉에도 배치 · 물 필요 · 결빙기 석탄 필요",
+    site: "빈 육지 · 구릉에도 배치 · 착공 시 물 필요 · 결빙기 석탄 필요",
   },
   ranch: {
     name: "목축장",
     cost: { RES_WATER: 1, RES_WOOD: 125, RES_STONE: 20 },
     work: 240,
     staff: 4,
-    site: "빈 육지 · 구릉에도 배치 · 풀·물로 가축 사육",
+    site: "빈 육지 · 구릉에도 배치 · 풀로 가축 사육",
   },
   scout: {
     name: "정찰 거점",
@@ -250,8 +259,10 @@ export const individualWorkplaces = [
   "logging",
   "workshop",
   "hospital",
+  "waterworks",
   "fishery",
   "farm",
+  "ranch",
   "quarry",
   "coal",
   "iron",
@@ -264,7 +275,7 @@ export const facilityStaffLimit = (f: Pick<Facility, "kind" | "level">) =>
     ? ([2, 4, 6][f.level - 1] ?? 2)
     : f.kind === "fishery"
       ? ([5, 10, 20][f.level - 1] ?? 5)
-      : canDirectStaff(f.kind)
+      : f.kind !== "ranch" && canDirectStaff(f.kind)
         ? BUILDING_RULES[f.kind].staff * (f.level + 1)
         : BUILDING_RULES[f.kind].staff;
 export interface Expedition {
@@ -476,6 +487,13 @@ export function buildingIssue(
     if (source && mineralWorksites(s, source) >= 2)
       return "이 광맥에는 건설 중인 곳을 포함해 채굴 시설을 두 곳까지 지을 수 있어요.";
   }
+  if (
+    kind === "waterworks" &&
+    !waterAt(p.position, 8) &&
+    Math.hypot(p.position.x - VILLAGE_POND.x, p.position.z - VILLAGE_POND.z) >
+      VILLAGE_POND.r + 8
+  )
+    return "취수장은 수원지 옆 육지에 지어 주세요.";
   if (kind === "fishery" && !waterAt(p.position, 7))
     return "물고기가 모이는 물가에만 어획막을 지을 수 있어요.";
   if (
@@ -559,30 +577,112 @@ export function planBuilding(
     stage: "waiting",
     workDone: 0,
   };
-  if (!n.town.orders.length && townShiftOpen(n, order.id)) {
-    order.crew = freeTownResidents(n, facilityDoor(order), 4);
-    if (order.crew.length) order.stage = "collect";
-  }
-  return {
+  return distributeBuilders({
     ...n,
-    residents: n.residents.map((r) =>
-      order.crew.includes(r.id)
-        ? {
-            ...r,
-            task: `build-order:${order.id}`,
-            routine: "working",
-            request: null,
-            diningSeat: null,
-            eatingUntil: null,
-            insideHome: false,
-          }
-        : r,
-    ),
     town: {
       ...n.town,
       nextId: n.town.nextId + 1,
       orders: [...n.town.orders, order],
     },
+  });
+}
+
+function distributeBuilders(input: TimberState): TimberState {
+  if (!input.town.orders.length) return input;
+  const orders = input.town.orders.map((o) => ({ ...o, crew: [...o.crew] }));
+  let s = { ...input, town: { ...input.town, orders } };
+  const open = orders.filter((o) => townShiftOpen(s, o.id));
+  const available =
+    idleTownResidents(s).length +
+    open.reduce(
+      (total, o) =>
+        total +
+        o.crew.filter((id) =>
+          s.residents.some((r) => r.id === id && r.health === "healthy"),
+        ).length,
+      0,
+    );
+  const capacity = (index: number) => {
+    const pair = Math.floor(index / 2) * 2;
+    const workers = Math.max(0, available - pair * 4);
+    const sites = Math.min(2, open.length - pair);
+    return Math.min(
+      4,
+      Math.floor(workers / sites) + Number(index - pair < workers % sites),
+    );
+  };
+  const released = new Set<string>();
+  for (const o of orders) {
+    const index = open.indexOf(o);
+    const limit = index < 0 ? 4 : capacity(index);
+    o.crew = o.crew.filter((id) => {
+      if (s.residents.some((r) => r.id === id && r.health === "healthy"))
+        return true;
+      released.add(id);
+      return false;
+    });
+    for (const id of o.crew.splice(limit)) released.add(id);
+  }
+  if (released.size)
+    s = {
+      ...s,
+      residents: s.residents.map((r) =>
+        released.has(r.id) && r.task?.startsWith("build-order:")
+          ? { ...r, task: null, routine: "idle" }
+          : r,
+      ),
+    };
+  const free = idleTownResidents(s);
+  if (!free.length) return s;
+  const claimed = new Map<string, string>();
+  const remaining = new Set(free.map((r) => r.id));
+  const candidates = new Map<string, string[]>();
+  for (let round = 0; round < 4 && remaining.size; round++) {
+    for (const o of orders) {
+      if (
+        o.crew.length > round ||
+        (open.includes(o) && o.crew.length >= capacity(open.indexOf(o)))
+      )
+        continue;
+      const working = open.includes(o);
+      if (
+        !working &&
+        orders
+          .slice(0, Math.floor(orders.indexOf(o) / 2) * 2)
+          .some((earlier) => earlier.crew.length < 4)
+      )
+        continue;
+      if (!working && !free.some((r) => isMechanical(s, r.id))) continue;
+      let ids = candidates.get(o.id);
+      if (!ids) {
+        ids = freeTownResidents(s, facilityDoor(o), free.length).filter(
+          (id) => working || isMechanical(s, id),
+        );
+        candidates.set(o.id, ids);
+      }
+      const id = ids.find((id) => remaining.has(id));
+      if (!id) continue;
+      remaining.delete(id);
+      claimed.set(id, o.id);
+      o.crew.push(id);
+      if (o.stage === "waiting") o.stage = "collect";
+    }
+  }
+  return {
+    ...s,
+    residents: s.residents.map((r) =>
+      claimed.has(r.id)
+        ? {
+            ...r,
+            task: "build-order:" + claimed.get(r.id),
+            routine: "working",
+            insideHome: false,
+            request: null,
+            diningSeat: null,
+            eatingUntil: null,
+          }
+        : r,
+    ),
   };
 }
 export function idleTownResidents(s: TimberState) {
@@ -632,24 +732,8 @@ export const orderResting = (s: TimberState, id: string) =>
   !residentShiftOpen(s, id) && s.town.orders.some((o) => o.crew.includes(id));
 export function advanceTown(input: TimberState, minutes: number): TimberState {
   if (!minutes) return input;
-  let s = input;
-  const waiting = input.town.orders.slice(1);
-  if (waiting.some((o) => o.crew.length)) {
-    const tasks = new Set(waiting.map((o) => `build-order:${o.id}`));
-    s = {
-      ...s,
-      residents: s.residents.map((r) =>
-        r.task && tasks.has(r.task) ? { ...r, task: null, routine: "idle" } : r,
-      ),
-      town: {
-        ...s.town,
-        orders: s.town.orders.map((o, i) =>
-          i && o.crew.length ? { ...o, crew: [] } : o,
-        ),
-      },
-    };
-  }
-  for (const first of input.town.orders.slice(0, 1)) {
+  let s = distributeBuilders(input);
+  for (const first of s.town.orders) {
     const open = first ? townShiftOpen(s, first.id) : false;
     if (
       first &&
@@ -664,14 +748,6 @@ export function advanceTown(input: TimberState, minutes: number): TimberState {
           s.residents.some((r) => r.id === id && r.health === "healthy"),
         ),
       };
-      const extra = (
-        o.crew.length < 4
-          ? freeTownResidents(s, facilityDoor(o), s.residents.length)
-          : []
-      )
-        .filter((id) => open || isMechanical(s, id))
-        .slice(0, 4 - o.crew.length);
-      o.crew = [...o.crew, ...extra];
       const active = o.crew.filter((id) => open || isMechanical(s, id));
       if (active.length) {
         if (o.stage === "waiting") o.stage = "collect";
@@ -859,6 +935,7 @@ export const facilityResource = (f: Facility): ResourceId | null =>
       coal: "RES_COAL",
       iron: "RES_IRON_ORE",
       quarry: "RES_STONE",
+      waterworks: "RES_WATER",
       fishery: "RES_FISH",
       farm: "RES_PLANT",
       ranch: "RES_MEAT",
@@ -1141,6 +1218,19 @@ export function deposit(s: TimberState, r: ResourceId, n: number): TimberState {
     },
   };
 }
+export function productionWorkers(s: TimberState, f: Facility) {
+  return s.residents.filter(
+    (r) =>
+      r.workplaceId === `facility:${f.id}` &&
+      r.health === "healthy" &&
+      residentShiftOpen(s, r.id) &&
+      r.routine === "working" &&
+      Math.hypot(
+        r.position.x - facilityDoor(f).x,
+        r.position.z - facilityDoor(f).z,
+      ) < 0.01,
+  );
+}
 function advanceTownProduction(
   input: TimberState,
   minutes: number,
@@ -1149,23 +1239,15 @@ function advanceTownProduction(
   for (const original of s.town.facilities) {
     const f = { ...original };
     const resource = facilityResource(f);
-    if (!resource || s.mutantDamage?.[f.id] === 100) continue;
-    const workers = s.residents.filter(
-      (r) =>
-        r.workplaceId === `facility:${f.id}` &&
-        r.health === "healthy" &&
-        residentShiftOpen(s, r.id) &&
-        r.routine === "working" &&
-        Math.hypot(
-          r.position.x - facilityDoor(f).x,
-          r.position.z - facilityDoor(f).z,
-        ) < 0.01,
-    );
-    const power = !s.town.orders.some(
-      (o) => o.upgradeTarget === f.id && o.stage !== "waiting",
-    )
-      ? workers.reduce((n, r) => n + buildingPower(s, r.id), 0)
-      : 0;
+    if (!resource) continue;
+    const workers = productionWorkers(s, f);
+    const power =
+      s.mutantDamage?.[f.id] !== 100 &&
+      !s.town.orders.some(
+        (o) => o.upgradeTarget === f.id && o.stage !== "waiting",
+      )
+        ? workers.reduce((n, r) => n + buildingPower(s, r.id), 0)
+        : 0;
     f.progress =
       Math.round(
         (f.progress +
@@ -1177,7 +1259,7 @@ function advanceTownProduction(
           1000,
       ) / 1000;
     const unitWork = 30;
-    while (power > 0 && f.progress >= unitWork && f.buffer < 20) {
+    while (power > 0 && f.progress >= unitWork) {
       let amount = f.kind === "farm" ? 3 : f.kind === "ranch" ? 2 : 1;
       const yieldUnits = amount * 6 + f.yieldRemainder;
       const extraYield =
@@ -1185,10 +1267,11 @@ function advanceTownProduction(
         collectionRate(s, f) === 1 &&
         hasResearch(s, "TECH_CULTURE");
       if (extraYield) amount = Math.floor(yieldUnits / 5);
-      if (f.buffer + amount > 20) break;
       const cost: Cost =
         f.kind === "farm"
-          ? { RES_WATER: 1, ...(s.town.cold ? { RES_COAL: 1 } : {}) }
+          ? s.town.cold
+            ? { RES_COAL: 1, RES_WATER: 1 }
+            : { RES_WATER: 1 }
           : f.kind === "ranch"
             ? { RES_PLANT: 1, RES_WATER: 1 }
             : {};
@@ -1229,103 +1312,25 @@ function advanceTownProduction(
       s = payTown(s, cost);
       if (extraYield) f.yieldRemainder = yieldUnits % 5;
       f.progress -= unitWork;
-      f.buffer += Math.min(amount, 20 - f.buffer);
+      f.buffer += amount;
     }
     f.progress = Math.min(f.progress, unitWork);
-    const destination = warehouseDoor(s, f.position) ?? { x: 4.5, z: 0.6 };
-    if (f.kind === "fishery") {
-      const amount = f.buffer;
+    const amount = f.buffer + (f.haul?.cargo ?? 0);
+    if (amount) {
       s = deposit(s, resource, amount);
-      f.buffer -= amount;
       f.delivered += amount;
-    }
-    if (
-      f.kind !== "fishery" &&
-      !f.haul &&
-      f.buffer >= 5 &&
-      workplaceOpen(s.world.minute)
-    ) {
-      const id = freeTownResidents(s, facilityDoor(f), 1)[0];
-      if (id) {
-        f.haul = { worker: id, cargo: Math.min(5, f.buffer), stage: "pickup" };
-        f.buffer -= f.haul.cargo;
-      }
+      f.buffer = 0;
     }
     if (f.haul) {
-      let h = { ...f.haul },
-        r = s.residents.find((r) => r.id === h.worker);
-      if (r?.health !== "healthy") {
-        if (r)
-          s = {
-            ...s,
-            residents: s.residents.map((q) =>
-              q.id === r?.id ? { ...q, task: null } : q,
-            ),
-          };
-        const id = freeTownResidents(s, r?.position ?? facilityDoor(f), 1)[0];
-        if (id) h.worker = id;
-        else {
-          f.haul = h;
-          s = {
-            ...s,
-            town: {
-              ...s.town,
-              facilities: s.town.facilities.map((q) => (q.id === f.id ? f : q)),
-            },
-          };
-          continue;
-        }
-        r = s.residents.find((r) => r.id === h.worker);
-      }
-      if (r) {
-        const goal = h.stage === "store" ? destination : facilityDoor(f),
-          position = moveOnGround(
-            r.position,
-            goal,
-            minutes,
-            2,
-            townObstacles(s),
-          );
-        s = {
-          ...s,
-          residents: s.residents.map((q) =>
-            q.id === h.worker
-              ? {
-                  ...q,
-                  position,
-                  task: `facility-haul:${f.id}`,
-                  insideHome: false,
-                  routine: "working",
-                  eatingUntil: null,
-                  diningSeat: null,
-                  request: null,
-                }
-              : q,
-          ),
-        };
-        if (Math.hypot(position.x - goal.x, position.z - goal.z) < 0.01) {
-          if (h.stage === "pickup") h.stage = "store";
-          else if (h.stage === "store") {
-            const unloaded = h.cargo;
-            s = deposit(s, resource, unloaded);
-            f.delivered += unloaded;
-            h = {
-              ...h,
-              cargo: h.cargo - unloaded,
-              stage: unloaded === h.cargo ? "return" : "store",
-            };
-          } else {
-            s = {
-              ...s,
-              residents: s.residents.map((q) =>
-                q.id === h.worker ? { ...q, task: null } : q,
-              ),
-            };
-            f.haul = null;
-          }
-        }
-        if (f.haul) f.haul = h;
-      }
+      s = {
+        ...s,
+        residents: s.residents.map((r) =>
+          r.id === f.haul?.worker && r.task === "facility-haul:" + f.id
+            ? { ...r, task: null, routine: "idle" }
+            : r,
+        ),
+      };
+      f.haul = null;
     }
     s = {
       ...s,

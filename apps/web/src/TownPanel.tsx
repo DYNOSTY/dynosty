@@ -14,6 +14,7 @@ import {
   mineralWorksites,
   orderWork,
   productionRate,
+  productionWorkers,
   type ResourceId,
   restaurantStaff,
   STORAGE_SPACE,
@@ -24,6 +25,7 @@ import {
   type TimberState,
   townShiftOpen,
   tradeRank,
+  villageTemperature,
   warehouseDoor,
   workplaceOpen,
   yardStock,
@@ -34,6 +36,36 @@ import { DevelopmentPanel, OvertimeControl } from "./DevelopmentPanel.js";
 import { facilityArt } from "./facility-art.js";
 import { HospitalPanel } from "./HospitalPanel.js";
 
+export function WorkplaceHeat({
+  state,
+  id,
+  command,
+}: {
+  state: TimberState;
+  id: string;
+  command: (c: TimberCommand) => void;
+}) {
+  return (
+    <label>
+      작업장 난방{" "}
+      <select
+        value={state.workplaceHeat?.[id] ?? 0}
+        onChange={(e) =>
+          command({ type: "workplace-heat", id, level: Number(e.target.value) })
+        }
+      >
+        {[0, 1, 2, 3].map((level) => (
+          <option key={level} value={level}>
+            {level ? "+" + level * 10 + " °C" : "끄기"}
+          </option>
+        ))}
+      </select>{" "}
+      실내 {villageTemperature(state) + (state.litWorkplaces?.[id] ?? 0) * 10}{" "}
+      °C · 영하에는 근무 중 매시간 땔감을 사용합니다. 석탄 난로 연구 후에는
+      석탄도 쓸 수 있습니다. 실내가 영하면 사고 위험이 50% 높습니다.
+    </label>
+  );
+}
 export const buildingCost = (kind: BuildingKind) =>
   Object.entries(BUILDING_RULES[kind].cost)
     .map(
@@ -225,6 +257,15 @@ export function TownPanel({
               </button>
               {facilityResource(f) ? (
                 <p>
+                  {GAME_RULES.resources[facilityResource(f) as ResourceId].name}{" "}
+                  · 배치{" "}
+                  {
+                    state.residents.filter(
+                      (r) => r.workplaceId === "facility:" + f.id,
+                    ).length
+                  }
+                  /{f.target}명 · 현장 근무 {productionWorkers(state, f).length}
+                  명<br />
                   생산 배율×{productionRate(state, f).toFixed(2)} · 건물·채집
                   연구 중 높은 배율, 최고2배
                 </p>
@@ -293,6 +334,13 @@ export function TownPanel({
                   command={command}
                 />
               ) : null}
+              {facilityStaffLimit(f) > 0 && (
+                <WorkplaceHeat
+                  state={state}
+                  id={"facility:" + f.id}
+                  command={command}
+                />
+              )}
               {facilityStaffLimit(f) > 0 ? (
                 <label>
                   {" "}
@@ -330,18 +378,17 @@ export function TownPanel({
                 "coal",
                 "iron",
                 "quarry",
+                "waterworks",
                 "fishery",
                 "farm",
                 "ranch",
               ].includes(f.kind) ? (
                 <p>
-                  {f.kind === "fishery" ? "어류 즉시 입고 · 대기" : "현장 적재"}{" "}
-                  {f.buffer}/20 · 운반 중 {f.haul?.cargo ?? 0} · 누적 입고{" "}
-                  {f.delivered}
+                  생산 즉시 입고 · 누적 입고 {f.delivered}
                   {f.kind === "ranch"
-                    ? " · 가축 사육: 풀1·물1 → 고기2"
+                    ? " · 물 1과 풀 1로 고기 2 생산"
                     : f.kind === "farm"
-                      ? " · 재배: 물1 → 풀3 · 결빙기 석탄1 추가"
+                      ? " · 물 1로 풀 3 생산 · 결빙기 석탄 1 소모"
                       : ""}
                 </p>
               ) : null}

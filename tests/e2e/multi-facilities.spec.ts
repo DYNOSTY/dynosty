@@ -207,8 +207,8 @@ test("어획막의 다섯 인원으로 별도 운반 없이 공동 어류가 즉
   await expect.poll(amount, { timeout: 15000 }).toBeGreaterThan(before);
   await expect(page.getByAltText("평상시의 나르미")).toBeAttached();
   await expect(page.getByText(/오늘 먹일 식량이 모자랍니다/)).toHaveCount(0);
-  await expect(page.getByText(/어류 즉시 입고 · 대기/)).toContainText(
-    "운반 중 0",
+  await expect(page.getByText(/생산 즉시 입고 · 누적 입고/)).toContainText(
+    "누적 입고",
   );
 });
 

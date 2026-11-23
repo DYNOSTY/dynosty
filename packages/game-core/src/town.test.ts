@@ -8,10 +8,14 @@ import {
   createTimberSave,
   createTimberState,
   createVillageGame,
+  fireWorkplaces,
   parseTimberSave,
   parseTimberState,
+  patrolCovers,
+  patrolRadius,
   type TimberCommand,
   type TimberState,
+  workplaceAccidentChance,
 } from "./timber.js";
 import {
   BUILDING_RULES,
@@ -79,15 +83,15 @@ it("무자원은 접수 거부, 자재 확보 후 무인력은 대기하고 1명
   expect(s.homes).toHaveLength(7);
   expect(s.world.resources.RES_WOOD).toBe(before - 500000);
 });
-it("여러 부지는 즉시 자재 확보하며 겹침 거부, 순차 완공, 저장 복원도 동일하다", () => {
+it("여러 부지는 즉시 자재 확보하며 겹침 거부, 병행 시공, 저장 복원도 동일하다", () => {
   let s = plan(start(), "home");
   expect(() => plan(s, "farm")).toThrow();
   s = plan(s, "storage", { ...pose, position: { x: 0, z: 16 } });
   expect(s.town.orders).toHaveLength(2);
-  expect(s.town.orders[1]?.crew).toEqual([]);
+  expect(s.town.orders[1]?.crew).toHaveLength(4);
   expect(s.world.resources.RES_WOOD).toBe(2200000);
   s = advanceTimber(s, 20);
-  expect(s.town.orders[1]?.workDone).toBe(0);
+
   const loaded = parseTimberSave(createTimberSave(s)).state;
   expect(advanceTimber(loaded, 120)).toEqual(advanceTimber(s, 120));
   s = finish(s);
@@ -97,6 +101,9 @@ it("여러 부지는 즉시 자재 확보하며 겹침 거부, 순차 완공, �
 it("자원별 입지와 물 위 건설을 검사하고 채석장은 암반, 어획막은 물가만 허용한다", () => {
   const s = start();
   expect(buildingIssue(s, "quarry", pose)).toContain("자원");
+  expect(
+    buildingIssue(s, "waterworks", { ...pose, position: { x: -24, z: -8 } }),
+  ).toContain("수원지");
   expect(buildingIssue(s, "fishery", pose)).toContain("물가");
   expect(
     buildingIssue(s, "home", { ...pose, position: { x: 60, z: 32 } }),
@@ -120,17 +127,28 @@ it("기본 공사량은4명 표준 체격 기준30~50초이며 체격에 따른 
   for (const rule of Object.values(BUILDING_RULES))
     expect(rule.work / 6).toBeGreaterThanOrEqual(30);
 });
-it.each(["farm", "ranch", "fishery", "logging", "quarry"] as const)(
+it.each([
+  "farm",
+  "ranch",
+  "waterworks",
+  "fishery",
+  "logging",
+  "quarry",
+  "iron",
+  "coal",
+] as const)(
   "%s 운영·소모와 입고 경로를 따르고 어획은 즉시 입고한다",
   (kind) => {
-    const point =
-      kind === "fishery"
-        ? { x: 46, z: 32 }
-        : kind === "logging"
-          ? { x: -24, z: -8 }
-          : kind === "quarry"
-            ? { x: 200, z: -40 }
-            : pose.position;
+    const point = {
+      waterworks: { x: 46, z: 32 },
+      fishery: { x: 46, z: 32 },
+      logging: { x: -24, z: -8 },
+      quarry: { x: 200, z: -40 },
+      coal: { x: -170, z: -56 },
+      iron: { x: 120, z: -140 },
+      farm: pose.position,
+      ranch: pose.position,
+    }[kind];
     let s = finish(plan(start(), kind, { ...pose, position: point }));
     const f = s.town.facilities[0];
     if (!f) throw Error("시설 없음");
@@ -140,12 +158,12 @@ it.each(["farm", "ranch", "fishery", "logging", "quarry"] as const)(
       s = advanceTimber(s, 1);
       observedBuffer ||= (s.town.facilities[0]?.buffer ?? 0) > 0;
     }
-    expect(observedBuffer).toBe(kind !== "fishery");
-    if (kind === "fishery") expect(s.town.facilities[0]?.haul).toBeNull();
+    expect(observedBuffer).toBe(false);
+    expect(s.town.facilities[0]?.haul).toBeNull();
     expect(s.town.facilities[0]?.delivered).toBeGreaterThan(0);
     expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
     if (kind === "farm" || kind === "ranch")
-      expect(s.town.spent.RES_WATER).toBeGreaterThan(0);
+      expect(s.town.spent.RES_WATER).toBeGreaterThan(1);
     if (kind === "logging" || kind === "quarry")
       expect(
         Object.values(s.town.extracted).reduce((n, x) => n + (x ?? 0), 0),
@@ -303,7 +321,8 @@ it("새 마을의 첫 식당은 공사 인부가 배식을 맡고 주민이 식�
       .every((id) => crew.includes(id)),
   ).toBe(true);
   expect(s.restaurantWorkerTarget).toBe(2);
-  s = advanceTimber(s, 180);
+  s = advanceTimber(s, 1440);
+  s = advanceTimber(s, 1260 - s.world.minute);
   expect(
     s.residents.some(
       (r) =>
@@ -517,4 +536,108 @@ it("아동 노동을 반포한 뒤에만 새끼 공룡에게 다음 업무를 �
   expect(assigned.residents.find((r) => r.id === child.id)?.nextWork?.id).toBe(
     "yard",
   );
+});
+
+it.each([
+  [1, 1, 0],
+  [2, 1, 1],
+  [3, 2, 1],
+  [4, 2, 2],
+  [8, 4, 4],
+])("일손 %i명을 두 현장에 %i명과 %i명으로 배치한다", (count, first, second) => {
+  let s = start();
+  s = {
+    ...s,
+    residents: s.residents.map((r, i) =>
+      i < count ? r : { ...r, workplaceId: "guard" },
+    ),
+  };
+  s = plan(plan(s, "home"), "storage", { ...pose, position: { x: 0, z: 16 } });
+  expect(s.town.orders.map((o) => o.crew.length)).toEqual([first, second]);
+  const ids = s.town.orders.flatMap((o) => o.crew);
+  expect(new Set(ids).size).toBe(count);
+  expect(parseTimberSave(createTimberSave(s)).state.town.orders).toEqual(
+    s.town.orders,
+  );
+});
+
+it.each([
+  [8, 0],
+  [9, 1],
+])("일손 %i명이면 세 번째 현장에 %i명을 보낸다", (count, third) => {
+  let s = start();
+  s = {
+    ...s,
+    residents: s.residents.map((r, i) =>
+      i < count ? r : { ...r, workplaceId: "guard" },
+    ),
+  };
+  s = plan(plan(s, "home"), "storage", { ...pose, position: { x: 0, z: 16 } });
+  s = plan(s, "home", { ...pose, position: { x: 46, z: 32 } });
+  expect(s.town.orders.map((o) => o.crew.length)).toEqual([4, 4, third]);
+});
+it("복홀 복구 예산으로 기본 시설과 정찰·교역 시설을 짓고 들보 12를 확보한다", () => {
+  const village = createVillageGame();
+  const buildings = [
+    "restaurant",
+    "logging",
+    "storage",
+    "home",
+    "home",
+    "scout",
+    "trade",
+  ] as const;
+  const timber = buildings.reduce(
+    (sum, k) => sum + (BUILDING_RULES[k].cost.RES_WOOD ?? 0),
+    0,
+  );
+  expect(village.world.resources.RES_WOOD / 10000 - timber - 12).toBe(644);
+  expect(
+    village.world.resources.RES_WATER / 10000 -
+      (BUILDING_RULES.farm.cost.RES_WATER ?? 0) -
+      (BUILDING_RULES.ranch.cost.RES_WATER ?? 0),
+  ).toBe(18);
+});
+
+it("순라 거리와 작업장 연료를 실제 배치와 연구에 따라 적용한다", () => {
+  const village = createVillageGame(false, true);
+  const guards = cmd(village, { type: "set-guards", count: 4 });
+  expect(patrolRadius(guards)).toBe(48);
+  expect(patrolCovers({ x: 0, z: 24 }, patrolRadius(guards))).toBe(true);
+  expect(patrolCovers({ x: 60, z: 0 }, patrolRadius(guards))).toBe(false);
+  const cold: TimberState = {
+    ...guards,
+    town: { ...guards.town, cold: true },
+    workplaceHeat: { logging: 2 },
+    residents: guards.residents.map((r, i) =>
+      i === 0 ? { ...r, routine: "working", workplaceId: "logging" } : r,
+    ),
+  };
+  expect(fireWorkplaces(cold).world.resources.RES_WOOD).toBe(
+    cold.world.resources.RES_WOOD - 20000,
+  );
+  const dry = {
+    ...cold,
+    world: {
+      ...cold.world,
+      resources: { ...cold.world.resources, RES_WOOD: 0 },
+    },
+  };
+  expect(fireWorkplaces(dry).litWorkplaces?.logging).toBe(0);
+  const researched = {
+    ...dry,
+    town: {
+      ...dry.town,
+      development: {
+        ...dry.town.development,
+        completed: ["TECH_WORKSITE_COAL"],
+      },
+    },
+  };
+  expect(fireWorkplaces(researched).litWorkplaces?.logging).toBe(2);
+});
+
+it("작업장이 영하이면 근무 중 사고 확률이 50% 증가한다", () => {
+  expect(workplaceAccidentChance(-1)).toBeCloseTo(0.525);
+  expect(workplaceAccidentChance(0)).toBe(0.35);
 });

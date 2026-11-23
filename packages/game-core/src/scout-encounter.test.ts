@@ -37,6 +37,12 @@ it.each([true, false])(
       { type: "scout-choice", site: "reed", take },
       "reply",
     );
+    expect(chosen.world.optimism).toBe(
+      Math.max(0, camp.world.optimism - (take ? 0 : 1)),
+    );
+    expect(chosen.world.pessimism).toBe(
+      Math.min(100, camp.world.pessimism + (take ? 0 : 1)),
+    );
     const travelling = advanceTimber(chosen, 2);
     expect(travelling.residents.length).toBe(initial.residents.length);
     const home = parseTimberState(advanceTimber(travelling, 1));

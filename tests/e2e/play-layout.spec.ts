@@ -9,7 +9,7 @@ test("첫 화면의 중심에 실제 3D 장면을 표시하고 저장·개발 �
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
+  await page.goto("/?worker-test");
   await expect(page.getByTestId("play-scene-status")).toHaveText(
     "3D 준비 완료",
   );
@@ -29,7 +29,7 @@ test("첫 화면의 중심에 실제 3D 장면을 표시하고 저장·개발 �
   expect(box?.height).toBeGreaterThan(400);
   expect(await canvas.evaluate((e) => e.width > 0 && e.height > 0)).toBe(true);
   await expect(
-    page.getByRole("button", { name: "하루 진행", exact: true }),
+    page.getByRole("button", { name: "Worker 날짜 전환", exact: true }),
   ).toBeHidden();
 });
 
@@ -38,13 +38,15 @@ test("메뉴를 여닫아도 장면·날짜를 유지하고 저장 메뉴에서 
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/");
+  await page.goto("/?worker-test");
   await expect(page.getByTestId("play-scene-status")).toHaveText(
     "3D 준비 완료",
   );
   const canvas = await page.locator("canvas").elementHandle();
   await page.getByRole("button", { name: "개발 도구", exact: true }).click();
-  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Worker 날짜 전환", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "3D 연결 예제 바꾸기", exact: true })
     .click();
@@ -63,7 +65,9 @@ test("메뉴를 여닫아도 장면·날짜를 유지하고 저장 메뉴에서 
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
   );
-  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Worker 날짜 전환", exact: true })
+    .click();
   await expect(page.getByText("3일차", { exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: "저장 불러오기", exact: true })
@@ -96,7 +100,7 @@ test("개발 패널을 접어도 음원 파일 연결과 재생을 유지한다"
     window.AudioContext = Observed;
     Object.assign(window, { layoutAudioElements: elements });
   });
-  await page.goto("/");
+  await page.goto("/?worker-test");
   await page.getByRole("button", { name: "개발 도구", exact: true }).click();
   await page.getByLabel("BGM 파일", { exact: true }).setInputFiles(wave);
   await page.getByLabel("BGM 이름", { exact: true }).fill("패널 유지 확인");
@@ -135,7 +139,7 @@ test("좁은 화면도 가로 넘침 없이 표시하고 키보드로 메뉴를 
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/");
+  await page.goto("/?worker-test");
   await expect(page.getByTestId("play-scene-status")).toHaveText(
     "3D 준비 완료",
   );

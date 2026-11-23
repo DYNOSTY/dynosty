@@ -55,9 +55,10 @@ it("식당별10석과 배치 인력을 보존하고 두 곳에서 동시에 식�
   if (!primary) throw Error("식당 없음");
   s = {
     ...s,
+    world: { ...s.world, minute: 1080 },
     residents: s.residents.map((r, i) => ({
       ...r,
-      hunger: r.workplaceId ? 0 : 400,
+      hunger: r.workplaceId ? 0 : 1440,
       rationUsed: 0,
       eatingUntil: null,
       diningSeat: null,
@@ -100,7 +101,7 @@ it("식당별10석과 배치 인력을 보존하고 두 곳에서 동시에 식�
   s = {
     ...s,
     residents: s.residents.map((r) =>
-      r.workplaceId ? { ...r, hunger: 400 } : r,
+      r.workplaceId ? { ...r, hunger: 1440 } : r,
     ),
   };
   for (let i = 0; i < 40; i++) {
@@ -222,13 +223,13 @@ it("직원이 늘면 한 끼 체류가 짧아지고 어떤 입력도30분을 넘
   if (!initialResident) throw Error("주민 없음");
   const r = {
     ...initialResident,
-    hunger: 400,
+    hunger: 1440,
     position: { x: 0, z: 0 },
   };
   const places = {
     warmth: { x: 0, z: 0 },
     restaurant: { x: 0, z: 0 },
-    minute: 420,
+    minute: 1080,
     restaurantStaffed: true,
     obstacles: [],
   };
@@ -273,9 +274,10 @@ it("2단계 식당에4명을 배치해도 정수8분 식사와 저장 복원이 
   if (!f) throw Error("식당 없음");
   s = {
     ...s,
+    world: { ...s.world, minute: 1080 },
     residents: s.residents.map((r) => ({
       ...r,
-      hunger: r.workplaceId ? 0 : 400,
+      hunger: r.workplaceId ? 0 : 1440,
       rationUsed: 0,
       eatingUntil: null,
       diningSeat: null,
@@ -317,9 +319,10 @@ it("입원한 주민이 식당 손님의 좌석을 차지하지 않는다", () =
   if (!first) throw Error("식당 없음");
   s = {
     ...s,
+    world: { ...s.world, minute: 1080 },
     residents: s.residents.map((r, i) => ({
       ...r,
-      hunger: r.workplaceId ? 0 : 400,
+      hunger: r.workplaceId ? 0 : 1440,
       rationUsed: 0,
       eatingUntil: null,
       diningSeat: null,

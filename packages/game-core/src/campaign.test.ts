@@ -28,7 +28,7 @@ import {
   villageFatalIncident,
   villageTemperature,
 } from "./timber.js";
-import { payTown } from "./town.js";
+import { deposit, payTown } from "./town.js";
 
 const restore = (s: TimberState) =>
   parseTimberSave(JSON.parse(JSON.stringify(createTimberSave(s)))).state;
@@ -182,23 +182,13 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
       s = restore(act(s, "report:" + x.id));
       continue;
     }
-    const roll = vi.spyOn(Math, "random");
-    try {
-      for (const [draw, increase] of [
-        [0.49, 1],
-        [0.5, 0],
-      ] as const) {
-        roll.mockReturnValue(draw);
-        const stayed = restore(act(s, "remember"));
-        expect(stayed.world.pessimism).toBe(s.world.pessimism + increase);
-        expect(stayed.campaign?.recoveryDue).toBeNull();
-        expect(stayed.residents.some((r) => r.task === "patrol-recovery")).toBe(
-          false,
-        );
-      }
-    } finally {
-      roll.mockRestore();
-    }
+    const stayed = restore(act(s, "remember"));
+    expect(stayed.world.pessimism).toBe(s.world.pessimism + 1);
+    expect(stayed.world.optimism).toBe(s.world.optimism - 1);
+    expect(stayed.campaign?.recoveryDue).toBeNull();
+    expect(stayed.residents.some((r) => r.task === "patrol-recovery")).toBe(
+      false,
+    );
     const before = restore({
       ...s,
       logging: { ...s.logging, built: true, target: 2 },
@@ -207,7 +197,7 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
       ),
     });
     s = restore(act(before, "recover"));
-    expect(s.world.optimism).toBe(before.world.optimism + 1);
+    expect(s.world.optimism).toBe(before.world.optimism);
     const roster = s.residents.filter((r) => r.task === "patrol-recovery");
     expect(roster).toHaveLength(2);
     expect(roster.every((r) => r.workplaceId === "logging")).toBe(true);
@@ -331,6 +321,13 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
   try {
     // Hold nightly incidents constant to compare the three choices on the same arriving convoy.
     s = act(s, "coexist");
+    // Isolate the ending branches with enough food for the entire convoy.
+    s = deposit(deposit(s, "RES_PLANT", 12000), "RES_FISH", 12000);
+    if (!s.restaurantBuilt) {
+      s = command(s, { type: "build-restaurant" });
+      s = command(s, { type: "advance", minutes: 120 });
+    }
+    s = command(s, { type: "set-restaurant-workers", count: 2 });
     for (
       let d = 0;
       d < 6 && minutesUntilCoup(s) > 1 && s.campaign?.beat === "forecast";
@@ -481,7 +478,7 @@ it("주민 청은 하루 한 번만 비용과 민심을 바꾸고 이전 저장�
     s.world.resources.RES_FISH - 4 * AMOUNT_SCALE,
   );
   expect(() => act(n, "reserve")).toThrow();
-  expect(act(later(n, 1440), "reserve").world.pessimism).toBe(6);
+  expect(act(later(n, 1440), "reserve").world.pessimism).toBe(5);
   const old = createTimberState();
   expect(campaignOf(old).beat).toBe("patrol");
   expect(campaignOf({ ...old, chapter: 2 }).beat).toBe("roads");
@@ -515,7 +512,7 @@ it.each(["control", "coexist"] as const)(
     expect(n.world.citizens.filter((p) => p.alive)).toHaveLength(
       s.world.citizens.length - (side === "control" ? 1 : 0),
     );
-    expect(n.world.pessimism).toBe(side === "control" ? 32 : 18);
+    expect(n.world.pessimism).toBe(side === "control" ? 25 : 18);
     expect(emergencyRation(n)).toBeUndefined();
     expect(() => act(n, action)).toThrow();
     expect(emergencyRation(later(n, 1440))).toBeTruthy();
@@ -536,7 +533,7 @@ it("재건 중 순라 인원과 배식소 부상을 실제 주민에게 기록�
   }
   s = commandTimber(s, { type: "set-ration-policy", policy: "cap" }, "decree");
   expect(s.decree?.title).toBe("식단별 배급 상한");
-  expect(s.world.pessimism).toBe(31);
+  expect(s.world.pessimism).toBe(35);
   s = commandTimber(s, { type: "set-ration-policy", policy: "cap" }, "same");
   expect(s.decree?.serial).toBe(1);
   s = commandTimber(
@@ -633,8 +630,8 @@ it("영상, 충분한 난방, 연료 부족과 장기 굶주림을 구별한다"
       i === 0 ? { ...r, hunger: 2880 } : r,
     ),
   };
-  expect(villageFatalIncident(hungry, () => 0).history.at(-1)?.text).toContain(
-    "굶주림",
+  expect(villageFatalIncident(hungry, () => 0).residents[0]?.health).not.toBe(
+    "dead",
   );
   const poor = payTown(cold, { RES_WOOD: 999 });
   const heated = commandTimber(
@@ -683,10 +680,11 @@ it.each([
       ...start,
       chapter: 5,
       campaign: newCampaign("summit"),
-      world: { ...start.world, optimism },
+      world: { ...start.world, optimism: optimism + 5 },
     },
     "control",
   );
+  expect(chosen.world.optimism).toBe(optimism);
   const rally = restore(later(chosen, minutesUntilCoup(chosen)));
   expect(rally.campaign?.beat).toBe("rally");
   expect(rally.town.development.story.rebellion).toBe(true);

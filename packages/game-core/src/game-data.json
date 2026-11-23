@@ -45,8 +45,8 @@
       "name": "물",
       "unit": "재고 단위",
       "initial": 180,
-      "purpose": "음용·농업·온돌",
-      "acquisition": "취수 수문·정수 물레"
+      "purpose": "온상 재배소·목축장 착공 및 생산",
+      "acquisition": "취수장·시작 비축분·방문 상인"
     },
     "RES_IRON_ORE": {
       "name": "철광석",

@@ -130,8 +130,17 @@ it("명시하지 않은 시설은 쉬고 지정 시설만18~21시에 일하며 �
   let s = staffed(build(start(), "farm"), "build-1");
   s = advanceTimber(s, 1080 - s.world.minute);
   const food = { ...s.world.resources };
+  const before = s.world;
   s = cmd(s, { type: "set-overtime", target: "build-1", enabled: true });
   expect(s.world.resources).toEqual(food);
+  expect(s.world.optimism).toBe(Math.max(0, before.optimism - 5));
+  expect(s.world.pessimism).toBe(Math.min(100, before.pessimism + 5));
+  const repeated = cmd(s, {
+    type: "set-overtime",
+    target: "build-1",
+    enabled: true,
+  });
+  expect(repeated.world.optimism).toBe(s.world.optimism);
   expect(townShiftOpen(s, "build-1")).toBe(true);
   expect(townShiftOpen(s, "other")).toBe(false);
   const progress = s.town.facilities[0]?.delivered ?? 0;
@@ -227,7 +236,7 @@ it("연구가 완료되는 마지막 야근 분도 정산하고 다음 분은 �
   const finished = advanceDevelopment(s, 1);
   expect(finished.town.development.completed).toContain(r.id);
   expect(finished.town.development.overtime[0]?.minutes).toBe(60);
-  expect(finished.world.pessimism).toBe(s.world.pessimism + 1);
+  expect(finished.world.pessimism).toBe(s.world.pessimism);
   expect(finished.town.development.seed).not.toBe(d.seed);
   const idle = advanceDevelopment(finished, 1);
   expect(idle.town.development.overtime[0]?.minutes).toBe(60);

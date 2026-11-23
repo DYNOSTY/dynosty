@@ -503,7 +503,7 @@ export function actCampaign(
     if (action === "share" && c.beat === "capital" && !capitalMealsReady(s))
       throw Error("병원 개량 연구와 2단계 병원, 식당이 필요합니다.");
     const base = action === "share" ? pay("RES_FISH", 4) : s;
-    const adjustment = action === "share" ? -4 : 6;
+    const adjustment = action === "share" ? -4 : 0;
     return change(
       c.beat,
       { petitionDay: s.world.day, lastPolicyAt: s.elapsed },
@@ -602,10 +602,6 @@ export function actCampaign(
             world: {
               ...loss.world,
               optimism: Math.min(100, loss.world.optimism + (send ? 1 : 0)),
-              pessimism: Math.min(
-                100,
-                loss.world.pessimism + (!send && Math.random() < 0.5 ? 1 : 0),
-              ),
             },
           },
         );
@@ -808,7 +804,7 @@ export function actCampaign(
           ...supplied.world,
           pessimism: Math.max(
             0,
-            Math.min(100, supplied.world.pessimism + (trade ? -2 : 12)),
+            Math.min(100, supplied.world.pessimism + (trade ? -2 : 0)),
           ),
         },
       };

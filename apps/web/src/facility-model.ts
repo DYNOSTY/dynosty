@@ -209,6 +209,32 @@ export function facilityModel(
         [0.68, 0.49, 0.22],
         [0, 0, 1],
       );
+    } else if (kind === "waterworks") {
+      box("intake-trough", [2.8, 0.3, 0.7], [0, -0.3, 1.65], stone);
+      box(
+        "basin-water",
+        [2.5, 0.08, 0.5],
+        [0, -0.12, 1.65],
+        [0.22, 0.47, 0.53],
+      );
+      box(
+        "lifting-beam",
+        [1.8, 0.13, 0.17],
+        [-0.65, 0.85, 1.4],
+        wood,
+        [0, 0, 0.28],
+      );
+      if (level >= 2)
+        for (let i = 0; i < 8; i++)
+          box("wheel-spoke-" + i, [1.7, 0.13, 0.2], [1.65, 0.15, 1.65], wood, [
+            0,
+            0,
+            (i * Math.PI) / 8,
+          ]);
+      if (level === 3) {
+        box("raised-cistern", [1.55, 1.8, 1.2], [-1, 0.4, 0.5], stone);
+        box("covered-aqueduct", [0.42, 0.3, 2.7], [-1, 1, 1.25], wood);
+      }
     } else if (kind === "fishery") {
       box("shore-pier", [3.6, 0.14, 0.8], [0, -0.5, 1.8], wood);
       for (let i = 0; i < level + 1; i++) {

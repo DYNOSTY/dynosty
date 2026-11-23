@@ -6,7 +6,6 @@ import {
   commandTimber,
   createPlayState,
   createTimberState,
-  LOGGING_RULES,
   loggingSiteRules,
   timberScene,
 } from "@dynosty/game-core";
@@ -22,7 +21,7 @@ function fundedTown() {
     resources: { ...world.resources, RES_WOOD: 4500000 },
   });
 }
-it("숲·작업장·적재·수레가 실제 상태를 표시하고 운반 공룡과 수레가 같은 방향을 향한다", () => {
+it("작업장의 생산이 저장소에 바로 표시된다", () => {
   const engine = new NullEngine(),
     scene = new Scene(engine),
     entities = createSceneEntities(scene),
@@ -50,30 +49,10 @@ it("숲·작업장·적재·수레가 실제 상태를 표시하고 운반 공�
     expect(scene.getTransformNodeByName("logging-workshop")?.isEnabled()).toBe(
       true,
     );
-    const phases = new Set<string>();
-    for (let i = 0; i < 100; i++) {
-      s = advanceTimber(s, 1);
-      update();
-      const h = s.logging.haul;
-      if (!h) continue;
-      phases.add(h.phase);
-      if (["outbound", "inbound"].includes(h.phase)) {
-        const cart = scene.getTransformNodeByName("logging-cart"),
-          resident = scene.getMeshById(h.workerId ?? "");
-        if (!cart || !resident) throw Error("운반 모델 없음");
-        expect(resident.position.x).toBeCloseTo(cart.position.x);
-        expect(Math.abs(resident.position.z - cart.position.z)).toBeCloseTo(
-          LOGGING_RULES.pullOffset,
-        );
-        expect(resident.rotation.y).toBe(h.phase === "outbound" ? 0 : Math.PI);
-      }
-      expect(scene.getMeshByName("logging-cart-cargo")?.isEnabled()).toBe(
-        h.cargo > 0,
-      );
-    }
-    expect(phases.has("inbound")).toBe(true);
-    expect(phases.has("park")).toBe(true);
-    expect(phases.has("release")).toBe(true);
+    s = advanceTimber(s, 100);
+    update();
+    expect(s.logging.haul).toBeNull();
+    expect(s.logging.delivered).toBeGreaterThan(0);
     expect(scene.getMeshByName("logging-stored-wood")?.isEnabled()).toBe(true);
   } finally {
     visual.dispose();

@@ -1780,13 +1780,16 @@ export function App() {
               <p>
                 3D 화면: <strong>{sceneStatus}</strong>
               </p>
-              <button
-                type="button"
-                onClick={advance}
-                disabled={!state || workerError !== null || saveBusy}
-              >
-                하루 진행
-              </button>
+              {import.meta.env.DEV &&
+                new URLSearchParams(location.search).has("worker-test") && (
+                  <button
+                    type="button"
+                    onClick={advance}
+                    disabled={!state || workerError !== null || saveBusy}
+                  >
+                    Worker 날짜 전환
+                  </button>
+                )}
               <button
                 type="button"
                 onClick={toggleSceneExample}

@@ -29,6 +29,7 @@ import {
   type LaborState,
   laborStock,
   PLOT_STEP,
+  patrolRadius,
   productionSites,
   RESIDENT_REQUEST_TEXT,
   type SceneSnapshot,
@@ -833,18 +834,16 @@ export function mountScene(
     }
   });
   let patrolMap: ReturnType<typeof CreateLineSystem> | undefined;
+  let patrolVisible = false;
   function showPatrolMap(visible: boolean) {
+    patrolVisible = visible;
     patrolMap?.dispose();
     patrolMap = undefined;
     if (!visible || !villageState) return;
-    const points = [
-      ...villageState.homes,
-      ...villageState.town.facilities,
-      ...villageState.town.orders,
-    ].map((f) => f.position);
-    const extent = Math.max(28, ...points.map((p) => Math.hypot(p.x, p.z) + 4));
+    const extent = patrolRadius(villageState);
+    if (!extent) return;
     const point = (x: number, z: number) =>
-      new Vector3(x, elevation(x, z) + 0.18, z);
+      new Vector3(x, elevation(x, z - 16) + 0.18, z - 16);
     const lines = [
       Array.from({ length: 129 }, (_, i) =>
         point(
@@ -909,7 +908,13 @@ export function mountScene(
         state?.campaign?.beat === "departure",
         state?.removedLandmarks,
       );
+      const redrawPatrol =
+        patrolVisible &&
+        (!state ||
+          !villageState ||
+          patrolRadius(villageState) !== patrolRadius(state));
       villageState = state;
+      if (redrawPatrol) showPatrolMap(true);
       animationSpeed = state?.speed ?? 1;
       entities.setObstacles(
         state

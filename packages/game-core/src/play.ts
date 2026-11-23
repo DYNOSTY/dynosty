@@ -631,6 +631,17 @@ export type CitizenEvent =
       citizenIds: readonly string[];
       severity?: "minor" | "major" | "critical";
     };
+export function moraleLoss(
+  world: PlayState,
+  points: 1 | 5,
+  before = world,
+): PlayState {
+  return {
+    ...world,
+    optimism: Math.max(0, before.optimism - points),
+    pessimism: Math.min(100, before.pessimism + points),
+  };
+}
 export function applyCitizenEvent(
   input: PlayState,
   event: CitizenEvent,
@@ -721,7 +732,13 @@ export function applyCitizenEvent(
     );
   }
   return parsePlayState({
-    ...s,
+    ...(event.type === "death" ||
+    (event.type === "illness" &&
+      event.citizenIds.some(
+        (id) => s.citizens.find((c) => c.id === id)?.health !== "sick",
+      ))
+      ? moraleLoss(s, 1)
+      : s),
     citizens,
     citizenEvents: [...(s.citizenEvents ?? []), event.id],
   });

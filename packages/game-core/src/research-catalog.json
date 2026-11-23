@@ -1,5 +1,21 @@
 [
   {
+    "id": "TECH_WORKSITE_COAL",
+    "name": "작업장 석탄 난로",
+    "tier": 2,
+    "requires": ["UPGRADE_COAL_2"],
+    "cost": { "RES_WOOD": 12, "RES_METAL": 4 },
+    "workdays": 1,
+    "effect": "작업장 난방에 석탄을 사용할 수 있다",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "",
+    "level": 0,
+    "route": "",
+    "connected": true
+  },
+  {
     "id": "TECH_SEED",
     "name": "살아남은 종자",
     "tier": 1,
@@ -622,6 +638,44 @@
     "scope": "campaign",
     "category": "building",
     "target": "fishery",
+    "level": 3,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_WATERWORKS_2",
+    "name": "취수장 2단계 개량 연구",
+    "tier": 1,
+    "requires": [],
+    "cost": {
+      "RES_WOOD": 8,
+      "RES_METAL": 2
+    },
+    "workdays": 0.5,
+    "effect": "취수장 2단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "waterworks",
+    "level": 2,
+    "route": "",
+    "connected": true
+  },
+  {
+    "id": "UPGRADE_WATERWORKS_3",
+    "name": "취수장 3단계 개량 연구",
+    "tier": 2,
+    "requires": ["UPGRADE_WATERWORKS_2"],
+    "cost": {
+      "RES_WOOD": 16,
+      "RES_METAL": 4
+    },
+    "workdays": 1,
+    "effect": "취수장 3단계 공사 허가 · 자동 개량 아님",
+    "mission": "",
+    "scope": "campaign",
+    "category": "building",
+    "target": "waterworks",
     "level": 3,
     "route": "",
     "connected": true

@@ -129,7 +129,7 @@ export function advanceHospital(
         ),
       },
     };
-    if (p.progress >= recoveryRequired(p)) {
+    if (p.progress >= recoveryRequired(p) && r.hunger < 5 * 1440) {
       const world = applyCitizenEvent(s.world, {
         type: "recovery",
         id: `hospital-${s.world.day}-${s.elapsed}-${r.id}`,

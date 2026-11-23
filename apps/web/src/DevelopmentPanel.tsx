@@ -369,7 +369,8 @@ export function DevelopmentPanel({
       <p>야근 부상 기록 {d.injuries.length}건</p>
       <p className="hint">
         저녁 여섯 시부터 아홉 시까지 지정된 일터에서만 야근합니다. 수당·추가
-        식량은 없습니다. 늦게까지 남은 일꾼은 다칠 수 있습니다.
+        식량은 없습니다. 일터에 그날 처음 야근을 지시하면 희망이 5 내려가고
+        절망이 5 오릅니다. 늦게까지 남은 일꾼은 다칠 수 있습니다.
       </p>
       {showDevTools && !state.campaign ? (
         <details>
