@@ -5,6 +5,7 @@ import {
   payTown,
   requireValue,
 } from "../../packages/game-core/dist/index.js";
+import { advanceVillageDay } from "./read-village.js";
 import { clickExample } from "./scene-picking.js";
 import { openLaborPanel } from "./workspace.js";
 
@@ -121,9 +122,9 @@ test("지도에 연구가 적용된 정찰 왕복 시간과 귀환을 표시한�
   await expect(
     page.getByRole("button", { name: "갈대나루 정찰 중 · 12시간 남음" }),
   ).toBeVisible();
-  await button(page, "1일 진행").click();
+  await advanceVillageDay(page);
   await page.getByRole("button", { name: "남겨 두고 정찰을 마친다" }).click();
-  await button(page, "1일 진행").click();
+  await advanceVillageDay(page);
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
   ).toContainText("갈대나루 발견");
@@ -168,9 +169,9 @@ test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에�
   await expect(page.getByTestId("resource-RES_PLANT")).toHaveText(food ?? "");
   await ready(page);
   await expect(face).toBeVisible();
-  await button(page, "1일 진행").click();
+  await advanceVillageDay(page);
   await page.getByRole("button", { name: "남겨 두고 정찰을 마친다" }).click();
-  await button(page, "1일 진행").click();
+  await advanceVillageDay(page);
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
   ).toContainText("갈대나루 발견");
