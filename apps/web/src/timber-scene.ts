@@ -20,6 +20,7 @@ import {
 } from "@dynosty/game-core";
 import { createLoggingVisual } from "./logging-scene.js";
 import { terrainElevation } from "./terrain.js";
+
 export function createTimberVisual(scene: Scene) {
   const loggingVisual = createLoggingVisual(scene);
   const brown = new StandardMaterial("timber-cart-material", scene);

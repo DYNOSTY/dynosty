@@ -5,6 +5,7 @@ import {
   payTown,
   requireValue,
 } from "../../packages/game-core/dist/index.js";
+import { advanceVillageDay } from "./read-village.js";
 import { clickExample } from "./scene-picking.js";
 import { openLaborPanel } from "./workspace.js";
 
@@ -121,9 +122,9 @@ test("지도에 연구가 적용된 정찰 왕복 시간과 귀환을 표시한�
   await expect(
     page.getByRole("button", { name: "갈대나루 정찰 중 · 12시간 남음" }),
   ).toBeVisible();
-  await button(page, "1일 진행").click();
+  await advanceVillageDay(page);
   await page.getByRole("button", { name: "남겨 두고 정찰을 마친다" }).click();
-  await button(page, "1일 진행").click();
+  await advanceVillageDay(page);
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
   ).toContainText("갈대나루 발견");
@@ -168,9 +169,9 @@ test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에�
   await expect(page.getByTestId("resource-RES_PLANT")).toHaveText(food ?? "");
   await ready(page);
   await expect(face).toBeVisible();
-  await button(page, "1일 진행").click();
+  await advanceVillageDay(page);
   await page.getByRole("button", { name: "남겨 두고 정찰을 마친다" }).click();
-  await button(page, "1일 진행").click();
+  await advanceVillageDay(page);
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
   ).toContainText("갈대나루 발견");
@@ -199,10 +200,13 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.route("**/models/buildings/BLD_NEST.glb", (r) =>
-    r.fulfill({ status: 404, body: "missing" }),
-  );
-  await ready(page);
+  const nestGlb = "**/models/buildings/BLD_NEST.glb";
+  await page.route(nestGlb, (r) => r.fulfill({ status: 404, body: "missing" }));
+  const [response] = await Promise.all([
+    page.waitForResponse(nestGlb, { timeout: 90_000 }),
+    ready(page),
+  ]);
+  expect(response.status()).toBe(404);
   await expect(page.getByRole("alert")).toContainText("모델");
   const fallback = await page.evaluate(() => {
     const scene = (
@@ -225,10 +229,19 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
   });
   expect(fallback.glb).toBe(false);
   expect(fallback.meshes).toBeGreaterThan(0);
+  // 캔버스에서 직접 선택한 뒤 접혀 있는 명령 콘솔에서 결과를 확인한다.
   await clickExample(page, "building");
+  await button(page, "명령 열기").click();
+  const selection = page.getByRole("region", {
+    name: "선택 정보",
+    exact: true,
+  });
   await expect(
-    page.getByRole("region", { name: "선택 정보", exact: true }),
-  ).toContainText("복홀 방 게시판");
+    selection.getByRole("heading", {
+      name: "건물 예제 · 온돌 둥지",
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
   expect(errors).toEqual([]);
 });

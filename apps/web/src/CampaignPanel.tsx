@@ -19,6 +19,7 @@ import {
   policyWait,
   type TimberCommand,
   type TimberState,
+  verdictRoute,
   villageDefenseActive,
   villageTemperature,
 } from "@dynosty/game-core";
@@ -528,6 +529,7 @@ export function CampaignPanel({
   southVisits,
   defenseOpen,
   setDefenseOpen,
+  clearOfficeSelection,
   work,
 }: {
   state: TimberState;
@@ -542,6 +544,7 @@ export function CampaignPanel({
   southVisits?: number;
   defenseOpen?: boolean;
   setDefenseOpen?: (open: boolean) => void;
+  clearOfficeSelection: () => void;
   work: boolean;
 }) {
   const [heating, setHeating] = useState(s.heating ?? 0);
@@ -614,22 +617,22 @@ export function CampaignPanel({
   }, [intro, mainMenu, pauseMenu, s.paused, command, c.beat]);
   const [opened, setOpened] = useState<string | null>(null);
   const [petition, setPetition] = useState(false);
+  const [manualOffice, setManualOffice] = useState(false);
+  const canOpenOffice = !["opening", "departure", "after"].includes(c.beat);
+  const office = canOpenOffice && (manualOffice || !!officeSelected);
+  const populatedCapital = c.beat === "capital" && !!s.bokhol;
   const [south, setSouth] = useState(false);
   useEffect(() => {
     if (southVisits) setSouth(true);
   }, [southVisits]);
-  const [office, setOffice] = useState(false);
   useEffect(() => {
     onPatrolMap?.(office && !mainMenu && !pauseMenu);
     return () => onPatrolMap?.(false);
   }, [office, mainMenu, pauseMenu, onPatrolMap]);
   useEffect(() => {
-    if (officeSelected) setOffice(true);
-  }, [officeSelected]);
-  useEffect(() => {
-    if (gateSelected && c.beat === "capital") setSouth(true);
+    if (gateSelected && populatedCapital) setSouth(true);
     else if (gateSelected) setDefenseOpen?.(true);
-  }, [gateSelected, setDefenseOpen, c.beat]);
+  }, [gateSelected, setDefenseOpen, populatedCapital]);
   const { audioRef, galleryMusic, filmHasAudio } = useAudio();
   const canPetition =
     [
@@ -807,7 +810,8 @@ export function CampaignPanel({
     setOpened(
       c.beat === "verdict" &&
         action === "next" &&
-        s.town.development.story.route === "mechanical"
+        verdictRoute(s) === "mechanical" &&
+        s.town.development.story.chungnyeong !== "mechanical"
         ? "vigil"
         : null,
     );
@@ -843,7 +847,7 @@ export function CampaignPanel({
           resetView?.();
           setPetition(false);
           setSouth(false);
-          setOffice(false);
+          setManualOffice(false);
           setDefenseOpen?.(false);
           command({ type: "restart" });
           command({
@@ -876,7 +880,7 @@ export function CampaignPanel({
             setDefenseOpen?.(false);
             setPetition(false);
             setSouth(false);
-            setOffice(false);
+            setManualOffice(false);
             setPauseMenu(false);
             setMainMenu(true);
           }}
@@ -925,7 +929,7 @@ export function CampaignPanel({
         {s.chapter ?? 1}단계 · {CHAPTERS[(s.chapter ?? 1) - 1]}
         <small>{firstTask?.words ?? (p.goal || p.title)}</small>
       </button>
-      {c.beat === "capital" && (
+      {populatedCapital && (
         <>
           <button
             type="button"
@@ -1014,12 +1018,15 @@ export function CampaignPanel({
           )}
         </>
       )}
-      {!["opening", "departure", "after"].includes(c.beat) && (
+      {canOpenOffice && (
         <button
           type="button"
           className="scout-all"
           aria-expanded={office}
-          onClick={() => setOffice(!office)}
+          onClick={() => {
+            if (office && officeSelected) clearOfficeSelection();
+            setManualOffice(!office);
+          }}
         >
           관아 · 순라 배치
         </button>
@@ -1072,9 +1079,20 @@ export function CampaignPanel({
               )}
               <strong>온돌 · 현재 화력 {s.firedHeat ?? 0}단계</strong>
               <p>
-                추워지면 집집마다 불을 더 땝니다. 거주 중인 집 한 채가 화력 한
-                단계마다 한 시간에 목재 1을 써서 10 °C를 덥힙니다. 땔감이
-                모자라면 남은 만큼만 땝니다.
+                {s.campaign?.beat === "capital" ? (
+                  <>
+                    거주 중인 집 한 채를 10 °C 덥히려면 화력 한 단계마다 한
+                    시간에 석탄 1이 필요합니다. 석탄이 모자라면 부족한 석탄 1당
+                    예약되지 않은 목재 {GAME_RULES.fuel.coalToWood}을 대신
+                    씁니다. 땔감이 모자라면 남은 만큼만 땝니다.
+                  </>
+                ) : (
+                  <>
+                    추워지면 집집마다 불을 더 땝니다. 거주 중인 집 한 채가 화력
+                    한 단계마다 한 시간에 목재 1을 써서 10 °C를 덥힙니다. 땔감이
+                    모자라면 남은 만큼만 땝니다.
+                  </>
+                )}
               </p>
               <label className="village-slider">
                 온돌 화력

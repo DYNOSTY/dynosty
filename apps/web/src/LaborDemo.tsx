@@ -111,9 +111,9 @@ export function LaborDemo({
         try {
           if (m.type === "saved") {
             saveLabor(localStorage, m.save);
-            setStatus("일손 배치을 저장했습니다.");
+            setStatus("일손 배치를 저장했습니다.");
           } else {
-            setStatus("일손 배치을 불러왔습니다. 일시정지 상태입니다.");
+            setStatus("일손 배치를 불러왔습니다. 일시정지 상태입니다.");
             onClearSelection();
           }
         } catch (err) {
