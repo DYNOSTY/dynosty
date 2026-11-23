@@ -14,6 +14,7 @@ import {
   mineralWorksites,
   orderWork,
   productionRate,
+  type ResourceId,
   restaurantStaff,
   STORAGE_SPACE,
   salvageMaterials,
@@ -25,6 +26,7 @@ import {
   tradeRank,
   warehouseDoor,
   workplaceOpen,
+  yardStock,
 } from "@dynosty/game-core";
 import { useState } from "react";
 import { BuildingUpgrade } from "./BuildingUpgrade.js";
@@ -75,7 +77,7 @@ function Reserve({
     </p>
   );
 }
-function Demolition({
+export function Demolition({
   state,
   id,
   command,
@@ -426,7 +428,17 @@ export function TownPanel({
           ? "공동 저장소"
           : "임시 야적장 · 눈이 녹으면 목재가 젖을 수 있음"}
         {state.yardDryAt ? " · 목재 1개 건조 중" : ""} · 공동 저장 용량: 품목별{" "}
-        {storageCapacity(state)} · 꽉 차면 새 입고 대기
+        {storageCapacity(state)} · 초과분은 야적장에 보관
+        {Object.keys(state.world.resources).map((key) => {
+          const r = key as ResourceId;
+          const count = yardStock(state, r);
+          return count >= 1 ? (
+            <span key={r}>
+              {" "}
+              · 야적 {GAME_RULES.resources[r].name} {Math.floor(count)}
+            </span>
+          ) : null;
+        })}
       </p>
       <details>
         <summary>온돌 둥지 개량 {state.homes.length}곳</summary>

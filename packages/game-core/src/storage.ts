@@ -37,15 +37,20 @@ export function storageResearchLevel(s: TimberState): number {
 export function storageCapacity(s: TimberState): number {
   const rank = storageResearchLevel(s);
   const legacy = productionSites(s).filter((l) => l.storageBuilt).length;
-  return Math.max(
-    s.campaign ? 1000 + STORAGE_SPACE[0] : STORAGE_SPACE[0],
+  return (
     legacy * (STORAGE_SPACE[rank - 1] ?? 500) +
-      s.town.facilities
-        .filter((f) => f.kind === "storage")
-        .reduce(
-          (n, f) => n + (STORAGE_SPACE[Math.max(f.level, rank) - 1] ?? 500),
-          0,
-        ),
+    s.town.facilities
+      .filter((f) => f.kind === "storage")
+      .reduce(
+        (n, f) => n + (STORAGE_SPACE[Math.max(f.level, rank) - 1] ?? 500),
+        0,
+      )
+  );
+}
+export function yardStock(s: TimberState, resource: ResourceId) {
+  return Math.max(
+    0,
+    s.world.resources[resource] / AMOUNT_SCALE - storageCapacity(s),
   );
 }
 export function storageRoom(

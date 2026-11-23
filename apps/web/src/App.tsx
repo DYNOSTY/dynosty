@@ -12,6 +12,7 @@ import {
   BUILDING_RULES,
   type BuildingKind,
   capitalRoad,
+  demolishableLandmark,
   type HomePlacement,
   type LaborState,
   laborScene,
@@ -82,7 +83,7 @@ import {
 } from "./site-targets.js";
 import { SCENE_SIGNS } from "./site-zones.js";
 import { TimberDemo } from "./TimberDemo.js";
-import { buildingCost } from "./TownPanel.js";
+import { buildingCost, Demolition } from "./TownPanel.js";
 import { VideoPanel } from "./VideoPanel.js";
 import { CREW_BADGES, cartBadge } from "./visual-badges.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
@@ -2009,6 +2010,17 @@ export function App() {
           </>
         )}
         <div className="g-console__info">
+          {consoleOpen &&
+            !prologue &&
+            timberState &&
+            selectedId &&
+            demolishableLandmark(timberState, selectedId) && (
+              <Demolition
+                state={timberState}
+                id={selectedId}
+                command={(cmd) => villageCommand.current?.(cmd)}
+              />
+            )}
           {showConstructionGrid ? (
             <section className="building-shelf" aria-label="건물 목록">
               <button

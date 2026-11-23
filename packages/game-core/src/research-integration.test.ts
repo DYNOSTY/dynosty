@@ -166,7 +166,7 @@ it("저장 공간500/1000/2000은 연구·건물의 높은 값으로 적용하�
   };
   expect(parseTimberState(legacy).world.resources.RES_FISH).toBe(30000000);
 });
-it("창고가 가득 차면 수레 화물을 유지하고 공간이 난 뒤 한 번만 입고한다", () => {
+it("저장 용량을 넘긴 수레 화물도 야적장 재고에 한 번만 더한다", () => {
   const w = createPlayState();
   let s = createTimberState({
     ...w,
@@ -177,20 +177,10 @@ it("창고가 가득 차면 수레 화물을 유지하고 공간이 난 뒤 한 
   s = cmd(s, { type: "facility-staff", id: "build-1", count: 2 });
   s = advanceTimber(s, 180);
   const f = s.town.facilities[0];
-  expect(f?.haul).toMatchObject({ stage: "store", cargo: 5 });
-  expect(f?.delivered).toBe(0);
-  expect(s.world.resources.RES_PLANT).toBe(5000000);
-  s = {
-    ...s,
-    world: {
-      ...s.world,
-      resources: { ...s.world.resources, RES_PLANT: 4960000 },
-    },
-  };
-  s = advanceTimber(s, 1);
-  expect(s.town.facilities[0]?.haul?.cargo).toBe(1);
-  expect(s.town.facilities[0]?.delivered).toBe(4);
-  expect(s.world.resources.RES_PLANT).toBe(5000000);
+  expect(f?.delivered).toBeGreaterThan(0);
+  expect(s.world.resources.RES_PLANT).toBe(
+    5000000 + (f?.delivered ?? 0) * 10000,
+  );
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
 it("반란 전·다른 분기 연구는 거부하고 진압 루트에서 날틀이 정찰 기본10배를 대체한다", () => {
@@ -367,7 +357,7 @@ it("메카는 야간에도 배치된 시설에서 일하고 배급·수면·둥�
   ]);
 });
 
-it("공동 목재가 꽉 차면 조달 검수 물량을 보존하고 공간이 난 뒤 자동 정산한다", () => {
+it("공동 목재가 꽉 차도 검수한 물량을 즉시 야적장에 정산한다", () => {
   const w = createPlayState();
   let s = createTimberState({
     ...w,
@@ -377,9 +367,9 @@ it("공동 목재가 꽉 차면 조달 검수 물량을 보존하고 공간이 �
   s = cmd(s, { type: "choose", offer: "B" });
   s = cmd(s, { type: "contract" });
   s = advanceTimber(s, 110);
-  expect(s.phase).toBe("inspecting");
-  expect(s.stock.waiting).toBe(20);
-  expect(s.world.resources.RES_WOOD).toBe(5000000);
+  expect(s.phase).toBe("ready");
+  expect(s.stock.waiting).toBe(0);
+  expect(s.world.resources.RES_WOOD).toBe(5200000);
   s = cmd(s, {
     type: "plan-building",
     kind: "home",

@@ -10,7 +10,6 @@ import {
 } from "./play.js";
 import { isRecord } from "./save.js";
 import { SCOUT_CREW, SCOUT_SITES, scoutRun } from "./scout-sites.js";
-import { storageRoom } from "./storage.js";
 import { recordResearchStory } from "./story-research.js";
 import {
   commandTimber,
@@ -291,6 +290,11 @@ function patrolCasualties(s: TimberState) {
 }
 export function recoveryCrew(s: TimberState) {
   const casualties = patrolCasualties(s);
+  const children = new Set(
+    s.childLabor
+      ? []
+      : s.world.citizens.filter((c) => c.age === "child").map((c) => c.id),
+  );
   const production = new Set(
     s.town.facilities
       .filter((f) => facilityResource(f))
@@ -304,6 +308,7 @@ export function recoveryCrew(s: TimberState) {
         r.health === "healthy" &&
         !r.task &&
         !r.nextWork &&
+        !children.has(r.id) &&
         (producer(r.workplaceId) || !r.workplaceId) &&
         !s.workerIds.includes(r.id) &&
         !casualties.includes(r.id),
@@ -919,8 +924,7 @@ export function emergencyRation(s: TimberState) {
     c?.beat !== "vigil" ||
     !c.side ||
     c.emergencyDay === s.world.day ||
-    !foodWarnings(s.world).some((w) => w.id === "RES_MEAT") ||
-    storageRoom(s, "RES_MEAT") < 8
+    !foodWarnings(s.world).some((w) => w.id === "RES_MEAT")
   )
     return;
   if (c.side === "coexist")

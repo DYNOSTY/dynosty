@@ -29,7 +29,6 @@ export function VillageBulletin({
   heat: () => void;
 }) {
   const [hiddenCold, setHiddenCold] = useState("");
-  const [folded, setFolded] = useState("");
   const [census, setCensus] = useState(false);
   const [filter, setFilter] = useState("");
   const alive = s.residents.filter((r) => r.health !== "dead");
@@ -56,8 +55,7 @@ export function VillageBulletin({
   const site = SCOUT_SITES.find((site) => encounterReady(s, site.id));
   const find = site && s.scoutFinds?.[site.id];
   const reportId = site ? site.id + "-" + find?.due : "";
-  const finding =
-    find && reportId !== folded ? scoutFinding(find.kind) : undefined;
+  const finding = find ? scoutFinding(find.kind) : undefined;
   const arrival = s.mission === "register-policy" || (s.scoutVisitors ?? 0) > 0;
   const temp = villageTemperature(s);
   const next = s.world.minute + 60;
@@ -73,7 +71,7 @@ export function VillageBulletin({
   const occupied = new Set(
     alive.filter((r) => r.homeId && homes.has(r.homeId)).map((r) => r.homeId),
   ).size;
-  const needed = Math.max(0, Math.ceil(-Math.min(temp, forecast) / 8));
+  const needed = Math.max(0, Math.ceil(-Math.min(temp, forecast) / 10));
   const setting = s.heating || Math.min(3, needed);
   const fuel =
     Math.max(
@@ -116,11 +114,6 @@ export function VillageBulletin({
   return (
     <>
       <div className="village-census">
-        {site && reportId === folded && (
-          <button type="button" onClick={() => setFolded("")}>
-            정찰 전갈 다시 열기
-          </button>
-        )}
         <button
           type="button"
           aria-expanded={census}
@@ -209,7 +202,7 @@ export function VillageBulletin({
                     return null;
                   const available =
                     citizen?.alive &&
-                    citizen.age !== "child" &&
+                    (s.childLabor || citizen.age !== "child") &&
                     r.health === "healthy" &&
                     !r.task &&
                     !r.nextWork &&
@@ -325,9 +318,6 @@ export function VillageBulletin({
               </p>
               {finding && site ? (
                 <>
-                  <button type="button" onClick={() => setFolded(reportId)}>
-                    보고 닫기
-                  </button>
                   <p>
                     {finding[2]} · 함께 돌아오면 마을에 도착할 때 인계합니다.
                   </p>

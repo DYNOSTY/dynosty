@@ -6,7 +6,12 @@ import {
   type TimberState,
 } from "@dynosty/game-core";
 export function terrainElevation(s: TimberState | null) {
-  const sites = [...(s?.homes.map((h) => h.position) ?? [])];
+  const plot = (f: {
+    position: { x: number; z: number };
+    headingRadians?: number;
+  }) => ({ ...f.position, headingRadians: f.headingRadians ?? 0 });
+  const sites: { x: number; z: number; headingRadians?: number }[] =
+    s?.homes.map(plot) ?? [];
   const forests: Partial<Record<ProductionSiteId, number>> = {};
   if (s)
     for (const l of productionSites(s)) {
@@ -15,11 +20,7 @@ export function terrainElevation(s: TimberState | null) {
       if (l.built) sites.push(rules.workshopPlot);
       if (l.storageBuilt) sites.push(rules.storagePlot);
     }
-  if (s)
-    sites.push(
-      ...s.town.facilities.map((f) => f.position),
-      ...s.town.orders.map((f) => f.position),
-    );
-  if (s?.construction) sites.push(s.construction.position);
+  if (s) sites.push(...s.town.facilities.map(plot), ...s.town.orders.map(plot));
+  if (s?.construction) sites.push(plot(s.construction));
   return (x: number, z: number) => bokholElevation(x, z, forests, sites);
 }

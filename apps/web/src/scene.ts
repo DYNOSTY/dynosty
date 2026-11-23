@@ -293,10 +293,11 @@ export function mountScene(
             l.storageBuilt,
           ])
         : null,
-      s?.homes.map((h) => h.position),
-      s?.town.facilities.map((f) => f.position),
-      s?.town.orders.map((f) => f.position),
+      s?.homes.map((h) => [h.position, h.headingRadians]),
+      s?.town.facilities.map((f) => [f.position, f.headingRadians]),
+      s?.town.orders.map((f) => [f.position, f.headingRadians]),
       s?.construction?.position,
+      s?.construction?.headingRadians,
     ]);
     if (key === terrainKey) return;
     terrainKey = key;
@@ -915,6 +916,7 @@ export function mountScene(
       village.setFireDamage(
         !!state?.rebuilding,
         state?.campaign?.beat === "departure",
+        state?.removedLandmarks,
       );
       villageState = state;
       animationSpeed = state?.speed ?? 1;

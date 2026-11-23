@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { campaignOf, policyWait } from "./campaign.js";
 import { createPlayState, type FoodId } from "./play.js";
 import { requireValue } from "./require-value.js";
 import {
@@ -83,8 +84,10 @@ it("여러 부지는 즉시 자재 확보하며 겹침 거부, 순차 완공, �
   expect(() => plan(s, "farm")).toThrow();
   s = plan(s, "storage", { ...pose, position: { x: 0, z: 16 } });
   expect(s.town.orders).toHaveLength(2);
+  expect(s.town.orders[1]?.crew).toEqual([]);
   expect(s.world.resources.RES_WOOD).toBe(2200000);
   s = advanceTimber(s, 20);
+  expect(s.town.orders[1]?.workDone).toBe(0);
   const loaded = parseTimberSave(createTimberSave(s)).state;
   expect(advanceTimber(loaded, 120)).toEqual(advanceTimber(s, 120));
   s = finish(s);
@@ -432,4 +435,86 @@ it("제재소는 벌목권 안의 숲을 차례로 쓰고 고갈한 숲을 다�
   expect(after.find((l) => l.siteId === second)?.remaining).toBeLessThan(120);
   expect(s.town.extracted[first]).toBe(120);
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
+});
+
+it("기존 시설은 한 번만 철거하고 보호 시설은 보존한다", () => {
+  const s = start();
+  const id = "village:BLD_GREENHOUSE:-6:22";
+  const refund = salvageMaterials(s, id).RES_WOOD ?? 0;
+  expect(refund).toBeGreaterThan(0);
+  const n = cmd(s, { type: "demolish-building", id });
+  expect(n.world.resources.RES_WOOD).toBe(
+    s.world.resources.RES_WOOD + refund * 10000,
+  );
+  expect(() =>
+    cmd(parseTimberSave(createTimberSave(n)).state, {
+      type: "demolish-building",
+      id,
+    }),
+  ).toThrow();
+  for (const protectedId of [
+    "village:BLD_OFFICE:0:-16",
+    "village:BLD_GATE:0:24",
+    "village:BLD_WATCH:-22:-16",
+  ])
+    expect(() =>
+      cmd(n, { type: "demolish-building", id: protectedId }),
+    ).toThrow();
+});
+it("파손된 교역소 철거는 자재의 10%를 반환하고 미완료 보완을 종료한다", () => {
+  const s = finish(plan(start(), "trade"));
+  const id = requireValue(s.town.facilities[0], "교역소").id;
+  const damaged = {
+    ...s,
+    mutantDamage: { [id]: 100 },
+    merchantRepair: { item: 0, quantity: 2, work: 20 },
+  };
+  expect(salvageMaterials(damaged, id).RES_WOOD).toBe(
+    Math.floor((BUILDING_RULES.trade.cost.RES_WOOD ?? 0) * 0.1),
+  );
+  expect(
+    cmd(damaged, { type: "demolish-building", id }).merchantRepair,
+  ).toBeUndefined();
+});
+
+it("아동 노동을 반포한 뒤에만 새끼 공룡에게 다음 업무를 맡길 수 있다", () => {
+  let s = createVillageGame();
+  const child = requireValue(
+    s.world.citizens.find((c) => c.age === "child"),
+    "아동",
+  );
+  s = {
+    ...s,
+    residents: s.residents.map((r) =>
+      r.id === child.id ? r : { ...r, workplaceId: "guard" },
+    ),
+  };
+  const work = {
+    type: "queue-work" as const,
+    workId: "yard",
+    position: { x: 0, z: 0 },
+  };
+  expect(() => cmd(s, work)).toThrow();
+  const active = { ...s, campaign: campaignOf(s) };
+  const rationed = cmd(active, {
+    type: "set-ration-policy",
+    policy: active.rationPolicy === "cap" ? "needs" : "cap",
+  });
+  expect(() => cmd(rationed, { type: "enact-child-labor" })).toThrow(
+    /열두 시간/,
+  );
+  s = cmd(active, { type: "enact-child-labor" });
+  const saved = parseTimberSave(createTimberSave(s)).state;
+  expect(policyWait(saved)).toBe(720);
+  expect(() =>
+    cmd(saved, {
+      type: "set-ration-policy",
+      policy: s.rationPolicy === "cap" ? "needs" : "cap",
+    }),
+  ).toThrow(/열두 시간/);
+  expect(s.decree?.title).toBe("아동 노동 허용");
+  const assigned = cmd(parseTimberSave(createTimberSave(s)).state, work);
+  expect(assigned.residents.find((r) => r.id === child.id)?.nextWork?.id).toBe(
+    "yard",
+  );
 });
