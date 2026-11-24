@@ -57,6 +57,13 @@ export function createSceneEntities(
       assetKey: string;
       path: GroundPoint[];
       needMarker: Mesh | null;
+      ground?: {
+        x: number;
+        z: number;
+        base: number;
+        height: (x: number, z: number) => number;
+        y: number;
+      };
     }
   >();
   let elevation = (x: number, z: number) => {
@@ -241,10 +248,26 @@ export function createSceneEntities(
               object.mesh.rotation.y = Math.atan2(dx, dz);
             }
           }
-          object.mesh.position.y =
-            e.position.y +
-            0.5 +
-            elevation(object.mesh.position.x, object.mesh.position.z);
+          // The terrain sample walks every foundation; skip it while the resident stands still.
+          let ground = object.ground;
+          const { x, z } = object.mesh.position;
+          if (
+            !ground ||
+            ground.x !== x ||
+            ground.z !== z ||
+            ground.base !== e.position.y ||
+            ground.height !== elevation
+          ) {
+            ground = {
+              x,
+              z,
+              base: e.position.y,
+              height: elevation,
+              y: e.position.y + 0.5 + elevation(x, z),
+            };
+            object.ground = ground;
+          }
+          object.mesh.position.y = ground.y;
           object.visual?.setMotion(moved ? "walking" : "idle");
           if (e.indoors && object.path.length === 0)
             object.mesh.setEnabled(false);
