@@ -24,6 +24,7 @@ import {
 import {
   createDevelopment,
   isMechanical,
+  nextVillageSeed,
   RESEARCH_CATALOG,
   residentShiftOpen,
   setElectricalWork,
@@ -159,7 +160,7 @@ import {
 } from "./village-services.js";
 
 export const TIMBER_RULES = {
-  version: 18,
+  version: 19,
   requested: 20,
   deadline: 60,
   workers: 60,
@@ -266,7 +267,7 @@ export interface TimberState {
   readonly openingFight?: boolean;
   readonly rationReactionDay?: number;
   readonly decree?: { title: string; reaction: string; serial: number };
-  readonly version: 18;
+  readonly version: 19;
   readonly childLabor?: boolean;
   readonly removedLandmarks?: readonly string[];
   readonly town: TownState;
@@ -316,6 +317,8 @@ export interface TimberState {
   } | null;
   readonly homes: readonly VillageHome[];
   readonly firstRationSet?: boolean;
+  /** Set on saves from before the guided first mission that already ran. */
+  readonly firstMissionDone?: boolean;
   readonly restaurantWorkerTarget: number;
   readonly rationPolicy: RationPolicy;
   readonly restaurantBuilt: boolean;
@@ -726,7 +729,7 @@ export function createTimberState(
     })),
   };
   return {
-    version: 18,
+    version: 19,
     town: createTown(),
     world: { ...world, paused: true },
     initialWood: parsed.resources.RES_WOOD,
@@ -1961,9 +1964,26 @@ export function parseTimberState(value: unknown): TimberState {
       },
     };
   }
+  if (isRecord(value) && value.version === 18) {
+    // v18 saves predate village bulletins, scout encounters and clues, build
+    // price versions, the child labor decree, landmark demolition and the
+    // guided first mission. Those optional fields stay absent, which the game
+    // reads as the earlier behaviour: no notices, no pending encounter,
+    // original build prices for refunds, child labor not enacted and no
+    // landmark removed. A save that already ran is past its first orders, so
+    // the guide treats it as complete; an untouched save keeps the guide.
+    const progressed =
+      value.restaurantBuilt === true ||
+      (typeof value.elapsed === "number" && value.elapsed > 0);
+    value = {
+      ...value,
+      version: 19,
+      ...(progressed && { firstRationSet: true, firstMissionDone: true }),
+    };
+  }
   if (
     !isRecord(value) ||
-    value.version !== 18 ||
+    value.version !== 19 ||
     !phases.includes(value.phase as string) ||
     typeof value.paused !== "boolean" ||
     ![1, 3].includes(value.speed as number) ||
@@ -2051,6 +2071,8 @@ export function parseTimberState(value: unknown): TimberState {
     value.homes.length > 100 ||
     (value.firstRationSet !== undefined &&
       typeof value.firstRationSet !== "boolean") ||
+    (value.firstMissionDone !== undefined &&
+      typeof value.firstMissionDone !== "boolean") ||
     !["needs", "cap"].includes(value.rationPolicy as string)
   )
     fail("거주지·배급 정책이 올바르지 않습니다.");
@@ -3668,6 +3690,9 @@ function applyTimberCommand(
       const departures = { ...s.scoutDepartures };
       const durations = { ...s.scoutTripDurations };
       const now = (s.world.day - 1) * 1440 + s.world.minute;
+      // Encounters use the saved village seed so a replayed command or a
+      // reloaded save finds the same thing.
+      let seed = s.town.development.seed;
       for (const id of command.ids) {
         const site = SCOUT_SITES.find((q) => q.id === id);
         if (!site) fail("알 수 없는 정찰 거점");
@@ -3715,8 +3740,10 @@ function applyTimberCommand(
           departures[id] = now;
           durations[id] = scoutTripMinutes(site, s);
           if (command.explore) {
+            seed = nextVillageSeed(seed);
+            const roll = seed / 4294967296;
             finds[id] = {
-              kind: pickOne(SCOUT_FINDS, Math.random),
+              kind: pickOne(SCOUT_FINDS, () => roll),
               decision: "waiting",
               due: now + Math.ceil(durations[id] / 2),
             };
@@ -3726,6 +3753,10 @@ function applyTimberCommand(
       n = {
         ...s,
         residents,
+        town: {
+          ...s.town,
+          development: { ...s.town.development, seed },
+        },
         ...(command.explore || s.scoutFinds ? { scoutFinds: finds } : {}),
         scoutDepartures: departures,
         scoutTripDurations: durations,

@@ -144,7 +144,7 @@ it("이전 저장의 치료 필요 주민을 보존하며 손상된 병상·회�
   const s = injure(build(), 1, "major");
   const { patients: _patients, ...town } = s.town;
   const migrated = parseTimberState({ ...s, version: 15, town });
-  expect(migrated.version).toBe(18);
+  expect(migrated.version).toBe(19);
   expect(migrated.town.patients[0]).toMatchObject({
     severity: "minor",
     progress: 0,

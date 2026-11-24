@@ -1,26 +1,15 @@
 /// <reference lib="webworker" />
 import {
-  campaignOf,
   commandTimber,
   createTimberSave,
   createVillageGame,
-  parseTimberSave,
   tickTimber,
-  updateCampaign,
 } from "@dynosty/game-core";
+import { resumeVillage } from "./resume-village.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 
 import { villageCompletions } from "./village-completions.js";
 
-function resumeVillage(data: unknown) {
-  const saved = parseTimberSave(data).state;
-  // Earlier developer saves can already have a mutually exclusive research ending.
-  const campaign =
-    saved.campaign || !saved.town.development.story.rebellion
-      ? { campaign: campaignOf(saved) }
-      : {};
-  return updateCampaign({ ...saved, ...campaign, remainder: 0 });
-}
 let state = createVillageGame(true),
   last = performance.now();
 let initialized = false;

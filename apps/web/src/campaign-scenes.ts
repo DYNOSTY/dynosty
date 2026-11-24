@@ -146,6 +146,7 @@ export function moraleAdvice(s: TimberState): Line | undefined {
 
 export function firstVillageTask(s: TimberState) {
   if (
+    s.firstMissionDone ||
     !s.rebuilding ||
     (s.chapter ?? 1) !== 1 ||
     campaignOf(s).beat !== "patrol"

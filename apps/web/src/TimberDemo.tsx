@@ -247,7 +247,8 @@ export function TimberDemo({
           if (m.type === "saved") {
             saveTimber(localStorage, m.save);
             setSaveStatus("마을 진행을 저장했습니다.");
-          } else setSaveStatus("마을 진행을 불러왔습니다.");
+          } else
+            setSaveStatus("마을 진행을 불러왔습니다. 일시정지 상태입니다.");
         } catch (err) {
           setError(timberSaveError(err));
         } finally {
@@ -310,6 +311,20 @@ export function TimberDemo({
       command: c,
     } satisfies TimberRequest);
   }
+  useEffect(() => {
+    // Village time stops while the tab is hidden; the player resumes it.
+    const pause = () => {
+      if (document.hidden)
+        worker.current?.postMessage({
+          type: "command",
+          id: `${session.current}-${++counter.current}`,
+          command: { type: "pause", paused: true },
+        } satisfies TimberRequest);
+    };
+    pause();
+    document.addEventListener("visibilitychange", pause);
+    return () => document.removeEventListener("visibilitychange", pause);
+  }, []);
   function placeBuilding(kind: BuildingKind) {
     setError(null);
     setPlacingKind(kind);

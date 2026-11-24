@@ -6,12 +6,13 @@ import {
 } from "./development.js";
 import { hospitalBeds, hospitalHours, recoveryRequired } from "./hospital.js";
 import { createPlayState, dailyFoodDemand, parsePlayState } from "./play.js";
-import { storageCapacity } from "./storage.js";
+import { storageCapacity, yardStock } from "./storage.js";
 import {
   advanceTimber,
   commandTimber,
   createTimberSave,
   createTimberState,
+  createVillageGame,
   parseTimberSave,
   parseTimberState,
   type TimberCommand,
@@ -165,6 +166,26 @@ it("저장 공간500/1000/2000은 연구·건물의 높은 값으로 적용하�
     },
   };
   expect(parseTimberState(legacy).world.resources.RES_FISH).toBe(30000000);
+});
+it("창고가 없어도 시작 적재 용량을 쓰고 창고 하나로 기존 용량이 줄지 않는다", () => {
+  const village = createVillageGame();
+  expect(storageCapacity(village)).toBe(1500);
+  expect(storageCapacity(start())).toBe(500);
+  expect(yardStock(village, "RES_WOOD")).toBe(0);
+  const crowded = {
+    ...village,
+    world: {
+      ...village.world,
+      resources: { ...village.world.resources, RES_WOOD: 2000 * 10000 },
+    },
+  };
+  // 넘친 물량은 기획자 규칙대로 야적장에 둔다.
+  expect(yardStock(crowded, "RES_WOOD")).toBe(500);
+  const warehouse = build(start(), "storage", 0, 16);
+  expect(storageCapacity(warehouse)).toBe(500);
+  expect(storageCapacity({ ...warehouse, campaign: village.campaign })).toBe(
+    1500,
+  );
 });
 it("저장 용량을 넘긴 수레 화물도 야적장 재고에 한 번만 더한다", () => {
   const w = createPlayState();

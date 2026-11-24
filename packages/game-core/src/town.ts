@@ -1201,12 +1201,12 @@ function advanceTownProduction(
       if (f.sourceId) {
         let l = productionSites(s).find((site) => site.siteId === f.sourceId);
         if (!l?.remaining) {
-          l =
-            f.kind !== "logging"
-              ? undefined
-              : connectedDeposits(s, f.kind, f.position).find(
-                  (site) => site.remaining > 0,
-                );
+          // Quarries and mines move on like sawmills, within the per-deposit cap.
+          l = connectedDeposits(s, f.kind, f.position).find(
+            (site) =>
+              site.remaining > 0 &&
+              (f.kind === "logging" || mineralWorksites(s, site.siteId) < 2),
+          );
           if (!l) {
             f.progress = 0;
             break;

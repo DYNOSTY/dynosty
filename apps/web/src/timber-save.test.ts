@@ -40,7 +40,7 @@ describe("체험판의 별도 최근·직전 저장", () => {
     });
     f.data.set("dynosty.timber.saves.v10", old);
     const loaded = loadTimber(f);
-    expect(loaded.state.version).toBe(18);
+    expect(loaded.state.version).toBe(19);
     saveTimber(f, loaded);
     expect(f.data.get("dynosty.timber.saves.v10")).toBe(old);
     expect(loadTimber(f).state.loggingSites).toHaveLength(12);

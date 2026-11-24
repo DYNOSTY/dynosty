@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   AMOUNT_SCALE,
   campaignOf,
@@ -412,6 +413,28 @@ it("복홀의 첫 명령은 식당 착공부터 보초·완공·일손·배급·
   expect(
     firstVillageTask({ ...fed, homes: createVillageGame().homes }),
   ).toBeNull();
+});
+
+it("첫 미션 안내는 새 게임에만 띄우고 진행된 v18 저장에서는 완료로 본다", () => {
+  // Written by the pinned base 1d1c6ed's save writer before the guide existed.
+  const legacy = JSON.parse(
+    readFileSync(
+      new URL(
+        "../../../packages/game-core/src/fixtures/timber-v18-stage1-save.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  const loaded = parseTimberSave(legacy).state;
+  expect(loaded.rebuilding).toBe(true);
+  expect(campaignOf(loaded).beat).toBe("patrol");
+  expect(firstVillageTask(loaded)).toBeNull();
+  expect(firstVillageTask(createVillageGame(false, true))?.step).toBe(
+    "restaurant",
+  );
+  const resaved = parseTimberSave(createTimberSave(loaded)).state;
+  expect(firstVillageTask(resaved)).toBeNull();
 });
 
 it.each([
