@@ -62,6 +62,7 @@ import {
   setLoggingSite,
   staffLogging,
 } from "./logging.js";
+import { findById, indexById } from "./lookup.js";
 import {
   advanceMutants,
   containMutant,
@@ -819,7 +820,7 @@ const restaurants = (s: TimberState) =>
   s.town.facilities.filter((f) => f.kind === "restaurant");
 const diningCapacity = (level: number) => [10, 20, 40][level - 1] ?? 10;
 function employeeRestaurant(s: TimberState, id: string) {
-  const workplace = s.residents.find((r) => r.id === id)?.workplaceId;
+  const workplace = findById(s.residents, id)?.workplaceId;
   if (
     !workplace ||
     (workplace !== "restaurant" && !workplace.startsWith("facility:"))
@@ -918,9 +919,7 @@ function residentMeal(
   r: VillageResident,
   resources = s.world.resources,
 ) {
-  const c =
-    s.world.citizens.find((c) => c.id === r.id) ??
-    fail("주민 등록이 없습니다.");
+  const c = findById(s.world.citizens, r.id) ?? fail("주민 등록이 없습니다.");
   return mealPlan(
     c,
     s.rationPolicy,
@@ -1005,8 +1004,31 @@ function diningSeats(s: TimberState): Map<string, number> {
   }
   return seats;
 }
-function routinePlaces(s: TimberState, id: string, seats = diningSeats(s)) {
-  const index = s.residents.findIndex((r) => r.id === id);
+// Values every resident reads from the same minute's state; computed once per minute.
+function routineShared(s: TimberState) {
+  const staff = new Map<
+    string | undefined,
+    ReturnType<typeof restaurantStaff>
+  >();
+  return {
+    obstacles: villageObstacles(s),
+    staff(facilityId: string | undefined) {
+      let value = staff.get(facilityId);
+      if (!value) {
+        value = restaurantStaff(s, facilityId);
+        staff.set(facilityId, value);
+      }
+      return value;
+    },
+  };
+}
+function routinePlaces(
+  s: TimberState,
+  id: string,
+  seats = diningSeats(s),
+  shared = routineShared(s),
+) {
+  const index = indexById(s.residents, id);
   const seat = seats.get(id) ?? -1;
   const employee = isDiningEmployee(s, s.residents[index] ?? fail());
   const facilities = restaurants(s);
@@ -1028,8 +1050,9 @@ function routinePlaces(s: TimberState, id: string, seats = diningSeats(s)) {
   const diningOrigin = diningPlace
     ? facilityDoor(diningPlace)
     : TIMBER_RULES.restaurant;
-  const h = s.homes.find((h) => h.id === s.residents[index]?.homeId);
-  const staff = restaurantStaff(s, diningPlace?.id);
+  const homeId = s.residents[index]?.homeId;
+  const h = homeId == null ? undefined : findById(s.homes, homeId);
+  const staff = shared.staff(diningPlace?.id);
   return {
     warmth: h
       ? rotatedPoint(
@@ -1072,13 +1095,14 @@ function routinePlaces(s: TimberState, id: string, seats = diningSeats(s)) {
       rationLimit(s.world.citizens[index]?.species ?? "R02", s.rationPolicy),
     minute: s.world.minute,
     workOpen: residentShiftOpen(s, id),
-    obstacles: villageObstacles(s),
+    obstacles: shared.obstacles,
   };
 }
 function resumeResidents(input: TimberState, minutes: number): TimberState {
   const s = staffTown(staffLogging(staffRestaurant(input), eligible));
   const resources = { ...s.world.resources };
   const seats = diningSeats(s);
+  const shared = routineShared(s);
   const residents = s.residents.map((r) => {
     const current = {
       ...r,
@@ -1156,7 +1180,7 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
       minutes,
       TIMBER_RULES.walkSpeed,
       {
-        ...routinePlaces(s, r.id, seats),
+        ...routinePlaces(s, r.id, seats, shared),
         ...(isMechanical(s, r.id) ? { minute: 720 } : {}),
         hungerRelief: meal.relief,
       },
@@ -2447,12 +2471,14 @@ export function parseTimberState(value: unknown): TimberState {
       (r.task !== null && typeof r.task !== "string")
     )
       fail("주민 명부가 올바르지 않습니다.");
+    // Citizen ids are unique here: parsePlayState(value.world) already checked them.
+    const citizen = findById(
+      (value.world as unknown as PlayState).citizens,
+      r.id as string,
+    );
     if (
-      !(value.world as unknown as PlayState).citizens.some(
-        (c) =>
-          c.id === r.id &&
-          (c.alive ? (c.health ?? "healthy") : "dead") === r.health,
-      )
+      !citizen ||
+      (citizen.alive ? (citizen.health ?? "healthy") : "dead") !== r.health
     )
       fail("존재하지 않는 주민입니다.");
     if ((r.routine === "eating") !== (r.eatingUntil !== null))
@@ -2571,8 +2597,8 @@ export function parseTimberState(value: unknown): TimberState {
       if (r.homeSlot !== null) fail("거주지 없는 주민의 잠자리 기록입니다.");
       continue;
     }
-    const h = s.homes.find((h) => h.id === r.homeId),
-      c = s.world.citizens.find((c) => c.id === r.id);
+    const h = findById(s.homes, r.homeId),
+      c = findById(s.world.citizens, r.id);
     if (
       !h ||
       !c?.alive ||
@@ -2590,8 +2616,8 @@ export function parseTimberState(value: unknown): TimberState {
     }
   }
   for (const r of s.residents) {
-    const h = s.homes.find((h) => h.id === r.homeId),
-      c = s.world.citizens.find((c) => c.id === r.id) ?? fail();
+    const h = r.homeId === null ? undefined : findById(s.homes, r.homeId),
+      c = findById(s.world.citizens, r.id) ?? fail();
     if (
       h
         ? !r.home ||
@@ -3221,7 +3247,15 @@ export function advanceTimber(
   input: TimberState,
   minutes: number,
 ): TimberState {
-  let s = parseTimberState(input);
+  return advanceParsedTimber(parseTimberState(input), minutes);
+}
+// `parsed` must come straight from parseTimberState; callers that already
+// validated the input skip a second full check of a large state.
+function advanceParsedTimber(
+  parsed: TimberState,
+  minutes: number,
+): TimberState {
+  let s = parsed;
   num(minutes, 1440);
   if (s.campaign?.ending) return s;
   s = replaceCrew(s);
@@ -3340,7 +3374,7 @@ export function advanceTimber(
     }
     if (
       !s.merchantRepair &&
-      s.world.day !== input.world.day &&
+      s.world.day !== parsed.world.day &&
       s.world.minute === 0 &&
       s.town.facilities.some(
         (f) =>
@@ -4550,7 +4584,7 @@ export function tickTimber(input: TimberState, elapsedMs: number): TimberState {
   if (s.paused) return s;
   const numerator = Math.min(1000, elapsedMs) * s.speed + s.remainder;
   return {
-    ...advanceTimber(s, Math.floor(numerator / 1000)),
+    ...advanceParsedTimber(s, Math.floor(numerator / 1000)),
     remainder: numerator % 1000,
   };
 }

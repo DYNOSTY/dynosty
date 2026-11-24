@@ -196,15 +196,23 @@ function staffOneLogging(s: TimberState, choose: Choose): TimberState {
     };
   }
   let retained = 0;
-  let next: TimberState = {
-    ...s,
-    residents: s.residents.map((r) =>
-      r.workplaceId === loggingWorkId(s.logging.siteId) &&
+  const work = loggingWorkId(s.logging.siteId);
+  const released = new Set<number>();
+  for (const [i, r] of s.residents.entries())
+    if (
+      r.workplaceId === work &&
       (r.health !== "healthy" || retained++ >= s.logging.target)
-        ? { ...r, workplaceId: null }
-        : r,
-    ),
-  };
+    )
+      released.add(i);
+  // Keep the same list when nobody leaves, so per-minute lookups can reuse its index.
+  let next: TimberState = released.size
+    ? {
+        ...s,
+        residents: s.residents.map((r, i) =>
+          released.has(i) ? { ...r, workplaceId: null } : r,
+        ),
+      }
+    : s;
   for (let i = loggingStaff(next).assigned; i < next.logging.target; i++) {
     const id = choose(next, rules.workshop, 1)[0];
     if (!id) break;
