@@ -24,6 +24,10 @@ import {
   reconcileTownHealth,
 } from "./town.js";
 
+/** Advances the saved village random seed (32-bit LCG). */
+export function nextVillageSeed(seed: number): number {
+  return (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+}
 export const RESEARCH_CATALOG = catalog;
 export const RESEARCH_CONNECTED = catalog
   .filter((r) => r.connected)
@@ -423,7 +427,7 @@ export function advanceDevelopment(
       },
     };
     for (const actor of actors) {
-      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      seed = nextVillageSeed(seed);
       // 시간당 부상 확률을 이번 작업 시간에 맞게 환산한다.
       if (
         seed / 4294967296 <

@@ -333,11 +333,27 @@ describe("자동 조달", () => {
 
 it("야적 식량은 저장을 이어 하루 지나면 줄고 저장소로 옮기면 보존된다", () => {
   const base = createTimberState();
-  const before = { ...base, elapsed: 1439, yardFoodSince: { RES_FISH: 0 } };
+  // Fish above the starting shared space (500) lies in the yard.
+  const before = {
+    ...base,
+    elapsed: 1439,
+    yardFoodSince: { RES_FISH: 0 },
+    world: {
+      ...base.world,
+      resources: { ...base.world.resources, RES_FISH: 600 * AMOUNT_SCALE },
+    },
+  };
   const resumed = parseTimberSave(createTimberSave(before)).state;
   const exposed = advanceTimber(resumed, 1);
+  // Two stores (1000) hold all of it.
   const protectedStock = advanceTimber(
-    { ...resumed, logging: { ...resumed.logging, storageBuilt: true } },
+    {
+      ...resumed,
+      logging: { ...resumed.logging, storageBuilt: true },
+      loggingSites: resumed.loggingSites.map((site, i) =>
+        i === 0 ? { ...site, storageBuilt: true } : site,
+      ),
+    },
     1,
   );
   expect(exposed.world.resources.RES_FISH).toBe(

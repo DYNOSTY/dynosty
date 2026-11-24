@@ -139,7 +139,7 @@ it("v10 저장은 기존 서쪽 숲·재고·진행을 유지하고 새 권역�
   const legacyLogging = { ...legacyRest, forest: remaining };
   const legacy = { ...base, version: 10, logging: legacyLogging };
   const loaded = parseTimberState(legacy);
-  expect(loaded.version).toBe(18);
+  expect(loaded.version).toBe(19);
   expect(loaded.world).toEqual(current.world);
   expect(loaded.logging).toEqual(current.logging);
   expect(loaded.loggingSites).toHaveLength(12);

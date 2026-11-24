@@ -48,6 +48,9 @@ test("시간이 흐르는 동안 사건을 하나씩 처리하고 건설과 수�
   await expect(page.getByText("지금 배치 가능한 일손")).toBeVisible();
   await expect(page.getByPlaceholder("이름 · 종 · 근무지")).toBeHidden();
   await census.click();
+  // A loaded save waits for the player before the village clock runs.
+  expect((await read()).paused).toBe(true);
+  await page.getByRole("button", { name: "게임 시작", exact: true }).click();
   const before = (await read()).elapsed;
   await expect.poll(async () => (await read()).elapsed).toBeGreaterThan(before);
   await page.keyboard.press("b");
@@ -93,6 +96,7 @@ test("공사가 끝난 순간 하단에 완공 소식이 뜨고 자동으로 사
     createTimberSave(state),
   );
   await page.goto("/");
+  await page.getByRole("button", { name: "게임 시작", exact: true }).click();
   const line = page.locator(".village-completion-line");
   await expect(line).toHaveText("온상 재배소 건설 완료");
   await expect(line).toBeEmpty();
