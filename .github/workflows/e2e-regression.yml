@@ -9,6 +9,10 @@ on:
         description: "검사 이름에 이 글자가 들어간 것만 실행(비우면 전체)"
         required: false
         default: ""
+      shards:
+        description: "나눠 돌릴 서버 수(1~16). 일부 검사만 돌릴 때는 4 정도"
+        required: false
+        default: "16"
   schedule:
     - cron: "30 18 * * *"
 
@@ -20,15 +24,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 검사를 16대에 나눠 동시에 돌린다. 한 대에서 1개씩 돌리면 40~80분 걸린다.
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+      total: ${{ steps.plan.outputs.total }}
+    steps:
+      - id: plan
+        env:
+          SHARDS: ${{ inputs.shards || '16' }}
+        run: |
+          case "$SHARDS" in ''|*[!0-9]*) echo "shards must be 1-16" >&2; exit 1;; esac
+          if [ "$SHARDS" -lt 1 ] || [ "$SHARDS" -gt 16 ]; then echo "shards must be 1-16" >&2; exit 1; fi
+          echo "total=$SHARDS" >> "$GITHUB_OUTPUT"
+          echo "shards=[$(seq -s, 1 "$SHARDS")]" >> "$GITHUB_OUTPUT"
+
+  # 검사를 여러 대(기본 16대)에 나눠 동시에 돌린다. 한 대에서 1개씩 돌리면 40~80분 걸린다.
   browser-regression:
-    name: 브라우저 검사 ${{ matrix.shard }}/16
+    name: 브라우저 검사 ${{ matrix.shard }}/${{ needs.plan.outputs.total }}
+    needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -48,7 +68,7 @@ jobs:
         env:
           GREP: ${{ inputs.grep }}
         run: |
-          args=(--fully-parallel --shard=${{ matrix.shard }}/16 --pass-with-no-tests --reporter=blob,github)
+          args=(--fully-parallel --shard=${{ matrix.shard }}/${{ needs.plan.outputs.total }} --pass-with-no-tests --reporter=blob,github)
           if [ -n "$GREP" ]; then args+=(--grep "$GREP"); fi
           pnpm test:e2e "${args[@]}"
       - if: always()
