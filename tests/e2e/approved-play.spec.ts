@@ -1,6 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
-import { requireValue } from "../../packages/game-core/dist/index.js";
-import { advanceVillageDay } from "./read-village.js";
+import {
+  AMOUNT_SCALE,
+  createVillageGame,
+  requireValue,
+} from "../../packages/game-core/dist/index.js";
+import { advanceVillageDay, readVillage } from "./read-village.js";
 import { clickExample } from "./scene-picking.js";
 
 async function ready(page: Page) {
@@ -22,6 +26,72 @@ async function tools(page: Page) {
   if ((await button.getAttribute("aria-expanded")) !== "true")
     await button.click();
 }
+
+const shown = (amount: number) =>
+  Math.floor(amount / AMOUNT_SCALE).toLocaleString("ko-KR");
+
+test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저장·새로고침 복원", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.evaluate(() =>
+    localStorage.setItem("dynosty.example.saves", "keep example"),
+  );
+  // 제출본 상단 재고는 복홀 마을(게임 규칙 createVillageGame)의 시작 장부를 보여 준다.
+  const start = createVillageGame().world.resources;
+  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH", "RES_COAL"] as const)
+    await expect(stock(page, id)).toHaveText(shown(start[id]));
+  await advanceVillageDay(page);
+  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  // 하루 뒤 식성별 재고는 실제 Worker가 자동 저장한 마을 장부와 같다.
+  await expect
+    .poll(() => page.evaluate(readVillage).then((s) => s.world.day))
+    .toBe(2);
+  const dayTwo = (await page.evaluate(readVillage)).world.resources;
+  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"] as const)
+    await expect(stock(page, id)).toHaveText(shown(dayTwo[id]));
+  await saveMenu(page);
+  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
+  await expect(page.getByTestId("play-save-status")).toHaveText(
+    "게임을 저장했습니다.",
+  );
+  const first = await page.evaluate(() =>
+    localStorage.getItem("dynosty.play.saves"),
+  );
+  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
+  await expect(page.getByTestId("play-save-status")).toHaveText(
+    "게임을 저장했습니다.",
+  );
+  // 두 번째 저장은 최근 기록을 직전(previous) 기록으로 옮긴다.
+  const slots = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("dynosty.play.saves") ?? "null"),
+  );
+  expect(slots.previous).toEqual(JSON.parse(first ?? "null").current);
+  await page
+    .getByRole("button", { name: "이전 게임 불러오기", exact: true })
+    .click();
+  await expect(page.getByTestId("play-save-status")).toHaveText(
+    "게임을 불러왔습니다. 일시정지 상태입니다.",
+  );
+  await page.reload();
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+  );
+  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"] as const)
+    await expect(stock(page, id)).toHaveText(shown(dayTwo[id]));
+  await saveMenu(page);
+  await page
+    .getByRole("button", { name: "게임 불러오기", exact: true })
+    .click();
+  await expect(page.getByTestId("play-save-status")).toHaveText(
+    "게임을 불러왔습니다. 일시정지 상태입니다.",
+  );
+  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => localStorage.getItem("dynosty.example.saves")),
+  ).toBe("keep example");
+});
 
 test("실제 Worker 시간이 흐르고 일시정지·탭 비활성 뒤 수동 재개를 적용한다", async ({
   page,
@@ -165,9 +235,10 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
     )
     .toBeLessThanOrEqual(77.36);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  // 복홀 마을이 열려 있으면 마을 전체를 보도록 최대 거리가 720으로 늘어난다(scene.ts updateTimber).
   for (const [delta, limit] of [
     [-10000, 4],
-    [100000, 140],
+    [100000, 720],
   ] as const) {
     // 새 카메라는 휠 한 번의 변화를 제한한다. 실제 입력을 반복해 한계를 확인한다.
     await expect
@@ -204,15 +275,21 @@ test("대표 모델 요청 실패는 명확히 안내하고 대체 표시로 게
     route.fulfill({ status: 404, body: "missing" }),
   );
   await ready(page);
-  await expect(page.getByRole("alert")).toContainText(
-    "모델을 불러오지 못했습니다",
-  );
+  await expect(page.getByRole("alert")).toContainText("대표 모델");
   const beforeScroll = await page.evaluate(() => scrollY);
   await clickExample(page, "resident");
   expect(await page.evaluate(() => scrollY)).toBe(beforeScroll);
-  await expect(
-    page.getByRole("region", { name: "선택 정보", exact: true }),
-  ).toContainText("주민 예제");
+  // 제출본은 주민 예제를 마을 주민 이름으로 표시한다. 종류와 예제 좌표로 같은 대상을 확인한다.
+  const selection = page.getByRole("region", {
+    name: "선택 정보",
+    exact: true,
+  });
+  await expect(selection.locator(".selection-facts dd").first()).toHaveText(
+    "주민",
+  );
+  await expect(selection.locator(".selection-facts dd").last()).toHaveText(
+    "-2, 0, 1",
+  );
   await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
 });
 

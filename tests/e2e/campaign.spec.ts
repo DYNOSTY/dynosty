@@ -1067,6 +1067,8 @@ for (const [hope, allegiance, film] of [
 test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장부를 복원한다", async ({
   page,
 }) => {
+  // Five full 3D page loads (start, two reloads, slot load, replay) share this budget.
+  test.setTimeout(240_000);
   const village = createVillageGame();
   const checkpoint = createTimberSave({
     ...village,
