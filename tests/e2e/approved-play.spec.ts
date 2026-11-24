@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { requireValue } from "../../packages/game-core/dist/index.js";
+import { advanceVillageDay } from "./read-village.js";
 import { clickExample } from "./scene-picking.js";
 
 async function ready(page: Page) {
@@ -32,7 +33,7 @@ test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저�
   for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"])
     await expect(stock(page, id)).toHaveText("120");
   await expect(stock(page, "RES_COAL")).toHaveText("60");
-  await page.getByRole("button", { name: "1일 진행", exact: true }).click();
+  await advanceVillageDay(page);
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
   for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"])
     await expect(stock(page, id)).toHaveText("100");
@@ -42,7 +43,7 @@ test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저�
     "게임을 저장했습니다.",
   );
   await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
-  await page.getByRole("button", { name: "1일 진행", exact: true }).click();
+  await advanceVillageDay(page);
   await expect(stock(page)).toHaveText("80");
   await saveMenu(page);
   await page.getByRole("button", { name: "게임 저장", exact: true }).click();
@@ -141,7 +142,7 @@ test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존�
     localStorage.getItem("dynosty.play.saves"),
   );
   await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
-  await page.getByRole("button", { name: "1일 진행", exact: true }).click();
+  await advanceVillageDay(page);
   await saveMenu(page);
   await expect(stock(page)).toHaveText("100");
   await page.evaluate(() => {

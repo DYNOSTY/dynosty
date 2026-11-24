@@ -456,3 +456,22 @@ it.each([
     ).toBe(assassinated);
   },
 );
+
+it.each([true, false])(
+  "출문 대사는 실제로 타서 사라지는 병원과 공방을 가리킨다 (식당 %s)",
+  (restaurantBuilt) => {
+    const departure = commandTimber(
+      createVillageGame(true),
+      { type: "campaign", beat: "opening", action: "hard" },
+      "departure-fire-line",
+    );
+    expect(campaignOf(departure).beat).toBe("departure");
+    const page = campaignPage({ ...departure, restaurantBuilt });
+    expect(page.lines.filter(([speaker]) => speaker === "돌쇠")).toEqual([
+      [
+        "돌쇠",
+        "공자님! 병원 처마에 불이 붙었습니다. 불씨가 공방 지붕으로 넘어갑니다!",
+      ],
+    ]);
+  },
+);
