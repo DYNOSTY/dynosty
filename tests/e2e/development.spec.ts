@@ -80,8 +80,10 @@ test("시설 개량 버튼으로2단계 생산 배율과 저장 복원을 확인
   await page.getByText("완공 시설 1곳", { exact: true }).click();
   await page.getByRole("button", { name: /2단계 개량/ }).click();
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
-  // 불러온 진행은 일시정지 상태로 시작한다.
-  await button(page, "시간 재개").click();
+  // 개량 명령 뒤 시간이 멈춰 있으면 재개한다. 생산 배율 확인에는 시간이 흘러야 한다.
+  if (await button(page, "시간 재개").isVisible())
+    await button(page, "시간 재개").click();
+  await expect(button(page, "일시정지")).toBeVisible();
   await expect(
     page.getByText("어획막 · 2단계 · build-1", { exact: true }),
   ).toBeVisible({ timeout: 25000 });

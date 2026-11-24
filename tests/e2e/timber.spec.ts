@@ -7,6 +7,7 @@ import {
   createTimberState,
   loggingSite,
   productionSiteDefinition,
+  RESIDENT_REQUEST_TEXT,
   TIMBER_RULES,
   VILLAGE_RULES,
 } from "../../packages/game-core/dist/index.js";
@@ -108,15 +109,8 @@ async function homeCursor(
   x: number,
   z: number,
 ) {
-  const canvas = page.locator("canvas"),
-    box = await canvas.boundingBox();
-  if (!box) throw Error("캔버스 없음");
-  const depth = 32 + z * Math.sin(Math.PI / 3),
-    scale = box.height / (2 * Math.tan(0.4) * depth);
-  const point = {
-    x: box.x + box.width / 2 + x * scale,
-    y: box.y + box.height / 2 - z * Math.cos(Math.PI / 3) * scale,
-  };
+  // 실제 카메라 행렬로 마을 바닥(높이 0)의 (x, z)를 화면 좌표로 옮긴다.
+  const point = await worldPoint(page, [x, 0, z], false);
   await page.mouse.move(point.x, point.y);
   return point;
 }
@@ -157,7 +151,9 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   await loadFixture(page, createTimberSave(s));
   await dev(page);
   await button(page, nestButton).click();
-  const invalid = await homeCursor(page, 0, -1);
+  // 중앙 광장(0, -1)은 이제 별도 사유로 막힌다. 첫 둥지(-6, -2) 바로 앞 바닥에 겹치게 둔다.
+  // 둥지 모델 위를 누르면 둥지가 선택되므로 모델이 없는 앞쪽 바닥을 쓴다.
+  const invalid = await homeCursor(page, -6, 1);
   await expect(page.getByTestId("home-placement-status")).toContainText("겹");
   await page.mouse.click(invalid.x, invalid.y);
   await expect(page.getByTestId("housing-status")).toContainText("둥지 6곳");
@@ -438,9 +434,10 @@ test("계약 한 번으로 주민 선택 없이 전 과정과 공동 재고·다
   await contract(page, "A");
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
   await button(page, "시간 재개").click();
+  // 제출본 A안 운송·검수·건조는 게임 63분(3배속 실시간 약 21초)이 걸린다.
   await expect(page.getByTestId("next-mission")).toContainText(
     "마을 문에 주민",
-    { timeout: 26000 },
+    { timeout: 45000 },
   );
   // 제출본 시작 재고(목재·철재 1,000)에 목재 20이 입고되고 A안 철재 4를 쓴다.
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,020");
@@ -750,10 +747,11 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
   await expect(table).toContainText("트리케라톱스520벨로키랍토르2.510");
   await button(page, "식단별 상한").click();
   await expect(table).toContainText("트리케라톱스2.510벨로키랍토르2.510");
-  await button(page, "필요량 배급").click();
-  await expect(table).toContainText("트리케라톱스520벨로키랍토르2.510");
+  await expect(button(page, "식단별 상한 · 시행 중")).toBeDisabled();
+  // 불러온 마을은 캠페인 규칙을 따르므로 정책을 바꾼 뒤 12시간 동안 다시 바꿀 수 없다.
+  await expect(button(page, "필요량 배급")).toBeDisabled();
   await button(page, "시간 재개").click();
-  // 고기 없는 벨로키랍토르 직원이 어류 2.5를 먹는다(상단 재고는 정수로 표시).
+  // 고기 없는 벨로키랍토르 직원이 상한 배급(2.5)으로 어류 2.5를 먹는다(상단 재고는 정수로 표시).
   await expect(page.getByTestId("resource-RES_FISH")).toHaveText("117", {
     timeout: 5000,
   });
@@ -863,5 +861,6 @@ test("주민의 느낌표에 마우스를 올리면 요구 사유를 읽을 수 
       },
       { timeout: 10000 },
     )
-    .toContain("지휘관님, 배가 고파요. 식당을 지어 주세요!");
+    // 제출본은 인물별 호칭을 통일했다(5bff4a7). 문구는 제품 규칙을 그대로 쓴다.
+    .toContain(RESIDENT_REQUEST_TEXT["no-restaurant"]);
 });
