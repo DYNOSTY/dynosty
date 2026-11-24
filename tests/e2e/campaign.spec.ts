@@ -1277,6 +1277,8 @@ test("3D 관아 선택과 해제가 순라 패널에 반영된다", async ({ pag
     await page.mouse.click(point.x, point.y);
     await expect(office).toBeVisible();
   };
+  // The office panel only opens from a real canvas pick of the 3D office.
+  await expect(office).toHaveCount(0);
   await pickOffice();
   await office.getByRole("button", { name: "1단계 · 4명" }).click();
   await expect(office).toContainText("순라 포졸 4명");
