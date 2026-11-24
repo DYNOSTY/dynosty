@@ -6,6 +6,7 @@ import {
 } from "./development.js";
 import { hospitalBeds, hospitalHours, recoveryRequired } from "./hospital.js";
 import { createPlayState, dailyFoodDemand, parsePlayState } from "./play.js";
+import { requireValue } from "./require-value.js";
 import { storageCapacity, yardStock } from "./storage.js";
 import {
   advanceTimber,
@@ -183,9 +184,8 @@ it("창고가 없어도 시작 적재 용량을 쓰고 창고 하나로 기존 �
   expect(yardStock(crowded, "RES_WOOD")).toBe(500);
   const warehouse = build(start(), "storage", 0, 16);
   expect(storageCapacity(warehouse)).toBe(500);
-  expect(storageCapacity({ ...warehouse, campaign: village.campaign })).toBe(
-    1500,
-  );
+  const campaign = requireValue(village.campaign, "캠페인 기록");
+  expect(storageCapacity({ ...warehouse, campaign })).toBe(1500);
 });
 it("저장 용량을 넘긴 수레 화물도 야적장 재고에 한 번만 더한다", () => {
   const w = createPlayState();
