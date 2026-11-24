@@ -348,13 +348,7 @@ export function createVillage(
         (row + col) % 3
       ];
       jobs.push(
-        place(
-          model,
-          x,
-          z,
-          face(x, z),
-          BUILDING_SCALE,
-        ).then((node) => {
+        place(model, x, z, face(x, z), BUILDING_SCALE).then((node) => {
           if (node) {
             lostQuarter.add(node);
             node.setEnabled(exodusVisible);
