@@ -39,7 +39,7 @@ import { createFog } from "./fog.js";
 import { createLaborVisual } from "./labor-scene.js";
 import { createLandmarks } from "./landmarks.js";
 import { type MarkerRect, placeMarker } from "./marker-layout.js";
-import { loadModelAssets } from "./model-assets.js";
+import { loadModelAssets, pickedNode } from "./model-assets.js";
 import { createQualityVisual } from "./quality-scene.js";
 import { createResourceSites } from "./resource-sites.js";
 import { createSceneEntities } from "./scene-entities.js";
@@ -439,7 +439,7 @@ export function mountScene(
   let animationSpeed = 1;
   const stopPicking = observeSceneClicks(canvas, (x, y) => {
     if (!selectionEnabled) return;
-    const picked = scene.pick(x, y)?.pickedMesh ?? null;
+    const picked = pickedNode(scene.pick(x, y));
     let hit = picked;
     while (hit) {
       const townId = hit.metadata?.townTarget as string | undefined;
@@ -501,10 +501,9 @@ export function mountScene(
       onBuildingHover(null);
       return;
     }
-    let mesh = scene.pick(
-      event.clientX - rect.left,
-      event.clientY - rect.top,
-    )?.pickedMesh;
+    let mesh = pickedNode(
+      scene.pick(event.clientX - rect.left, event.clientY - rect.top),
+    );
     let name: string | null = null,
       health: number | undefined,
       details = "";

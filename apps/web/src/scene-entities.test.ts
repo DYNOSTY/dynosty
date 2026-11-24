@@ -418,11 +418,11 @@ it("대기 GLB가 늦게 와도 새 종별 모델을 덮어쓰지 않고 단계 
       ),
     };
     entities.update(custom);
-    expect(scene.getMeshById("example-resident-1:back-sail-0")).not.toBeNull();
+    expect(scene.getMeshById("model:resident-SPINO:figure")).not.toBeNull();
     pending.get("resident")?.(visual);
     await Promise.resolve();
     expect(visual.dispose).toHaveBeenCalledOnce();
-    expect(scene.getMeshById("example-resident-1:back-sail-0")).not.toBeNull();
+    expect(scene.getMeshById("model:resident-SPINO:figure")).not.toBeNull();
     const original = { ...visual, dispose: vi.fn() };
     pending.get("building1")?.(original);
     await Promise.resolve();
