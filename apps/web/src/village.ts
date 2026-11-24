@@ -19,6 +19,7 @@ import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
 import { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
 import { loadSceneAsset as load } from "./scene-assets.js";
+import { hasWinterModel, seasonalModelUrl } from "./seasonal-model.js";
 import { elevation, rng, type Season } from "./world.js";
 
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
@@ -221,15 +222,15 @@ export function createVillage(
     depth = 3.8,
     role?: "walk" | Omit<Hauler, "state" | "timer">,
   ) => {
-    let winter = season === "winter";
+    let winter = season === "winter" && hasWinterModel(model);
     const folder = role ? "residents" : "buildings";
     const asset = await load(
       scene,
-      `/models/${folder}/${model}${winter ? "_v2" : ""}.glb`,
+      seasonalModelUrl(folder, model, winter),
     ).catch((error: unknown) => {
       if (!winter || disposed) throw error;
       winter = false;
-      return load(scene, `/models/${folder}/${model}.glb`);
+      return load(scene, seasonalModelUrl(folder, model, false));
     });
     if (disposed) return;
     // Keep scene/selection identities independent of the asset variant.
