@@ -60,6 +60,7 @@ DB를 끄면 DB 준비 상태 확인은 실패하는 것이 정상입니다. 로
 
 `preview`는 운영용 웹 서버가 아닙니다. 실제 배포 방법은 별도로 구성합니다.
 주민(`models/residents`)·건물(`models/buildings`) GLB를 추가하거나 바꾸면 `pnpm models:optimize`를 실행합니다. 압축하지 않은 파일이 있으면 `pnpm test`가 실패합니다.
+`apps/web/public`의 UI·삽화 이미지는 PNG 대신 WebP로 둡니다. 화면이 바뀌지 않도록 무손실(lossless, exact)로 변환합니다.
 VS Code에서는 선택적으로 Biome 확장을 설치하면 저장소의 포맷·검사 설정을 사용할 수 있습니다.
 
 ## 브라우저까지 검사

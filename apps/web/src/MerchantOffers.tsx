@@ -162,7 +162,7 @@ export function MerchantDialog({
       }}
     >
       <img
-        src={`/art/merchants/${merchant[0]}.png`}
+        src={`/art/merchants/${merchant[0]}.webp`}
         alt={`${merchant[1]} 상인 ${merchant[2]}의 초상`}
         width="86"
         height="86"

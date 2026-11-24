@@ -429,7 +429,7 @@ function SceneDialog({
               ) : name === "나르미" || name === "달이" ? (
                 <img
                   alt=""
-                  src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.png`}
+                  src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.webp`}
                 />
               ) : ["고리", "가솔을 이끄는 귀족", "노귀족"].includes(name) ? (
                 <span
