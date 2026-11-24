@@ -6,8 +6,17 @@ for (const season of ["winter", "summer"] as const) {
   }) => {
     const loaded = new Set<string>();
     const errors: string[] = [];
+    const missing: string[] = [];
     page.on("response", (response) => {
-      if (response.ok()) loaded.add(new URL(response.url()).pathname);
+      const path = new URL(response.url()).pathname;
+      if (response.ok()) loaded.add(path);
+      // The dev server answers a missing file with the app page instead of a 404.
+      if (
+        path.startsWith("/models/") &&
+        (!response.ok() ||
+          response.headers()["content-type"]?.includes("text/html"))
+      )
+        missing.push(path);
     });
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(season === "summer" ? "/?season=summer" : "/");
@@ -19,6 +28,8 @@ for (const season of ["winter", "summer"] as const) {
     expect(loaded).toContain(`/models/buildings/BLD_OFFICE${suffix}.glb`);
     expect(loaded).toContain(`/models/residents/R02_Triceratops${suffix}.glb`);
     expect(loaded).toContain("/models/buildings/BLD_NEST.glb");
+    // Models without a winter variant are requested in their original form directly.
+    expect(missing).toEqual([]);
     const ondol = await page.evaluate(() => {
       const { __scene: scene } = window as unknown as {
         __scene: {
