@@ -1121,7 +1121,10 @@ test("마지막 장을 덮은 뒤 다시 하기로 복홀의 5단계 시작 장�
   await page.reload();
   await expect(dialog).toHaveAccessibleName("메인 메뉴");
   await dialog.getByRole("button", { name: "이어하기" }).click();
+  // 슬롯을 불러오면 페이지가 다시 열리므로 새 문서가 뜬 뒤 기록을 읽는다.
+  const reloaded = page.waitForEvent("load");
   await dialog.getByRole("button", { name: /슬롯 10 · 5단계/ }).click();
+  await reloaded;
   await expect
     .poll(() => page.evaluate(readVillage).then((s) => s.campaign?.beat))
     .toBe("forecast");

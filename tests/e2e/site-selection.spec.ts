@@ -44,11 +44,13 @@ test("검수대·배급소 실제 클릭의 테두리·정보·단일 선택과 
   await expect(p.getByTestId("site-name")).toHaveText("배급소");
   await expect(b(p, "검수대 선택")).toHaveAttribute("aria-pressed", "false");
   await expect(b(p, "현장 일손 1 배급 준비로 보내기")).toBeDisabled();
-  await b(p, "건물 예제 선택").click();
+  // 제출본 마을은 건물이 여러 채라 같은 이름의 선택 버튼이 여럿이다. 첫 건물을 쓴다.
+  const example = b(p, "건물 예제 선택").first();
+  await example.click();
   await expect(p.getByTestId("site-name")).toHaveCount(0);
-  await expect(b(p, "건물 예제 선택")).toHaveAttribute("aria-pressed", "true");
+  await expect(example).toHaveAttribute("aria-pressed", "true");
   await clickSite(p, "site-inspection");
-  await expect(b(p, "건물 예제 선택")).toHaveAttribute("aria-pressed", "false");
+  await expect(example).toHaveAttribute("aria-pressed", "false");
   await clickFloor(p);
   await expect(p.getByTestId("site-name")).toHaveCount(0);
   await expect(b(p, "검수대 선택")).toHaveAttribute("aria-pressed", "false");

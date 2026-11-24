@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { clickExample, worldPoint } from "./scene-picking.js";
+import { openCommandConsole } from "./workspace.js";
 
 test("selecting a village building shows its portrait without replacing the existing selection flow", async ({
   page,
@@ -8,7 +9,7 @@ test("selecting a village building shows its portrait without replacing the exis
   await expect(page.getByTestId("play-scene-status")).toHaveText(
     "3D 준비 완료",
   );
-  await page.getByRole("button", { name: "명령 열기", exact: true }).click();
+  await openCommandConsole(page);
   const selection = page.getByRole("region", {
     name: "선택 정보",
     exact: true,
@@ -82,7 +83,7 @@ test("a missing building portrait leaves its selection text usable", async ({
   await expect(page.getByTestId("play-scene-status")).toHaveText(
     "3D 준비 완료",
   );
-  await page.getByRole("button", { name: "명령 열기", exact: true }).click();
+  await openCommandConsole(page);
   const office = await worldPoint(page, [0, 1.4, -14]);
   const blocked = page.waitForResponse((response) =>
     response.url().endsWith("/ui/buildings/BLD_OFFICE.jpg"),

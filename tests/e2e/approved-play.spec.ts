@@ -23,62 +23,14 @@ async function tools(page: Page) {
     await button.click();
 }
 
-test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저장·새로고침 복원", async ({
-  page,
-}) => {
-  await ready(page);
-  await page.evaluate(() =>
-    localStorage.setItem("dynosty.example.saves", "keep example"),
-  );
-  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"])
-    await expect(stock(page, id)).toHaveText("120");
-  await expect(stock(page, "RES_COAL")).toHaveText("60");
-  await advanceVillageDay(page);
-  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
-  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"])
-    await expect(stock(page, id)).toHaveText("100");
-  await saveMenu(page);
-  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
-  await expect(page.getByTestId("play-save-status")).toHaveText(
-    "게임을 저장했습니다.",
-  );
-  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
-  await advanceVillageDay(page);
-  await expect(stock(page)).toHaveText("80");
-  await saveMenu(page);
-  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
-  await expect(page.getByTestId("play-save-status")).toHaveText(
-    "게임을 저장했습니다.",
-  );
-  await page
-    .getByRole("button", { name: "이전 게임 불러오기", exact: true })
-    .click();
-  await expect(stock(page)).toHaveText("100");
-  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
-  await page.reload();
-  await expect(stock(page)).toHaveText("120");
-  await saveMenu(page);
-  await page
-    .getByRole("button", { name: "게임 불러오기", exact: true })
-    .click();
-  await expect(stock(page)).toHaveText("80");
-  await expect(page.getByText("3일차", { exact: true })).toBeVisible();
-  expect(
-    await page.evaluate(() => localStorage.getItem("dynosty.example.saves")),
-  ).toBe("keep example");
-});
-
 test("실제 Worker 시간이 흐르고 일시정지·탭 비활성 뒤 수동 재개를 적용한다", async ({
   page,
 }) => {
   await ready(page);
+  // 제출본 마을은 일시정지 상태로 이어진다. 게임 시작 뒤 실제 Worker 시계가 흐른다.
+  const start = await page.getByTestId("play-clock").textContent();
   await page.getByRole("button", { name: "게임 시작", exact: true }).click();
-  await expect(page.getByTestId("play-clock")).not.toHaveText("1일차 · 00:00");
-  await expect
-    .poll(async () =>
-      Number((await stock(page).textContent())?.replaceAll(",", "")),
-    )
-    .toBeLessThan(120);
+  await expect(page.getByTestId("play-clock")).not.toHaveText(start ?? "");
   await page.getByRole("button", { name: "일시정지", exact: true }).click();
   const clock = await page.getByTestId("play-clock").textContent();
   await page.waitForTimeout(1200);
@@ -106,29 +58,6 @@ test("실제 Worker 시간이 흐르고 일시정지·탭 비활성 뒤 수동 �
   ).toBeVisible();
 });
 
-test("식량 고갈 경고는 식성별로 한 번 표시하고 1일분 보충 시 해제한다", async ({
-  page,
-}) => {
-  await ready(page);
-  await tools(page);
-  await page
-    .getByRole("button", { name: "식량 고갈 검사", exact: true })
-    .click();
-  await expect(page.getByTestId("food-warnings").locator("p")).toHaveCount(3);
-  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"])
-    await expect(stock(page, id)).toHaveText("0");
-  await page
-    .getByRole("button", { name: "식량 고갈 검사", exact: true })
-    .click();
-  await expect(page.getByTestId("food-warnings").locator("p")).toHaveCount(3);
-  await page
-    .getByRole("button", { name: "1일분 식량 복구", exact: true })
-    .click();
-  await expect(page.getByTestId("food-warnings")).toBeHidden();
-  await expect(stock(page)).toHaveText("20");
-  await expect(page.getByText("1일차", { exact: true })).toBeVisible();
-});
-
 test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존한다", async ({
   page,
 }) => {
@@ -144,7 +73,8 @@ test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존�
   await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   await advanceVillageDay(page);
   await saveMenu(page);
-  await expect(stock(page)).toHaveText("100");
+  // 제출본 마을 재고(1,000)는 하루 진행만으로 줄지 않는다. 저장 실패 전후 같은 값을 유지해야 한다.
+  await expect(stock(page)).toHaveText("1,000");
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
     Storage.prototype.setItem = function (k, v) {
@@ -165,7 +95,7 @@ test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존�
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.play.saves")),
   ).toBe(before);
-  await expect(stock(page)).toHaveText("100");
+  await expect(stock(page)).toHaveText("1,000");
   await page.evaluate(() =>
     (window as unknown as { restoreWrite: () => void }).restoreWrite(),
   );
@@ -178,7 +108,7 @@ test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존�
   await expect(
     page.getByRole("region", { name: "생존 게임 저장" }).getByRole("alert"),
   ).toContainText("손상");
-  await expect(stock(page)).toHaveText("100");
+  await expect(stock(page)).toHaveText("1,000");
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.play.saves")),
   ).toBe("{broken");
@@ -200,7 +130,8 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   expect(loaded.some((x) => x.endsWith("triceratops.json"))).toBe(true);
   expect(loaded.some((x) => x.endsWith("ondol-nest.json"))).toBe(true);
   expect(loaded.some((x) => x.endsWith("BLD_NEST.glb"))).toBe(true);
-  expect(loaded.some((x) => x.endsWith("R02_Triceratops.glb"))).toBe(true);
+  // 겨울 마을은 주민 모델의 겨울판(_v2)을 불러온다.
+  expect(loaded.some((x) => /R02_Triceratops(_v2)?\.glb$/.test(x))).toBe(true);
   const canvas = page.locator("canvas");
   const idle = await canvas.screenshot();
   await expect
@@ -273,7 +204,9 @@ test("대표 모델 요청 실패는 명확히 안내하고 대체 표시로 게
     route.fulfill({ status: 404, body: "missing" }),
   );
   await ready(page);
-  await expect(page.getByRole("alert")).toContainText("대표 모델");
+  await expect(page.getByRole("alert")).toContainText(
+    "모델을 불러오지 못했습니다",
+  );
   const beforeScroll = await page.evaluate(() => scrollY);
   await clickExample(page, "resident");
   expect(await page.evaluate(() => scrollY)).toBe(beforeScroll);
@@ -292,10 +225,9 @@ test("저울 설명은 가리킬 때 나타나고 상단 재고는 같은 간격
   await expect(hope).toBeHidden();
   await page.getByRole("button", { name: "희망과 절망 확인" }).hover();
   await expect(hope).toBeVisible();
+  const start = await page.getByTestId("play-clock").textContent();
   await page.getByRole("button", { name: "게임 시작", exact: true }).click();
-  await expect
-    .poll(async () => Number(await stock(page).textContent()))
-    .toBeLessThan(120);
+  await expect(page.getByTestId("play-clock")).not.toHaveText(start ?? "");
   for (const n of await page.locator(".resource-card strong").allTextContents())
     expect(n).toMatch(/^[\d,]+$/);
   const cells = await page

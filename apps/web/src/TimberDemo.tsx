@@ -558,7 +558,7 @@ export function TimberDemo({
                 }
                 onClick={() => placeBuilding("restaurant")}
               >
-                공동 식당 배치 · 목재30 · 철재2
+                공동 식당 배치 · {buildingCost("restaurant")}
               </button>
             ) : null}
             <label>

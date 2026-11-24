@@ -9,9 +9,9 @@ import {
 
 async function ready(page: import("@playwright/test").Page) {
   await page.goto("/");
-  await expect(
-    page.getByRole("button", { name: "건물 예제 선택", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+  );
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -56,9 +56,11 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   await expect(
     info.getByText("정책 시행 · 필요량에 따른 배급", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "건물 예제 선택", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  // 예제 선택 버튼은 제출본에서 개발 도구 전용으로 숨어 있지만 선택 상태는 계속 따라간다.
+  const pressed = page.locator(
+    '[aria-label="예제 대상 선택"] button[aria-pressed="true"]',
+  );
+  await expect(pressed).toHaveText("건물 예제 선택");
   await expect
     .poll(async () => outlinePixels(await canvas.screenshot()))
     .toBeGreaterThan(20);
@@ -68,9 +70,7 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   await clickExample(page, "resident");
   await expect(info.getByText("주민 예제", { exact: false })).toBeVisible();
   await expect(info.getByText("대기 표시", { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "건물 예제 선택", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
+  await expect(pressed).toHaveText("주민 예제 선택");
   await clickFloor(page);
   await expect(info).toBeHidden();
   await expect
@@ -138,7 +138,7 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
 
 test.describe("좁은 터치 화면", () => {
   test.use({ hasTouch: true, viewport: { width: 375, height: 812 } });
-  test("터치로 선택하고 키보드 버튼으로 전환·해제하며 가로 넘침 없이 표시한다", async ({
+  test("터치로 선택하고 선택 해제 버튼으로 해제하며 가로 넘침 없이 표시한다", async ({
     page,
   }) => {
     await ready(page);
@@ -146,11 +146,7 @@ test.describe("좁은 터치 화면", () => {
     await page.touchscreen.tap(point.x, point.y);
     const info = page.getByRole("region", { name: "선택 정보", exact: true });
     await expect(info).toContainText("복홀 방 게시판");
-    await page
-      .getByRole("button", { name: "주민 예제 선택", exact: true })
-      .focus();
-    await page.keyboard.press("Enter");
-    await expect(info).toContainText("주민 예제");
+    // 예제 대상 키보드 버튼은 제출본에서 개발 도구 전용이라 화면의 선택 해제 버튼으로 끝낸다.
     await page.getByRole("button", { name: "선택 해제", exact: true }).click();
     await expect(info).toBeHidden();
     await expect(page.locator("canvas")).toBeFocused();

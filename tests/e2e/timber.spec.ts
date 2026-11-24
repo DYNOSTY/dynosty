@@ -1,16 +1,21 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
   advanceTimber,
+  BUILDING_RULES,
   commandTimber,
   createTimberSave,
   createTimberState,
   loggingSite,
   productionSiteDefinition,
   TIMBER_RULES,
+  VILLAGE_RULES,
 } from "../../packages/game-core/dist/index.js";
+import { worldPoint } from "./scene-picking.js";
 
 const button = (page: Page, name: string) =>
   page.getByRole("button", { name, exact: true });
+const nestButton = `온돌 둥지 증설 · 목재${VILLAGE_RULES.constructionWood}`;
+const restaurantCost = BUILDING_RULES.restaurant.cost;
 
 for (const siteId of ["coal-west", "iron-north", "stone-east"] as const) {
   test(`${siteId} 작업장에 배치하면 광물을 자동 입고하고 저장 후 이어진다`, async ({
@@ -150,7 +155,8 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   const s = advanceTimber(createTimberState(), 120);
   await enter(page);
   await loadFixture(page, createTimberSave(s));
-  await button(page, "온돌 둥지 증설 · 목재20").click();
+  await dev(page);
+  await button(page, nestButton).click();
   const invalid = await homeCursor(page, 0, -1);
   await expect(page.getByTestId("home-placement-status")).toContainText("겹");
   await page.mouse.click(invalid.x, invalid.y);
@@ -166,13 +172,17 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   await expect(page.getByTestId("home-placement-status")).toContainText("180°");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("home-placement-status")).toHaveCount(0);
-  await button(page, "온돌 둥지 증설 · 목재20").click();
+  await button(page, nestButton).click();
   await homeCursor(page, 12, 12);
   await page.keyboard.press("ArrowRight");
   await page.mouse.click(point.x, point.y);
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("100");
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText(
+    String(120 - VILLAGE_RULES.constructionWood),
+  );
   await expect(page.getByTestId("building-queue")).toContainText("자재 운반");
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
+  // 불러온 진행은 일시정지 상태로 시작한다.
+  await button(page, "시간 재개").click();
   await expect(page.getByTestId("housing-status")).toContainText("둥지 7곳", {
     timeout: 25000,
   });
@@ -324,8 +334,9 @@ test("식성별 주민 구성과 수레 내려놓기·이탈 단계를 표시한
     "스피노사우루스 20명(어류)",
   );
   await contract(page);
-  await button(page, "일시정지").click();
+  // 제출본 마을은 일시정지 상태로 이어지므로 계약 뒤에도 시간이 멈춰 있다.
   await dev(page);
+  await expect(button(page, "시간 재개")).toBeVisible();
   for (const phase of [
     "야적장으로 운반",
     "수레 내려놓기",
@@ -355,8 +366,13 @@ test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각
     { timeout: 5000 },
   );
   await expect(button(page, "식사 필요 검사")).toHaveCount(0);
+  await dev(page);
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
-  await button(page, "공동 식당 배치 · 목재30 · 철재2").click();
+  await button(page, "시간 재개").click();
+  await button(
+    page,
+    `공동 식당 배치 · 목재${restaurantCost.RES_WOOD} · 철재${restaurantCost.RES_METAL}`,
+  ).click();
   const preview = page.getByTestId("home-placement-status");
   let point: Awaited<ReturnType<typeof homeCursor>> | undefined;
   for (const [x, z] of [
@@ -389,7 +405,9 @@ test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각
   });
   await expect(page.getByTestId("resource-RES_PLANT")).not.toHaveText("120");
   await button(page, "일시정지").click();
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("90");
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText(
+    String(120 - restaurantCost.RES_WOOD),
+  );
   await saves(page);
   await button(page, "진행 저장").click();
   await expect(page.getByTestId("timber-save-status")).toContainText(
@@ -414,30 +432,33 @@ test("계약 한 번으로 주민 선택 없이 전 과정과 공동 재고·다
     "사용 가능한 목재 20 둥지에 배분",
   ])
     await expect(button(page, name)).toHaveCount(0);
+  await dev(page);
+  // 제출본 마을은 시설 직원이 있어 처음부터 모두 유휴는 아니다. 운송 뒤 같은 수로 돌아온다.
+  const idle = await page.getByTestId("timber-workers").textContent();
   await contract(page, "A");
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
+  await button(page, "시간 재개").click();
   await expect(page.getByTestId("next-mission")).toContainText(
     "마을 문에 주민",
     { timeout: 26000 },
   );
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("140");
-  await expect(page.getByTestId("resource-RES_METAL")).toHaveText("36");
-  await expect(page.getByTestId("timber-workers")).toHaveText(
-    "유휴 일손 60/60",
-  );
+  // 제출본 시작 재고(목재·철재 1,000)에 목재 20이 입고되고 A안 철재 4를 쓴다.
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,020");
+  await expect(page.getByTestId("resource-RES_METAL")).toHaveText("996");
+  await expect(page.getByTestId("timber-workers")).toHaveText(idle ?? "");
   await button(page, "받아준다").click();
   await expect(page.getByTestId("next-mission")).toContainText(
     "현재 인구 63명",
   );
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("140");
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,020");
 });
 
 test("B도 직접 수령이나 배분 없이 공동 재고에 입고한다", async ({ page }) => {
   await enter(page);
   await contract(page);
   await finish(page);
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("140");
-  await expect(page.getByTestId("resource-RES_METAL")).toHaveText("34");
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,020");
+  await expect(page.getByTestId("resource-RES_METAL")).toHaveText("994");
   await expect(page.getByTestId("timber-result")).toContainText(
     "공동 재고 정산 완료",
   );
@@ -452,8 +473,9 @@ test("운송 중 저장과 새로고침 복원은 자동 업무와 공동 재고
 }) => {
   await enter(page);
   await contract(page);
-  await button(page, "일시정지").click();
+  // 제출본 마을은 일시정지 상태로 이어지므로 계약 뒤에도 시간이 멈춰 있다.
   await dev(page);
+  await expect(button(page, "시간 재개")).toBeVisible();
   await button(page, "다음 작업 완료까지").click();
   await expect(page.getByTestId("timber-phase")).toHaveText("야적장으로 운반");
   await saves(page);
@@ -467,11 +489,11 @@ test("운송 중 저장과 새로고침 복원은 자동 업무와 공동 재고
   await button(page, "진행 불러오기").click();
   await expect(page.getByTestId("timber-phase")).toHaveText("야적장으로 운반");
   await expect(button(page, "시간 재개")).toBeVisible();
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("120");
-  await expect(page.getByTestId("resource-RES_METAL")).toHaveText("34");
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,000");
+  await expect(page.getByTestId("resource-RES_METAL")).toHaveText("994");
   await finish(page);
   await button(page, "5분 진행").click();
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("140");
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,020");
 });
 
 test("마을 현황으로 돌아가도 같은 공동 재고를 유지한다", async ({ page }) => {
@@ -479,8 +501,8 @@ test("마을 현황으로 돌아가도 같은 공동 재고를 유지한다", as
   await contract(page);
   await finish(page);
   await button(page, "마을 현황으로").click();
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("140");
-  await expect(page.getByTestId("resource-RES_METAL")).toHaveText("34");
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,020");
+  await expect(page.getByTestId("resource-RES_METAL")).toHaveText("994");
 });
 
 async function loadFixture(
@@ -510,14 +532,17 @@ async function hoverHouse(page: Page) {
   const canvas = page.locator("canvas"),
     box = await canvas.boundingBox();
   if (!box) throw Error("장면이 없습니다.");
-  for (const dy of [-65, -50, -35, -20, 0, 15, 30])
-    for (const dx of [0, -15, 15]) {
+  // 손상은 첫 둥지("온돌 둥지")에만 적용된다. 번호가 붙은 다른 둥지는 건너뛴다.
+  for (const dy of [-65, -50, -35, -20, 0, 15, 30, 45, 60, 80, 100])
+    for (const dx of [0, -15, 15, -40, 40, -70, 70, -100, 100]) {
       await canvas.hover({
         position: { x: box.width / 2 + dx, y: box.height / 2 + dy },
       });
       if (
         (await page.getByRole("tooltip").isVisible()) &&
-        (await page.getByRole("tooltip").textContent())?.includes("온돌 둥지")
+        /^온돌 둥지(?!\d)/.test(
+          (await page.getByRole("tooltip").textContent()) ?? "",
+        )
       )
         return;
     }
@@ -547,11 +572,11 @@ test("건물 체력은 마우스를 올리면 나타나며 화재 손상 뒤 직
   ).toHaveAttribute("value", "75");
   await button(page, "저장").hover();
   await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await dev(page);
   await page.getByText("둥지 보수", { exact: true }).click();
   await button(page, "건물 보수 명령").click();
-  await button(page, "일시정지").click();
+  // 불러온 진행은 일시정지 상태로 시작한다.
   await expect(button(page, "시간 재개")).toBeVisible();
-  await dev(page);
   await button(page, "다음 작업 완료까지").click();
   await expect(page.getByTestId("timber-phase")).toHaveText(
     "명령받은 건물 보수",
@@ -653,6 +678,10 @@ test("손상 저장과 저장 공간 오류는 현재 상태·기존 원본을 �
 test("탭 비활성과 저장 복원은 명시적 재개를 기다린다", async ({ page }) => {
   await enter(page);
   await contract(page);
+  await dev(page);
+  // 제출본 마을은 일시정지로 이어지므로 먼저 시간을 흐르게 한 뒤 탭을 숨긴다.
+  await button(page, "시간 재개").click();
+  await expect(button(page, "일시정지")).toBeVisible();
   await page.evaluate(() => {
     Object.defineProperty(document, "hidden", {
       configurable: true,
@@ -710,17 +739,22 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
   };
   await enter(page);
   await loadFixture(page, createTimberSave(s));
+  await dev(page);
   await expect(page.getByTestId("housing-status")).toContainText(
     "둥지 6곳 · 입주 60/60명",
   );
   await expect(page.getByTestId("timber-clock")).toContainText("현재 07:00");
   await page.getByText("종별 배급", { exact: true }).click();
-  await expect(page.getByTestId("ration-table")).toContainText("0.5");
-  await page.getByLabel("배급 방식", { exact: true }).selectOption("cap");
-  await expect(page.getByTestId("ration-table")).not.toContainText("0.5");
-  await page.getByLabel("배급 방식", { exact: true }).selectOption("needs");
+  // 제출본 배급표: 필요량은 종별 한 끼(풀 5·고기 2.5·어류 5), 상한은 모두 2.5.
+  const table = page.getByTestId("ration-table");
+  await expect(table).toContainText("트리케라톱스520벨로키랍토르2.510");
+  await button(page, "식단별 상한").click();
+  await expect(table).toContainText("트리케라톱스2.510벨로키랍토르2.510");
+  await button(page, "필요량 배급").click();
+  await expect(table).toContainText("트리케라톱스520벨로키랍토르2.510");
   await button(page, "시간 재개").click();
-  await expect(page.getByTestId("resource-RES_FISH")).toHaveText("119.75", {
+  // 고기 없는 벨로키랍토르 직원이 어류 2.5를 먹는다(상단 재고는 정수로 표시).
+  await expect(page.getByTestId("resource-RES_FISH")).toHaveText("117", {
     timeout: 5000,
   });
   await button(page, "일시정지").click();
@@ -739,8 +773,8 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
       (r: { workplaceId: string | null }) => r.workplaceId === "restaurant",
     ),
   );
-  expect(record.rationUsed).toBe(2500);
-  expect(record.lastMeal).toEqual({ RES_FISH: 2500 });
+  expect(record.rationUsed).toBe(25000);
+  expect(record.lastMeal).toEqual({ RES_FISH: 25000 });
 });
 test("거주 공간이 부족한 합류 주민을 둥지 증설 후 자동 입주시킨다", async ({
   page,
@@ -760,8 +794,10 @@ test("거주 공간이 부족한 합류 주민을 둥지 증설 후 자동 입�
   s = advanceTimber(s, 1);
   await enter(page);
   await loadFixture(page, createTimberSave(s));
+  await dev(page);
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
-  await button(page, "온돌 둥지 증설 · 목재20").click();
+  await button(page, "시간 재개").click();
+  await button(page, nestButton).click();
   const point = await homeCursor(page, 12, 12);
   await expect(page.getByTestId("home-placement-status")).toContainText(
     "배치 가능",
@@ -813,26 +849,13 @@ test("주민의 느낌표에 마우스를 올리면 요구 사유를 읽을 수 
   };
   await enter(page);
   await loadFixture(page, createTimberSave(s));
-  const box = await page.locator("canvas").boundingBox();
-  if (!box) throw Error("장면 없음");
-  // 현재 기본 카메라(거리32·고도60도·수직시야각0.8)의 전경 표식 위치.
-  const beta = Math.PI / 3,
-    depth = 32 - 2 * Math.cos(beta) - 6 * Math.sin(beta);
-  const point = {
-    x: box.width / 2,
-    y:
-      box.height / 2 -
-      ((2 * Math.sin(beta) - 6 * Math.cos(beta)) * box.height) /
-        (2 * depth * Math.tan(0.4)),
-  };
+  // 실제 카메라 행렬로 (0, -6)에 세운 주민의 머리 위 표식을 화면 좌표로 옮긴다.
+  const point = await worldPoint(page, [0, 2, -6], false);
   let offset = 0;
   await expect
     .poll(
       async () => {
-        await page.mouse.move(
-          box.x + point.x + (offset++ % 2),
-          box.y + point.y,
-        );
+        await page.mouse.move(point.x + (offset++ % 2), point.y);
         return await page
           .getByRole("tooltip")
           .textContent({ timeout: 300 })

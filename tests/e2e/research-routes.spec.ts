@@ -18,7 +18,13 @@ function fixture(
   completed: string[],
   pending?: string,
 ) {
-  let s = createTimberState({ ...createPlayState(), minute: 540 });
+  // 제출본 건물·연구 비용은 기본 재고(목재 120·철재 40)를 넘으므로 자재를 넉넉히 둔다.
+  const w = createPlayState();
+  let s = createTimberState({
+    ...w,
+    minute: 540,
+    resources: { ...w.resources, RES_WOOD: 5000000, RES_METAL: 5000000 },
+  });
   s = commandTimber(
     s,
     {
@@ -95,6 +101,10 @@ async function load(p: Page, s: TimberState) {
     "불러왔습니다",
   );
   await p.locator("canvas").press("j");
+  // 제출본은 운영 장부를 메뉴별로 나눠 보여 준다. 개발 도구를 열면 전체 장부와 시간 조작이 보인다.
+  const tools = button(p, "개발 도구");
+  if ((await tools.getAttribute("aria-expanded")) !== "true")
+    await tools.click();
 }
 test("초기 연구 화면은 후반 사건과 기술을 공개하지 않는다", async ({
   page,

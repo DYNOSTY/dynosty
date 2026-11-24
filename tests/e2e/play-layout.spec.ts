@@ -57,8 +57,9 @@ test("메뉴를 여닫아도 장면·날짜를 유지하고 저장 메뉴에서 
   await expect(
     page.getByRole("button", { name: "개발 도구", exact: true }),
   ).toBeFocused();
-  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  // 제출본은 개발 도구를 연 동안에만 예제 날짜를 상단에 표시한다.
   await page.getByRole("button", { name: "개발 도구", exact: true }).click();
+  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
