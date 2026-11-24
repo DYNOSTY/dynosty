@@ -20,15 +20,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 검사를 8대에 나눠 동시에 돌린다. 한 대에서 1개씩 돌리면 40~80분 걸린다.
+  # 검사를 16대에 나눠 동시에 돌린다. 한 대에서 1개씩 돌리면 40~80분 걸린다.
   browser-regression:
-    name: 브라우저 검사 ${{ matrix.shard }}/8
+    name: 브라우저 검사 ${{ matrix.shard }}/16
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -48,7 +48,7 @@ jobs:
         env:
           GREP: ${{ inputs.grep }}
         run: |
-          args=(--fully-parallel --shard=${{ matrix.shard }}/8 --reporter=blob,github)
+          args=(--fully-parallel --shard=${{ matrix.shard }}/16 --pass-with-no-tests --reporter=blob,github)
           if [ -n "$GREP" ]; then args+=(--grep "$GREP"); fi
           pnpm test:e2e "${args[@]}"
       - if: always()
