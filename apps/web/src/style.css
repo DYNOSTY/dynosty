@@ -1474,7 +1474,7 @@ h1 {
     box-shadow: none;
     border-radius: 0;
     border: 36px solid transparent;
-    border-image: url(/ui/kit/board_frame.png) 175 fill / 44px / 8px stretch;
+    border-image: url(/ui/kit/board_frame.webp) 175 fill / 44px / 8px stretch;
   }
   .play-status::before {
     content: "의뢰";
@@ -1508,7 +1508,7 @@ h1 {
     border-radius: 0;
     box-shadow: none;
     border: 36px solid transparent;
-    border-image: url(/ui/kit/board_frame.png) 175 fill / 44px / 8px stretch;
+    border-image: url(/ui/kit/board_frame.webp) 175 fill / 44px / 8px stretch;
     padding: 0;
   }
   .workspace-panel-heading {
@@ -1731,7 +1731,7 @@ h1 {
     padding: 0;
     box-sizing: border-box;
     border: 8px solid var(--jjok-deep);
-    border-image: url(/ui/kit/btn.png) 56 fill / 12px / 2px stretch;
+    border-image: url(/ui/kit/btn.webp) 56 fill / 12px / 2px stretch;
     background: var(--jjok);
     color: var(--hanji);
     border-radius: 0;
@@ -1757,7 +1757,7 @@ h1 {
     filter: brightness(1.15);
   }
   .g-cmd:active:not(:disabled) {
-    border-image-source: url(/ui/kit/btn_pressed.png);
+    border-image-source: url(/ui/kit/btn_pressed.webp);
   }
   .g-cmd[aria-expanded="true"] {
     outline: 2px solid var(--hanji);
@@ -2081,10 +2081,10 @@ h1 {
     background: var(--jjok);
     color: var(--hanji);
     border: 6px solid var(--jjok-deep);
-    border-image: url(/ui/kit/btn.png) 56 fill / 10px / 2px stretch;
+    border-image: url(/ui/kit/btn.webp) 56 fill / 10px / 2px stretch;
   }
   .play-menu.g-console__cmd .g-cmd:active:not(:disabled) {
-    border-image-source: url(/ui/kit/btn_pressed.png);
+    border-image-source: url(/ui/kit/btn_pressed.webp);
   }
   .g-mood figcaption {
     display: none;
@@ -2645,7 +2645,7 @@ body {
     display: block;
     width: 32px;
     height: 32px;
-    background: url(/ui/cmd/economy.png) center / contain no-repeat;
+    background: url(/ui/cmd/economy.webp) center / contain no-repeat;
     filter: drop-shadow(0 1px 2px rgb(0 0 0 / 60%));
   }
 }
@@ -2789,10 +2789,10 @@ body {
   background: center / contain no-repeat;
 }
 [data-testid="timber-iron"]::before {
-  background-image: url(/ui/resources-3d/RES_METAL.png);
+  background-image: url(/ui/resources-3d/RES_METAL.webp);
 }
 [data-testid="timber-workers"]::before {
-  background-image: url(/ui/cmd/residents.png);
+  background-image: url(/ui/cmd/residents.webp);
 }
 @media (min-width: 761px) {
   /* 위 막대 */
@@ -2909,10 +2909,10 @@ body {
   transition: filter 0.12s;
 }
 .g-knob--close {
-  background-image: url(/ui/kit/knob_close.png);
+  background-image: url(/ui/kit/knob_close.webp);
 }
 .g-knob--back {
-  background-image: url(/ui/kit/knob_back.png);
+  background-image: url(/ui/kit/knob_back.webp);
 }
 .g-knob:hover {
   filter: brightness(1.18);
@@ -3032,7 +3032,7 @@ body {
     padding: 4px 8px 16px;
     border: 36px solid transparent;
     border-radius: 0;
-    border-image: url(/ui/kit/board_frame.png) 175 fill / 44px / 8px stretch;
+    border-image: url(/ui/kit/board_frame.webp) 175 fill / 44px / 8px stretch;
     background: none;
     color: var(--meok);
     overflow: hidden;

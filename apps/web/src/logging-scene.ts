@@ -2,6 +2,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
+import "@babylonjs/core/Meshes/instancedMesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import {
@@ -117,6 +118,24 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
     [rules.workshop.x, 0.5, rules.workshop.z + 3],
     logs,
   );
+  // Every tree in a forest is the same trunk and crown, drawn as instances of one
+  // hidden pair instead of two separate meshes (and draw calls) per tree.
+  const trunkSource = isForest
+    ? box("logging-trunk-source", [0.35, 1.4, 0.35], [0, 0.7, 0], wood)
+    : null;
+  const crownSource = isForest
+    ? CreateCylinder(
+        unique("logging-crown-source"),
+        { height: 3, diameterBottom: 2, diameterTop: 0, tessellation: 6 },
+        scene,
+      )
+    : null;
+  if (crownSource) crownSource.material = leaves;
+  for (const source of [trunkSource, crownSource])
+    if (source) {
+      source.isVisible = false;
+      source.isPickable = false;
+    }
   const forest = Array.from(
     { length: isForest ? LOGGING_RULES.treesPerForest : 0 },
     (_, i) => {
@@ -126,17 +145,15 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
         0,
         patch.z - 9 + Math.floor(i / 8) * 6 + Math.cos(i * 7 + patch.z) * 1.1,
       );
-      box("logging-trunk", [0.35, 1.4, 0.35], [0, 0.7, 0], wood, tree);
-      const crown = CreateCylinder(
-        unique("logging-crown"),
-        { height: 3, diameterBottom: 2, diameterTop: 0, tessellation: 6 },
-        scene,
-      );
+      if (!trunkSource || !crownSource) return tree;
+      const trunk = trunkSource.createInstance(unique("logging-trunk"));
+      trunk.parent = tree;
+      trunk.position.set(0, 0.7, 0);
+      const crown = crownSource.createInstance(unique("logging-crown"));
       tree.scaling.setAll(0.8 + (1 + Math.sin(i * 4.9 + patch.z)) * 0.24);
       tree.rotation.y = i * 1.61;
       crown.parent = tree;
       crown.position.y = 2.5;
-      crown.material = leaves;
       return tree;
     },
   );
@@ -298,6 +315,8 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
     dispose() {
       for (const node of [workshop, storage, cart, deposit, ...forest])
         node.dispose();
+      trunkSource?.dispose();
+      crownSource?.dispose();
       buffer.dispose();
       for (const m of [wood, tile, leaves, logs]) m?.dispose();
     },

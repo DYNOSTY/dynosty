@@ -40,6 +40,7 @@ import {
   productionSites,
   setLoggingSite,
 } from "./logging.js";
+import { findById } from "./lookup.js";
 import { usableHomes } from "./mutants.js";
 import {
   AMOUNT_SCALE,
@@ -607,24 +608,23 @@ export function freeTownResidents(
   count: number,
 ): string[] {
   if (count <= 0) return [];
+  const obstacles = townObstacles(s);
+  const length = (id: string, path: GroundPoint[]) => {
+    let q = findById(s.residents, id)?.position ?? p,
+      n = 0;
+    for (const p of path) {
+      n += Math.hypot(q.x - p.x, q.z - p.z);
+      q = p;
+    }
+    return n;
+  };
   return idleTownResidents(s)
-    .map((r) => ({
-      id: r.id,
-      path: residentPath(r.position, p, townObstacles(s)),
-    }))
-    .filter((r) => r.path.length)
-    .sort((a, b) => {
-      const length = (id: string, path: GroundPoint[]) => {
-        let q = s.residents.find((r) => r.id === id)?.position ?? p,
-          n = 0;
-        for (const p of path) {
-          n += Math.hypot(q.x - p.x, q.z - p.z);
-          q = p;
-        }
-        return n;
-      };
-      return length(a.id, a.path) - length(b.id, b.path);
+    .map((r) => {
+      const path = residentPath(r.position, p, obstacles);
+      return { id: r.id, path, length: length(r.id, path) };
     })
+    .filter((r) => r.path.length)
+    .sort((a, b) => a.length - b.length)
     .slice(0, count)
     .map((r) => r.id);
 }

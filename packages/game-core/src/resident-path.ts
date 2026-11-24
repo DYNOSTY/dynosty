@@ -8,50 +8,67 @@ export type GroundObstacle = GroundPoint & {
 // shortcut: 현재 개발 건물의 바닥과 주민 여유 폭. 건물별 크기가 달라지면 충돌 외곽을 모델 정의에서 받는다.
 const CLEARANCE = 1.75;
 
+type Box = {
+  point: GroundObstacle;
+  cos: number;
+  sin: number;
+  halfWidth: number;
+  halfDepth: number;
+};
+// Every resident in the same minute walks around the same obstacle list, so the
+// rotated boxes are prepared once per list instead of once per path request.
+const prepared = new WeakMap<readonly GroundObstacle[], readonly Box[]>();
+function boxesOf(buildings: readonly GroundObstacle[]): readonly Box[] {
+  let boxes = prepared.get(buildings);
+  if (!boxes || boxes.length !== buildings.length) {
+    boxes = buildings.map((p) => ({
+      point: p,
+      cos: Math.cos(p.headingRadians ?? 0),
+      sin: Math.sin(p.headingRadians ?? 0),
+      halfWidth: p.halfWidth ?? CLEARANCE,
+      halfDepth: p.halfDepth ?? CLEARANCE,
+    }));
+    prepared.set(buildings, boxes);
+  }
+  return boxes;
+}
+
 export function residentPath(
   start: GroundPoint,
   goal: GroundPoint,
   buildings: readonly GroundObstacle[],
   narrow = true,
 ): GroundPoint[] {
-  const boxes = buildings.map((p) => ({
-    point: p,
-    angle: p.headingRadians ?? 0,
-  }));
-  const local = (p: GroundPoint, b: (typeof boxes)[number]) => ({
-    x:
-      (p.x - b.point.x) * Math.cos(b.angle) -
-      (p.z - b.point.z) * Math.sin(b.angle),
-    z:
-      (p.x - b.point.x) * Math.sin(b.angle) +
-      (p.z - b.point.z) * Math.cos(b.angle),
-  });
-  const world = (x: number, z: number, b: (typeof boxes)[number]) => ({
-    x: b.point.x + x * Math.cos(b.angle) + z * Math.sin(b.angle),
-    z: b.point.z - x * Math.sin(b.angle) + z * Math.cos(b.angle),
+  const boxes = boxesOf(buildings);
+  const world = (x: number, z: number, b: Box) => ({
+    x: b.point.x + x * b.cos + z * b.sin,
+    z: b.point.z - x * b.sin + z * b.cos,
   });
   const inside = (p: GroundPoint) =>
     boxes.some((b) => {
-      const q = local(p, b);
+      const dx = p.x - b.point.x,
+        dz = p.z - b.point.z;
       return (
-        Math.abs(q.x) <= (b.point.halfWidth ?? CLEARANCE) &&
-        Math.abs(q.z) <= (b.point.halfDepth ?? CLEARANCE)
+        Math.abs(dx * b.cos - dz * b.sin) <= b.halfWidth &&
+        Math.abs(dx * b.sin + dz * b.cos) <= b.halfDepth
       );
     });
   if (inside(start) || inside(goal)) return [];
-  const intersects = (
-    a: GroundPoint,
-    b: GroundPoint,
-    box: (typeof boxes)[number],
-  ) => {
-    const from = local(a, box),
-      to = local(b, box);
+  const intersects = (a: GroundPoint, b: GroundPoint, box: Box) => {
+    const ax = a.x - box.point.x,
+      az = a.z - box.point.z,
+      bx = b.x - box.point.x,
+      bz = b.z - box.point.z;
+    const fromX = ax * box.cos - az * box.sin,
+      fromZ = ax * box.sin + az * box.cos,
+      toX = bx * box.cos - bz * box.sin,
+      toZ = bx * box.sin + bz * box.cos;
     let enter = 0,
       leave = 1;
-    for (const [origin, delta, clearance] of [
-      [from.x, to.x - from.x, box.point.halfWidth ?? CLEARANCE],
-      [from.z, to.z - from.z, box.point.halfDepth ?? CLEARANCE],
-    ] as const) {
+    for (let axis = 0; axis < 2; axis++) {
+      const origin = axis ? fromZ : fromX,
+        delta = axis ? toZ - fromZ : toX - fromX,
+        clearance = axis ? box.halfDepth : box.halfWidth;
       if (Math.abs(delta) < 1e-9) {
         if (origin < -clearance || origin > clearance) return false;
       } else {

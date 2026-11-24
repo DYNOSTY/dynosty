@@ -1004,8 +1004,8 @@ export function App() {
       alt=""
       src={
         speakingMerchant
-          ? "/art/merchants/" + speakingMerchant[0] + ".png"
-          : `/art/advisers/${daylight ? "nareumi" : "dali"}/neutral.png`
+          ? "/art/merchants/" + speakingMerchant[0] + ".webp"
+          : `/art/advisers/${daylight ? "nareumi" : "dali"}/neutral.webp`
       }
     />
   );
@@ -1134,7 +1134,7 @@ export function App() {
             <>
               {/* 정찰 목표 */}
               <div className="g-quest">
-                <img src="/ui/cmd/map.png" alt="" />
+                <img src="/ui/cmd/map.webp" alt="" />
                 <div className="g-quest__body">
                   <span>1단계 목표 · 정찰</span>
                   <span className="g-pips" aria-hidden="true">
@@ -1187,7 +1187,7 @@ export function App() {
                   className="g-quest g-quest--btn is-found"
                   onClick={() => openOnly(() => setScoutOpen(site.id))}
                 >
-                  <img src="/ui/cmd/economy.png" alt="" />
+                  <img src="/ui/cmd/economy.webp" alt="" />
                   <span className="g-quest__body">
                     <span>{site.name} 발견</span>
                     <small>
