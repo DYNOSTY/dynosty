@@ -2,7 +2,9 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import {
   clickExample,
+  EXAMPLE_IDS,
   examplePoint,
+  nodePoint,
   outlinePixels,
   worldPoint,
 } from "./scene-picking.js";
@@ -186,7 +188,8 @@ test.describe("좁은 터치 화면", () => {
     page,
   }) => {
     await ready(page);
-    const point = await worldPoint(page, BOARD, false);
+    // 좁은 화면에서는 게시판 앞을 주민이 가릴 수 있어 실제 광선이 닿는 지점을 장면에서 고른다.
+    const point = await nodePoint(page, EXAMPLE_IDS.board);
     await page.touchscreen.tap(point.x, point.y);
     const info = page.getByRole("region", { name: "선택 정보", exact: true });
     await expect(info).toContainText("복홀 방 게시판");

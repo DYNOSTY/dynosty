@@ -11,7 +11,7 @@ import {
   TIMBER_RULES,
   VILLAGE_RULES,
 } from "../../packages/game-core/dist/index.js";
-import { worldPoint } from "./scene-picking.js";
+import { nodePoint, worldPoint } from "./scene-picking.js";
 
 const button = (page: Page, name: string) =>
   page.getByRole("button", { name, exact: true });
@@ -151,9 +151,9 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   await loadFixture(page, createTimberSave(s));
   await dev(page);
   await button(page, nestButton).click();
-  // 중앙 광장(0, -1)은 이제 별도 사유로 막힌다. 첫 둥지(-6, -2) 바로 앞 바닥에 겹치게 둔다.
-  // 둥지 모델 위를 누르면 둥지가 선택되므로 모델이 없는 앞쪽 바닥을 쓴다.
-  const invalid = await homeCursor(page, -6, 1);
+  // 중앙 광장(0, -1)은 이제 별도 사유로 막힌다. 첫 둥지(-6, -2) 자리에 그대로 겹치게 둔다.
+  // 배치 미리보기 중에는 포인터가 미리보기로 가므로 둥지 중심(game-core 기준 '다른 건물과 겹치는 자리')을 쓴다.
+  const invalid = await homeCursor(page, -6, -2);
   await expect(page.getByTestId("home-placement-status")).toContainText("겹");
   await page.mouse.click(invalid.x, invalid.y);
   await expect(page.getByTestId("housing-status")).toContainText("둥지 6곳");
@@ -848,7 +848,8 @@ test("주민의 느낌표에 마우스를 올리면 요구 사유를 읽을 수 
   await enter(page);
   await loadFixture(page, createTimberSave(s));
   // 실제 카메라 행렬로 (0, -6)에 세운 주민의 머리 위 표식을 화면 좌표로 옮긴다.
-  const point = await worldPoint(page, [0, 2, -6], false);
+  // 다른 주민이 앞을 가리지 않도록 이 주민에게 실제 광선이 닿는 지점을 장면에서 고른다.
+  const point = await nodePoint(page, id);
   let offset = 0;
   await expect
     .poll(
