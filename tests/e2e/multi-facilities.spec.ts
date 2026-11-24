@@ -88,8 +88,9 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상�
   await expect(
     page.getByLabel("build-1 운영 인원", { exact: true }),
   ).toHaveValue("1");
-  // 개발 도구와 운영 화면을 함께 닫는 제출본 경로(Esc)로 마을로 돌아간다.
-  await page.keyboard.press("Escape");
+  // 제출본에서 Esc는 캠페인 일시정지 메뉴를 연다(CampaignPanel 캡처 단계 처리).
+  // 개발 도구는 같은 단추를 다시 눌러 닫는다.
+  await b(page, "개발 도구").click();
   await expect(b(page, "개발 도구")).toHaveAttribute("aria-expanded", "false");
   await b(page, "주민").click();
   await b(page, "건설").click();
@@ -308,8 +309,10 @@ test("희망과 절망 중 높은 쪽 저울 접시가 내려간다", async ({ p
       paused: true,
       world: { ...base.world, optimism, pessimism },
     });
-    // 건설 목록이 열려 있으면 저울을 가린다. Esc로 창을 닫고 마을 화면에서 확인한다.
-    await page.keyboard.press("Escape");
+    // 건설 목록(.building-shelf)이 열려 있으면 저울을 가린다. Esc는 제출본에서
+    // 일시정지 메뉴를 열므로, 다른 메뉴로 옮긴 뒤 운영 화면을 닫고 마을 화면에서 확인한다.
+    await b(page, "주민").click();
+    await b(page, "마을로 돌아가기").click();
     const scale = page.getByRole("figure", {
       name: `희망 ${optimism}, 절망 ${pessimism}`,
     });
