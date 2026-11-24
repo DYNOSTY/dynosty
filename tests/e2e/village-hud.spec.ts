@@ -7,7 +7,7 @@ import {
   payTown,
   requireValue,
 } from "../../packages/game-core/dist/index.js";
-import { openLaborPanel } from "./workspace.js";
+import { openLaborPanel, openWorkspace } from "./workspace.js";
 
 test("HUD 건설·연구 메뉴와 저장·개발 도구가 같은 마을 진행을 유지한다", async ({
   page,
@@ -52,7 +52,8 @@ test("HUD 건설·연구 메뉴와 저장·개발 도구가 같은 마을 진행
   await expect(page.getByTestId("labor-clock")).toBeVisible();
   await button("목재 조달 보기").click();
   await button("복홀 전체 보기").click();
-  await button("개발 도구").click();
+  // 일손 화면은 이미 개발 도구를 연 채라서 토글하지 않고 열린 상태를 보장한다.
+  await openWorkspace(page);
   await expect(page.getByTestId("camera-distance")).toHaveText("640.00");
   await button("개발 도구 닫기").click();
   await page.screenshot({ path: info.outputPath("village-hud.png") });

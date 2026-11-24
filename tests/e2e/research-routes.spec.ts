@@ -110,6 +110,13 @@ test("초기 연구 화면은 후반 사건과 기술을 공개하지 않는다"
   page,
 }) => {
   await load(page, createTimberState(createPlayState()));
+  // 개발 도구는 후반 분기 검사 정보를 함께 보여 준다. 끄고 플레이어의 연구 메뉴만 확인한다.
+  await button(page, "개발 도구").click();
+  await expect(button(page, "개발 도구")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await button(page, "연구").click();
   const panel = page.getByRole("region", { name: "연구와 교역망" });
   await expect(panel.getByLabel("연구 기술")).toBeAttached();
   await expect(panel).not.toContainText(/반란|시해|날틀|전기자극기|메카/);

@@ -6,6 +6,7 @@ import {
   createTimberSave,
   createTimberState,
 } from "../../packages/game-core/dist/index.js";
+import { worldPoint } from "./scene-picking.js";
 
 test("병원 클릭으로 주민별 회복을 보고 저장 후 야간 자동 퇴원한다", async ({
   page,
@@ -96,9 +97,9 @@ test("병원 클릭으로 주민별 회복을 보고 저장 후 야간 자동 �
   const canvas = page.locator("canvas");
   const rect = await canvas.boundingBox();
   if (!rect) throw Error("3D 화면 없음");
-  await canvas.click({
-    position: { x: rect.width / 2, y: rect.height / 2 - 8 },
-  });
+  // 실제 카메라 행렬로 병원(12, 12) 몸체를 화면 좌표로 옮겨 누른다.
+  const hospital = await worldPoint(page, [12, 1.5, 12], false);
+  await page.mouse.click(hospital.x, hospital.y);
   const ward = page.getByTestId("hospital-build-1");
   await expect(ward).toHaveAttribute("open", "");
   await expect(ward.getByRole("listitem")).toHaveCount(3);
