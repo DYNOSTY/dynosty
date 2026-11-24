@@ -349,7 +349,7 @@ export function createVillage(
       ];
       jobs.push(
         place(
-          `/models/buildings/${model}.glb`,
+          model,
           x,
           z,
           face(x, z),
