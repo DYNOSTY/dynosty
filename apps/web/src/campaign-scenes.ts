@@ -439,9 +439,7 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line(
         "돌쇠",
-        s.restaurantBuilt
-          ? "공자님! 식당 처마에 불이 붙었습니다. 불씨가 둥지 지붕으로 넘어갑니다!"
-          : "공자님! 둥지 지붕에 불이 붙었습니다!",
+        "공자님! 병원 처마에 불이 붙었습니다. 불씨가 공방 지붕으로 넘어갑니다!",
       );
       choice("leave", "성문을 열고 남은 장부 확인");
       break;
