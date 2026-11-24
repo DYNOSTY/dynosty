@@ -108,15 +108,8 @@ async function homeCursor(
   x: number,
   z: number,
 ) {
-  const canvas = page.locator("canvas"),
-    box = await canvas.boundingBox();
-  if (!box) throw Error("캔버스 없음");
-  const depth = 32 + z * Math.sin(Math.PI / 3),
-    scale = box.height / (2 * Math.tan(0.4) * depth);
-  const point = {
-    x: box.x + box.width / 2 + x * scale,
-    y: box.y + box.height / 2 - z * Math.cos(Math.PI / 3) * scale,
-  };
+  // 실제 카메라 행렬로 마을 바닥(높이 0)의 (x, z)를 화면 좌표로 옮긴다.
+  const point = await worldPoint(page, [x, 0, z], false);
   await page.mouse.move(point.x, point.y);
   return point;
 }
@@ -157,7 +150,8 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   await loadFixture(page, createTimberSave(s));
   await dev(page);
   await button(page, nestButton).click();
-  const invalid = await homeCursor(page, 0, -1);
+  // 중앙 광장(0, -1)은 이제 별도 사유로 막힌다. 첫 둥지(-6, -2) 위로 겹치게 옮긴다.
+  const invalid = await homeCursor(page, -6, -2);
   await expect(page.getByTestId("home-placement-status")).toContainText("겹");
   await page.mouse.click(invalid.x, invalid.y);
   await expect(page.getByTestId("housing-status")).toContainText("둥지 6곳");
@@ -438,9 +432,10 @@ test("계약 한 번으로 주민 선택 없이 전 과정과 공동 재고·다
   await contract(page, "A");
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
   await button(page, "시간 재개").click();
+  // 제출본 A안 운송·검수·건조는 게임 63분(3배속 실시간 약 21초)이 걸린다.
   await expect(page.getByTestId("next-mission")).toContainText(
     "마을 문에 주민",
-    { timeout: 26000 },
+    { timeout: 45000 },
   );
   // 제출본 시작 재고(목재·철재 1,000)에 목재 20이 입고되고 A안 철재 4를 쓴다.
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,020");
