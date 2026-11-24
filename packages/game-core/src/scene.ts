@@ -16,10 +16,15 @@ export type SceneEntity =
   | (SceneEntityBase & {
       readonly kind: "resident";
       readonly motion: "idle" | "walking";
+      readonly needsHelp?: boolean;
+      readonly indoors?: boolean;
+      readonly species?: string;
     })
   | (SceneEntityBase & {
       readonly kind: "building";
       readonly highlighted: boolean;
+      readonly lit?: boolean;
+      readonly level?: 1 | 2 | 3;
     });
 
 export interface SceneSnapshot {
@@ -36,6 +41,18 @@ export function validateSceneSnapshot(snapshot: SceneSnapshot): void {
         "표시 객체의 식별값은 비어 있거나 중복될 수 없습니다.",
       );
     ids.add(entity.id);
+    if (
+      entity.kind === "building" &&
+      entity.level !== undefined &&
+      ![1, 2, 3].includes(entity.level)
+    )
+      throw new RangeError("건물 표시 단계 오류");
+    if (
+      entity.kind === "resident" &&
+      entity.species !== undefined &&
+      !["R02", "R03", "SPINO"].includes(entity.species)
+    )
+      throw new RangeError("주민 표시 종 오류");
     if (
       ![
         entity.position.x,

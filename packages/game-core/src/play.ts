@@ -1,23 +1,7 @@
+import { BOKHOL_MAP } from "./bokhol.js";
 import raw from "./game-data.json" with { type: "json" };
 import { isRecord } from "./save.js";
 import type { SceneEntity, SceneSnapshot } from "./scene.js";
-import {
-  absMinute,
-  createStoryState,
-  minutesUntilStory,
-  parseStoryState,
-  pendingStory,
-  STORY_RULES,
-  type StoryId,
-  type StorySide,
-  type StoryState,
-} from "./story.js";
-import {
-  createWinterState,
-  parseWinterState,
-  stepWinter,
-  type WinterState,
-} from "./winter.js";
 
 export type RuleSet = typeof raw;
 export type ResourceId = keyof RuleSet["resources"];
@@ -71,7 +55,7 @@ export function parseRules(value: unknown): RuleSet {
   ])
     if (!isRecord(value[key])) fail();
   const resources = value.resources as Record<string, unknown>;
-  if (Object.keys(resources).length !== 7) fail();
+  if (Object.keys(resources).length !== RESOURCE_IDS.length) fail();
   for (const id of RESOURCE_IDS) {
     const r = resources[id];
     if (!isRecord(r)) fail();
@@ -161,7 +145,9 @@ export function parseRules(value: unknown): RuleSet {
     fail();
   const e = value.endings as Record<string, unknown>;
   if (
-    e.warningPessimism !== 90 ||
+    e.concernPessimism !== 60 ||
+    e.warningPessimism !== 75 ||
+    e.urgentPessimism !== 90 ||
     e.evictionPessimism !== 100 ||
     e.evictionOptimism !== 0 ||
     e.evictionMinutes !== 1440 ||
@@ -208,8 +194,10 @@ export interface Citizen {
   readonly id: string;
   readonly species: string;
   readonly diet: FoodId;
-  readonly age: "adult";
+  readonly age: "adult" | "child";
   readonly alive: boolean;
+  readonly mechanicalFrom?: string;
+  readonly health?: "healthy" | "sick" | "dead";
 }
 export interface PlayBuilding {
   readonly id: string;
@@ -229,21 +217,14 @@ export interface PlayState {
   readonly paused: boolean;
   readonly tickRemainder: number;
   readonly citizens: readonly Citizen[];
+  readonly citizenEvents?: readonly string[];
   readonly buildings: readonly PlayBuilding[];
   readonly resources: Readonly<Record<ResourceId, number>>;
   readonly foodCarry: Readonly<Record<FoodId, number>>;
   readonly unmet: Readonly<Record<FoodId, number>>;
   readonly optimism: number;
   readonly pessimism: number;
-  /** 절기·온돌·체온 (winter.ts) — 옛 저장에는 없어서 불러올 때 기본값으로 채움 */
-  readonly winter: WinterState;
-  /** 생산 분자 이월 (벌목 목재, food와 같은 고정 소수점) */
-  readonly work: { readonly woodCarry: number };
-  /** 사건·정책 선택 (story.ts) — 옛 저장에는 없어서 불러올 때 기본값으로 채움 */
-  readonly story: StoryState;
 }
-// 벌목장 B02 (온돌 UI v0.4 표): 정원6 · 목재18/일 → 1단계 초기 배치 4명 = 하루 12, 낮 9~18시에만
-export const LOGGING = { woodPerDay: 12, from: 9, to: 18 } as const;
 export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
   const r = parseRules(rules);
   const citizens: Citizen[] = [];
@@ -258,6 +239,7 @@ export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
         diet: p.diet as FoodId,
         age: "adult",
         alive: true,
+        health: "healthy",
       });
   return {
     schemaVersion: 1,
@@ -283,9 +265,6 @@ export function createPlayState(rules: RuleSet = GAME_RULES): PlayState {
     unmet: { RES_PLANT: 0, RES_MEAT: 0, RES_FISH: 0 },
     optimism: r.initial.optimism,
     pessimism: r.initial.pessimism,
-    winter: createWinterState(citizens.map((c) => c.id)),
-    work: { woodCarry: 0 },
-    story: createStoryState(),
   };
 }
 export function parsePlayState(
@@ -304,9 +283,14 @@ export function parsePlayState(
     value.buildings.length > 100 ||
     !Array.isArray(value.citizens) ||
     value.citizens.length === 0 ||
-    value.citizens.length > 600
+    value.citizens.length > 1000
   )
     fail();
+  const resourceSource: Record<string, unknown> = {
+    ...value.resources,
+    ...(!("RES_IRON_ORE" in value.resources) ? { RES_IRON_ORE: 0 } : {}),
+    ...(!("RES_STONE" in value.resources) ? { RES_STONE: 0 } : {}),
+  };
   number(value.day, 1, 100_000, true);
   number(value.minute, 0, 1439, true);
   number(value.tickRemainder, 0, 999, true);
@@ -314,7 +298,7 @@ export function parsePlayState(
   number(value.pessimism, 0, 100);
   const resources = {} as Record<ResourceId, number>;
   for (const id of RESOURCE_IDS) {
-    const amount = value.resources[id];
+    const amount = resourceSource[id];
     number(amount, 0, 10_000_000_000, true);
     resources[id] = amount;
   }
@@ -328,23 +312,63 @@ export function parsePlayState(
     carry[id] = c;
     unmet[id] = u;
   }
+  if (
+    value.citizenEvents !== undefined &&
+    (!Array.isArray(value.citizenEvents) ||
+      value.citizenEvents.length > 2000 ||
+      value.citizenEvents.some(
+        (id) => typeof id !== "string" || !id || id.length > 100,
+      ) ||
+      new Set(value.citizenEvents).size !== value.citizenEvents.length)
+  )
+    fail();
   const ids = new Set<string>();
   const citizens = value.citizens.map((p): Citizen => {
-    if (!isRecord(p) || p.age !== "adult" || typeof p.alive !== "boolean")
+    if (
+      !isRecord(p) ||
+      (p.age !== "adult" && p.age !== "child") ||
+      typeof p.alive !== "boolean"
+    )
       fail();
     text(p.id);
     text(p.species);
     const definition = rules.population.find((x) => x.species === p.species);
     if (!definition || p.diet !== definition.diet || ids.has(p.id)) fail();
+    if (
+      p.health !== undefined &&
+      (!["healthy", "sick", "dead"].includes(p.health as string) ||
+        (p.health === "dead") !== !p.alive)
+    )
+      fail();
     ids.add(p.id);
     return {
       id: p.id,
       species: p.species,
       diet: p.diet as FoodId,
-      age: "adult",
+      age: p.age,
       alive: p.alive,
+      ...(p.mechanicalFrom !== undefined
+        ? { mechanicalFrom: String(p.mechanicalFrom) }
+        : {}),
+      ...(p.health !== undefined
+        ? { health: p.health as NonNullable<Citizen["health"]> }
+        : {}),
     };
   });
+  const bones = new Set<string>();
+  for (const c of citizens)
+    if (c.mechanicalFrom !== undefined) {
+      const source = citizens.find((p) => p.id === c.mechanicalFrom);
+      if (
+        !source ||
+        source.alive ||
+        source.mechanicalFrom ||
+        bones.has(source.id) ||
+        c.id !== `mecha:${source.id}`
+      )
+        fail();
+      bones.add(source.id);
+    }
   const buildings = value.buildings.map((b): PlayBuilding => {
     if (!isRecord(b) || b.type !== "ondol-nest" || !isRecord(b.position))
       fail();
@@ -353,9 +377,9 @@ export function parsePlayState(
     ids.add(b.id);
     number(b.headingRadians, -Math.PI * 2, Math.PI * 2);
     const p = b.position;
-    number(p.x, -9, 9);
-    number(p.y, -9, 9);
-    number(p.z, -9, 9);
+    number(p.x, -BOKHOL_MAP.coordinateLimit, BOKHOL_MAP.coordinateLimit);
+    number(p.y, -48, 48);
+    number(p.z, -BOKHOL_MAP.coordinateLimit, BOKHOL_MAP.coordinateLimit);
     return {
       id: b.id,
       type: "ondol-nest",
@@ -371,34 +395,15 @@ export function parsePlayState(
     paused: value.paused,
     tickRemainder: value.tickRemainder,
     citizens,
+    ...(value.citizenEvents !== undefined
+      ? { citizenEvents: [...(value.citizenEvents as string[])] }
+      : {}),
     buildings,
     resources,
     foodCarry: carry,
     unmet,
     optimism: value.optimism,
     pessimism: value.pessimism,
-    winter: (() => {
-      try {
-        return parseWinterState(
-          value.winter,
-          citizens.map((c) => c.id),
-        );
-      } catch {
-        fail();
-      }
-    })(),
-    work: (() => {
-      const w = isRecord(value.work) ? value.work : { woodCarry: 0 };
-      number(w.woodCarry, 0, Number.MAX_SAFE_INTEGER, true);
-      return { woodCarry: w.woodCarry };
-    })(),
-    story: (() => {
-      try {
-        return parseStoryState(value.story);
-      } catch {
-        fail();
-      }
-    })(),
   };
 }
 export function dailyFoodDemand(
@@ -407,7 +412,7 @@ export function dailyFoodDemand(
 ): Record<FoodId, number> {
   const demand = { RES_PLANT: 0, RES_MEAT: 0, RES_FISH: 0 };
   for (const c of state.citizens)
-    if (c.alive)
+    if (c.alive && !c.mechanicalFrom)
       demand[c.diet] += Math.round(
         rules.food.unitsPerResidentPerDay * AMOUNT_SCALE,
       );
@@ -433,83 +438,16 @@ export function advancePlayMinutes(
     unmet[id] += needed - used;
     if (!Number.isSafeInteger(unmet[id])) fail();
   }
-  // 절기·온돌·체온: 정시 경계에서 끊어 1시간 이하씩 (불때기 시간표가 시각마다 맞게)
-  let winter = state.winter;
-  let citizens = state.citizens;
-  let optimism = state.optimism;
-  let pessimism = state.pessimism;
-  let wDay = state.day;
-  let wMinute = state.minute;
-  let woodCarry = state.work.woodCarry;
-  const workMinutes = (LOGGING.to - LOGGING.from) * 60;
-  let left = minutes;
-  while (left > 0) {
-    const hour = Math.floor(wMinute / 60);
-    const logging = hour >= LOGGING.from && hour < LOGGING.to;
-    // 벌목 중에는 매분 난방 후 생산: 그 목재는 다음 분부터 연료로 쓸 수 있다.
-    const chunk = logging ? 1 : Math.min(left, 60 - (wMinute % 60));
-    const r = stepWinter({
-      winter,
-      day: wDay,
-      minute: wMinute,
-      minutes: chunk,
-      coal: resources.RES_COAL,
-      wood: resources.RES_WOOD,
-      // ponytail: 공사·연구 예약 목재 연결 전이라 0 — 예약 장부가 생기면 여기로 넘김
-      reservedWood: 0,
-      scale: AMOUNT_SCALE,
-      citizens,
-    });
-    winter = r.winter;
-    resources.RES_COAL -= r.coalUsed;
-    resources.RES_WOOD -= r.woodUsed;
-    if (r.deaths.length) {
-      const dead = new Set(r.deaths);
-      citizens = citizens.map((c) =>
-        dead.has(c.id) ? { ...c, alive: false } : c,
-      );
-    }
-    // 벌목: 일하는 시각에만 목재가 쌓임
-    if (logging) {
-      // ponytail: 벌목꾼 4명이 늘 일한다고 봄 — 일손 배치·부상과 연결되면 인원 비례로
-      const n = LOGGING.woodPerDay * AMOUNT_SCALE * chunk + woodCarry;
-      resources.RES_WOOD += Math.floor(n / workMinutes);
-      woodCarry = n % workMinutes;
-    }
-    pessimism = Math.min(100, Math.max(0, pessimism + r.pessimismDelta));
-    optimism = Math.min(100, Math.max(0, optimism + r.optimismDelta));
-    wMinute += chunk;
-    if (wMinute >= rules.time.minutesPerDay) {
-      wMinute -= rules.time.minutesPerDay;
-      wDay += 1;
-    }
-    left -= chunk;
-  }
   const elapsed = state.minute + minutes;
   const day = state.day + Math.floor(elapsed / rules.time.minutesPerDay);
   number(day, 1, 100_000, true);
-  // 전량 검수로 늦춘 목재가 도착 (사건·정책 선택, story.ts)
-  let story = state.story;
-  if (
-    story.woodDue !== null &&
-    absMinute(day, elapsed % rules.time.minutesPerDay) >= story.woodDue
-  ) {
-    resources.RES_WOOD += STORY_RULES.trade.wood * AMOUNT_SCALE;
-    story = { ...story, woodDue: null };
-  }
   return {
     ...state,
     day,
     minute: elapsed % rules.time.minutesPerDay,
-    story,
     resources,
     foodCarry: carry,
     unmet,
-    citizens,
-    optimism,
-    pessimism,
-    winter,
-    work: { woodCarry },
   };
 }
 export function tickPlay(
@@ -526,54 +464,8 @@ export function tickPlay(
     state.tickRemainder;
   const minutes = Math.floor(numerator / 1000);
   return {
-    ...advanceToStory(state, minutes, rules),
+    ...advancePlayMinutes(state, minutes, rules),
     tickRemainder: numerator % 1000,
-  };
-}
-/** 사건이 뜰 시각에서 시간을 끊고 멈추는 진행 — 실시간 진행과 '하루 진행'이 쓴다.
- *  사건을 고를 때까지 시간은 그 시각에 서 있다 (다시 시작을 눌러도 곧바로 다시 멈춤) */
-export function advanceToStory(
-  input: PlayState,
-  minutes: number,
-  rules: RuleSet = GAME_RULES,
-): PlayState {
-  const state = parsePlayState(input, rules);
-  const until = minutesUntilStory(state.story, state.day, state.minute);
-  if (until === null || minutes < until)
-    return advancePlayMinutes(state, minutes, rules);
-  return { ...advancePlayMinutes(state, until, rules), paused: true };
-}
-/** 떠 있는 사건에서 한쪽을 고름 (가 = a, 나 = b). 수치는 story.ts STORY_RULES(임시 값) */
-export function pickStory(
-  input: PlayState,
-  id: StoryId,
-  side: StorySide,
-  rules: RuleSet = GAME_RULES,
-): PlayState {
-  const state = parsePlayState(input, rules);
-  if (pendingStory(state.story, state.day, state.minute) !== id) fail();
-  const rule = STORY_RULES[id];
-  const picked = { ...state.story.picked, [id]: side };
-  // 가: 전량 검수 — 불량은 막지만 하루 뒤에 들어옴
-  if (side === "a")
-    return {
-      ...state,
-      paused: false,
-      story: {
-        picked,
-        woodDue: absMinute(state.day, state.minute) + rule.fullDelayMinutes,
-      },
-    };
-  // 나: 표본 검수 — 바로 들어오지만 젖은 목재가 섞여 비관이 오름
-  return {
-    ...state,
-    paused: false,
-    resources: {
-      ...state.resources,
-      RES_WOOD: state.resources.RES_WOOD + rule.wood * AMOUNT_SCALE,
-    },
-    pessimism: Math.min(100, state.pessimism + rule.samplePessimism),
-    story: { picked, woodDue: state.story.woodDue },
   };
 }
 export function setPlayPaused(state: PlayState, paused: boolean): PlayState {
@@ -607,7 +499,22 @@ export function foodWarnings(state: PlayState, rules: RuleSet = GAME_RULES) {
       : [],
   );
 }
+export type Difficulty = "easy" | "normal" | "hard";
+export const isDifficulty = (v: unknown): v is Difficulty =>
+  v === "easy" || v === "normal" || v === "hard";
+export const productionMultiplier = (d?: Difficulty) =>
+  d === "easy" ? 1.2 : d === "hard" ? 0.8 : 1;
+export const incidentChance = (base: number, d?: Difficulty) =>
+  Math.min(1, base * (d === "easy" ? 0.5 : d === "hard" ? 5 : 1));
+export function evictionDelay(
+  difficulty: Difficulty = "normal",
+  rules = GAME_RULES,
+) {
+  return difficulty === "hard" ? 0 : rules.endings.evictionMinutes;
+}
 export interface OutcomeFacts {
+  hopeAtCoup?: number;
+  difficulty?: Difficulty;
   admitted: number;
   dead: number;
   pessimism: number;
@@ -624,7 +531,7 @@ export interface OutcomeFacts {
 export function evaluateOutcome(
   f: OutcomeFacts,
   rules: RuleSet = GAME_RULES,
-): "failure" | "ending-a" | "ending-b" | "continue" {
+): "failure" | "ending-a" | "ending-b" | "ending-c" | "continue" {
   number(f.admitted, 1, 100_000, true);
   number(f.dead, 0, f.admitted, true);
   number(f.pessimism, 0, 100);
@@ -636,30 +543,24 @@ export function evaluateOutcome(
     f.lowPessimismMinutes,
   ])
     number(n, 0, Number.MAX_SAFE_INTEGER, true);
+  const delay = evictionDelay(f.difficulty, rules);
   if (
     (f.pessimism >= rules.endings.evictionPessimism &&
-      f.pessimismExtremeMinutes >= rules.endings.evictionMinutes) ||
+      f.pessimismExtremeMinutes >= delay) ||
     (f.optimism <= rules.endings.evictionOptimism &&
-      f.optimismZeroMinutes >= rules.endings.evictionMinutes) ||
+      f.optimismZeroMinutes >= delay) ||
     f.dead / f.admitted >= rules.endings.deathFraction
   )
     return "failure";
-  if (
-    f.stage5Minutes < rules.campaign.stage5MinimumDays * 1440 ||
-    !rules.campaign.clues.every((c) => f.clues.includes(c)) ||
-    !rules.campaign.researchOrder.every((r) => f.research.includes(r))
-  )
+  if (!f.route || f.stage5Minutes < rules.campaign.stage5MinimumDays * 1440)
     return "continue";
-  if (
-    f.route === "coexist" &&
-    f.pessimism <= rules.endings.endingAPessimism &&
-    f.lowPessimismMinutes >= rules.endings.endingAHoldDays * 1440
-  )
-    return "ending-a";
-  if (f.route === "yangnyeong" && f.research.includes("R19") && f.mech2)
-    return "ending-b";
-  return "continue";
+  if (f.route === "yangnyeong") return "ending-c";
+  const hope = f.hopeAtCoup ?? f.optimism;
+  number(hope, 0, 100);
+  if (hope >= COUP_SURVIVAL_HOPE) return "ending-a";
+  return f.mech2 ? "ending-b" : "continue";
 }
+export const COUP_SURVIVAL_HOPE = 70;
 export interface PlaySave {
   readonly format: "dynosty-play";
   readonly saveVersion: 1;
@@ -715,4 +616,129 @@ export function createPlayScene(
       motion: state.paused ? "idle" : "walking",
     });
   return { schemaVersion: 1, entities };
+}
+
+export type CitizenEvent =
+  | { type: "mechanize"; id: string; sourceCitizenId: string }
+  | {
+      type: "arrival";
+      id: string;
+      groups: readonly { species: string; count: number }[];
+    }
+  | {
+      type: "illness" | "recovery" | "death";
+      id: string;
+      citizenIds: readonly string[];
+      severity?: "minor" | "major" | "critical";
+    };
+export type CitizenEventRecording = boolean | "if-room";
+export function applyCitizenEvent(
+  input: PlayState,
+  event: CitizenEvent,
+  record: CitizenEventRecording = true,
+): PlayState {
+  const s = parsePlayState(input);
+  text(event.id);
+  if (event.id.length > 100) fail();
+  if (s.citizenEvents?.includes(event.id)) return s;
+  const full = (s.citizenEvents?.length ?? 0) >= 2000;
+  if (record === true && full) fail();
+  let citizens = [...s.citizens];
+  if (event.type === "mechanize") {
+    const source = citizens.find((c) => c.id === event.sourceCitizenId);
+    if (
+      !source ||
+      source.alive ||
+      source.mechanicalFrom ||
+      citizens.length >= 600 ||
+      citizens.some((c) => c.mechanicalFrom === source.id)
+    )
+      fail();
+    citizens.push({
+      ...source,
+      id: `mecha:${source.id}`,
+      alive: true,
+      health: "healthy",
+      mechanicalFrom: source.id,
+    });
+  } else if (event.type === "arrival") {
+    if (
+      !Array.isArray(event.groups) ||
+      !event.groups.length ||
+      event.groups.length > GAME_RULES.population.length
+    )
+      fail();
+    const species = new Set<string>();
+    for (const group of event.groups) {
+      const definition = GAME_RULES.population.find(
+        (p) => p.species === group.species,
+      );
+      if (!definition || species.has(group.species)) fail();
+      species.add(group.species);
+      number(group.count, 1, 600, true);
+      if (
+        citizens.length + group.count >
+        (event.id === "capital-refugees" ? 1000 : 600)
+      )
+        fail();
+      for (let i = 0; i < group.count; i++) {
+        const id = `arrival:${event.id}:${group.species}:${i}`;
+        if (citizens.some((c) => c.id === id)) fail();
+        citizens.push({
+          id,
+          species: group.species,
+          diet: definition.diet as FoodId,
+          age: "adult",
+          alive: true,
+          health: "healthy",
+        });
+      }
+    }
+  } else {
+    if (
+      !["illness", "recovery", "death"].includes(event.type) ||
+      (event.severity !== undefined &&
+        (event.type !== "illness" ||
+          !["minor", "major", "critical"].includes(event.severity))) ||
+      !Array.isArray(event.citizenIds) ||
+      !event.citizenIds.length ||
+      new Set(event.citizenIds).size !== event.citizenIds.length ||
+      event.citizenIds.some(
+        (id) => !citizens.some((c) => c.id === id && c.alive),
+      )
+    )
+      fail();
+    citizens = citizens.map((c) =>
+      event.citizenIds.includes(c.id)
+        ? {
+            ...c,
+            alive: event.type !== "death",
+            health:
+              event.type === "death"
+                ? "dead"
+                : event.type === "illness"
+                  ? "sick"
+                  : "healthy",
+          }
+        : c,
+    );
+  }
+  return parsePlayState({
+    ...s,
+    citizens,
+    ...(record &&
+      !full && {
+        citizenEvents: [...(s.citizenEvents ?? []), event.id],
+      }),
+  });
+}
+export function advancePlayClock(input: PlayState, minutes: number): PlayState {
+  number(minutes, 0, 10080, true);
+  const s = parsePlayState(input),
+    total = s.minute + minutes;
+  return parsePlayState({
+    ...s,
+    day: s.day + Math.floor(total / 1440),
+    minute: total % 1440,
+  });
 }

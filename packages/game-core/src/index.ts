@@ -1,3 +1,4 @@
+export { requireValue } from "./require-value.js";
 export {
   createSceneExample,
   type SceneEntity,
@@ -28,17 +29,7 @@ export type PlayCommand =
   | { readonly type: "pause"; readonly paused: boolean }
   | { readonly type: "advance-day" }
   | { readonly type: "new-game" }
-  | { readonly type: "test-food"; readonly days: number }
-  | {
-      readonly type: "set-heat";
-      readonly zone: import("./winter.js").Zone;
-      readonly heat: import("./winter.js").HeatLevel;
-    }
-  | {
-      readonly type: "story-pick";
-      readonly id: import("./story.js").StoryId;
-      readonly side: import("./story.js").StorySide;
-    };
+  | { readonly type: "test-food"; readonly days: number };
 export type GameCommand =
   | { readonly type: "play-command"; readonly command: PlayCommand }
   | { readonly type: "request-play-save"; readonly requestId: number }
@@ -99,23 +90,40 @@ export function advanceDay(state: GameState): GameState {
   return { ...state, day: state.day + 1 };
 }
 
+export * from "./bokhol.js";
+export * from "./campaign.js";
+export * from "./development.js";
 export * from "./exchange.js";
+export * from "./home-construction.js";
+export * from "./home-placement.js";
+export * from "./hospital.js";
 export * from "./labor.js";
 export {
+  TIMBER_RULES as LEGACY_TIMBER_RULES,
+  type TimberCommand as LegacyTimberCommand,
+  TimberError as LegacyTimberError,
+  type TimberState as LegacyTimberState,
+} from "./legacy-timber.js";
+export * from "./logging.js";
+export * from "./mutants.js";
+export {
   AMOUNT_SCALE,
+  advancePlayClock,
   advancePlayMinutes,
-  advanceToStory,
+  applyCitizenEvent,
   type Citizen,
+  type CitizenEvent,
   createPlaySave,
   createPlayScene,
   createPlayState,
+  type Difficulty,
   dailyFoodDemand,
   evaluateOutcome,
   FOOD_IDS,
   type FoodId,
   foodWarnings,
   GAME_RULES,
-  LOGGING,
+  isDifficulty,
   type OutcomeFacts,
   PlayDataError,
   type PlaySave,
@@ -123,7 +131,6 @@ export {
   parsePlaySave,
   parsePlayState,
   parseRules,
-  pickStory,
   RESOURCE_IDS,
   type ResourceId,
   type RuleSet,
@@ -131,6 +138,15 @@ export {
   supplyFood,
   tickPlay,
 } from "./play.js";
-export * from "./story.js";
+export {
+  type GroundObstacle,
+  type GroundPoint,
+  residentPath,
+} from "./resident-path.js";
+export * from "./resident-routine.js";
+export * from "./scout-sites.js";
+export * from "./storage.js";
+export * from "./story-research.js";
 export * from "./timber.js";
-export * from "./winter.js";
+export * from "./town.js";
+export * from "./village-services.js";

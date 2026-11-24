@@ -1,3 +1,4 @@
+import { VILLAGE_POND as POND } from "@dynosty/game-core";
 // 본진 세상: 운석 뒤 혹한(기획서) — 눈보라 속 떠 있는 땅, 베어 낸 숲, 무너진 집터, 따뜻한 불빛만 남은 마을
 import "@babylonjs/core/Particles/particleSystemComponent";
 import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
@@ -15,15 +16,14 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { Scene } from "@babylonjs/core/scene";
-import { LOGGING_SITES } from "./layout.js";
-import { loadSceneAsset } from "./scene-assets.js";
-import { nearResourceSite, SCOUT_SITES } from "./scout-sites.js";
+import { SCOUT_SITES } from "./scout-sites.js";
 
 export const ISLAND_RADIUS = 70;
 /** 미니맵 한 변(m) */
 export const MAP_SPAN = (ISLAND_RADIUS + 1) * 2;
-export const POND = { x: 17, z: 15, r: 3.6 };
-export const LAKE = { x: 40, z: -26, r: 10 };
+export { VILLAGE_POND as POND } from "@dynosty/game-core";
+
+const LAKE = { x: 40, z: -26, r: 10 };
 
 const smooth = (a: number, b: number, v: number) => {
   const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
@@ -95,8 +95,7 @@ const PALETTE = {
   winter: {
     snowA: [0.74, 0.79, 0.88],
     snowB: [0.86, 0.9, 0.97],
-    // 다져진 눈길(회청) — 짙은 흙색이면 거친 땅 격자에 번져 검은 연기 띠처럼 보였음 (11/20 숲 점검)
-    dirt: [0.58, 0.58, 0.64],
+    dirt: [0.34, 0.31, 0.31],
     lip: [0.84, 0.88, 0.95],
     waste: [0.6, 0.65, 0.74],
     fog: [0.6, 0.66, 0.77],
@@ -148,8 +147,7 @@ export function frustum(
   const top = segs * 2;
   for (let i = 0; i < segs; i++) {
     const j = (i + 1) % segs;
-    // 바깥을 보게(시계 반대 → 시계): 예전엔 면이 안쪽을 봐서 나무·바위가 빛을 못 받고 검게 보였음
-    ind.push(i, j, segs + j, i, segs + j, segs + i, segs + i, segs + j, top);
+    ind.push(i, segs + j, j, i, segs + i, segs + j, segs + i, top, segs + j);
   }
   for (let i = 0; i < pos.length / 3; i++) {
     const shade = 0.88 + r() * 0.24;
@@ -248,8 +246,6 @@ export function buildWorld(
   season: Season = "winter",
 ) {
   const P = PALETTE[season];
-  /** 온돌 둘레 열기 원판 재질 — 화력에 따라 밝기 (setWeather) */
-  let heatMat = null as StandardMaterial | null;
   scene.clearColor = new Color4(0, 0, 0, 0);
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogDensity = P.fogDensity;
@@ -285,10 +281,10 @@ export function buildWorld(
     blurKernelSize: 24,
     mainTextureRatio: 0.25,
   });
-  glow.intensity = 1.1;
+  glow.intensity = 0.9;
   const warmMat = new StandardMaterial("warm-light", scene);
   warmMat.disableLighting = true;
-  warmMat.emissiveColor = new Color3(1, 0.55, 0.18); // 차가운 세상 속 유일한 주황
+  warmMat.emissiveColor = new Color3(1, 0.62, 0.28);
 
   const vertexMat = (name: string) => {
     const m = new StandardMaterial(name, scene);
@@ -389,11 +385,8 @@ export function buildWorld(
     }
   const colors: number[] = [];
   const noise = rng(7);
-  for (let i = 0; i < pos.length; i += 3) {
-    const x = pos[i] ?? 0,
-      z = pos[i + 2] ?? 0,
-      d = Math.hypot(x, z);
-    pos[i + 1] = elevation(x, z);
+  const groundColor = (x: number, z: number) => {
+    const d = Math.hypot(x, z);
     const g =
       0.5 +
       0.5 * Math.sin(x * 0.31 + Math.cos(z * 0.27) * 2) * Math.cos(z * 0.17) +
@@ -401,7 +394,7 @@ export function buildWorld(
     let c = mix(P.snowA, P.snowB, Math.max(0, Math.min(1, g)));
     c = mix(c, P.waste, smooth(30, 55, d) * 0.8); // 바깥 황무지는 잿빛
     const wob = Math.sin(x * 0.9) * 0.35 + Math.cos(z * 1.1) * 0.3;
-    const roadW = 0.9 + smooth(25, 60, d) * -0.45; // 마을 밖 길은 좁아지고 눈에 묻힘
+    const roadW = 1.1 + smooth(25, 60, d) * -0.5; // 마을 밖 길은 좁아지고 눈에 묻힘
     const pathD = Math.min(
       d - 7.2 + wob * 1.5,
       ...ROADS.map(
@@ -412,42 +405,22 @@ export function buildWorld(
       c,
       P.dirt,
       (1 - smooth(-0.2, 0.9, pathD)) *
-        (0.65 + noise() * 0.15) *
-        (1 - smooth(30, 62, d) * 0.75),
+        (0.8 + noise() * 0.2) *
+        (1 - smooth(40, 62, d) * 0.6),
     );
+    return c;
+  };
+  for (let i = 0; i < pos.length; i += 3) {
+    const x = pos[i] ?? 0,
+      z = pos[i + 2] ?? 0,
+      d = Math.hypot(x, z);
+    pos[i + 1] = elevation(x, z) - smooth(R - 0.8, R, d) * 0.4;
+    let c = groundColor(x, z);
+    c = mix(c, P.lip, smooth(R - 1.4, R, Math.min(d, R)));
     colors.push(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, 1);
   }
   const normals: number[] = [];
   VertexData.ComputeNormals(pos, idx, normals);
-  // 가운데 온돌 = 난방의 중심. 둘레만 주황빛이 번져 차가운 섬과 대비 (프로스트펑크 톤)
-  if (season === "winter") {
-    const tex = new DynamicTexture("heat-tex", 256, scene, false);
-    const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
-    const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    g.addColorStop(0, "rgba(255,150,70,0.5)");
-    g.addColorStop(0.4, "rgba(255,120,50,0.2)");
-    g.addColorStop(1, "rgba(255,100,40,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 256, 256);
-    tex.update();
-    tex.hasAlpha = true;
-    const heat = CreateDisc(
-      "heat-glow",
-      { radius: 13, tessellation: 48 },
-      scene,
-    );
-    heat.rotation.x = Math.PI / 2;
-    heat.position.set(0, 0.08, -1);
-    const hm = new StandardMaterial("heat-mat", scene);
-    hm.disableLighting = true;
-    hm.diffuseColor = Color3.Black();
-    hm.emissiveTexture = tex;
-    hm.opacityTexture = tex;
-    hm.alphaMode = 1; // 더하기
-    heat.material = hm;
-    heat.isPickable = false;
-    heatMat = hm;
-  }
   const ground = new Mesh("ground", scene);
   const vd = new VertexData();
   vd.positions = pos;
@@ -458,43 +431,56 @@ export function buildWorld(
   ground.material = vertexMat("ground-material");
   ground.freezeWorldMatrix();
 
-  // ── 바깥 눈밭: 섬 절벽을 걷고 땅을 시야 밖까지 이음 (2026-11-21 사용자 "지금은 섬처럼 떠 있잖아") ──
-  // 마을 둘레 밖은 먹빛으로 덮여 있다가(fog.ts) 정찰하면 드러난다. 드러난 자리에 허공이 보이지 않게 잿빛 눈밭을 깔아 둠
+  // ── 섬 밑면: 울퉁불퉁 바위 절벽 ──
   {
-    const AR = 14,
-      AS = 120,
-      OUT = 120,
-      ap: number[] = [],
-      ai: number[] = [],
-      ac: number[] = [];
-    const far = mix(mix(P.snowA, P.snowB, 0.5), P.waste, 0.8);
-    for (let r = 0; r <= AR; r++)
-      for (let k = 0; k < AS; k++) {
-        const a = (k / AS) * Math.PI * 2,
-          rr = R + (r / AR) * OUT,
-          x = Math.cos(a) * rr,
-          z = Math.sin(a) * rr;
-        ap.push(x, elevation(x, z), z);
-        ac.push(far[0] ?? 0, far[1] ?? 0, far[2] ?? 0, 1);
+    const cr = rng(19),
+      LAYERS = 10,
+      S = 140,
+      cp: number[] = [],
+      ci: number[] = [],
+      cc: number[] = [];
+    for (let l = 0; l <= LAYERS; l++) {
+      const t = l / LAYERS,
+        y = -0.4 - t * 22;
+      const base = R * (1 - t ** 1.5 * 0.93);
+      for (let s = 0; s < S; s++) {
+        const a = (s / S) * Math.PI * 2;
+        const rr = l === 0 ? R : base * (1 + (cr() - 0.5) * 0.1 * (1 + t));
+        cp.push(
+          Math.cos(a) * rr,
+          y + (l === 0 ? 0 : (cr() - 0.5) * 1.6),
+          Math.sin(a) * rr,
+        );
+        const col =
+          l === 0
+            ? P.lip
+            : l === 1
+              ? [0.45, 0.38, 0.34]
+              : mix([0.4, 0.35, 0.34], [0.2, 0.19, 0.23], t);
+        const sh = 0.86 + cr() * 0.26;
+        cc.push((col[0] ?? 0) * sh, (col[1] ?? 0) * sh, (col[2] ?? 0) * sh, 1);
       }
-    for (let r = 0; r < AR; r++)
-      for (let k = 0; k < AS; k++) {
-        const p0 = r * AS + k,
-          p1 = r * AS + ((k + 1) % AS);
-        ai.push(p0, p1 + AS, p1, p0, p0 + AS, p1 + AS);
+    }
+    for (let l = 0; l < LAYERS; l++)
+      for (let s = 0; s < S; s++) {
+        const a = l * S + s,
+          b = l * S + ((s + 1) % S),
+          c = a + S,
+          d2 = b + S;
+        ci.push(a, b, d2, a, d2, c);
       }
-    const an: number[] = [];
-    VertexData.ComputeNormals(ap, ai, an);
-    const apron = new Mesh("ground-far", scene);
-    const avd = new VertexData();
-    avd.positions = ap;
-    avd.indices = ai;
-    avd.normals = an;
-    avd.colors = ac;
-    avd.applyToMesh(apron);
-    apron.material = vertexMat("ground-far-material");
-    apron.isPickable = false;
-    apron.freezeWorldMatrix();
+    const cn: number[] = [];
+    VertexData.ComputeNormals(cp, ci, cn);
+    const cliff = new Mesh("island-cliff", scene);
+    const cvd = new VertexData();
+    cvd.positions = cp;
+    cvd.indices = ci;
+    cvd.normals = cn;
+    cvd.colors = cc;
+    cvd.applyToMesh(cliff);
+    cliff.convertToFlatShadedMesh();
+    cliff.material = vertexMat("cliff-material");
+    cliff.isPickable = false;
   }
 
   // 언 연못·호수
@@ -514,131 +500,11 @@ export function buildWorld(
 
   // ── 나무·그루터기·죽은 나무·바위 ──
   const treeMat = vertexMat("pine-material");
-  // 블렌더로 깎은 나무(tools/blender/tree.py, 2026-11-19)가 오면 같은 메시의 모양만 바꿔 끼움 —
-  // 숲 배치(thin instance)·벌목 쓰러짐은 그대로. 재질 색은 정점 색으로 옮겨 한 번에 그림
-  const treeHosts: Array<{ mesh: Mesh; kind: string }> = [];
-  let treeGeo: Map<string, VertexData> | null = null;
-  // 면이 바깥을 보는 방향(감김) 점수: 면 법선 · (면 중심 − 모양 중심)의 합. 부호가 감김 방향을 알려 줌
-  const windingScore = (pos: ArrayLike<number>, ix: ArrayLike<number>) => {
-    let cx = 0,
-      cy = 0,
-      cz = 0;
-    const n = pos.length / 3;
-    for (let i = 0; i < pos.length; i += 3) {
-      cx += pos[i] ?? 0;
-      cy += pos[i + 1] ?? 0;
-      cz += pos[i + 2] ?? 0;
-    }
-    cx /= n;
-    cy /= n;
-    cz /= n;
-    let score = 0;
-    for (let t = 0; t < ix.length; t += 3) {
-      const a = (ix[t] ?? 0) * 3,
-        b = (ix[t + 1] ?? 0) * 3,
-        c = (ix[t + 2] ?? 0) * 3;
-      const ux = (pos[b] ?? 0) - (pos[a] ?? 0),
-        uy = (pos[b + 1] ?? 0) - (pos[a + 1] ?? 0),
-        uz = (pos[b + 2] ?? 0) - (pos[a + 2] ?? 0);
-      const vx = (pos[c] ?? 0) - (pos[a] ?? 0),
-        vy = (pos[c + 1] ?? 0) - (pos[a + 1] ?? 0),
-        vz = (pos[c + 2] ?? 0) - (pos[a + 2] ?? 0);
-      const nx = uy * vz - uz * vy,
-        ny = uz * vx - ux * vz,
-        nz = ux * vy - uy * vx;
-      const fx = ((pos[a] ?? 0) + (pos[b] ?? 0) + (pos[c] ?? 0)) / 3 - cx,
-        fy =
-          ((pos[a + 1] ?? 0) + (pos[b + 1] ?? 0) + (pos[c + 1] ?? 0)) / 3 - cy,
-        fz =
-          ((pos[a + 2] ?? 0) + (pos[b + 2] ?? 0) + (pos[c + 2] ?? 0)) / 3 - cz;
-      score += nx * fx + ny * fy + nz * fz;
-    }
-    return score;
-  };
-  const fitTree = (mesh: Mesh, kind: string) => {
-    const src = treeGeo?.get(kind);
-    if (!src) return;
-    // 겉면 방향 맞추기: 블렌더가 내보낸 법선이 바깥 방향의 기준(믿을 수 있음).
-    // 감김에서 계산한 법선이 그 법선과 대부분 반대면 감김을 뒤집어 겉면이 앞면이 되게 함 (안 그러면 아랫면이 보이거나 까맣게)
-    const vd = new VertexData();
-    vd.positions = Array.from(src.positions ?? []);
-    vd.colors = Array.from(src.colors ?? []);
-    const ix = Array.from(src.indices ?? []);
-    const flip = () => {
-      for (let i = 0; i < ix.length; i += 3) {
-        const t = ix[i + 1] ?? 0;
-        ix[i + 1] = ix[i + 2] ?? 0;
-        ix[i + 2] = t;
-      }
-    };
-    const geomN: number[] = [];
-    VertexData.ComputeNormals(vd.positions, ix, geomN);
-    if (src.normals && src.normals.length === vd.positions.length) {
-      const n = Array.from(src.normals);
-      let agree = 0;
-      for (let i = 0; i < n.length; i += 3)
-        agree +=
-          (n[i] ?? 0) * (geomN[i] ?? 0) +
-          (n[i + 1] ?? 0) * (geomN[i + 1] ?? 0) +
-          (n[i + 2] ?? 0) * (geomN[i + 2] ?? 0);
-      if (agree < 0) flip();
-      vd.normals = n;
-    } else {
-      // 법선이 없으면 코드로 만든 옛 나무와 같은 감김으로 맞추고 감김에서 법선 계산
-      const oldPos = mesh.getVerticesData("position"),
-        oldIx = mesh.getIndices();
-      if (
-        oldPos &&
-        oldIx &&
-        Math.sign(windingScore(oldPos, oldIx)) !==
-          Math.sign(windingScore(vd.positions, ix))
-      )
-        flip();
-      const normals: number[] = [];
-      VertexData.ComputeNormals(vd.positions, ix, normals);
-      vd.normals = normals;
-    }
-    vd.indices = ix;
-    // 이미 thin instance가 붙은 메시의 모양을 제자리에서 바꾸면 그려지지 않음(Babylon) →
-    // 새 메시를 만들어 옛 메시의 행렬을 받아 쓰고, 옛 메시는 감춤 (옛 메시는 행렬 보관용으로 남김)
-    const fresh = new Mesh(`${mesh.name}-glb`, scene);
-    vd.applyToMesh(fresh);
-    fresh.material = mesh.material;
-    fresh.parent = mesh.parent;
-    fresh.isPickable = false;
-    fresh.alwaysSelectAsActiveMesh = true;
-    let buf: Float32Array | null = null;
-    const copy = () => {
-      const mats = mesh.thinInstanceGetWorldMatrices();
-      const fresh16 = !buf || buf.length !== Math.max(1, mats.length) * 16;
-      if (fresh16) buf = new Float32Array(Math.max(1, mats.length) * 16);
-      const b = buf as Float32Array;
-      mats.forEach((m, i) => {
-        m.copyToArray(b, i * 16);
-      });
-      if (fresh16) fresh.thinInstanceSetBuffer("matrix", b, 16, false);
-      else fresh.thinInstanceBufferUpdated("matrix");
-      fresh.thinInstanceCount = mats.length;
-      fresh.isVisible = mesh.thinInstanceCount > 0;
-    };
-    copy();
-    mesh.isVisible = false;
-    // 벌목장 나무·그루터기는 매 장면 행렬이 바뀜(쓰러짐·다시 자람) → 매번 옮겨 담음
-    if (mesh.name.startsWith("logging"))
-      scene.onBeforeRenderObservable.add(copy);
-  };
-  const hostTree = (mesh: Mesh, kind: string) => {
-    treeHosts.push({ mesh, kind });
-    fitTree(mesh, kind);
-    return mesh;
-  };
-  // 눈 쌓인 전나무(컨셉 시트): 별 모양 가지 층 + 층마다 위를 덮은 눈 (가지 끝 초록은 남김)
-  // far: 마을에서 먼 숲(40m~)용 — 층·가지를 줄인 같은 모양 (점 개수 약 1/3)
-  const makePine = (v: number, name = `pine-${v}`, far = false) => {
+  const makePine = (v: number) => {
     const tr = rng(100 + v),
       parts: VertexData[] = [];
     parts.push(frustum(tr, 0, 1.1, 0.17, 0.1, 6, [0.27, 0.2, 0.17], 0));
-    const tiers = far ? 4 + v : 6 + v,
+    const tiers = 6 + v,
       height = 3.3 + v * 0.55;
     for (let k = 0; k < tiers; k++) {
       const t = k / tiers,
@@ -646,7 +512,7 @@ export function buildWorld(
         rb = 1.45 * (1 - t * 0.8) + 0.12,
         h = 0.95 - t * 0.3,
         off = tr() * Math.PI,
-        segs = far ? 8 : 10;
+        segs = 10;
       parts.push(
         pineTier(
           tr,
@@ -683,108 +549,42 @@ export function buildWorld(
     // 꼭대기 눈 뾰족
     if (P.cap)
       parts.push(frustum(tr, 0.75 + height, 0.45, 0.18, 0.01, 6, P.cap, 0.1));
-    // 네 갈래: 전나무 셋(보통·가늘고 높은·넓고 빽빽한) + 적송 하나 — 같은 나무가 줄지어 보이지 않게
-    // 먼 숲(40m~)은 가벼운 모양(_FAR): 안개 속이라 차이가 안 보이고 그리는 면은 절반
-    const kinds = far
-      ? ["TREE_FIR_FAR", "TREE_PINE_FAR", "TREE_FIR_FAR", "TREE_FIR_FAR"]
-      : ["TREE_FIR", "TREE_PINE", "TREE_FIR_B", "TREE_FIR_C"];
-    return hostTree(
-      mergedMesh(name, parts, scene, treeMat),
-      kinds[v % 4] ?? "TREE_FIR",
-    );
+    return mergedMesh(`pine-${v}`, parts, scene, treeMat);
   };
-  const pines = [0, 1, 2, 3].map((v) => makePine(v));
-  const pinesFar = [0, 1, 2, 3].map((v) => makePine(v, `pine-far-${v}`, true));
-  const pineAt = (d: number, n: number) =>
-    (d > 40 ? pinesFar : pines)[n % 4] as Mesh;
-  const cap = P.cap ?? [0.5, 0.45, 0.4];
-  const makeStump = (name = "stump") => hostStump(name);
-  const hostStump = (name: string) =>
-    hostTree(
-      mergedMesh(
-        name,
-        (() => {
-          const sr = rng(55);
-          return [
-            frustum(sr, 0, 0.42, 0.28, 0.24, 7, [0.33, 0.25, 0.2], 0.2),
-            frustum(sr, 0.42, 0.06, 0.25, 0.2, 7, cap, 0.1),
-          ];
-        })(),
-        scene,
-        treeMat,
-      ),
-      "TREE_STUMP",
-    );
-  const stump = makeStump();
-  // 숲 바닥을 채우는 것들: 어린 전나무·쓰러진 적송·덤불 (자리만 먼저 잡고 모양은 GLB가 오면 바뀜)
-  const holder = (name: string, kind: string) =>
-    hostTree(
-      mergedMesh(
-        name,
-        [frustum(rng(9), 0, 0.3, 0.2, 0.15, 6, cap, 0.1)],
-        scene,
-        treeMat,
-      ),
-      kind,
-    );
-  const youngFir = holder("young-fir", "TREE_FIR_YOUNG");
-  const fallenPine = holder("fallen-pine", "TREE_PINE_FALLEN");
-  const shrub = holder("shrub", "TREE_SHRUB");
-  void (async () => {
-    const geo = new Map<string, VertexData>();
-    for (const kind of [
-      "TREE_FIR",
-      "TREE_FIR_B",
-      "TREE_FIR_C",
-      "TREE_PINE",
-      "TREE_STUMP",
-      "TREE_FIR_YOUNG",
-      "TREE_PINE_FALLEN",
-      "TREE_SHRUB",
-      "TREE_SNAG",
-      "TREE_SNAG_B",
-      "TREE_FIR_FAR",
-      "TREE_PINE_FAR",
-    ]) {
-      try {
-        const asset = await loadSceneAsset(scene, `/models/trees/${kind}.glb`);
-        const inst = asset.instantiateModelsToScene(
-          (n) => `${kind}-src:${n}`,
-          false,
+  const pines = [0, 1, 2].map((v) => {
+    if (season === "winter") return makePine(v);
+    const tr = rng(100 + v),
+      parts: VertexData[] = [];
+    parts.push(frustum(tr, 0, 1.2, 0.17, 0.11, 6, [0.3, 0.22, 0.18], 0));
+    const tiers = 4 + v;
+    for (let k = 0; k < tiers; k++) {
+      const t = k / tiers,
+        y = 0.8 + t * (2.6 + v * 0.5),
+        rb = 1.35 * (1 - t * 0.78) + 0.15,
+        h = 1.05 - t * 0.25;
+      parts.push(
+        frustum(tr, y, h, rb, rb * 0.25, 9, k % 2 ? P.pineB : P.pine, 0.35),
+      );
+      if (P.cap)
+        parts.push(
+          frustum(tr, y + h * 0.42, h * 0.62, rb * 0.62, 0.02, 9, P.cap, 0.25),
         );
-        const parts: Mesh[] = [];
-        for (const root of inst.rootNodes) {
-          root.computeWorldMatrix(true);
-          for (const m of root.getChildMeshes(false))
-            if (m instanceof Mesh && m.getTotalVertices() > 0) parts.push(m);
-        }
-        for (const m of parts) {
-          m.computeWorldMatrix(true);
-          const c =
-            (m.material as { albedoColor?: Color3 } | null)?.albedoColor ??
-            Color3.White();
-          // 블렌더가 구운 정점 색(그라데이션)이 있으면 그대로, 없으면 재질 색으로 칠함
-          if (!m.isVerticesDataPresent("color")) {
-            const n = m.getTotalVertices();
-            const cols = new Float32Array(n * 4);
-            for (let i = 0; i < n; i++) cols.set([c.r, c.g, c.b, 1], i * 4);
-            m.setVerticesData("color", cols);
-          }
-        }
-        const merged = Mesh.MergeMeshes(parts, true, true);
-        if (merged) {
-          geo.set(kind, VertexData.ExtractFromMesh(merged));
-          merged.dispose();
-        }
-        inst.dispose();
-      } catch {
-        // 못 받으면 코드로 만든 나무 그대로
-      }
     }
-    if (scene.isDisposed) return;
-    treeGeo = geo;
-    for (const h of treeHosts) fitTree(h.mesh, h.kind);
-  })();
+    return mergedMesh(`pine-${v}`, parts, scene, treeMat);
+  });
+  const cap = P.cap ?? [0.5, 0.45, 0.4];
+  const stump = mergedMesh(
+    "stump",
+    (() => {
+      const sr = rng(55);
+      return [
+        frustum(sr, 0, 0.42, 0.28, 0.24, 7, [0.33, 0.25, 0.2], 0.2),
+        frustum(sr, 0.42, 0.06, 0.25, 0.2, 7, cap, 0.1),
+      ];
+    })(),
+    scene,
+    treeMat,
+  );
   const deadTrees = [0, 1].map((v) => {
     const dr = rng(70 + v),
       bark = [0.24, 0.21, 0.21],
@@ -808,11 +608,7 @@ export function buildWorld(
         ),
       );
     }
-    // 프로스트펑크의 얼어붙은 고목 (GLB가 오면 그 모양으로)
-    return hostTree(
-      mergedMesh(`dead-${v}`, parts, scene, treeMat),
-      v ? "TREE_SNAG_B" : "TREE_SNAG",
-    );
+    return mergedMesh(`dead-${v}`, parts, scene, treeMat);
   });
   const rockMat = vertexMat("rock-material");
   const rocks = [0, 1].map((v) => {
@@ -835,11 +631,7 @@ export function buildWorld(
     nearRoad(x, z, 2.8) ||
     Math.hypot(x - POND.x, z - POND.z) < POND.r + 1.2 ||
     Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r + 1.5 ||
-    SCOUT_SITES.some((s) => Math.hypot(x - s.x, z - s.z) < 8) || // 거점 자리는 비워 둠 (발견 모형)
-    nearResourceSite(x, z) ||
-    LOGGING_SITES.some(
-      ([lx, lz]) => Math.hypot(x - lx * 1.12, z - lz * 1.12) < 4.2,
-    ); // 벌목터 나무는 logging.ts가 따로 심음
+    SCOUT_SITES.some((s) => Math.hypot(x - s.x, z - s.z) < 8); // 거점 자리는 비워 둠 (발견 모형)
   const r = rng(42);
   const put = (
     src: Mesh,
@@ -859,8 +651,7 @@ export function buildWorld(
     );
     if (Math.hypot(x, z) < 34) shadow(new Vector3(x, y, z), blob * s);
   };
-  // 숲은 한 덩어리로 빽빽하게, 사이사이 얼어붙은 고목 (레퍼런스 프로스트펑크·실록, 11/20)
-  for (let n = 0; n < 12000; n++) {
+  for (let n = 0; n < 9000; n++) {
     const a = r() * Math.PI * 2,
       d = 9 + Math.sqrt(r()) * (R - 11);
     const x = Math.cos(a) * d,
@@ -868,37 +659,22 @@ export function buildWorld(
     if (blocked(x, z)) continue;
     const s = 0.7 + r() * 0.7,
       roll = r();
-    // 마을 둘레(22~27m)는 땔감으로 베어 낸 그루터기 벌판, 27m부터 숲 가장자리
-    if (d > 27 && d < 34) {
-      if (roll < 0.22) put(pineAt(d, n), x, z, s, `pine-${n}`, 1.4);
-      else if (roll < 0.24)
-        put(stump, x, z, 0.8 + r() * 0.5, `stump-${n}`, 0.4);
-      else if (roll < 0.3) put(youngFir, x, z, s, `young-${n}`, 0.8);
-      else if (roll < 0.33) put(shrub, x, z, s, `shrub-${n}`, 0.6);
-      else if (roll < 0.36)
-        put(deadTrees[n % 2] as Mesh, x, z, s, `dead-${n}`, 0.7);
-      continue;
-    }
-    if (d > 21 && d <= 27) {
+    // 마을 둘레(22~34m)는 땔감으로 베어 낸 그루터기 벌판
+    if (d > 21 && d < 34) {
       if (roll < 0.035) put(stump, x, z, 0.8 + r() * 0.5, `stump-${n}`, 0.4);
       else if (roll < 0.04)
         put(deadTrees[n % 2] as Mesh, x, z, s, `dead-${n}`, 0.7);
-      else if (roll < 0.055) put(shrub, x, z, s, `shrub-${n}`, 0.6);
       continue;
     }
     if (d <= 21) {
-      if (roll < 0.05) put(pineAt(d, n), x, z, s, `pine-${n}`, 1.4);
+      if (roll < 0.05) put(pines[n % 3] as Mesh, x, z, s, `pine-${n}`, 1.4);
       continue;
     }
     // 바깥: 숲, 군데군데 죽은 나무와 바위
-    if (roll < 0.3) put(pineAt(d, n), x, z, s, `pine-${n}`, 1.4);
-    else if (roll < 0.33) put(youngFir, x, z, s, `young-${n}`, 0.8);
-    else if (roll < 0.35) put(shrub, x, z, s, `shrub-${n}`, 0.6);
-    else if (roll < 0.355 && d < 50)
-      put(fallenPine, x, z, s, `fallen-${n}`, 1.2);
-    else if (roll < 0.395)
+    if (roll < 0.11) put(pines[n % 3] as Mesh, x, z, s * 1.1, `pine-${n}`, 1.4);
+    else if (roll < 0.125)
       put(deadTrees[n % 2] as Mesh, x, z, s, `dead-${n}`, 0.7);
-    else if (roll < 0.405 || (d > R - 3 && roll < 0.5)) {
+    else if (roll < 0.135 || (d > R - 3 && roll < 0.3)) {
       put(
         rocks[n % 2] as Mesh,
         x,
@@ -957,7 +733,7 @@ export function buildWorld(
     [52, 18],
     [-20, -46],
     [18, -50],
-  ].forEach(([cx = 0, cz = 0], _i) => {
+  ].forEach(([cx = 0, cz = 0]) => {
     const yaw = ruinR() * Math.PI;
     for (let k = 0; k < 4; k++) {
       const side = k % 2 ? 1 : -1,
@@ -1036,8 +812,6 @@ export function buildWorld(
 
   // ── 눈보라 (겨울): 바람에 비스듬히 ──
   let snow: ParticleSystem | null = null;
-  /** 날씨에 따른 시야 (scene.ts 안개 끝 거리에 곱함) */
-  let visibility = 1;
   if (season === "winter") {
     const flake = new DynamicTexture("flake-tex", 32, scene, false);
     const fc = flake.getContext() as CanvasRenderingContext2D;
@@ -1049,21 +823,20 @@ export function buildWorld(
     flake.update();
     flake.hasAlpha = true;
     // 눈은 카메라 주변(±32m)에만 내림 → 개수를 줄여도 보이는 밀도는 같음
-    snow = new ParticleSystem("snow", 3800, scene);
+    snow = new ParticleSystem("snow", 2600, scene);
     snow.particleTexture = flake;
-    snow.emitter = new Vector3(1, 30, 0);
+    snow.emitter = new Vector3(8, 30, -4);
     snow.minEmitBox = new Vector3(-26, 0, -32);
     snow.maxEmitBox = new Vector3(38, 0, 32);
-    // 거의 곧게 내리는 눈 (사용자 11/19: 사선 → 직선). 바람은 아주 조금만
-    snow.direction1 = new Vector3(-0.3, -1, 0.05);
-    snow.direction2 = new Vector3(-0.1, -1, 0.15);
+    snow.direction1 = new Vector3(-2.2, -1, 0.6);
+    snow.direction2 = new Vector3(-1.4, -1, 1.1);
     snow.minEmitPower = 3;
     snow.maxEmitPower = 5;
     snow.minLifeTime = 6;
     snow.maxLifeTime = 9;
     snow.minSize = 0.12;
-    snow.maxSize = 0.32;
-    snow.emitRate = 620;
+    snow.maxSize = 0.26;
+    snow.emitRate = 380;
     snow.color1 = new Color4(1, 1, 1, 0.9);
     snow.color2 = new Color4(0.86, 0.88, 0.95, 0.75);
     snow.colorDead = new Color4(1, 1, 1, 0);
@@ -1095,15 +868,7 @@ export function buildWorld(
     sky.diffuse = c3(mix(P.skyNight, P.skyDay, daylight));
     const warm = smooth(0, 0.18, daylight) * (1 - smooth(0.18, 0.5, daylight));
     sun.diffuse = c3(mix(P.sun, [1, 0.72, 0.55], warm));
-    glow.intensity = 0.85 + 0.7 * (1 - daylight); // 밤일수록 불빛이 번짐
-    // 밤에는 안개·먼 곳 빛깔도 어둡게: 낮 색 그대로 두면 어두운 마을을 흰 테가 두른 것처럼 보임 (11/21)
-    scene.fogColor = c3(
-      mix(
-        P.fog.map((v, k) => v * ([0.3, 0.34, 0.5][k] ?? 1)),
-        P.fog,
-        smooth(0, 0.35, daylight),
-      ),
-    );
+    glow.intensity = 0.55 + 0.6 * (1 - daylight); // 밤일수록 불빛이 번짐
     // 배경 밝기는 20단계로만 바꿈 (매 프레임 바꾸면 화면 전체를 다시 그려 느려짐)
     const level = (0.72 + (0.28 * Math.round(daylight * 20)) / 20).toFixed(3);
     if (level !== lastLevel) {
@@ -1118,47 +883,30 @@ export function buildWorld(
 
   /** 눈이 카메라를 따라오게 */
   const followSnow = (x: number, z: number) => {
-    if (snow) (snow.emitter as Vector3).set(x + 1, 26, z);
+    if (snow) (snow.emitter as Vector3).set(x + 8, 26, z - 4);
   };
-  // 날씨(winter.ts) → 눈발 세기·바람·크기, 시야 / 화력·축열 → 온돌 둘레 열기
-  // 시야(see): 눈보라도 적당히만 뿌옇게 — 사용자 11/19 "심하면 경험을 해친다"
-  const WEATHER_LOOK: Record<
-    string,
-    { rate: number; wind: number; life: number; size: number; see: number }
-  > = {
-    맑음: { rate: 90, wind: 0.6, life: 8, size: 0.7, see: 1 },
-    흐림: { rate: 240, wind: 0.8, life: 8, size: 0.85, see: 0.96 },
-    눈: { rate: 620, wind: 1, life: 7.5, size: 1, see: 0.92 },
-    눈보라: { rate: 900, wind: 1.6, life: 5, size: 1.1, see: 0.78 },
-    한파: { rate: 160, wind: 1.3, life: 6, size: 0.55, see: 0.94 },
-  };
-  let lastWeather = "";
-  const setWeather = (weather: string, heat: number) => {
-    if (heatMat) heatMat.emissiveColor = new Color3(heat, heat, heat);
-    if (!snow || weather === lastWeather) return;
-    lastWeather = weather;
-    const look = WEATHER_LOOK[weather] ?? WEATHER_LOOK.눈;
-    if (!look) return;
-    snow.emitRate = look.rate;
-    snow.minLifeTime = look.life * 0.75;
-    snow.maxLifeTime = look.life;
-    snow.direction1 = new Vector3(-0.3 * look.wind, -1, 0.05 * look.wind);
-    snow.direction2 = new Vector3(-0.1 * look.wind, -1, 0.15 * look.wind);
-    snow.minEmitPower = 3 * Math.sqrt(look.wind);
-    snow.maxEmitPower = 5 * Math.sqrt(look.wind);
-    snow.minSize = 0.12 * look.size;
-    snow.maxSize = 0.32 * look.size;
-    visibility = look.see;
+  // The campaign supplies its own graded terrain, forests and mineral deposits.
+  const previewScenery = [
+    ground,
+    ...pines,
+    ...deadTrees,
+    ...rocks,
+    stump,
+    wall,
+    beam,
+    blobFlat,
+  ];
+  const showPreviewTerrain = (visible: boolean) => {
+    for (const mesh of previewScenery) mesh.setEnabled(visible);
+    scene.getMeshByName("island-cliff")?.setEnabled(visible);
   };
   return {
     shadow,
     setTime,
-    setWeather,
-    visibility: () => visibility,
     glow,
     warmMat,
     followSnow,
-    makePine: (name: string) => makePine(0, name),
-    makeStump,
+    showPreviewTerrain,
+    groundColor,
   };
 }

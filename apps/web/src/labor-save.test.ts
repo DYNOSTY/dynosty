@@ -4,7 +4,12 @@ import {
   createLaborState,
 } from "@dynosty/game-core";
 import { expect, it } from "vitest";
-import { LABOR_SAVE_KEY, loadLabor, saveLabor } from "./labor-save.js";
+import {
+  LABOR_SAVE_KEY,
+  laborSaveError,
+  loadLabor,
+  saveLabor,
+} from "./labor-save.js";
 
 function storage() {
   const data = new Map<string, string>();
@@ -15,6 +20,25 @@ function storage() {
     },
   };
 }
+it("기존 교환 저장의 검증 사유를 표시하고 원문을 보존하며 일반 오류는 숨긴다", () => {
+  const s = storage();
+  saveLabor(s, createLaborSave(createLaborState()));
+  const archive = JSON.parse(s.getItem(LABOR_SAVE_KEY) ?? "");
+  archive.current.state.exchange.phase = "unsupported";
+  const raw = JSON.stringify(archive);
+  s.setItem(LABOR_SAVE_KEY, raw);
+  let failure: unknown;
+  try {
+    loadLabor(s);
+  } catch (error) {
+    failure = error;
+  }
+  expect(laborSaveError(failure)).toContain("교환 저장");
+  expect(s.getItem(LABOR_SAVE_KEY)).toBe(raw);
+  expect(laborSaveError(new Error("private storage details"))).not.toContain(
+    "private",
+  );
+});
 it("현재·이전 일손 저장을 분리하고 기존 목재·생존 원문을 보존한다", () => {
   const s = storage();
   s.setItem("dynosty.timber.saves", "original timber");

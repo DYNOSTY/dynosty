@@ -2,7 +2,6 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.js";
 import { AudioProvider } from "./AudioProvider.js";
-import "./fonts.css";
 import "./theme.css";
 import "./kit.css";
 import "./style.css";

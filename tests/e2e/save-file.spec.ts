@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { press } from "./labor-tabs.js";
 import { openWorkspace } from "./workspace.js";
 
 const key = "dynosty.example.saves";
@@ -14,19 +13,19 @@ const fileValue = {
 async function seed(page: Page) {
   await page.goto("/");
   await openWorkspace(page);
-  await page.getByRole("button", { name: "하루 진행" }).click();
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await page.getByRole("button", { name: "3D 연결 예제 바꾸기" }).click();
-  await press(page, "예제 저장");
+  await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
   );
-  await page.getByRole("button", { name: "하루 진행" }).click();
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await page.getByRole("button", { name: "3D 연결 예제 바꾸기" }).click();
-  await press(page, "예제 저장");
+  await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
   );
-  await page.getByRole("button", { name: "하루 진행" }).click();
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await expect(page.getByText("4일차", { exact: true })).toBeVisible();
 }
 
@@ -86,7 +85,9 @@ test("최근·직전 저장을 실제 파일로 내보내고 가져오기 확정
   expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe(
     before,
   );
-  await press(page, "파일 가져오기");
+  await page
+    .getByRole("button", { name: "파일 가져오기", exact: true })
+    .click();
   await expect(page.getByTestId("save-file-status")).toContainText(
     "파일을 가져왔습니다",
   );
@@ -103,14 +104,18 @@ test("최근·직전 저장을 실제 파일로 내보내고 가져오기 확정
   );
   expect(archive.current.game.day).toBe(2);
   expect(archive.previous.game.day).toBe(3);
-  await press(page, "저장 불러오기");
+  await page
+    .getByRole("button", { name: "저장 불러오기", exact: true })
+    .click();
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
   await expect(page.getByTestId("scene-example-motion")).toHaveText(
     "걷기 표시",
   );
-  await page.getByRole("button", { name: "하루 진행" }).click();
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await expect(page.getByText("3일차", { exact: true })).toBeVisible();
-  await press(page, "이전 저장 불러오기");
+  await page
+    .getByRole("button", { name: "이전 저장 불러오기", exact: true })
+    .click();
   await expect(page.getByTestId("scene-example-motion")).toHaveText(
     "대기 표시",
   );
@@ -224,7 +229,9 @@ test("기존 로컬 저장이 손상되었으면 유효한 가져오기 파일�
   await seed(page);
   await page.evaluate((key) => localStorage.setItem(key, "{keep broken"), key);
   await choose(page);
-  await press(page, "파일 가져오기");
+  await page
+    .getByRole("button", { name: "파일 가져오기", exact: true })
+    .click();
   await expect(page.getByRole("alert")).toContainText("손상");
   expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe(
     "{keep broken",

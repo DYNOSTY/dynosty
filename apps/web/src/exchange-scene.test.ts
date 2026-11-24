@@ -8,7 +8,7 @@ import {
 } from "@dynosty/game-core";
 import { expect, it } from "vitest";
 import { createLaborVisual } from "./labor-scene.js";
-import { createTimberVisual } from "./timber-scene.js";
+import { createLegacyTimberVisual as createTimberVisual } from "./legacy-timber-scene.js";
 
 it("수레 회수·재납품 색상·검수대 물량 이동과 종료 정리를 실제 mesh에서 확인한다", () => {
   const engine = new NullEngine(),

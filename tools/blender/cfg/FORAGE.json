@@ -1,6 +1,0 @@
-{
-  "name": "forage",
-  "roof": ["thatch", "strawlight", "rope"],
-  "patchy": false,
-  "props": [{ "type": "fire", "x": 0.9, "y": -1, "from": 1.5, "smoke": true }]
-}

@@ -2,7 +2,10 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import type { Scene } from "@babylonjs/core/scene";
-import { type LaborState, TIMBER_RULES } from "@dynosty/game-core";
+import {
+  type LaborState,
+  LEGACY_TIMBER_RULES as TIMBER_RULES,
+} from "@dynosty/game-core";
 import { qualityView } from "./quality-view.js";
 /** 표시만 분리한다. 선택 대상·게임 시간·물량은 기존 원장을 유지한다. */
 export function createQualityVisual(scene: Scene) {

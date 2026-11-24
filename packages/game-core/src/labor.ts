@@ -8,8 +8,6 @@ import {
   parseExchange,
   validateExchange,
 } from "./exchange.js";
-import { isRecord } from "./save.js";
-import type { SceneSnapshot } from "./scene.js";
 import {
   advanceTimber,
   commandTimber,
@@ -19,7 +17,9 @@ import {
   type TimberCommand,
   TimberError,
   type TimberState,
-} from "./timber.js";
+} from "./legacy-timber.js";
+import { isRecord } from "./save.js";
+import type { SceneSnapshot } from "./scene.js";
 export const LABOR_RULES = {
   version: 1,
   workers: 4,
@@ -77,7 +77,7 @@ export type LaborCommand =
   | { type: "speed"; speed: 1 | 3 };
 const LOCKED = ["contracted", "transport", "arrived", "inspecting"];
 function fail(
-  message = "일손 체험 저장이 올바르지 않습니다. 현재 진행과 원본은 유지됩니다.",
+  message = "일손 배치 저장이 올바르지 않습니다. 현재 진행과 원본은 유지됩니다.",
 ): never {
   throw new TimberError(message);
 }
@@ -381,7 +381,7 @@ export function commandLabor(
   if (command.type === "restart")
     return { ...createLaborState(), processed: [id] };
   if (s.processed.length >= 1999)
-    fail("처리 이력이 가득 찼습니다. 저장 후 새 체험을 시작하세요.");
+    fail("처리 이력이 가득 찼습니다. 저장 후 다시 시작하세요.");
   let n = s;
   switch (command.type) {
     case "exchange-request":
@@ -500,7 +500,7 @@ export function parseLaborSave(v: unknown): LaborSave {
       (v.saveVersion === 2 && v.state.version === 2)
     )
   )
-    fail("지원하지 않는 일손 체험 저장입니다. 원본을 유지합니다.");
+    fail("지원하지 않는 일손 배치 저장입니다. 원본을 유지합니다.");
   return {
     format: "dynosty-labor",
     saveVersion: 2,

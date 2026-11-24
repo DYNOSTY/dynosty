@@ -1,6 +1,5 @@
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { press } from "./labor-tabs.js";
 
 const wave = fileURLToPath(
   new URL("./fixtures/test-audio.wav", import.meta.url),
@@ -44,30 +43,38 @@ test("메뉴를 여닫아도 장면·날짜를 유지하고 저장 메뉴에서 
     "3D 준비 완료",
   );
   const canvas = await page.locator("canvas").elementHandle();
-  await press(page, "개발 도구");
-  await press(page, "하루 진행");
-  await press(page, "3D 연결 예제 바꾸기");
+  await page.getByRole("button", { name: "개발 도구", exact: true }).click();
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
+  await page
+    .getByRole("button", { name: "3D 연결 예제 바꾸기", exact: true })
+    .click();
   await expect(page.getByTestId("scene-example-motion")).toHaveText(
     "걷기 표시",
   );
-  await press(page, "개발 도구 닫기");
+  await page
+    .getByRole("button", { name: "개발 도구 닫기", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "개발 도구", exact: true }),
   ).toBeFocused();
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
-  await press(page, "개발 도구");
-  await press(page, "예제 저장");
+  await page.getByRole("button", { name: "개발 도구", exact: true }).click();
+  await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
   );
-  await press(page, "하루 진행");
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await expect(page.getByText("3일차", { exact: true })).toBeVisible();
-  await press(page, "저장 불러오기");
+  await page
+    .getByRole("button", { name: "저장 불러오기", exact: true })
+    .click();
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
   expect(
     await canvas?.evaluate((e) => e === document.querySelector("canvas")),
   ).toBe(true);
-  await press(page, "개발 도구 닫기");
+  await page
+    .getByRole("button", { name: "개발 도구 닫기", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "개발 도구", exact: true }),
   ).toBeFocused();
@@ -90,14 +97,18 @@ test("개발 패널을 접어도 음원 파일 연결과 재생을 유지한다"
     Object.assign(window, { layoutAudioElements: elements });
   });
   await page.goto("/");
-  await press(page, "개발 도구");
+  await page.getByRole("button", { name: "개발 도구", exact: true }).click();
   await page.getByLabel("BGM 파일", { exact: true }).setInputFiles(wave);
   await page.getByLabel("BGM 이름", { exact: true }).fill("패널 유지 확인");
-  await press(page, "BGM 목록 추가");
+  await page
+    .getByRole("button", { name: "BGM 목록 추가", exact: true })
+    .click();
   const id = await page.getByLabel("BGM 음원 목록").inputValue();
-  await press(page, "BGM 재생");
+  await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
-  await press(page, "개발 도구 닫기");
+  await page
+    .getByRole("button", { name: "개발 도구 닫기", exact: true })
+    .click();
   expect(
     await page.evaluate(() =>
       (
@@ -105,7 +116,7 @@ test("개발 패널을 접어도 음원 파일 연결과 재생을 유지한다"
       ).layoutAudioElements.map((e) => e.paused),
     ),
   ).toEqual([false]);
-  await press(page, "설정");
+  await page.getByRole("button", { name: "설정", exact: true }).click();
   await page
     .getByRole("dialog")
     .getByRole("checkbox", { name: "소리 끄기" })
@@ -114,10 +125,10 @@ test("개발 패널을 접어도 음원 파일 연결과 재생을 유지한다"
   await expect(
     page.getByRole("button", { name: "설정", exact: true }),
   ).toBeFocused();
-  await press(page, "개발 도구");
+  await page.getByRole("button", { name: "개발 도구", exact: true }).click();
   await expect(page.getByLabel("BGM 음원 목록")).toHaveValue(id);
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
-  await press(page, "BGM 정지");
+  await page.getByRole("button", { name: "BGM 정지", exact: true }).click();
 });
 
 test("좁은 화면도 가로 넘침 없이 표시하고 키보드로 메뉴를 여닫는다", async ({
@@ -129,21 +140,30 @@ test("좁은 화면도 가로 넘침 없이 표시하고 키보드로 메뉴를 
     "3D 준비 완료",
   );
   await expect(page.locator("canvas")).toBeInViewport({ ratio: 1 });
+  if (
+    await page
+      .getByRole("button", { name: "명령 열기", exact: true })
+      .isVisible()
+  )
+    await page.getByRole("button", { name: "명령 열기", exact: true }).click();
   await page.getByRole("button", { name: "저장", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(
     page.getByRole("region", { name: "저장 패널", exact: true }),
   ).toBeVisible();
-  await press(page, "저장 닫기");
+  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "저장", exact: true }),
   ).toBeFocused();
-  await press(page, "개발 도구");
+  await page.getByRole("button", { name: "개발 도구", exact: true }).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await press(page, "개발 도구 닫기");
+  await page
+    .getByRole("button", { name: "개발 도구 닫기", exact: true })
+    .click();
+  await page.locator("canvas").scrollIntoViewIfNeeded();
   await expect(page.locator("canvas")).toBeInViewport({ ratio: 1 });
 });

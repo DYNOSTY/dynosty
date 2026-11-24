@@ -1,4 +1,10 @@
 import { defineConfig } from "@playwright/test";
+import {
+  createTimberSave,
+  createVillageGame,
+} from "./packages/game-core/dist/index.js";
+
+const baseURL = "http://127.0.0.1:5173";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -6,9 +12,23 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 30_000 },
   use: {
-    // 깎은 건물 13종·공용 텍스처로 소프트웨어 렌더러 첫 로딩이 약 20초 → 첫 조작에 여유
-    actionTimeout: 60_000,
-    baseURL: "http://127.0.0.1:5173",
+    actionTimeout: 30_000,
+    baseURL,
+    // Village tool tests start after the prologue. Campaign tests open a fresh game.
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: baseURL,
+          localStorage: [
+            {
+              name: "dynosty.village.resume",
+              value: JSON.stringify(createTimberSave(createVillageGame())),
+            },
+          ],
+        },
+      ],
+    },
     headless: true,
     launchOptions: {
       args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],

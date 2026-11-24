@@ -5,7 +5,7 @@ import {
   laborIron,
   laborReservedIron,
   laborStock,
-  TIMBER_RULES,
+  LEGACY_TIMBER_RULES as TIMBER_RULES,
 } from "@dynosty/game-core";
 export const STOCK_LABELS = {
   transit: "운송 중",

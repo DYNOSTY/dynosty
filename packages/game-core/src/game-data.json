@@ -39,7 +39,7 @@
       "unit": "재고 단위",
       "initial": 40,
       "purpose": "시설 개량·메카 연구",
-      "acquisition": "철광 작업장·제련소"
+      "acquisition": "교역·제련(제련소는 후속 구현)"
     },
     "RES_WATER": {
       "name": "물",
@@ -48,12 +48,26 @@
       "purpose": "음용·농업·온돌",
       "acquisition": "취수 수문·정수 물레"
     },
+    "RES_IRON_ORE": {
+      "name": "철광석",
+      "unit": "재고 단위",
+      "initial": 0,
+      "purpose": "제련 전 원료",
+      "acquisition": "철광산"
+    },
+    "RES_STONE": {
+      "name": "석재",
+      "unit": "재고 단위",
+      "initial": 0,
+      "purpose": "건설 자재",
+      "acquisition": "채석장"
+    },
     "RES_COAL": {
       "name": "석탄",
       "unit": "재고 단위",
       "initial": 60,
       "purpose": "온돌·식당 연료",
-      "acquisition": "발주·운송(승인 개발 기준)"
+      "acquisition": "석탄광·교역·운송"
     }
   },
   "population": [
@@ -81,7 +95,7 @@
   ],
   "initial": {
     "day": 1,
-    "minute": 0,
+    "minute": 420,
     "optimism": 50,
     "pessimism": 0,
     "weather": "보통",
@@ -106,7 +120,7 @@
     "residentHeadingRadians": 3.141592653589793
   },
   "time": {
-    "minutesPerRealSecond": 10,
+    "minutesPerRealSecond": 1,
     "minutesPerDay": 1440,
     "tickMs": 1000,
     "maxCatchUpMs": 1000,
@@ -133,7 +147,9 @@
     "yangnyeong": "stage5"
   },
   "endings": {
-    "warningPessimism": 90,
+    "concernPessimism": 60,
+    "warningPessimism": 75,
+    "urgentPessimism": 90,
     "evictionPessimism": 100,
     "evictionOptimism": 0,
     "evictionMinutes": 1440,
@@ -155,7 +171,8 @@
     "시작 재고는 식량 종류별 120, 목재120, 철재40, 물180, 석탄60 단위다. 원문 확정 수치로 인용하지 않는다.",
     "첫 시작·불러오기·탭 비활성 후는 일시정지하며 오프라인 정산하지 않는다. 현실 1초=게임10분.",
     "식성별 비례 소비, 부족 경고는 1일분 미만·0이면 긴급, 1일분 이상이면 해제. 기아 피해·사망 수치는 아직 이번 구현 범위가 아니다.",
-    "3D는 자체 제작한 개발용 트리케라톱스·온돌 둥지와 20×20m 지형, 1 표시 단위=1m를 사용하며 최종 외부 에셋과 구분한다."
+    "3D 마을 생활 장면은 등록 주민 전원을 표시한다. 외형은 자체 제작 트리케라톱스 임시 모델을 공유하며 100×100m 개발 지형을 사용한다. 최종 종별 에셋과 구분한다.",
+    "C1 2026-11-17 생활 기준: 개인별 허기에 따라 실제 식당에서 식량을 소비한다. 식당06–22시, 작업장08–18시, 새 게임07시 시작은 개발 체험 값이다. 생활 장면은 진입 즉시 시간 진행하며 저장 복원·비활성 후는 수동 재개한다. 질병·사망은 공통 상태·사건 처리만 적용하고 확률은 보류한다."
   ],
   "sources": [
     {

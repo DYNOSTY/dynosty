@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from "react";
+import type { ReactNode } from "react";
 
 type Props = {
   id: string;
@@ -7,7 +7,6 @@ type Props = {
   subtitle?: string | undefined;
   open: boolean;
   onClose: () => void;
-  closeButtonRef?: Ref<HTMLButtonElement>;
   /** 있으면 제목 앞에 ← 뒤로 */
   onBack?: (() => void) | undefined;
   children: ReactNode;
@@ -20,7 +19,6 @@ export function WorkspacePanel({
   subtitle,
   open,
   onClose,
-  closeButtonRef,
   onBack,
   children,
 }: Props) {
@@ -48,7 +46,6 @@ export function WorkspacePanel({
         <button
           type="button"
           className="g-knob g-knob--close"
-          ref={closeButtonRef}
           onClick={onClose}
           aria-label={`${title} 닫기`}
           title="닫기 (Esc)"

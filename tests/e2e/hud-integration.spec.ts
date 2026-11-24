@@ -1,6 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
-import { press, startTimber } from "./labor-tabs.js";
+import {
+  createTimberSave,
+  createVillageGame,
+  payTown,
+  requireValue,
+} from "../../packages/game-core/dist/index.js";
+import { advanceVillageDay } from "./read-village.js";
 import { clickExample } from "./scene-picking.js";
+import { openLaborPanel } from "./workspace.js";
 
 type SceneMesh = {
   isVisible: boolean;
@@ -8,7 +15,7 @@ type SceneMesh = {
   getChildMeshes(): SceneMesh[];
 };
 
-const _button = (p: Page, name: string) =>
+const button = (p: Page, name: string) =>
   p.getByRole("button", { name, exact: true });
 async function ready(p: Page) {
   await p.goto("/");
@@ -42,6 +49,7 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
     const scene = (
       window as unknown as {
         __scene: {
+          getMeshById(id: string): SceneMesh | null;
           getEngine(): {
             getGlInfo(): unknown;
             getHardwareScalingLevel(): number;
@@ -56,11 +64,10 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
       gl: scene.getEngine().getGlInfo(),
       scaling: scene.getEngine().getHardwareScalingLevel(),
       villageMeshes:
-        scene.getTransformNodeByName("BLD_OFFICE_v2.glb")?.getChildMeshes()
+        scene.getTransformNodeByName("BLD_OFFICE.glb")?.getChildMeshes()
           .length ?? 0,
       representativeMeshes:
-        scene.getTransformNodeByName("example-building-1:glb")?.getChildMeshes()
-          .length ?? 0,
+        scene.getMeshById("example-building-1")?.getChildMeshes().length ?? 0,
     };
   });
   expect(renderer.villageMeshes).toBeGreaterThan(0);
@@ -71,11 +78,9 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   });
   const canvas = await page.locator("canvas").elementHandle();
   await page.screenshot({ path: info.outputPath("integrated-hud.png") });
-  // 조달은 의뢰 목록에서 연다 (하단 명령판은 조달소를 골랐을 때만)
-  await startTimber(page);
-  await press(page, "일손 배치·배급 체험하기");
-  // 조달은 따로 떨어진 판이 아니라 섬 광장 안에서 진행 — 섬은 계속 보임
-  await expect.poll(() => islandVisible(page)).toBe(true);
+  await button(page, "조달").click();
+  await openLaborPanel(page);
+  await expect.poll(() => islandVisible(page)).toBe(false);
   await expect(
     page.getByRole("region", { name: "첫 플레이 안내" }),
   ).toBeVisible();
@@ -86,7 +91,7 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   await page.screenshot({
     path: info.outputPath("integrated-procurement.png"),
   });
-  await press(page, "생존 예제로 돌아가기");
+  await button(page, "마을로 돌아가기").click();
   await expect.poll(() => islandVisible(page)).toBe(true);
   expect(
     await canvas?.evaluate((c) => c === document.querySelector("canvas")),
@@ -95,48 +100,98 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   expect(errors).toEqual([]);
 });
 
-test("정찰 시안은 발견 표시를 갱신하고 게임 불러오기·새 게임에서 일관되게 초기화한다", async ({
+test("지도에 연구가 적용된 정찰 왕복 시간과 귀환을 표시한다", async ({
   page,
 }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+  const village = payTown(createVillageGame(), { RES_WOOD: 8, RES_METAL: 2 });
+  const save = createTimberSave({
+    ...village,
+    town: {
+      ...village.town,
+      development: { ...village.town.development, completed: ["TECH_TRAIL"] },
+    },
+  });
+  await page.addInitScript((value) => {
+    localStorage.setItem("dynosty.village.resume", JSON.stringify(value));
+  }, save);
   await ready(page);
-  await press(page, "정찰 거점 갈대나루");
+  await button(page, "정찰 거점 갈대나루").click();
+  const panel = page.getByRole("region", { name: "정찰 · 미탐색 거점 패널" });
+  await expect(panel).toContainText("24시간", { timeout: 5000 });
+  await button(page, "정찰대 보내기").click();
   await expect(
-    page.getByRole("region", { name: "정찰 · 미탐색 거점 패널" }),
-  ).toContainText("저장되지 않으며 인원·식량 재고에 반영하지 않습니다");
-  const food = await page.getByTestId("resource-RES_PLANT").textContent();
-  await press(page, "정찰대 보내기");
-  await expect(
-    page.getByRole("region", { name: "의뢰", exact: true }),
-  ).toContainText("갈대나루 정찰 중");
-  await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
-  await expect(page.getByTestId("resource-RES_PLANT")).toHaveText(food ?? "");
-  await press(page, "1일 진행");
-  await press(page, "1일 진행");
+    page.getByRole("button", { name: "갈대나루 정찰 중 · 12시간 남음" }),
+  ).toBeVisible();
+  await advanceVillageDay(page);
+  await page.getByRole("button", { name: "남겨 두고 정찰을 마친다" }).click();
+  await advanceVillageDay(page);
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
   ).toContainText("갈대나루 발견");
-  await press(page, "저장");
-  await press(page, "게임 저장");
-  await expect(page.getByTestId("play-save-status")).toContainText(
-    "저장했습니다",
+  await expect(
+    page.getByRole("dialog", { name: "갈대나루 · 정찰 결과" }),
+  ).toBeVisible();
+});
+
+test("정찰 진행과 발견을 새로고침으로 복원하고 새 게임에서는 초기화한다", {
+  tag: "@smoke",
+}, async ({ page }) => {
+  // Three full 3D loads share this test's budget on software-rendered CI.
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await ready(page);
+  await button(page, "정찰 거점 갈대나루").click();
+  await expect(
+    page.getByRole("region", { name: "정찰 · 미탐색 거점 패널" }),
+  ).toContainText("파견 기록은 마을과 함께 자동 저장됩니다");
+  const food = await page.getByTestId("resource-RES_PLANT").textContent();
+  await button(page, "정찰대 보내기").click();
+  const face = page
+    .getByRole("region", { name: "파견 중인 정찰대" })
+    .getByRole("button", { name: /갈대나루 정찰 중/ });
+  await expect(
+    page.getByRole("button", { name: /갈대나루 정찰 중/ }),
+  ).toHaveCount(1);
+  const bounds = requireValue(await face.boundingBox(), "화면 위치");
+  const consoleBounds = requireValue(
+    await page.locator(".g-console").boundingBox(),
+    "화면 위치",
   );
-  await press(page, "게임 불러오기");
-  await expect(page.getByTestId("play-save-status")).toContainText(
-    "불러왔습니다",
-  );
-  await press(page, "저장 닫기");
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(consoleBounds.y);
+  expect(bounds.x).toBeGreaterThan(consoleBounds.x + consoleBounds.width * 0.8);
+  const detail = face.locator(".g-scout-detail");
+  await expect(detail).toBeHidden();
+  await face.hover();
+  await expect(detail).toBeVisible();
+  await expect(detail).toHaveText(/갈대나루 정찰 중 · \d+시간 남음/);
+  await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
+  await expect(page.getByTestId("resource-RES_PLANT")).toHaveText(food ?? "");
+  await ready(page);
+  await expect(face).toBeVisible();
+  await advanceVillageDay(page);
+  await page.getByRole("button", { name: "남겨 두고 정찰을 마친다" }).click();
+  await advanceVillageDay(page);
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
-  ).toContainText("정찰대를 보내 보자"); // 불러오면 정찰이 처음 상태로 돌아감 (몇 곳인지는 화면에 알리지 않음)
-  await press(page, "정찰 거점 갈대나루");
-  await press(page, "정찰대 보내기");
-  await press(page, "새 게임");
-  await press(page, "새 게임 시작");
+  ).toContainText("갈대나루 발견");
+  await ready(page);
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
-  ).not.toContainText("정찰 중");
+  ).toContainText("갈대나루 발견");
+  const report = page.getByRole("dialog", { name: "갈대나루 · 정찰 결과" });
+  await expect(report).toBeVisible();
+  await report.getByRole("button", { name: "장면 접기" }).click();
+  await expect(report).toBeHidden();
+  await button(page, "새 게임").click();
+  await button(page, "새 게임 시작").click();
+  await expect(
+    page.getByRole("dialog", { name: "미션 시작 준비" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "의뢰", exact: true }),
+  ).not.toContainText("갈대나루 발견");
+  await expect(face).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -145,11 +200,13 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  // The representative building uses the ondol hub, not a village nest.
-  await page.route("**/models/buildings/BLD_ONDOL_v2.glb", (r) =>
-    r.fulfill({ status: 404, body: "missing" }),
-  );
-  await ready(page);
+  const nestGlb = "**/models/buildings/BLD_NEST.glb";
+  await page.route(nestGlb, (r) => r.fulfill({ status: 404, body: "missing" }));
+  const [response] = await Promise.all([
+    page.waitForResponse(nestGlb, { timeout: 90_000 }),
+    ready(page),
+  ]);
+  expect(response.status()).toBe(404);
   await expect(page.getByRole("alert")).toContainText("모델");
   const fallback = await page.evaluate(() => {
     const scene = (
@@ -172,10 +229,19 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
   });
   expect(fallback.glb).toBe(false);
   expect(fallback.meshes).toBeGreaterThan(0);
+  // 캔버스에서 직접 선택한 뒤 접혀 있는 명령 콘솔에서 결과를 확인한다.
   await clickExample(page, "building");
+  await button(page, "명령 열기").click();
+  const selection = page.getByRole("region", {
+    name: "선택 정보",
+    exact: true,
+  });
   await expect(
-    page.getByRole("region", { name: "선택 정보", exact: true }),
-  ).toContainText("온돌");
+    selection.getByRole("heading", {
+      name: "건물 예제 · 온돌 둥지",
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(page.getByTestId("play-population")).toHaveText("주민 60명");
   expect(errors).toEqual([]);
 });

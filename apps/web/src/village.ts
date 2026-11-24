@@ -2,56 +2,31 @@
 import "@babylonjs/loaders/glTF";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
-import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
+import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
+import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
-import { type JigeLoad, wearJige } from "./jige.js";
-import {
-  createMaterialLibrary,
-  isGlowMaterial,
-  snowOnResident,
-} from "./materials.js";
+import { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
 import { loadSceneAsset as load } from "./scene-assets.js";
-import { elevation, rng } from "./world.js";
+import { elevation, rng, type Season } from "./world.js";
 
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
 export const BUILDING_SCALE = 0.75; // 둥지 지붕 1.85m = 목재 체험 보수 표시 높이
-export const RESIDENT_SCALE = 0.5;
+export const RESIDENT_SCALE = 0.75;
 const OUTLINE = new Color3(0.3, 0.9, 1); // 현장과 대표 모델의 공통 선택색
 
-// [건물, x, z] — 입구(+Z)가 마당을 향함. 가운데 반경 9m는 체험 소품 자리로 비워 둠
-// 블렌더로 컨셉 시트처럼 깎은 판(2026-11-18) — 있으면 이걸 씀 (원본 GLB는 그대로 둠)
-const CARVED: Record<string, string> = Object.fromEntries(
-  [
-    "BLD_NEST",
-    "BLD_OFFICE",
-    "BLD_ONDOL",
-    "BLD_WATER",
-    "BLD_FORAGE",
-    "BLD_SALVAGE",
-    "BLD_GREENHOUSE",
-    "BLD_FISHERY",
-    "BLD_WAREHOUSE",
-    "BLD_WORKSHOP",
-    "BLD_WATCH",
-    "BLD_GATE",
-    "BLD_CLINIC",
-  ].map((id) => [id, `${id}_v2`]),
-);
-export const glbFile = (id: string) =>
-  `/models/buildings/${CARVED[id] ?? id}.glb`;
-export { LAYOUT } from "./layout.js";
-
-import { LAYOUT } from "./layout.js";
+export { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
 
 // 공룡마다 원래 몸집 차이는 살리되, 가장 큰 브라키오사우루스도 둥지 문(약 1.38m) 안으로 들어가게
 // [게임 안 키(m), 모델 키] — 모델은 종과 상관없이 비슷한 크기로 만들어져 있어 종별로 따로 줄임
@@ -67,14 +42,6 @@ const RESIDENT_HEIGHT: Record<string, [number, number]> = {
   R04_Ankylosaurus: [0.75, 2.45],
   R12_Protoceratops: [0.6, 2.28],
 };
-/** 겨울 차림(컨셉 시트 재질 누빔·비늘, 털 테두리·목도리·짚 장화·등불·등짐) — tools/blender/tex.py → dino2.py */
-export const residentGlb = (file: string) => `/models/residents/${file}_v2.glb`;
-/** 사용자 11/19 "공룡 크기 좀만 더" — 종별 차이는 그대로 두고 모두 15% 키움 */
-const RESIDENT_GROW = 1.15;
-export const residentScale = (file: string) => {
-  const h = RESIDENT_HEIGHT[file];
-  return (h ? h[0] / h[1] : RESIDENT_SCALE) * RESIDENT_GROW;
-};
 const RESIDENTS = [
   "R01_Pachycephalosaurus",
   "R02_Triceratops",
@@ -88,19 +55,51 @@ const RESIDENTS = [
   "R12_Protoceratops",
 ];
 
+const villageNames: Record<string, string> = {
+  BLD_OFFICE: "관아",
+  BLD_NEST: "온돌 둥지",
+  BLD_WAREHOUSE: "갈무리 창고",
+  BLD_WORKSHOP: "공방",
+  BLD_FORAGE: "채집막",
+  BLD_GREENHOUSE: "온상 재배소",
+  BLD_WATER: "물터",
+  BLD_FISHERY: "어획막",
+  BLD_WATCH: "망루",
+  BLD_CLINIC: "병원",
+  BLD_SALVAGE: "자재 회수장",
+  BLD_GATE: "마을 문",
+  R01_Pachycephalosaurus: "파키케팔로사우루스",
+  R02_Triceratops: "트리케라톱스",
+  R03_Velociraptor: "벨로키랍토르",
+  R04_Ankylosaurus: "안킬로사우루스",
+  R05_Gallimimus: "갈리미무스",
+  R07_Parasaurolophus: "파라사우롤로푸스",
+  R08_Brachiosaurus: "브라키오사우루스",
+  R09_Oviraptor: "오비랍토르",
+  R10_Iguanodon: "이구아노돈",
+  R12_Protoceratops: "프로토케라톱스",
+};
 export interface GlbVisual {
   setOutline(value: boolean): void;
+  setLit?(lit: boolean): void;
   setMotion(value: string): void;
   animate(delta: number): void;
   dispose(): void;
 }
 
-export type Shadow = (
+export type VillageTargetInfo = {
+  name: string;
+  detail: string;
+  portrait?: string;
+  buildingPosition?: { x: number; z: number };
+};
+
+type Shadow = (
   at: TransformNode,
   radius: number,
   depth?: number,
 ) => InstancedMesh | null;
-export function instantiate(
+function instantiate(
   container: AssetContainer,
   parent: TransformNode,
   scale: number,
@@ -120,12 +119,11 @@ export function instantiate(
     // 화면에서 몇 픽셀도 안 되는 조각(발톱·눈 등)은 멀리서 그리지 않음 — 그리기 호출 약 1/4 감소
     if (m instanceof Mesh && m.getTotalVertices() > 0) {
       m.useLODScreenCoverage = true;
-      m.addLODLevel(0.00012, null);
+      m.addLODLevel(0.00005, null);
     }
   }
   const blob = shadow(parent, radius, depth);
   const groups = inst.animationGroups;
-  if (inst.skeletons.length) for (const m of meshes) snowOnResident(m.material);
   for (const g of groups) g.stop();
   let playing: AnimationGroup | undefined;
   const play = (clip: string, offset = 0) => {
@@ -161,9 +159,28 @@ type Light = {
 export function createVillage(
   scene: Scene,
   shadow: Shadow,
-  light?: Light,
-  worldRoot?: TransformNode,
+  light: Light,
+  worldRoot: TransformNode,
+  season: Season,
 ) {
+  const targets = new Map<
+    string,
+    VillageTargetInfo & { meshes: AbstractMesh[] }
+  >();
+  let marked: string | null = null;
+  function mark(id: string | null) {
+    if (marked === id) return;
+    if (marked)
+      for (const m of targets.get(marked)?.meshes ?? [])
+        m.renderOutline = false;
+    marked = id;
+    if (id)
+      for (const m of targets.get(id)?.meshes ?? []) {
+        m.outlineColor = OUTLINE;
+        m.outlineWidth = 0.025;
+        m.renderOutline = true;
+      }
+  }
   let disposed = false;
   let scoutGeneration = 0;
   const landmarkVisuals = new Map<
@@ -177,10 +194,7 @@ export function createVillage(
   type Hauler = {
     work: Vector3;
     store: Vector3;
-    /** 등에 늘 지는 지게 (일꾼 노드에 붙임) */
-    rig: TransformNode;
-    /** 지게 위 짐 — 창고로 갈 때만 켬 */
-    prop: { setEnabled(on: boolean): void };
+    prop: Mesh;
     state: "work" | "toStore" | "drop" | "toWork";
     timer: number;
   };
@@ -190,42 +204,14 @@ export function createVillage(
     target: Vector3 | null;
     wait: number;
     haul?: Hauler;
-    /** 둥지 문(약 1.38m)보다 커서 밤에 밖에서 자는지 */
-    tall: boolean;
-    /** 밤에 갈 자리(둥지 문 앞 또는 둥지 옆 바깥) */
-    bed: Vector3 | null;
-    asleep: boolean;
   };
   const walkers: Walker[] = [];
-  /** 하루 안의 게임 시각(분) — updateParties가 매 프레임 넣어 줌 */
-  let clockMin = 0;
-  let started = false;
-  const NEST_DOOR = 1.38;
-  const isTall = (url: string) => {
-    const file = (url.split("/").pop() ?? "").replace("_v2.glb", "");
-    const h = RESIDENT_HEIGHT[file];
-    return h ? h[0] * RESIDENT_GROW > NEST_DOOR : false;
-  };
   const plinthMat = new StandardMaterial("plinth-snow", scene);
-  // 땅(StandardMaterial)과 같은 빛 계산이라야 눈밭에 묻힘 — PBR 그대로면 색을 낮춰도 하얗게 뜸
-  plinthMat.diffuseColor = new Color3(0.82, 0.82, 0.88);
+  plinthMat.diffuseColor = new Color3(0.74, 0.74, 0.8);
   plinthMat.specularColor = Color3.Black();
-  // 공용 재질 세트: GLB 재질 이름으로 그을린 기와·나무·초가 등을 입힘 (materials.ts)
-  const lib = createMaterialLibrary(scene);
-  const templates = new Map<
-    string,
-    { meshes: Mesh[]; local: Map<Mesh, Matrix>; smoke: Vector3 | null }
-  >();
-  // 누를 수 있는 마을 건물: 건물 뿌리 노드 → LAYOUT 번호
-  const buildingNodes = new Map<Node, number>();
-  const register = (node: TransformNode, x: number, z: number) => {
-    const i = LAYOUT.findIndex(([, lx, lz]) => lx === x && lz === z);
-    if (i >= 0) buildingNodes.set(node, i);
-  };
-  // 고른 건물 발밑 금빛 고리는 없앰 (사용자 11/19: "분위기 깬다") — 고른 건 오른쪽 아래 메달 창으로 알 수 있음
   plinthMat.freeze();
   const place = async (
-    url: string,
+    model: string,
     x: number,
     z: number,
     yaw: number,
@@ -235,149 +221,190 @@ export function createVillage(
     depth = 3.8,
     role?: "walk" | Omit<Hauler, "state" | "timer">,
   ) => {
-    const asset = await load(scene, url);
+    let winter = season === "winter";
+    const folder = role ? "residents" : "buildings";
+    const asset = await load(
+      scene,
+      `/models/${folder}/${model}${winter ? "_v2" : ""}.glb`,
+    ).catch((error: unknown) => {
+      if (!winter || disposed) throw error;
+      winter = false;
+      return load(scene, `/models/${folder}/${model}.glb`);
+    });
     if (disposed) return;
-    const node = new TransformNode(url.split("/").pop() ?? "glb", scene);
-    node.parent = worldRoot ?? null;
+    // Keep scene/selection identities independent of the asset variant.
+    const node = new TransformNode(`${model}.glb`, scene);
+    node.parent = worldRoot;
     node.position.set(x, elevation(x, z), z);
     node.rotation.y = yaw;
     nodes.push(node);
-    // 같은 건물 두 채째부터(둥지 8채 등): 첫 채의 조각을 인스턴스로 → 그리기 호출을 한 번에 같이
-    const tpl = role ? undefined : templates.get(url);
-    if (tpl) {
-      node.scaling.setAll(scale);
-      node.computeWorldMatrix(true);
-      for (const src of tpl.meshes) {
-        const inst = src.createInstance(`${node.name}:${src.name}`);
-        inst.parent = node;
-        inst.rotationQuaternion = new Quaternion();
-        tpl.local
-          .get(src)
-          ?.decompose(inst.scaling, inst.rotationQuaternion, inst.position);
-        inst.isPickable = true;
-        inst.computeWorldMatrix(true);
-        inst.freezeWorldMatrix();
-      }
-      shadow(node, radius, depth);
-      if (tpl.smoke)
-        addSmoke(
-          Vector3.TransformCoordinates(tpl.smoke, node.getWorldMatrix()),
-        );
-      register(node, x, z);
-      return;
-    }
-    const v = instantiate(asset, node, scale, shadow, radius, depth);
-    if (!role) register(node, x, z);
+    const height = winter && role ? RESIDENT_HEIGHT[model] : undefined;
+    const v = instantiate(
+      asset,
+      node,
+      height ? height[0] / height[1] : scale,
+      shadow,
+      radius,
+      depth,
+    );
+    const id = "village:" + model + ":" + x + ":" + z;
+    const detail = !role
+      ? "복홀 · 마을 시설"
+      : role === "walk"
+        ? "복홀 · 마을 주민"
+        : "복홀 · 작업장과 창고 사이 운반 담당";
+    targets.set(id, {
+      name: villageNames[model] ?? model,
+      detail,
+      // Only the fixed village buildings have a matching concept portrait.
+      ...(!role && {
+        portrait: `/ui/buildings/${model}.jpg`,
+        buildingPosition: { x, z },
+      }),
+      meshes: v.meshes,
+    });
     for (const m of v.meshes) {
-      m.isPickable = !role;
-      if (!role) lib.dress(m.material);
-      // 불 켜진 창(window·amber·ember)은 재질 자체로 주황 — 글로우는 가림을 모르고 지붕을 뚫고 번져서 넣지 않음
-      // 건물 밑 눈 깔개·납작한 돌판이 눈밭 위 흰 네모로 튀어 보임 → 땅과 같은 눈 재질로
-      const name = m.material?.name;
-      const bb = m.getBoundingInfo().boundingBox;
-      // 아주 납작한 돌판만 땅 눈으로 (둥지 돌담 기단은 돌 그대로)
-      const flat = bb.maximum.y - bb.minimum.y < 0.3;
-      if (!role && (name === "snow" || (name === "stone" && flat)))
+      m.isPickable = true;
+      m.metadata = { ...m.metadata, villageTarget: id };
+      // 건물 밑 돌판(상자 1개)이 눈밭 위 흰 네모로 튀어 보임 → 둘레 눈 색으로 덮음
+      if (!role && m.material?.name === "stone" && m.getTotalVertices() <= 36)
         m.material = plinthMat;
-      // 건물은 그을린 듯 어둡게 — 밝은 하늘 반사를 줄여 불 켜진 창만 눈에 띄게 (프로스트펑크 톤)
-      const pbr = m.material as { environmentIntensity?: number } | null;
-      if (!role && pbr && pbr.environmentIntensity !== undefined)
-        pbr.environmentIntensity = 0.35;
     }
     if (!role) {
       node.computeWorldMatrix(true);
-      // 굴뚝 연기: 모델 안 smoke 노드 자리 → 없으면 예전 높이표
-      const bld = url.split("/").pop()?.replace(".glb", "") ?? "";
-      const smokeNode = node
-        .getDescendants(false)
-        .find(
-          (n): n is TransformNode =>
-            /smoke/i.test(n.name) && n instanceof TransformNode,
-        );
-      const chimney = CHIMNEY[bld];
-      const at = smokeNode
-        ? smokeNode.computeWorldMatrix(true).getTranslation()
-        : chimney !== undefined
-          ? new Vector3(x, chimney + elevation(x, z), z)
-          : null;
-      if (at) addSmoke(at);
+      if (winter) {
+        const smoke = smokeByBuilding.get(model);
+        const chimney = node
+          .getDescendants()
+          .find(
+            (child): child is TransformNode =>
+              child instanceof TransformNode && child.name.endsWith(":smoke"),
+          );
+        if (smoke && chimney)
+          smoke.emitter = chimney.computeWorldMatrix(true).getTranslation();
+      }
       for (const m of v.meshes) {
         m.computeWorldMatrix(true);
         m.freezeWorldMatrix();
         m.doNotSyncBoundingInfo = true;
         m.material?.freeze();
       }
-      // 다음 채가 인스턴스로 쓸 본(本): 조각마다 이 건물 기준 위치
-      const inv = node.getWorldMatrix().clone().invert();
-      const local = new Map<Mesh, Matrix>();
-      const meshes = v.meshes.filter(
-        (m): m is Mesh => m instanceof Mesh && m.getTotalVertices() > 0,
-      );
-      for (const m of meshes) local.set(m, m.getWorldMatrix().multiply(inv));
-      templates.set(url, {
-        meshes,
-        local,
-        smoke: at && smokeNode ? Vector3.TransformCoordinates(at, inv) : null,
-      });
     }
     if (clip) v.play(clip, r());
     disposers.push(v.dispose);
-    const door = DOOR[url.split("/").pop()?.replace(".glb", "") ?? ""];
-    // 창이 스스로 빛나는 건물은 임시 문 불빛 상자를 두지 않음 (바닥에 깔린 주황 판처럼 보임)
-    const glowsItself = v.meshes.some((m) => isGlowMaterial(m.material?.name));
-    if (door && light && !glowsItself) {
+    const door = winter ? undefined : DOOR[model];
+    if (door) {
       const lamp = CreateBox(
         `${node.name}-door`,
-        { width: 0.8, height: 0.75, depth: 0.04 }, // 문 안쪽 불빛: 처마 밖으로 튀지 않게 작고 안으로
+        { width: 1.1, height: 0.95, depth: 0.06 },
         scene,
       );
       lamp.parent = node;
-      lamp.position.set(0, door[0] - 0.1, door[1] - 0.18);
+      lamp.position.set(0, door[0], door[1]);
       lamp.material = light.warmMat;
-      lamp.isPickable = false; // 문 불빛도 지붕 너머로 번지지 않게 글로우 제외
+      lamp.isPickable = false;
+      light.glow.addIncludedOnlyMesh(lamp);
     }
-    const tall = isTall(url);
     if (role === "walk")
-      walkers.push({
-        node,
-        play: v.play,
-        target: null,
-        wait: r() * 2,
-        tall,
-        bed: null,
-        asleep: false,
-      });
+      walkers.push({ node, play: v.play, target: null, wait: r() * 2 });
     else if (role) {
-      role.rig.parent = node;
+      role.prop.parent = node;
       walkers.push({
         node,
         play: v.play,
         target: null,
         wait: 0,
         haul: { ...role, state: "work", timer: 2 + r() * 3 },
-        tall,
-        bed: null,
-        asleep: false,
       });
     }
+    return node;
   };
   const face = (x: number, z: number) => Math.atan2(-x, -z); // +Z가 마당 쪽
-  const jobs: Array<Promise<void>> = LAYOUT.map(([id, x, z]) =>
+  const permanent = new Map<string, TransformNode>();
+  let missing = new Set<string>();
+  const lostQuarter = new Set<TransformNode>();
+  let exodusVisible = false;
+  let previewResidentsVisible = true;
+  const jobs: Array<Promise<unknown>> = LAYOUT.filter(
+    ([id]) => id !== "BLD_NEST",
+  ).map(([id, x, z]) =>
     place(
-      glbFile(id),
+      id,
       x,
       z,
       id === "BLD_GATE" ? Math.PI : face(x, z),
       BUILDING_SCALE,
-    ),
+    ).then((node) => {
+      if (node) {
+        permanent.set(id, node);
+        node.setEnabled(!missing.has(id));
+      }
+    }),
   );
 
+  for (const [row, z] of [-28, -14, 0, 14, 28].entries()) {
+    for (const [col, x] of [-30, 30].entries()) {
+      const model = ["BLD_NEST", "BLD_WAREHOUSE", "BLD_WORKSHOP"][
+        (row + col) % 3
+      ] as string;
+      jobs.push(
+        place(model, x, z, face(x, z), BUILDING_SCALE).then((node) => {
+          if (node) {
+            lostQuarter.add(node);
+            node.setEnabled(exodusVisible);
+          }
+        }),
+      );
+    }
+  }
   // 등에 지는 짐 (모델 단위: 주민 0.5배 안에서 등 높이)
-  // 지게: 빈 지게는 늘 등에, 짐은 창고로 갈 때만 (jige.ts)
-  const makeProp = (kind: JigeLoad) => {
-    const j = wearJige(scene, kind, lib);
-    disposers.push(j.dispose);
-    return { rig: j.rig, prop: j };
+  const propMat = (name: string, hex: string) => {
+    const m = new StandardMaterial(name, scene);
+    m.diffuseColor = Color3.FromHexString(hex);
+    m.specularColor = Color3.Black();
+    return m;
+  };
+  const makeProp = (kind: "plant" | "wood" | "fish") => {
+    const root = new Mesh(`carry-${kind}`, scene);
+    if (kind === "wood") {
+      const mat = propMat("carry-wood", "#7a5a40");
+      [-0.28, 0, 0.28].forEach((x, i) => {
+        const log = CreateCylinder(
+          `carry-log-${i}`,
+          { height: 1.6, diameter: 0.34, tessellation: 7 },
+          scene,
+        );
+        log.rotation.x = Math.PI / 2;
+        log.position.set(x, i === 1 ? 0.28 : 0, 0);
+        log.material = mat;
+        log.parent = root;
+      });
+    } else if (kind === "plant") {
+      const bundle = CreateCylinder(
+        "carry-fern",
+        {
+          height: 1.2,
+          diameterBottom: 0.9,
+          diameterTop: 0.15,
+          tessellation: 7,
+        },
+        scene,
+      );
+      bundle.material = propMat("carry-plant", "#5e7a4a");
+      bundle.parent = root;
+    } else {
+      const fish = CreateSphere(
+        "carry-fish",
+        { diameterX: 0.45, diameterY: 0.35, diameterZ: 1.3, segments: 6 },
+        scene,
+      );
+      fish.material = propMat("carry-fish-mat", "#9aa6ad");
+      fish.parent = root;
+    }
+    root.position.set(0, 1.75, -0.45);
+    root.setEnabled(false);
+    for (const m of root.getChildMeshes()) m.isPickable = false;
+    return root;
   };
   // 일터 앞 자리(건물에서 마당 쪽으로 3.4m)
   const spot = (i: number) => {
@@ -397,15 +424,19 @@ export function createVillage(
       const work = spot(haul[0]);
       jobs.push(
         place(
-          residentGlb(file),
+          file,
           work.x,
           work.z,
           r() * Math.PI * 2,
-          residentScale(file),
+          RESIDENT_SCALE,
           "Idle",
           1.3,
           2,
-          { work, store: store.clone(), ...makeProp(haul[1]) },
+          {
+            work,
+            store: store.clone(),
+            prop: makeProp(haul[1]),
+          },
         ),
       );
       return;
@@ -414,11 +445,11 @@ export function createVillage(
       d = 5 + r() * 3;
     jobs.push(
       place(
-        residentGlb(file),
+        file,
         Math.cos(a) * d,
         Math.sin(a) * d,
         r() * Math.PI * 2,
-        residentScale(file),
+        RESIDENT_SCALE,
         "Idle",
         1.3,
         2,
@@ -440,44 +471,64 @@ export function createVillage(
   pc.fillRect(0, 0, 64, 64);
   puff.update();
   puff.hasAlpha = true;
+  const fires = [
+    [-30, 0],
+    [30, -14],
+    [-8, -20],
+    [16, 0],
+    [-10, -8],
+  ].map(([x = 0, z = 0], i) => {
+    const fire = new ParticleSystem("처마 불길-" + i, 90, scene);
+    fire.particleTexture = puff;
+    fire.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    fire.minScaleY = 1.2;
+    fire.maxScaleY = 1.9;
+    fire.emitter = new Vector3(x, elevation(x, z) + 1.8, z);
+    fire.minEmitBox = new Vector3(-1, 0, -0.5);
+    fire.maxEmitBox = new Vector3(1, 0, 0.5);
+    fire.direction1 = new Vector3(-0.4, 1.8, -0.2);
+    fire.direction2 = new Vector3(0.4, 3, 0.2);
+    fire.minLifeTime = 0.4;
+    fire.maxLifeTime = 1.2;
+    fire.minSize = 0.4;
+    fire.maxSize = 1.2;
+    fire.emitRate = 55;
+    fire.addColorGradient(0, new Color4(1, 0.72, 0.13, 1));
+    fire.addColorGradient(0.36, new Color4(0.94, 0.26, 0.04, 0.9));
+    fire.addColorGradient(0.72, new Color4(0.24, 0.17, 0.14, 0.64));
+    fire.addColorGradient(1, new Color4(0.18, 0.17, 0.16, 0));
+    return fire;
+  });
   const CHIMNEY: Record<string, number> = {
-    BLD_NEST: 1.95,
     BLD_OFFICE: 2.5,
     BLD_WORKSHOP: 3,
     BLD_GREENHOUSE: 2.4,
     BLD_CLINIC: 2.2,
   };
-  // 석탄 연기처럼 짙고 무겁게 (프로스트펑크 톤)
-  const smokes: ParticleSystem[] = [];
-  const smokeBase = new Map<ParticleSystem, number>();
-  /** 화력(절약0.6·보통1·긴급1.4) × 연료 유무 → 굴뚝 연기 양 */
-  let smokeScale = 1;
-  function addSmoke(at: Vector3, scale = 1) {
-    const ps = new ParticleSystem(`smoke-${smokes.length}`, 110, scene);
+  const smokeByBuilding = new Map<string, ParticleSystem>();
+  const smokes = LAYOUT.filter(([id]) => id in CHIMNEY).map(([id, x, z], i) => {
+    const ps = new ParticleSystem(`smoke-${i}`, 80, scene);
     ps.particleTexture = puff;
-    ps.emitter = at;
-    ps.minEmitBox = new Vector3(-0.12, 0, -0.12);
-    ps.maxEmitBox = new Vector3(0.12, 0, 0.12);
+    ps.emitter = new Vector3(x, (CHIMNEY[id] ?? 2) + elevation(x, z), z);
+    ps.minEmitBox = new Vector3(-0.15, 0, -0.15);
+    ps.maxEmitBox = new Vector3(0.15, 0, 0.15);
     ps.direction1 = new Vector3(-0.1, 1, -0.05);
-    ps.direction2 = new Vector3(0.25, 1.4, 0.15);
-    ps.minEmitPower = 0.6;
-    ps.maxEmitPower = 1;
-    ps.minLifeTime = 3;
-    ps.maxLifeTime = 5;
-    ps.gravity = new Vector3(0.35, 0, 0.1);
-    ps.addSizeGradient(0, 0.3 * scale);
-    ps.addSizeGradient(1, 1.5 * scale);
-    if (scale > 1) ps.emitRate = 18;
-    ps.color1 = new Color4(0.3, 0.3, 0.34, 0.6);
-    ps.color2 = new Color4(0.42, 0.42, 0.47, 0.5);
-    ps.colorDead = new Color4(0.55, 0.56, 0.62, 0);
-    ps.emitRate = 10;
+    ps.direction2 = new Vector3(0.25, 1.3, 0.15);
+    ps.minEmitPower = 0.5;
+    ps.maxEmitPower = 0.9;
+    ps.minLifeTime = 2.5;
+    ps.maxLifeTime = 4;
+    ps.gravity = new Vector3(0.25, 0, 0.08);
+    ps.addSizeGradient(0, 0.22);
+    ps.addSizeGradient(1, 0.95);
+    ps.color1 = new Color4(1, 1, 1, 0.4);
+    ps.color2 = new Color4(0.95, 0.95, 0.97, 0.3);
+    ps.colorDead = new Color4(0.95, 0.95, 0.97, 0);
+    ps.emitRate = 7;
     ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
-    smokes.push(ps);
-    smokeBase.set(ps, ps.emitRate);
-    ps.emitRate = ps.emitRate * smokeScale;
-    if (running) ps.start();
-  }
+    smokeByBuilding.set(id, ps);
+    return ps;
+  });
 
   // ── 발견한 거점: 건물 도감 GLB가 땅에서 솟아오름 (전용 모형은 모델링 담당 몫) ──
   const LANDMARK_GLB: Record<string, string> = {
@@ -491,7 +542,7 @@ export function createVillage(
     const file = LANDMARK_GLB[id];
     if (!file || disposed || landmarkVisuals.has(id)) return;
     const generation = scoutGeneration;
-    const asset = await load(scene, glbFile(file));
+    const asset = await load(scene, `/models/buildings/${file}.glb`);
     if (disposed || generation !== scoutGeneration || landmarkVisuals.has(id))
       return;
     const node = new TransformNode(`landmark-glb-${id}`, scene);
@@ -543,6 +594,7 @@ export function createVillage(
     z: number;
     start: number;
     hours: number;
+    due: number;
   };
   type Party = {
     m: Mission;
@@ -554,115 +606,42 @@ export function createVillage(
     }>;
     from: Vector3;
     to: Vector3;
-    /** 지나간 자리에 남는 발자국 (나간 만큼만 그림) */
-    trail: Mesh;
-    steps: number;
-    shown: number;
-    flag?: Mesh;
   };
   const parties = new Map<string, Party>();
-  // 정찰대가 눈에 띄게: 앞장선 이가 붉은 깃발을 들고, 지나간 눈밭에 발자국이 남음
-  // (주민이 작아 기본 시점에서는 가는지 안 가는지 알 수 없었음 — 사용자 11/21 "정찰 가긴 하냐?")
-  const stepMat = new StandardMaterial("scout-step", scene);
-  stepMat.diffuseColor = new Color3(0.5, 0.57, 0.7);
-  stepMat.specularColor = Color3.Black();
-  const poleMat = new StandardMaterial("scout-flag-pole", scene);
-  poleMat.diffuseColor = new Color3(0.3, 0.22, 0.15);
-  poleMat.specularColor = Color3.Black();
-  const flagMat = new StandardMaterial("scout-flag", scene);
-  flagMat.diffuseColor = new Color3(0.72, 0.16, 0.12);
-  flagMat.emissiveColor = new Color3(0.3, 0.06, 0.05); // 밤에도 보이게
-  flagMat.specularColor = Color3.Black();
-  function layTrail(id: string, from: Vector3, to: Vector3) {
-    const mesh = CreateBox(
-      `scout-trail-${id}`,
-      { width: 0.2, height: 0.03, depth: 0.34 },
-      scene,
-    );
-    mesh.material = stepMat;
-    mesh.isPickable = false;
-    mesh.isVisible = false;
-    mesh.parent = worldRoot ?? null;
-    const dx = to.x - from.x,
-      dz = to.z - from.z,
-      len = Math.hypot(dx, dz) || 1;
-    const steps = Math.max(1, Math.floor(len / 0.7));
-    const buf = new Float32Array(steps * 16);
-    const q = Quaternion.RotationYawPitchRoll(Math.atan2(dx, dz), 0, 0);
-    for (let i = 0; i < steps; i++) {
-      const t = (i + 0.5) / steps,
-        side = (i % 2 ? 0.22 : -0.22) + (i % 4 < 2 ? 0.9 : -0.9); // 둘이 나란히 걸은 자국
-      const x = from.x + dx * t + (-dz / len) * side,
-        z = from.z + dz * t + (dx / len) * side;
-      Matrix.Compose(
-        Vector3.One(),
-        q,
-        new Vector3(x, elevation(x, z) + 0.03, z),
-      ).copyToArray(buf, i * 16);
-    }
-    mesh.thinInstanceSetBuffer("matrix", buf, 16, true);
-    return { trail: mesh, steps };
-  }
-  function raiseFlag(on: TransformNode) {
-    const pole = CreateBox(
-      "scout-flag-pole",
-      { width: 0.07, height: 2.6, depth: 0.07 },
-      scene,
-    );
-    pole.material = poleMat;
-    pole.isPickable = false;
-    pole.parent = on;
-    pole.position.set(0.3, 1.3, -0.1);
-    const cloth = CreateBox(
-      "scout-flag",
-      { width: 0.95, height: 0.55, depth: 0.03 },
-      scene,
-    );
-    cloth.bakeTransformIntoVertices(Matrix.Translation(0.5, 0, 0)); // 깃대를 축으로 펄럭이게
-    cloth.material = flagMat;
-    cloth.isPickable = false;
-    cloth.parent = pole;
-    cloth.position.y = 0.95;
-    return cloth;
-  }
-  function dropParty(p: Party) {
-    for (const mb of p.members) {
-      mb.dispose();
-      mb.node.dispose();
-    }
-    p.trail.dispose();
-  }
   async function setMissions(list: Mission[]) {
     const ids = new Set(list.map((m) => m.id));
     for (const [id, p] of parties)
       if (!ids.has(id)) {
-        dropParty(p);
+        for (const mb of p.members) {
+          mb.dispose();
+          mb.node.dispose();
+        }
         parties.delete(id);
       }
     for (const m of list) {
-      if (parties.has(m.id)) continue;
+      const underway = parties.get(m.id);
+      if (underway) {
+        underway.m = m;
+        continue;
+      }
       const dir = new Vector3(m.x, 0, m.z).normalize();
-      const from = dir.scale(9.5),
-        to = new Vector3(m.x, 0, m.z).subtract(dir.scale(4));
       const party: Party = {
         m,
         members: [],
-        from,
-        to,
-        ...layTrail(m.id, from, to),
-        shown: -1,
+        from: dir.scale(9.5),
+        to: new Vector3(m.x, 0, m.z).subtract(dir.scale(4)),
       };
       parties.set(m.id, party);
       for (const [k, file] of [
         "R05_Gallimimus",
         "R03_Velociraptor",
       ].entries()) {
-        const asset = await load(scene, residentGlb(file));
+        const asset = await load(scene, `/models/residents/${file}.glb`);
         if (disposed || parties.get(m.id) !== party) return;
         const node = new TransformNode(`scout-${m.id}-${k}`, scene);
         node.parent = worldRoot ?? null;
         node.setEnabled(false);
-        const v = instantiate(asset, node, residentScale(file), shadow, 1.3, 2);
+        const v = instantiate(asset, node, RESIDENT_SCALE, shadow, 1.3, 2);
         for (const mesh of v.meshes) mesh.isPickable = false;
         if (parties.get(m.id) !== party) {
           v.dispose();
@@ -675,31 +654,21 @@ export function createVillage(
           dispose: v.dispose,
           side: k ? -0.9 : 0.9,
         });
-        if (k === 0) party.flag = raiseFlag(node);
       }
     }
   }
   // 게임 시각(분)에 맞춰 위치를 정함 → 멈추면 그 자리에 멈춤
   function updateParties(gameMin: number) {
-    clockMin = ((gameMin % 1440) + 1440) % 1440;
     for (const p of parties.values()) {
       const total = p.m.hours * 60,
         e = gameMin - p.m.start;
       const dist = Vector3.Distance(p.from, p.to);
       const travel = Math.min(total / 2, dist * 6.25); // 1초=게임 10분, 걸음 1.6m/s
-      // 발자국: 나간 만큼 남고, 돌아올 때까지 그대로
-      const count = Math.floor(p.steps * Math.max(0, Math.min(1, e / travel)));
-      if (count !== p.shown) {
-        p.shown = count;
-        p.trail.thinInstanceCount = count;
-        p.trail.isVisible = count > 0;
-      }
-      if (p.flag) p.flag.rotation.y = 0.35 * Math.sin(performance.now() / 260);
       let t = -1,
         out = true;
       if (e >= 0 && e < travel) t = e / travel;
-      else if (e >= total - travel && e < total) {
-        t = 1 - (e - (total - travel)) / travel;
+      else if (gameMin >= p.m.due - travel && gameMin < p.m.due) {
+        t = (p.m.due - gameMin) / travel;
         out = false;
       }
       const dx = p.to.x - p.from.x,
@@ -720,17 +689,15 @@ export function createVillage(
     }
   }
 
-  function setHeat(scale: number) {
-    if (Math.abs(scale - smokeScale) < 0.01) return;
-    smokeScale = scale;
-    for (const ps of smokes) ps.emitRate = (smokeBase.get(ps) ?? 10) * scale;
-  }
   let running = false;
   function setRunning(value: boolean) {
     if (value === running) return;
     running = value;
-    if (value) started = true;
     for (const ps of smokes) value ? ps.start() : ps.stop();
+    for (const w of walkers) {
+      w.target = null;
+      w.play(value && w.haul?.state === "work" ? "Work" : "Idle");
+    }
   }
   const moveTo = (w: Walker, to: Vector3, dt: number) => {
     const p = w.node.position,
@@ -745,49 +712,71 @@ export function createVillage(
     w.node.rotation.y = Math.atan2(dx, dz);
     return false;
   };
+  const herald = new TransformNode("관아 포졸", scene);
+  herald.parent = worldRoot ?? null;
+  herald.setEnabled(false);
+  const writ = CreateBox(
+    "법령 한지",
+    { width: 0.95, height: 1.22, depth: 0.035 },
+    scene,
+  );
+  writ.parent = worldRoot ?? null;
+  writ.isPickable = false;
+  const paper = new StandardMaterial("방 한지", scene);
+  const ink = new DynamicTexture(
+    "법령 글씨",
+    { width: 256, height: 320 },
+    scene,
+    false,
+  );
+  paper.diffuseTexture = ink;
+  writ.material = paper;
+  writ.setEnabled(false);
+  let delivery = -1;
+  let messenger: GlbVisual | undefined;
+  function postDecree(title: string, deliver: boolean) {
+    const pen = ink.getContext() as CanvasRenderingContext2D;
+    pen.fillStyle = "#ead9ac";
+    pen.fillRect(0, 0, 256, 320);
+    pen.fillStyle = "#38271a";
+    pen.font = "bold 48px serif";
+    pen.fillText("방", 102, 70);
+    pen.font = "28px serif";
+    for (const [i, word] of title.split(" ").entries())
+      pen.fillText(word, 30, 122 + i * 36);
+    pen.fillStyle = "#973929";
+    pen.fillRect(183, 245, 35, 35);
+    ink.update();
+    delivery = deliver ? 0 : 1;
+    if (deliver && !messenger)
+      void entityVisual("resident", herald, 0)
+        .then((visual) => {
+          if (disposed) {
+            visual.dispose();
+            return;
+          }
+          messenger = visual;
+          visual.setMotion("walking");
+        })
+        .catch(() => {});
+  }
   function animate(dt: number) {
+    if (delivery >= 0) {
+      delivery = Math.min(1, delivery + dt / 3);
+      const z = -10 + 13.6 * delivery;
+      herald.setEnabled(delivery < 1);
+      herald.position.set(0, elevation(0, z), z);
+      writ.setEnabled(true);
+      writ.position.set(
+        delivery < 1 ? 0.55 : 0,
+        elevation(0, z) + 1.2,
+        delivery < 1 ? z : 3.79,
+      );
+      if (delivery === 1) delivery = -1;
+    }
     animateRisers(dt);
-    // 마을 생활은 일시정지와 상관없이 늘 움직임 (사용자 11/19: "상호작용 하는 움직임이 계속 있어야")
-    // — 일시정지는 시간·자원 계산(game-core)에만 걸림
-    // 게임을 시작한 뒤부터 (첫 화면이 밤 0시라 켜자마자 마을이 비지 않게)
-    const night = started && (clockMin >= 21 * 60 || clockMin < 5 * 60);
+    if (!running && !exodusVisible) return;
     for (const w of walkers) {
-      // 밤: 문에 들어가는 주민은 가까운 둥지 안으로, 큰 주민(문보다 큼)은 둥지 옆 바깥에서 잠
-      if (night) {
-        if (w.asleep) continue;
-        if (!w.bed) {
-          const p = w.node.position;
-          const nest = LAYOUT.filter(([id]) => id === "BLD_NEST").reduce(
-            (best, n) =>
-              Math.hypot(n[1] - p.x, n[2] - p.z) <
-              Math.hypot(best[1] - p.x, best[2] - p.z)
-                ? n
-                : best,
-          );
-          const [, nx, nz] = nest;
-          const d = Math.hypot(nx, nz) || 1;
-          // 문은 가운데(온돌) 쪽, 큰 주민은 반대편 바깥
-          const out = w.tall ? 2.8 : -2.1;
-          w.bed = new Vector3(nx + (nx / d) * out, 0, nz + (nz / d) * out);
-          w.haul?.prop.setEnabled(false);
-          w.play("Walk");
-        }
-        if (moveTo(w, w.bed, dt)) {
-          w.asleep = true;
-          if (w.tall) w.play("Idle");
-          else w.node.setEnabled(false);
-        }
-        continue;
-      }
-      if (w.asleep || w.bed) {
-        // 새벽: 둥지에서 나와 하던 일로
-        w.asleep = false;
-        w.bed = null;
-        w.node.setEnabled(true);
-        w.target = null;
-        if (w.haul) w.haul.state = "toWork";
-        w.play("Walk");
-      }
       const h = w.haul;
       if (h) {
         // 일꾼: 일터에서 작업 → 짐 지고 창고로 → 내려놓고 → 빈손으로 돌아감
@@ -826,19 +815,8 @@ export function createVillage(
       }
       if (moveTo(w, w.target, dt)) {
         w.target = null;
-        // 가만히 서 있지 않고: 가까운 이웃을 보고 손짓(일하는 동작) — 이웃이 멀면 가까운 건물 쪽으로
-        const near = walkers
-          .filter((o) => o !== w)
-          .map((o) => o.node.position)
-          .concat(LAYOUT.map(([, x, z]) => new Vector3(x, 0, z)))
-          .reduce((best, q) =>
-            Vector3.DistanceSquared(q, p) < Vector3.DistanceSquared(best, p)
-              ? q
-              : best,
-          );
-        w.node.rotation.y = Math.atan2(near.x - p.x, near.z - p.z);
-        w.wait = 1.6 + r() * 2;
-        w.play("Work");
+        w.wait = 1.5 + r() * 3.5;
+        w.play("Idle");
       }
     }
   }
@@ -848,12 +826,13 @@ export function createVillage(
     kind: "building" | "resident",
     parent: Node,
     offsetY: number,
+    level = 1,
   ): Promise<GlbVisual> {
     const asset = await load(
       scene,
       kind === "building"
-        ? glbFile("BLD_ONDOL") // 가운데 온돌: 난방의 중심 (블렌더로 만든 화덕·큰 굴뚝·구들 고래)
-        : residentGlb("R02_Triceratops"),
+        ? "/models/buildings/BLD_NEST.glb"
+        : "/models/residents/R02_Triceratops.glb",
     );
     if (disposed || parent.isDisposed()) throw new Error("종료한 대상입니다.");
     const node = new TransformNode(`${parent.name}:glb`, scene);
@@ -862,32 +841,60 @@ export function createVillage(
     const v = instantiate(
       asset,
       node,
-      kind === "building" ? BUILDING_SCALE : residentScale("R02_Triceratops"),
+      kind === "building"
+        ? BUILDING_SCALE * (1 + (level - 1) * 0.06)
+        : RESIDENT_SCALE,
       shadow,
       kind === "building" ? 4.2 : 1.3,
       kind === "building" ? 4 : 2,
     );
-    v.play("Idle", 0);
-    if (kind === "building") {
-      for (const m of v.meshes) lib.dress(m.material);
-      // 큰 굴뚝 연기 (온돌은 늘 땜)
-      (parent as TransformNode).computeWorldMatrix?.(true);
-      node.computeWorldMatrix(true);
-      const s = node
-        .getDescendants(false)
-        .find(
-          (n): n is TransformNode =>
-            /smoke/i.test(n.name) && n instanceof TransformNode,
-        );
-      if (s) addSmoke(s.computeWorldMatrix(true).getTranslation(), 2.2);
+    const lamp =
+      kind === "building" && light
+        ? CreateBox(
+            node.name + "-door-light",
+            { width: 1.1, height: 0.95, depth: 0.06 },
+            scene,
+          )
+        : null;
+    if (lamp && light) {
+      lamp.parent = node;
+      lamp.position.set(0, 1, 2.95);
+      lamp.material = light.warmMat;
+      lamp.isPickable = false;
+      light.glow.addIncludedOnlyMesh(lamp);
+      lamp.setEnabled(false);
     }
+    // 겨울 연출만: 대표 둥지의 입구 주변 표면에만 따뜻한 빛을 반사한다.
+    // 기존 입주·시각에 따른 문 불빛(setLit)은 계절에 관계없이 그대로 둔다.
+    const ondolMeshes =
+      season === "winter" &&
+      kind === "building" &&
+      parent.id === "example-building-1"
+        ? v.meshes.filter((mesh) => mesh.getTotalVertices() > 0)
+        : [];
+    let ondolGlow: PointLight | undefined;
+    if (ondolMeshes.length > 0) {
+      ondolGlow = new PointLight(
+        "representative-ondol-glow",
+        new Vector3(0, 1, 3.25),
+        scene,
+      );
+      ondolGlow.includedOnlyMeshes = ondolMeshes;
+      ondolGlow.parent = node;
+      ondolGlow.diffuse = new Color3(1, 0.53, 0.22);
+      ondolGlow.specular = Color3.Black();
+      ondolGlow.intensity = 0.18;
+      ondolGlow.range = 2;
+    }
+    v.play("Idle", 0);
     return {
+      setLit(value) {
+        lamp?.setEnabled(value);
+      },
       setOutline(value) {
-        if (kind === "building") return; // 건물은 바닥 고리·윤곽선 없이
         for (const m of v.meshes) {
           m.outlineColor = OUTLINE;
-          // 주민은 작게 줄여 그려서(0.3배대) 0.025면 1픽셀도 안 됨 — 고르면 보이게 두껍게
-          m.outlineWidth = 0.09;
+          m.outlineWidth = 0.025;
           m.renderOutline = value;
         }
       },
@@ -896,6 +903,7 @@ export function createVillage(
       },
       animate() {},
       dispose() {
+        ondolGlow?.dispose();
         v.dispose();
         node.dispose();
       },
@@ -904,19 +912,40 @@ export function createVillage(
 
   return {
     ready,
-    setHeat,
     entityVisual,
-    /** 누른 조각이 마을 건물이면 LAYOUT 번호 */
-    buildingForMesh(mesh: Node | null): number | null {
-      for (let n: Node | null = mesh; n; n = n.parent) {
-        const i = buildingNodes.get(n);
-        if (i !== undefined) return i;
-      }
-      return null;
+    postDecree,
+    clearDecree() {
+      delivery = -1;
+      herald.setEnabled(false);
+      writ.setEnabled(false);
     },
-    /** 고른 건물 발밑 고리 (null이면 숨김) */
-    /** 고른 마을 건물 표시 — 바닥 고리는 없앰(메달 창으로 대신) */
-    highlight(_i: number | null) {},
+    setFireDamage(
+      burned: boolean,
+      burning: boolean,
+      removed: readonly string[] = [],
+    ) {
+      missing = new Set(removed);
+      if (burned) {
+        missing.add("BLD_WORKSHOP");
+        missing.add("BLD_CLINIC");
+      }
+      for (const [id, node] of permanent) node.setEnabled(!missing.has(id));
+      exodusVisible = burning;
+      for (const w of walkers)
+        if (w.haul) w.node.setEnabled(burning || previewResidentsVisible);
+      for (const node of lostQuarter) node.setEnabled(burning);
+      for (const fire of fires) {
+        if (burning && !fire.isStarted()) fire.start();
+        if (!burning && fire.isStarted()) fire.stop();
+      }
+    },
+    setPreviewResidentsVisible(visible: boolean) {
+      previewResidentsVisible = visible;
+      for (const walker of walkers)
+        walker.node.setEnabled(visible || (exodusVisible && !!walker.haul));
+    },
+    targets,
+    mark,
     setRunning,
     animate,
     setMissions,
@@ -925,7 +954,11 @@ export function createVillage(
     partyPoints,
     resetScouting() {
       scoutGeneration++;
-      for (const party of parties.values()) dropParty(party);
+      for (const party of parties.values())
+        for (const member of party.members) {
+          member.dispose();
+          member.node.dispose();
+        }
       parties.clear();
       for (const visual of landmarkVisuals.values()) {
         visual.dispose();
@@ -936,9 +969,19 @@ export function createVillage(
     },
     dispose() {
       disposed = true;
+      messenger?.dispose();
+      herald.dispose();
+      writ.dispose();
+      ink.dispose();
+      paper.dispose();
       plinthMat.dispose();
+      for (const fire of fires) fire.dispose(false);
       for (const ps of smokes) ps.dispose();
-      for (const p of parties.values()) dropParty(p);
+      for (const p of parties.values())
+        for (const mb of p.members) {
+          mb.dispose();
+          mb.node.dispose();
+        }
       parties.clear();
       for (const visual of landmarkVisuals.values()) {
         visual.dispose();

@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import {
   advanceDay,
-  advanceToStory,
+  advancePlayMinutes,
   createExampleSave,
   createInitialState,
   createPlaySave,
@@ -14,9 +14,7 @@ import {
   type PlayState,
   parseExampleSave,
   parsePlaySave,
-  pickStory,
   setPlayPaused,
-  setZoneHeat,
   supplyFood,
   tickPlay,
 } from "@dynosty/game-core";
@@ -71,16 +69,9 @@ self.onmessage = (event: MessageEvent<GameCommand>) => {
         else if (command.type === "pause")
           play = setPlayPaused(play, command.paused);
         else if (command.type === "advance-day")
-          play = advanceToStory(play, 1440);
+          play = advancePlayMinutes(play, 1440);
         else if (command.type === "test-food")
           play = supplyFood(play, command.days);
-        else if (command.type === "story-pick")
-          play = pickStory(play, command.id, command.side);
-        else if (command.type === "set-heat")
-          play = {
-            ...play,
-            winter: setZoneHeat(play.winter, command.zone, command.heat),
-          };
         manualScene = false;
         lastTick = performance.now();
         publishPlay();

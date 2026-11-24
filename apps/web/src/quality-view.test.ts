@@ -9,9 +9,9 @@ import {
 } from "@dynosty/game-core";
 import { expect, it } from "vitest";
 import { createLaborVisual } from "./labor-scene.js";
+import { createLegacyTimberVisual as createTimberVisual } from "./legacy-timber-scene.js";
 import { createQualityVisual } from "./quality-scene.js";
 import { qualityView } from "./quality-view.js";
-import { createTimberVisual } from "./timber-scene.js";
 
 function fixture(offer: "A" | "B" = "A") {
   let s = createLaborState(),

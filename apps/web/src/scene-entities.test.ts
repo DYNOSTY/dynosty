@@ -6,7 +6,76 @@ import { createSceneExample } from "@dynosty/game-core";
 import { describe, expect, it, vi } from "vitest";
 import { createSceneEntities } from "./scene-entities.js";
 
+it("구릉을 따라 이동할 때 주민의 발과 건물 기초가 지면 높이를 따른다", () => {
+  const engine = new NullEngine(),
+    scene = new Scene(engine),
+    entities = createSceneEntities(scene);
+  try {
+    entities.setElevation((x) => x / 10);
+    const initial = createSceneExample();
+    entities.update(initial);
+    const resident = scene.getMeshById("example-resident-1"),
+      home = scene.getMeshById("example-building-1");
+    if (!resident || !home) throw Error("표시 없음");
+    expect(resident.position.y).toBeCloseTo(0.3);
+    expect(home.position.y).toBeCloseTo(0.75);
+    entities.update({
+      ...initial,
+      entities: initial.entities.map((e) =>
+        e.kind === "resident" ? { ...e, position: { x: 8, y: 0, z: 1 } } : e,
+      ),
+    });
+    for (let i = 0; i < 10; i++) {
+      entities.animate(0.5);
+      expect(resident.position.y).toBeCloseTo(0.5 + resident.position.x / 10);
+    }
+  } finally {
+    entities.dispose();
+    scene.dispose();
+    engine.dispose();
+  }
+});
+
 describe("표시 정보에서 Babylon 객체로 변환", () => {
+  it("재시작·복귀 도중에도 매 프레임 집을 우회하고 목적지에 도착한다", () => {
+    const engine = new NullEngine(),
+      scene = new Scene(engine),
+      entities = createSceneEntities(scene);
+    const snapshot = createSceneExample();
+    const move = (x: number, z: number) =>
+      entities.update({
+        ...snapshot,
+        entities: snapshot.entities.map((e) =>
+          e.kind === "resident" ? { ...e, position: { x, y: 0, z } } : e,
+        ),
+      });
+    try {
+      move(4, -3);
+      const resident = scene.getMeshById("example-resident-1");
+      if (!resident) throw new Error("주민 표시가 없습니다.");
+      for (const goal of [
+        { x: -2, z: 1 },
+        { x: 4, z: -3 },
+        { x: 0, z: -3 },
+        { x: -2, z: 1 },
+      ]) {
+        move(goal.x, goal.z);
+        for (let frame = 0; frame < 600; frame++) {
+          entities.animate(1 / 60);
+          const { x, z } = resident.position;
+          expect(x >= -1.75 && x <= 1.75 && z >= -2.75 && z <= 0.75).toBe(
+            false,
+          );
+        }
+        expect(resident.position.x).toBeCloseTo(goal.x);
+        expect(resident.position.z).toBeCloseTo(goal.z);
+      }
+    } finally {
+      entities.dispose();
+      scene.dispose();
+      engine.dispose();
+    }
+  });
   it("식별값으로 객체를 재사용하고 위치·방향·색을 갱신한다", () => {
     const engine = new NullEngine();
     const scene = new Scene(engine);
@@ -16,9 +85,20 @@ describe("표시 정보에서 Babylon 객체로 변환", () => {
       const resident = scene.getMeshById("example-resident-1");
       expect(resident?.position).toMatchObject({ x: -2, y: 0.5, z: 1 });
       entities.update(createSceneExample(true));
+      expect(resident?.position.x).toBe(-2);
+      entities.animate(1);
+      expect(resident?.position.x).toBe(0);
+      entities.animate(1);
       expect(scene.getMeshById("example-resident-1")).toBe(resident);
       expect(scene.meshes).toHaveLength(2);
       expect(resident?.position).toMatchObject({ x: 2, y: 0.5, z: 1 });
+      expect(resident?.rotation.y).toBe(Math.PI / 2);
+      entities.update({
+        ...createSceneExample(true),
+        entities: createSceneExample(true).entities.map((e) =>
+          e.kind === "resident" ? { ...e, headingRadians: Math.PI } : e,
+        ),
+      });
       expect(resident?.rotation.y).toBe(Math.PI / 2);
       const material = scene.getMeshById("example-building-1")?.material;
       expect(material).toBeInstanceOf(StandardMaterial);
@@ -109,6 +189,7 @@ describe("예제 대상 선택", () => {
       const mesh = w.scene.getMeshById(id) as Mesh;
       const snapshot = createSceneExample(true);
       w.entities.update(snapshot);
+      w.entities.animate(2);
       expect(w.scene.getMeshById(id)).toBe(mesh);
       expect(mesh.renderOutline).toBe(true);
       expect(mesh.position.x).toBe(2);
@@ -227,4 +308,135 @@ describe("늦게 도착하는 GLB와 최신 게임 표시", () => {
       engine.dispose();
     }
   });
+});
+it("요구가 있는 주민만 표식을 보이고 해소·종료 시 숨기고 정리한다", () => {
+  const engine = new NullEngine(),
+    scene = new Scene(engine),
+    entities = createSceneEntities(scene),
+    base = createSceneExample();
+  const update = (needsHelp: boolean) =>
+    entities.update({
+      ...base,
+      entities: base.entities.map((e) =>
+        e.kind === "resident" ? { ...e, needsHelp } : e,
+      ),
+    });
+  try {
+    update(true);
+    expect(scene.getMeshById("need:example-resident-1")?.isEnabled()).toBe(
+      true,
+    );
+    update(false);
+    expect(scene.getMeshById("need:example-resident-1")?.isEnabled()).toBe(
+      false,
+    );
+    entities.dispose();
+    expect(scene.meshes).toHaveLength(0);
+  } finally {
+    scene.dispose();
+    engine.dispose();
+  }
+});
+
+it("실내 휴식은 문까지 걸어간 뒤 숨기고 다음 지시 때 문에서 다시 나온다", () => {
+  const engine = new NullEngine(),
+    scene = new Scene(engine),
+    entities = createSceneEntities(scene),
+    base = createSceneExample();
+  const resident = base.entities.find((e) => e.kind === "resident");
+  if (!resident) throw Error("주민 없음");
+  try {
+    entities.update(base);
+    entities.update({
+      ...base,
+      entities: base.entities.map((e) =>
+        e.kind === "resident"
+          ? {
+              ...e,
+              position: { x: -2, y: 0, z: -3 },
+              visible: false,
+              indoors: true,
+            }
+          : e,
+      ),
+    });
+    expect(scene.getMeshById(resident.id)?.isEnabled()).toBe(true);
+    entities.animate(10);
+    expect(scene.getMeshById(resident.id)?.isEnabled()).toBe(false);
+    expect(scene.getMeshById(resident.id)?.position.z).toBe(-3);
+    entities.update({
+      ...base,
+      entities: base.entities.map((e) =>
+        e.kind === "resident"
+          ? {
+              ...e,
+              position: { x: -4, y: 0, z: -3 },
+              visible: true,
+              indoors: false,
+            }
+          : e,
+      ),
+    });
+    expect(scene.getMeshById(resident.id)?.position.z).toBe(-3);
+    entities.animate(1);
+    expect(scene.getMeshById(resident.id)?.position.x).toBe(-4);
+  } finally {
+    entities.dispose();
+    scene.dispose();
+    engine.dispose();
+  }
+});
+it("대기 GLB가 늦게 와도 새 종별 모델을 덮어쓰지 않고 단계 개량은 모델을 교체한다", async () => {
+  const engine = new NullEngine(),
+    scene = new Scene(engine),
+    entities = createSceneEntities(scene);
+  const pending = new Map<
+    string,
+    (v: import("./village.js").GlbVisual) => void
+  >();
+  const visual = {
+    setOutline: vi.fn(),
+    setMotion: vi.fn(),
+    animate: vi.fn(),
+    dispose: vi.fn(),
+  };
+  try {
+    const base = createSceneExample();
+    entities.update(base);
+    entities.setGlb(
+      (kind, _parent, _offset, level) =>
+        new Promise((resolve) =>
+          pending.set(level ? kind + level : kind, resolve),
+        ),
+    );
+    const custom = {
+      ...base,
+      entities: base.entities.map((e) =>
+        e.kind === "resident"
+          ? { ...e, species: "SPINO" }
+          : { ...e, level: 1 as const },
+      ),
+    };
+    entities.update(custom);
+    expect(scene.getMeshById("example-resident-1:back-sail-0")).not.toBeNull();
+    pending.get("resident")?.(visual);
+    await Promise.resolve();
+    expect(visual.dispose).toHaveBeenCalledOnce();
+    expect(scene.getMeshById("example-resident-1:back-sail-0")).not.toBeNull();
+    const original = { ...visual, dispose: vi.fn() };
+    pending.get("building1")?.(original);
+    await Promise.resolve();
+    entities.update({
+      ...custom,
+      entities: custom.entities.map((e) =>
+        e.kind === "building" ? { ...e, level: 3 as const } : e,
+      ),
+    });
+    expect(original.dispose).toHaveBeenCalledOnce();
+    expect(pending.has("building3")).toBe(true);
+  } finally {
+    entities.dispose();
+    scene.dispose();
+    engine.dispose();
+  }
 });

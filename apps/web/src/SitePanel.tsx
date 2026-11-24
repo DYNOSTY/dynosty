@@ -37,7 +37,6 @@ export function SitePanel({
       aside.scrollTop +=
         heading.getBoundingClientRect().top -
         aside.getBoundingClientRect().top -
-        aside.clientTop -
         12;
   }, []);
   if (!siteAvailable(state, selected)) return null;
@@ -104,10 +103,6 @@ export function SitePanel({
         </button>
       </div>
       {error ? <p role="alert">{error}</p> : null}
-      <p className="hint">
-        기존 체험 개발값을 사용합니다. 본편의 영양·기아·반품 책임·위약금·공급처
-        신뢰도·불량률은 미정입니다.
-      </p>
     </section>
   );
 }

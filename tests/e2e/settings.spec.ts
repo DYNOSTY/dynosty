@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { press } from "./labor-tabs.js";
 
 const settingsKey = "dynosty.settings";
 const gameKey = "dynosty.example.saves";
@@ -31,94 +30,41 @@ test("설정 메뉴에서 키보드로 바꾼 음량·음소거를 새로고침 
   await expect(
     dialog.getByRole("checkbox", { name: "소리 끄기" }),
   ).toBeChecked();
-  await expect(
-    dialog.getByRole("button", { name: "확인음 듣기" }),
-  ).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "확인음 듣기" })).toHaveCount(
+    0,
+  );
   expect(await page.evaluate((key) => localStorage.getItem(key), gameKey)).toBe(
     "keep game save",
   );
 });
 
-test("저장된 음량이 실제 오디오 출력에 적용되고 자동 재생하지 않는다", async ({
-  page,
-}) => {
-  await page.addInitScript((key) => {
-    localStorage.setItem(
-      key,
-      JSON.stringify({ settingsVersion: 1, masterVolume: 25, muted: false }),
-    );
-    const probe = {
-      contexts: [] as AudioContext[],
-      gains: [] as GainNode[],
-      oscillators: 0,
-    };
-    const Base = window.AudioContext;
-    class ObservedAudioContext extends Base {
-      constructor(options?: AudioContextOptions) {
-        super(options);
-        probe.contexts.push(this);
-      }
-      override createGain() {
-        const node = super.createGain();
-        probe.gains.push(node);
-        return node;
-      }
-      override createOscillator() {
-        probe.oscillators += 1;
-        return super.createOscillator();
-      }
-    }
-    window.AudioContext = ObservedAudioContext;
-    Object.assign(window, { settingsAudioProbe: probe });
-  }, settingsKey);
-  await page.goto("/");
-  await press(page, "설정");
-  const dialog = page.getByRole("dialog");
-  const volume = dialog.getByRole("slider", { name: "전체 음량" });
-  await expect(volume).toHaveValue("25");
-  expect(
-    await page.evaluate(
-      () =>
-        (
-          window as unknown as {
-            settingsAudioProbe: { contexts: AudioContext[] };
-          }
-        ).settingsAudioProbe.contexts.length,
-    ),
-  ).toBe(0);
-  await dialog.getByRole("button", { name: "확인음 듣기" }).click();
-  await expect(dialog.getByTestId("audio-preview-status")).toHaveText(
-    "확인음을 재생했습니다.",
+test("돌아보기 영상에 저장한 음량을 적용한다", async ({ page }) => {
+  await page.addInitScript(
+    (key) =>
+      localStorage.setItem(
+        key,
+        JSON.stringify({ settingsVersion: 1, masterVolume: 25, muted: false }),
+      ),
+    settingsKey,
   );
-  const output = () =>
-    page.evaluate(() => {
-      const probe = (
-        window as unknown as {
-          settingsAudioProbe: {
-            contexts: AudioContext[];
-            gains: GainNode[];
-            oscillators: number;
-          };
-        }
-      ).settingsAudioProbe;
-      return {
-        state: probe.contexts[0]?.state,
-        gain: probe.gains[0]?.gain.value,
-        oscillators: probe.oscillators,
-      };
-    });
-  await expect
-    .poll(output)
-    .toEqual({ state: "running", gain: 0.25, oscillators: 1 });
-  const muted = dialog.getByRole("checkbox", { name: "소리 끄기" });
-  await muted.check();
-  await expect.poll(async () => (await output()).gain).toBe(0);
-  await muted.uncheck();
-  await expect.poll(async () => (await output()).gain).toBe(0.25);
-  await volume.press("Home");
-  await expect.poll(async () => (await output()).gain).toBe(0);
-  await volume.press("End");
-  await expect.poll(async () => (await output()).gain).toBe(1);
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: /복홀의 첫 명령/ }),
+  ).toBeVisible();
+  await expect(page.getByTestId("play-scene-status")).toContainText(
+    "준비 완료",
+  );
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "나가기", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "메인 메뉴" });
+  await page.evaluate(() =>
+    localStorage.setItem("dynosty.film.opening", "seen"),
+  );
+  await menu.getByRole("button", { name: "돌아보기" }).click();
+  const gallery = page.getByRole("dialog", { name: "돌아보기" });
+  await gallery.getByRole("button", { name: "영상 보기" }).click();
+  await expect(gallery.locator("video")).toHaveJSProperty("volume", 0.25);
+  await expect(gallery.locator("video")).toHaveJSProperty("muted", false);
 });
 
 for (const raw of [
@@ -134,7 +80,7 @@ for (const raw of [
       value: raw,
     });
     await page.reload();
-    await press(page, "설정");
+    await page.getByRole("button", { name: "설정", exact: true }).click();
     const dialog = page.getByRole("dialog");
     const volume = dialog.getByRole("slider", { name: "전체 음량" });
     await expect(volume).toHaveValue("50");
@@ -154,7 +100,7 @@ test("설정 쓰기 실패는 이번 실행에만 적용하고 이전 설정·�
   page,
 }) => {
   await page.goto("/");
-  await press(page, "설정");
+  await page.getByRole("button", { name: "설정", exact: true }).click();
   const dialog = page.getByRole("dialog");
   const volume = dialog.getByRole("slider", { name: "전체 음량" });
   await volume.press("End");
@@ -187,7 +133,7 @@ test("설정 쓰기 실패는 이번 실행에만 적용하고 이전 설정·�
     "keep game save",
   );
   await page.reload();
-  await press(page, "설정");
+  await page.getByRole("button", { name: "설정", exact: true }).click();
   await expect(volume).toHaveValue("100");
 });
 
@@ -204,12 +150,8 @@ test("오디오를 사용할 수 없어도 안전한 안내 후 설정을 변경
     });
   });
   await page.goto("/");
-  await press(page, "설정");
+  await page.getByRole("button", { name: "설정", exact: true }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "확인음 듣기" }).click();
-  await expect(dialog.getByTestId("audio-preview-status")).toContainText(
-    "재생하지 못했습니다",
-  );
   await dialog.getByRole("slider", { name: "전체 음량" }).press("End");
   await expect(dialog.getByTestId("settings-save-status")).toHaveText(
     "설정을 저장했습니다.",

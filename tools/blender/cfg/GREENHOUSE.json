@@ -1,6 +1,0 @@
-{
-  "name": "greenhouse",
-  "roof": ["glass", "glass2", "tile", "cap"],
-  "patchy": true,
-  "smoke": [2.62, 1.52, 3.15]
-}

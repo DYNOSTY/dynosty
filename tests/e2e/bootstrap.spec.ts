@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { openWorkspace } from "./workspace.js";
 
-test("웹 프록시를 통해 실제 PostgreSQL 연결을 확인한다", async ({
-  request,
-}) => {
+test("웹 프록시를 통해 실제 PostgreSQL 연결을 확인한다", {
+  tag: "@smoke",
+}, async ({ request }) => {
   const response = await request.get("/api/ready");
   expect(response.status()).toBe(200);
   expect(await response.json()).toEqual({
@@ -21,7 +21,7 @@ test("브라우저에서 API·Worker·3D 연결을 확인한다", async ({ page 
   await expect(page.getByRole("status")).toHaveText("연결 완료");
   await expect(page.getByText("준비 완료", { exact: true })).toBeVisible();
   await expect(page.getByText("1일차", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "하루 진행" }).click();
+  await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
   const canvas = page.locator("canvas");
   await expect(canvas).toBeVisible();

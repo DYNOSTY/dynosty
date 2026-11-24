@@ -50,8 +50,6 @@ export function ConsoleFrame() {
           className={i % 2 ? "grow" : ""}
         />
       ))}
-      {/* 짧은 콘솔(건물 선택)의 오른쪽 마감 — console_4 바깥 테두리만 잘라 냄 */}
-      <img src="/ui/kit/console_end.png" alt="" className="end" />
     </div>
   );
 }
@@ -63,8 +61,6 @@ type CmdProps = {
   onClick?: () => void;
   disabled?: boolean;
   pressed?: boolean;
-  /** 켜고 끄는 명령(화력 등)의 지금 상태 — aria-pressed */
-  toggled?: boolean | undefined;
   buttonRef?: React.Ref<HTMLButtonElement>;
   controls?: string;
 };
@@ -76,7 +72,6 @@ export function CmdButton({
   onClick,
   disabled,
   pressed,
-  toggled,
   buttonRef,
   controls,
 }: CmdProps) {
@@ -89,7 +84,6 @@ export function CmdButton({
       onClick={onClick}
       disabled={disabled}
       aria-expanded={pressed}
-      aria-pressed={toggled}
       aria-controls={controls}
       title={disabled ? `${label} · 규칙 준비 중` : `${label} (${hotkey})`}
     >
@@ -108,16 +102,7 @@ export function CmdFace({
 }): ReactNode {
   return (
     <>
-      <img
-        src={
-          icon === "close"
-            ? "/ui/kit/knob_close.png"
-            : icon.startsWith("heat_")
-              ? `/ui/season/${icon}.png` // 화력 3단계: 아궁이 불 크기
-              : `/ui/cmd/${icon}.png`
-        }
-        alt=""
-      />
+      <img src={`/ui/cmd/${icon}.png`} alt="" />
       <span>{label}</span>
       <span className="g-hotkey" aria-hidden="true">
         {hotkey}
@@ -153,11 +138,32 @@ export function MoodScale({
         ready ? `희망 ${hope}, 절망 ${despair}` : "희망·절망 규칙 준비 중"
       }
     >
-      <span className="g-mood__v">
-        <small>희망</small>
-        <b>{ready ? hope : "—"}</b>
-      </span>
       <div className="rig-box">
+        <button
+          type="button"
+          className="mood-inspect"
+          aria-label="희망과 절망 확인"
+        />
+        <span
+          className="g-mood__v"
+          style={{
+            left: ((X + lx) / 1120) * 100 + "%",
+            top: ((Y + ly + 480) / 930) * 100 + "%",
+          }}
+        >
+          <small>희망</small>
+          {ready && <b>{hope}</b>}
+        </span>
+        <span
+          className="g-mood__v"
+          style={{
+            left: ((X + rx) / 1120) * 100 + "%",
+            top: ((Y + ry + 480) / 930) * 100 + "%",
+          }}
+        >
+          <small>절망</small>
+          {ready && <b>{despair}</b>}
+        </span>
         <div className="rig">
           <img
             src="/ui/kit/scale_post.png"
@@ -186,10 +192,7 @@ export function MoodScale({
           />
         </div>
       </div>
-      <span className="g-mood__v">
-        <small>절망</small>
-        <b>{ready ? despair : "—"}</b>
-      </span>
+
       {ready ? null : <figcaption>민심 규칙 준비 중</figcaption>}
     </figure>
   );

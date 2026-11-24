@@ -1,5 +1,40 @@
 /* DYNOSTY 그림체 기준 (M1) — 유물 화면·시나리오 삽화·건물 도감에서 뽑음
    재질: 한지 · 옻칠 나무 · 쪽빛 천 · 먹 · 낙관 빨강 */
+@font-face {
+  font-family: "Gowun Batang";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/fonts/gowun-batang-korean-400-normal.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Gowun Batang";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/fonts/gowun-batang-latin-400-normal.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Gowun Batang";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(/fonts/gowun-batang-korean-700-normal.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Gowun Batang";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(/fonts/gowun-batang-latin-700-normal.woff2) format("woff2");
+}
+@font-face {
+  font-family: Pretendard;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/PretendardVariable.woff2") format("woff2");
+}
 
 :root {
   /* 바탕 */
@@ -20,9 +55,8 @@
   --hanbok: #7b6a9b; /* 한복 보라 · 인물·선택 */
 
   /* 글꼴 */
-  /* 글꼴: 화면 전체 고운바탕 하나 (2026-11-19 사용자) — src/fonts.css */
   --font-title: "Gowun Batang", "Nanum Myeongjo", serif;
-  --font-body: "Gowun Batang", "Nanum Myeongjo", serif;
+  --font-body: Pretendard, "Malgun Gothic", system-ui, sans-serif;
   /* 글자 크기 (1920×1080 기준, 본문 18 이상) */
   --fs-display: 36px; /* 창 제목 */
   --fs-title: 24px; /* 칸 제목 */
@@ -34,4 +68,34 @@
   --sp-2: 16px;
   --sp-3: 24px;
   --sp-4: 32px;
+}
+
+.village-key-help {
+  position: fixed;
+  left: 1rem;
+  top: 4.5rem;
+  z-index: 12;
+  max-width: calc(100vw - 2rem);
+  padding: 1rem;
+  color: #34291f;
+  background: #f4e4c9;
+  border: 1px solid #795e3e;
+}
+
+.convoy-road {
+  position: relative;
+  margin: 0.5rem 2rem;
+  padding-top: 44px;
+  text-align: center;
+}
+.convoy-road::before {
+  content: "";
+  position: absolute;
+  inset: 40px 0 auto;
+  border-top: 2px solid #795e3e;
+}
+.convoy-road-cart {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
 }

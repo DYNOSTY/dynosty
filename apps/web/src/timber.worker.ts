@@ -2,21 +2,45 @@
 import {
   commandTimber,
   createTimberSave,
-  createTimberState,
-  parseTimberSave,
+  createVillageGame,
   tickTimber,
 } from "@dynosty/game-core";
+import { resumeVillage } from "./resume-village.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 
-let state = createTimberState(),
+import { villageCompletions } from "./village-completions.js";
+
+let state = createVillageGame(true),
   last = performance.now();
+let initialized = false;
 const send = (m: TimberResponse) => self.postMessage(m);
-const publish = () => send({ type: "state", state });
-publish();
+const publish = (before?: typeof state) =>
+  send({
+    type: "state",
+    state,
+    ...(before
+      ? { completions: villageCompletions(before, state) }
+      : { resetNotices: true }),
+  });
 self.onmessage = (event: MessageEvent<TimberRequest>) => {
   const m = event.data;
+  const before = state;
+  const wasPaused = state.paused;
   try {
-    if (m.type === "command") state = commandTimber(state, m.command, m.id);
+    if (m.type === "init") {
+      if (!initialized)
+        state = m.resume ? resumeVillage(m.resume) : createVillageGame(true);
+      initialized = true;
+    } else if (m.type === "exit") {
+      state = { ...state, paused: true, remainder: 0 };
+      send({ type: "exited", world: state.world });
+      publish();
+      return;
+    } else if (m.type === "command")
+      state =
+        m.command.type === "restart"
+          ? createVillageGame(true)
+          : commandTimber(state, m.command, m.id);
     else if (m.type === "save") {
       send({
         type: "saved",
@@ -25,18 +49,30 @@ self.onmessage = (event: MessageEvent<TimberRequest>) => {
       });
       return;
     } else {
-      const loaded = parseTimberSave(m.data);
-      state = { ...loaded.state, paused: true, remainder: 0 };
+      state = resumeVillage(m.data);
+      initialized = true;
       send({ type: "loaded", requestId: m.requestId });
     }
-    last = performance.now();
-    publish();
+    if (
+      m.type !== "command" ||
+      wasPaused !== state.paused ||
+      m.command.type === "restart"
+    )
+      last = performance.now();
+    publish(
+      m.type === "command" &&
+        m.command.type !== "restart" &&
+        before.chapter === state.chapter &&
+        before.campaign?.beat !== "departure"
+        ? before
+        : undefined,
+    );
   } catch (e) {
     send({
       type: "error",
-      requestId: m.type === "command" ? null : m.requestId,
+      requestId: m.type === "save" || m.type === "load" ? m.requestId : null,
       message:
-        e instanceof Error ? e.message : "체험판 명령을 처리하지 못했습니다.",
+        e instanceof Error ? e.message : "마을 명령을 처리하지 못했습니다.",
     });
   }
 };
@@ -46,8 +82,9 @@ setInterval(() => {
   last = now;
   if (state.paused) return;
   try {
+    const before = state;
     state = tickTimber(state, elapsed);
-    publish();
+    publish(before);
   } catch {
     state = { ...state, paused: true };
     publish();

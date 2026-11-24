@@ -1,6 +1,0 @@
-{
-  "name": "clinic",
-  "roof": ["thatch", "strawlight", "rope"],
-  "patchy": false,
-  "smoke": [2.27, 0.82, 2.2]
-}

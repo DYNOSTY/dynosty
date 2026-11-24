@@ -1,24 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { press } from "./labor-tabs.js";
 import {
   clickExample,
-  clickUnoccupiedGround,
-  clickVisibleResident,
+  clickFloor,
   examplePoint,
   outlinePixels,
+  worldPoint,
 } from "./scene-picking.js";
-
-/** 주민 윤곽선이 켜졌는지 — 화면 픽셀 대신 장면 상태로 (헤드리스는 반 해상도라 가는 선이 배경과 섞여 색으로 못 셈) */
-const residentOutlined = (page: import("@playwright/test").Page) =>
-  page.evaluate(() =>
-    (
-      window as unknown as {
-        __scene: { meshes: Array<{ name: string; renderOutline: boolean }> };
-      }
-    ).__scene.meshes.some(
-      (m) => m.name.startsWith("example-resident") && m.renderOutline,
-    ),
-  );
 
 async function ready(page: import("@playwright/test").Page) {
   await page.goto("/");
@@ -31,16 +18,12 @@ async function ready(page: import("@playwright/test").Page) {
         const scene = (
           window as unknown as {
             __scene: {
-              getTransformNodeByName(
-                name: string,
-              ): { getChildMeshes(): unknown[] } | null;
+              getMeshById(name: string): { getChildMeshes(): unknown[] } | null;
             };
           }
         ).__scene;
         return (
-          scene
-            .getTransformNodeByName("example-building-1:glb")
-            ?.getChildMeshes().length ?? 0
+          scene.getMeshById("example-building-1")?.getChildMeshes().length ?? 0
         );
       }),
     )
@@ -61,33 +44,38 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
     localStorage.setItem("dynosty.example.saves", "keep saved data"),
   );
   // 패널 전환에 따른 장면 폭 변경 없이 실제 테두리 픽셀의 변화를 비교한다.
-  await press(page, "저장");
-  await press(page, "저장 닫기");
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   const canvas = page.locator("canvas");
   expect(outlinePixels(await canvas.screenshot())).toBe(0);
   await clickExample(page, "building");
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
-  // 선택 창은 이름·설명만 (개발용 예제 문구는 사용자 화면에서 뺌, 2026-11-19)
-  await expect(info.getByRole("heading", { name: "온돌" })).toBeVisible();
+  await expect(
+    info.getByText("복홀 방 게시판", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    info.getByText("정책 시행 · 필요량에 따른 배급", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "건물 예제 선택", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  // 건물은 바닥 고리 없이 선택 창으로만 알림 (2026-11-19 사용자 요청)
-  expect(outlinePixels(await canvas.screenshot())).toBe(0);
-  await clickVisibleResident(page);
-  await expect(
-    info.getByRole("heading", { name: "트리케라톱스" }),
-  ).toBeVisible();
-  await expect.poll(() => residentOutlined(page)).toBe(true);
+  await expect
+    .poll(async () => outlinePixels(await canvas.screenshot()))
+    .toBeGreaterThan(20);
+  await page.screenshot({
+    path: test.info().outputPath("bokhol-notice-board.png"),
+  });
+  await clickExample(page, "resident");
+  await expect(info.getByText("주민 예제", { exact: false })).toBeVisible();
+  await expect(info.getByText("대기 표시", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "건물 예제 선택", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
-  await press(page, "기본 시점");
-  await examplePoint(page, "building"); // Wait for the default camera to render.
-  await clickUnoccupiedGround(page);
+  await clickFloor(page);
   await expect(info).toBeHidden();
-  await expect.poll(() => residentOutlined(page)).toBe(false);
-  expect(outlinePixels(await canvas.screenshot())).toBe(0);
+  await expect
+    .poll(async () => outlinePixels(await canvas.screenshot()))
+    .toBe(0);
   await expect(page.getByText("1일차", { exact: true })).toBeVisible();
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.example.saves")),
@@ -102,41 +90,47 @@ test("카메라 드래그·우클릭은 대상 선택이나 선택 해제로 처
   await ready(page);
   await clickExample(page, "building");
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
-  await expect(info).toContainText("온돌");
+  await expect(info).toContainText("복홀 방 게시판");
   const p = await examplePoint(page, "building");
   await page.mouse.move(p.x, p.y);
   await page.mouse.down();
   await page.mouse.move(p.x + 90, p.y + 30, { steps: 12 });
   await page.mouse.up();
-  await expect(info).toContainText("온돌");
+  await expect(info).toContainText("복홀 방 게시판");
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("캔버스 없음");
   await page.mouse.click(box.x + 10, box.y + 10, { button: "right" });
-  await expect(info).toContainText("온돌");
+  await expect(info).toContainText("복홀 방 게시판");
 });
 
 test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최신 예제 정보를 표시한다", async ({
   page,
 }) => {
   await ready(page);
-  await press(page, "주민 예제 선택");
+  await clickExample(page, "resident");
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
-  // 예제 상태(대기·걷기)는 개발 도구 칸에서 확인 — 선택 창은 이름·설명만 (2026-11-19)
-  await expect(info).toContainText("트리케라톱스");
-  const motion = page.getByTestId("scene-example-motion");
-  await press(page, "개발 도구");
-  await expect(motion).toHaveText("대기 표시");
-  await press(page, "3D 연결 예제 바꾸기");
-  await expect(motion).toHaveText("걷기 표시");
-  await press(page, "예제 저장");
+  await expect(info).toContainText("대기 표시");
+  await page.getByRole("button", { name: "개발 도구", exact: true }).click();
+  await page
+    .getByRole("button", { name: "3D 연결 예제 바꾸기", exact: true })
+    .click();
+  await expect(info).toContainText("걷기 표시");
+  await expect(info).toContainText("2, 0, 1");
+  await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
   );
-  await press(page, "3D 연결 예제 바꾸기");
-  await expect(motion).toHaveText("대기 표시");
-  await press(page, "저장 불러오기");
-  await expect(motion).toHaveText("걷기 표시");
-  await press(page, "개발 도구 닫기");
+  await page
+    .getByRole("button", { name: "3D 연결 예제 바꾸기", exact: true })
+    .click();
+  await expect(info).toContainText("대기 표시");
+  await page
+    .getByRole("button", { name: "저장 불러오기", exact: true })
+    .click();
+  await expect(info).toContainText("걷기 표시");
+  await page
+    .getByRole("button", { name: "개발 도구 닫기", exact: true })
+    .click();
   await expect(info).toBeVisible();
   await page.reload();
   await expect(info).toBeHidden();
@@ -151,13 +145,13 @@ test.describe("좁은 터치 화면", () => {
     const point = await examplePoint(page, "building");
     await page.touchscreen.tap(point.x, point.y);
     const info = page.getByRole("region", { name: "선택 정보", exact: true });
-    await expect(info).toContainText("온돌");
+    await expect(info).toContainText("복홀 방 게시판");
     await page
       .getByRole("button", { name: "주민 예제 선택", exact: true })
       .focus();
     await page.keyboard.press("Enter");
-    await expect(info).toContainText("트리케라톱스");
-    await press(page, "선택 해제");
+    await expect(info).toContainText("주민 예제");
+    await page.getByRole("button", { name: "선택 해제", exact: true }).click();
     await expect(info).toBeHidden();
     await expect(page.locator("canvas")).toBeFocused();
     expect(
@@ -166,4 +160,56 @@ test.describe("좁은 터치 화면", () => {
       ),
     ).toBe(true);
   });
+});
+
+test("마당의 시설과 주민, 게시판을 눌러도 하단 콘솔이 움직이지 않는다", async ({
+  page,
+}) => {
+  await ready(page);
+  const panel = page.getByRole("region", { name: "선택 정보", exact: true });
+  const consoleBox = () => page.locator(".g-console").boundingBox();
+  const before = await consoleBox();
+  for (const [model, label] of [
+    ["BLD_OFFICE", "관아"],
+    ["R05_Gallimimus", "갈리미무스"],
+  ] as const) {
+    const position = await page.evaluate((model) => {
+      const scene = (
+        window as unknown as {
+          __scene: {
+            meshes: Array<{
+              metadata?: { villageTarget?: string };
+              getBoundingInfo(): {
+                boundingBox: {
+                  extendSizeWorld: { length(): number };
+                  centerWorld: { x: number; y: number; z: number };
+                };
+              };
+            }>;
+          };
+        }
+      ).__scene;
+      const meshes = scene.meshes.filter((m) =>
+        m.metadata?.villageTarget?.startsWith("village:" + model + ":"),
+      );
+      const bounds = meshes
+        .map((m) => m.getBoundingInfo().boundingBox)
+        .sort(
+          (a, b) => b.extendSizeWorld.length() - a.extendSizeWorld.length(),
+        );
+      const largest = bounds[0];
+      if (!largest) throw Error(model + " 모형이 없습니다.");
+      const { x, y, z } = largest.centerWorld;
+      return [x, y, z] as const;
+    }, model);
+    const point = await worldPoint(page, position, false);
+    await page.mouse.click(point.x, point.y);
+    await expect(panel).toContainText(label);
+    expect(await consoleBox()).toEqual(before);
+  }
+  await clickExample(page, "building");
+  await expect(panel).toContainText("복홀 방 게시판");
+  expect(await consoleBox()).toEqual(before);
+  await clickFloor(page);
+  await expect(page.getByRole("heading", { name: "복홀 본진" })).toBeVisible();
 });

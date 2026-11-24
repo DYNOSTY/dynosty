@@ -1,13 +1,13 @@
 import { expect, type Page } from "@playwright/test";
-import { press, startTimber } from "./labor-tabs.js";
+import { openLaborPanel } from "./workspace.js";
 export const progressButton = (p: Page, name: string) =>
   p.getByRole("button", { name, exact: true });
 export const progressCard = (p: Page, id: string) =>
   p.getByTestId(`progress-site-${id}`);
 export async function enterProgress(p: Page) {
   await p.goto("/");
-  await startTimber(p);
-  await press(p, "일손 배치·배급 체험하기");
+  await progressButton(p, "마른 목재 20 조달").click();
+  await openLaborPanel(p);
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 }
 export async function receiveProgress(p: Page) {
@@ -21,9 +21,9 @@ export async function receiveProgress(p: Page) {
     "다음 일손 사건까지",
     "확장 정상분 16 받기",
   ])
-    await press(p, n);
+    await progressButton(p, n).click();
 }
 export async function siteAction(p: Page, site: string, action: string) {
-  await press(p, `${site} 작업 보기`);
-  await press(p, action);
+  await progressButton(p, `${site} 작업 보기`).click();
+  await progressButton(p, action).click();
 }

@@ -8,8 +8,8 @@ import {
 } from "@dynosty/game-core";
 import { expect, it } from "vitest";
 import { createLaborVisual } from "./labor-scene.js";
+import { createLegacyTimberVisual as createTimberVisual } from "./legacy-timber-scene.js";
 import { createSiteSelection } from "./site-selection.js";
-import { createTimberVisual } from "./timber-scene.js";
 
 function fixture() {
   const engine = new NullEngine(),
