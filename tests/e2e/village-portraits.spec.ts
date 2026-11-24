@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { clickExample, worldPoint } from "./scene-picking.js";
+import { worldPoint } from "./scene-picking.js";
 import { openCommandConsole } from "./workspace.js";
 
 test("selecting a village building shows its portrait without replacing the existing selection flow", async ({
@@ -16,7 +16,8 @@ test("selecting a village building shows its portrait without replacing the exis
   });
   await expect(selection).toHaveCount(0);
 
-  const office = await worldPoint(page, [0, 1.4, -14], false);
+  // 관아는 측량된 터(0, -16)로 옮겨졌다(game-core bokhol.ts, 24ee011).
+  const office = await worldPoint(page, [0, 1.4, -16], false);
   await page.mouse.click(office.x, office.y);
   await expect(selection.getByRole("heading", { name: "관아" })).toBeVisible();
   await expect(selection).toContainText("복홀 · 마을 시설");
@@ -51,7 +52,7 @@ test("selecting a village building shows its portrait without replacing the exis
   await expect
     .poll(async () => {
       const { radius, x, z } = await camera();
-      return radius < before.radius && Math.hypot(x, z + 14) < 0.5;
+      return radius < before.radius && Math.hypot(x, z + 16) < 0.5;
     })
     .toBe(true);
   await expect(selection.getByRole("heading", { name: "관아" })).toBeVisible();
@@ -60,7 +61,9 @@ test("selecting a village building shows its portrait without replacing the exis
   const canvas = page.locator("canvas");
   await expect(canvas).toBeFocused();
   await page.getByRole("button", { name: "시점을 가운데로" }).click();
-  await clickExample(page, "building");
+  // 마을의 첫 온돌 둥지(example-building-1)는 (-6, 0, -2)에 있다.
+  const nest = await worldPoint(page, [-6, 1.2, -2], false);
+  await page.mouse.click(nest.x, nest.y);
   await expect(
     selection.getByRole("heading", { name: "건물 예제 · 온돌 둥지" }),
   ).toBeVisible();
@@ -84,7 +87,7 @@ test("a missing building portrait leaves its selection text usable", async ({
     "3D 준비 완료",
   );
   await openCommandConsole(page);
-  const office = await worldPoint(page, [0, 1.4, -14]);
+  const office = await worldPoint(page, [0, 1.4, -16]);
   const blocked = page.waitForResponse((response) =>
     response.url().endsWith("/ui/buildings/BLD_OFFICE.jpg"),
   );

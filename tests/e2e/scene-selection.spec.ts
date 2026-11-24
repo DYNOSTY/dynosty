@@ -1,13 +1,55 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import {
   clickExample,
-  clickFloor,
   examplePoint,
   outlinePixels,
   worldPoint,
 } from "./scene-picking.js";
 
-async function ready(page: import("@playwright/test").Page) {
+// 복홀 방 게시판은 마을 장면의 (0, 0, 4)에 서고(App.tsx), 게시판 판은 바닥 위 약 1.87m다.
+const BOARD: [number, number, number] = [0, 1.87, 4];
+// 관아는 측량된 터(0, -16)에 있다(game-core bokhol.ts).
+const OFFICE: [number, number, number] = [0, 1.4, -16];
+
+async function clickBoard(page: Page) {
+  const point = await worldPoint(page, BOARD, false);
+  await page.mouse.click(point.x, point.y);
+}
+
+// 마당은 주민·집으로 붐빈다. 실제 카메라 광선이 맨땅에 닿고 콘솔 위에 보이는 지점을 골라 누른다.
+async function clickEmptyGround(page: Page) {
+  const bar = await page.locator(".g-console").boundingBox();
+  for (const world of [
+    [8, 0, -12],
+    [-16, 0, -8],
+    [14, 0, 4],
+    [10, 0, 10],
+    [20, 0, -6],
+  ] as const) {
+    const point = await worldPoint(page, world, false);
+    if (bar && point.y >= bar.y) continue;
+    const ground = await page.locator("canvas").evaluate((el, { x, y }) => {
+      const r = el.getBoundingClientRect();
+      const scene = (
+        window as unknown as {
+          __scene: {
+            pick(x: number, y: number): { pickedMesh: { id: string } | null };
+          };
+        }
+      ).__scene;
+      return (
+        scene.pick(x - r.x, y - r.y).pickedMesh?.id === "procurement-ground"
+      );
+    }, point);
+    if (!ground) continue;
+    await page.mouse.click(point.x, point.y);
+    return;
+  }
+  throw new Error("누를 빈 바닥이 없습니다.");
+}
+
+async function ready(page: Page) {
   await page.goto("/");
   await expect(page.getByTestId("play-scene-status")).toHaveText(
     "3D 준비 완료",
@@ -48,7 +90,7 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   const canvas = page.locator("canvas");
   expect(outlinePixels(await canvas.screenshot())).toBe(0);
-  await clickExample(page, "building");
+  await clickBoard(page);
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
   await expect(
     info.getByText("복홀 방 게시판", { exact: false }),
@@ -67,11 +109,13 @@ test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈
   await page.screenshot({
     path: test.info().outputPath("bokhol-notice-board.png"),
   });
+  // 마을 주민은 예제 이름 대신 주민 이름(example-resident-1 = 돌쇠)으로 보인다.
   await clickExample(page, "resident");
-  await expect(info.getByText("주민 예제", { exact: false })).toBeVisible();
+  await expect(info.getByRole("heading", { name: "돌쇠" })).toBeVisible();
+  await expect(info.getByText("주민", { exact: true })).toBeVisible();
   await expect(info.getByText("대기 표시", { exact: true })).toBeVisible();
   await expect(pressed).toHaveText("주민 예제 선택");
-  await clickFloor(page);
+  await clickEmptyGround(page);
   await expect(info).toBeHidden();
   await expect
     .poll(async () => outlinePixels(await canvas.screenshot()))
@@ -88,10 +132,10 @@ test("카메라 드래그·우클릭은 대상 선택이나 선택 해제로 처
   page,
 }) => {
   await ready(page);
-  await clickExample(page, "building");
+  await clickBoard(page);
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
   await expect(info).toContainText("복홀 방 게시판");
-  const p = await examplePoint(page, "building");
+  const p = await worldPoint(page, BOARD, false);
   await page.mouse.move(p.x, p.y);
   await page.mouse.down();
   await page.mouse.move(p.x + 90, p.y + 30, { steps: 12 });
@@ -142,7 +186,7 @@ test.describe("좁은 터치 화면", () => {
     page,
   }) => {
     await ready(page);
-    const point = await examplePoint(page, "building");
+    const point = await worldPoint(page, BOARD, false);
     await page.touchscreen.tap(point.x, point.y);
     const info = page.getByRole("region", { name: "선택 정보", exact: true });
     await expect(info).toContainText("복홀 방 게시판");
@@ -165,47 +209,19 @@ test("마당의 시설과 주민, 게시판을 눌러도 하단 콘솔이 움직
   const panel = page.getByRole("region", { name: "선택 정보", exact: true });
   const consoleBox = () => page.locator(".g-console").boundingBox();
   const before = await consoleBox();
-  for (const [model, label] of [
-    ["BLD_OFFICE", "관아"],
-    ["R05_Gallimimus", "갈리미무스"],
+  // 관아(마을 시설)와 마을 주민(돌쇠)을 실제로 누른다.
+  for (const [point, label] of [
+    [() => worldPoint(page, OFFICE, false), "관아"],
+    [() => examplePoint(page, "resident"), "돌쇠"],
   ] as const) {
-    const position = await page.evaluate((model) => {
-      const scene = (
-        window as unknown as {
-          __scene: {
-            meshes: Array<{
-              metadata?: { villageTarget?: string };
-              getBoundingInfo(): {
-                boundingBox: {
-                  extendSizeWorld: { length(): number };
-                  centerWorld: { x: number; y: number; z: number };
-                };
-              };
-            }>;
-          };
-        }
-      ).__scene;
-      const meshes = scene.meshes.filter((m) =>
-        m.metadata?.villageTarget?.startsWith("village:" + model + ":"),
-      );
-      const bounds = meshes
-        .map((m) => m.getBoundingInfo().boundingBox)
-        .sort(
-          (a, b) => b.extendSizeWorld.length() - a.extendSizeWorld.length(),
-        );
-      const largest = bounds[0];
-      if (!largest) throw Error(model + " 모형이 없습니다.");
-      const { x, y, z } = largest.centerWorld;
-      return [x, y, z] as const;
-    }, model);
-    const point = await worldPoint(page, position, false);
-    await page.mouse.click(point.x, point.y);
+    const { x, y } = await point();
+    await page.mouse.click(x, y);
     await expect(panel).toContainText(label);
     expect(await consoleBox()).toEqual(before);
   }
-  await clickExample(page, "building");
+  await clickBoard(page);
   await expect(panel).toContainText("복홀 방 게시판");
   expect(await consoleBox()).toEqual(before);
-  await clickFloor(page);
+  await clickEmptyGround(page);
   await expect(page.getByRole("heading", { name: "복홀 본진" })).toBeVisible();
 });
