@@ -223,5 +223,7 @@ test("마당의 시설과 주민, 게시판을 눌러도 하단 콘솔이 움직
   await expect(panel).toContainText("복홀 방 게시판");
   expect(await consoleBox()).toEqual(before);
   await clickEmptyGround(page);
-  await expect(page.getByRole("heading", { name: "복홀 본진" })).toBeVisible();
+  // "복홀 본진" 제목은 844b96f에서 하단 대화로 바뀌어 사라졌다. 선택만 풀리고 콘솔은 그대로여야 한다.
+  await expect(panel).toBeHidden();
+  expect(await consoleBox()).toEqual(before);
 });
