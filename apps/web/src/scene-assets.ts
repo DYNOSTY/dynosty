@@ -1,6 +1,7 @@
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import type { Scene } from "@babylonjs/core/scene";
+import { installMeshoptDecoder } from "./meshopt.js";
 
 // GLB 자산은 생성한 Scene에 속한다. StrictMode 재기동에서 공유하지 않는다.
 const caches = new WeakMap<Scene, Map<string, Promise<AssetContainer>>>();
@@ -20,6 +21,7 @@ export function loadSceneAsset(scene: Scene, url: string) {
   }
   let pending = cache.get(url);
   if (!pending) {
+    installMeshoptDecoder();
     pending = LoadAssetContainerAsync(url, scene).then((asset) => {
       if (scene.isDisposed) {
         asset.dispose();
