@@ -700,8 +700,8 @@ export function TimberDemo({
                 height="64"
                 src={
                   foodShortage
-                    ? "/art/advisers/nareumi/concern.png"
-                    : "/art/advisers/nareumi/neutral.png"
+                    ? "/art/advisers/nareumi/concern.webp"
+                    : "/art/advisers/nareumi/neutral.webp"
                 }
                 alt={foodShortage ? "걱정스러운 나르미" : "평상시의 나르미"}
               />{" "}
@@ -725,7 +725,7 @@ export function TimberDemo({
                 ❗ 교역소 · {merchant[1]} 상인 {merchant[2]} 방문
               </h3>
               <img
-                src={"/art/merchants/" + merchant[0] + ".png"}
+                src={"/art/merchants/" + merchant[0] + ".webp"}
                 alt={merchant[1] + " 상인 " + merchant[2] + "의 초상"}
                 width="112"
                 height="112"
@@ -823,7 +823,7 @@ export function TimberDemo({
                 <summary>종별 주민 설계 보기</summary>
                 <img
                   className="facility-reference"
-                  src="/art/residents/species-turnaround-v1.png"
+                  src="/art/residents/species-turnaround-v1.webp"
                   alt="세 뿔과 목깃의 트리케라톱스, 두 다리와 깃의 벨로키랍토르, 긴 주둥이와 등돛의 스피노사우루스"
                   loading="lazy"
                   width="1536"
@@ -1273,7 +1273,7 @@ export function TimberDemo({
                 <img
                   width="64"
                   height="64"
-                  src="/art/advisers/dali/concern.png"
+                  src="/art/advisers/dali/concern.webp"
                   alt="아픈 주민을 걱정하는 달이"
                 />{" "}
                 달이 ·{" "}
@@ -1306,7 +1306,7 @@ export function TimberDemo({
                 <img
                   width="64"
                   height="64"
-                  src="/art/advisers/dali/neutral.png"
+                  src="/art/advisers/dali/neutral.webp"
                   alt="평상시의 달이"
                 />{" "}
                 달이 · 현재 인구{" "}

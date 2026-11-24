@@ -1,10 +1,23 @@
 import { readFileSync } from "node:fs";
+import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
+import type { PickingInfo } from "@babylonjs/core/Collisions/pickingInfo";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
+import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { Scene } from "@babylonjs/core/scene";
 import { createSceneExample } from "@dynosty/game-core";
 import { describe, expect, it } from "vitest";
-import { loadModelAssets, parseModel } from "./model-assets.js";
+import {
+  buildModel,
+  loadModelAssets,
+  type ModelVisual,
+  parseModel,
+  pickedNode,
+} from "./model-assets.js";
+import { residentModel } from "./resident-model.js";
 import { createSceneEntities } from "./scene-entities.js";
 
 const resident = JSON.parse(
@@ -101,6 +114,87 @@ describe("자체 제작 대표 모델", () => {
       engine.dispose();
     }
   });
+});
+
+it("주민 모델은 같은 부위를 공유 메시에 몰아 그리고 선택한 주민만 윤곽선을 켠다", () => {
+  const engine = new NullEngine(),
+    scene = new Scene(engine);
+  try {
+    new FreeCamera("camera", new Vector3(0, 5, -10), scene);
+    const asset = residentModel("R02");
+    const material = new StandardMaterial("resident-fallback", scene);
+    // Like scene entities: the root box carries the resident and stays hidden.
+    const roots = ["resident-a", "resident-b"].map((id) => {
+      const root = CreateBox(id, { size: 1 }, scene);
+      root.material = material;
+      root.isVisible = false;
+      return root;
+    });
+    const [a, b] = roots.map((root) =>
+      buildModel(scene, root, material, asset),
+    ) as [ModelVisual, ModelVisual];
+    const [ra, rb] = roots as [Mesh, Mesh];
+    rb.position.x = 3;
+    scene.render();
+    const figure = scene.getMeshById(`model:${asset.id}:figure`) as Mesh;
+    // Still parts merge into one figure and the breathing parts into one body;
+    // each leg and the tail stay separate so they can swing.
+    const shared = scene.meshes.filter(
+      (m) => m.name.startsWith(`model:${asset.id}:`) && m.isVisible,
+    );
+    expect(shared).toHaveLength(
+      2 +
+        asset.parts.filter((p) => p.role === "leg" || p.role === "tail").length,
+    );
+    expect(a.meshes).toHaveLength(0);
+    expect(figure.thinInstanceCount).toBe(2);
+    expect(figure.renderOutline).toBe(false);
+    // Each thin instance follows its resident, and a click resolves to that resident.
+    expect(figure.thinInstanceGetWorldMatrices()[1]?.getTranslation().x).toBe(
+      3,
+    );
+    expect(
+      pickedNode({
+        pickedMesh: figure,
+        thinInstanceIndex: 1,
+      } as unknown as PickingInfo),
+    ).toBe(rb);
+
+    a.setOutline(true);
+    scene.render();
+    const twin = scene.getMeshById("resident-a:figure") as InstancedMesh;
+    expect(twin.sourceMesh.renderOutline).toBe(true);
+    expect(twin.parent).toBe(ra);
+    expect(figure.thinInstanceCount).toBe(1);
+    expect(
+      pickedNode({
+        pickedMesh: figure,
+        thinInstanceIndex: 0,
+      } as unknown as PickingInfo),
+    ).toBe(rb);
+    a.setOutline(false);
+    scene.render();
+    expect(scene.getMeshById("resident-a:figure")).toBeNull();
+    expect(figure.thinInstanceCount).toBe(2);
+    // A resident indoors (disabled root) leaves the shared buffer.
+    rb.setEnabled(false);
+    scene.render();
+    expect(figure.thinInstanceCount).toBe(1);
+
+    a.setOutline(true);
+    a.dispose();
+    b.dispose();
+    for (const root of roots) root.dispose();
+    material.dispose();
+    expect(scene.meshes).toHaveLength(0);
+    expect(scene.materials).toHaveLength(0);
+    expect(scene.onAfterActiveMeshesEvaluationObservable.hasObservers()).toBe(
+      false,
+    );
+  } finally {
+    scene.dispose();
+    engine.dispose();
+  }
 });
 
 it("둥지 창호는 입주한 밤에 빛나고 아침에는 발광을 끈다", () => {

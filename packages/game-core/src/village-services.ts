@@ -5,6 +5,7 @@ import {
   constructionPlot,
   inBokholForest,
 } from "./bokhol.js";
+import { findById } from "./lookup.js";
 import {
   AMOUNT_SCALE,
   type Citizen,
@@ -195,7 +196,7 @@ export function homeUsage(
   return residents
     .filter((r) => r.homeId === homeId)
     .reduce((sum, r) => {
-      const c = citizens.find((c) => c.id === r.id);
+      const c = findById(citizens, r.id);
       return sum + (c?.alive ? speciesRule(c.species).space : 0);
     }, 0);
 }

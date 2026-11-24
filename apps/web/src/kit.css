@@ -16,7 +16,7 @@
   min-height: 48px;
   padding: 0 24px;
   border: 10px solid var(--jjok-deep);
-  border-image: url(/ui/kit/btn.png) 56 fill / 16px / 4px stretch;
+  border-image: url(/ui/kit/btn.webp) 56 fill / 16px / 4px stretch;
   background: var(--jjok);
   color: var(--hanji);
   font: 600 var(--fs-body) / 1 var(--font-body);
@@ -32,7 +32,7 @@
 }
 .k-btn:active,
 .k-btn.is-active {
-  border-image-source: url(/ui/kit/btn_pressed.png);
+  border-image-source: url(/ui/kit/btn_pressed.webp);
   box-shadow: none;
 }
 .k-btn:focus-visible {
@@ -61,7 +61,7 @@
   box-shadow: inset 0 -3px 0 rgb(0 0 0 / 22%);
 }
 
-/* 창: 한지 + 먹 이중선 + 모서리 구름 (panel_frame.png 9조각) */
+/* 창: 한지 + 먹 이중선 + 모서리 구름 (panel_frame.webp 9조각) */
 .k-panel,
 .k-window,
 .k-tip,
@@ -69,7 +69,7 @@
   position: relative;
   background: var(--hanji);
   border: 20px solid transparent;
-  border-image: url(/ui/kit/panel_frame.png) 210 fill / 46px / 16px stretch;
+  border-image: url(/ui/kit/panel_frame.webp) 210 fill / 46px / 16px stretch;
   margin: 16px;
   color: var(--meok);
 }
@@ -94,7 +94,7 @@
 .k-window__band {
   margin: -8px -8px 0;
   padding: 12px 24px;
-  background: url(/ui/kit/band.png) center / 104% 100% no-repeat;
+  background: url(/ui/kit/band.webp) center / 104% 100% no-repeat;
   color: var(--hanji);
 }
 .k-window__band h3 {
@@ -478,7 +478,7 @@
   place-items: center;
   gap: 0;
   border: 8px solid var(--jjok-deep);
-  border-image: url(/ui/kit/btn.png) 56 fill / 12px / 2px stretch;
+  border-image: url(/ui/kit/btn.webp) 56 fill / 12px / 2px stretch;
   background: var(--jjok);
   color: var(--hanji);
   font: 600 var(--fs-sub) / 1.1 var(--font-body);
@@ -834,7 +834,7 @@
 .k-window,
 .k-tip,
 .k-bubble {
-  border-image: url(/ui/kit/board_frame.png) 175 fill / 40px / 10px stretch;
+  border-image: url(/ui/kit/board_frame.webp) 175 fill / 40px / 10px stretch;
 }
 .k-panel,
 .k-window,

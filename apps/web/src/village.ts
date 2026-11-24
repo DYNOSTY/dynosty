@@ -107,14 +107,20 @@ function instantiate(
   shadow: Shadow,
   radius: number,
   depth?: number,
+  // Instances of unskinned parts share draw calls with every other copy of the model.
+  instanced = false,
 ) {
+  const before = new Set(parent.getChildMeshes(false));
   const inst = container.instantiateModelsToScene(
     (n) => `${parent.name}:${n}`,
     false,
+    { doNotInstantiate: !instanced },
   );
   for (const root of inst.rootNodes) root.parent = parent;
   parent.scaling.setAll(scale);
-  const meshes = parent.getChildMeshes(false) as AbstractMesh[];
+  const meshes = parent
+    .getChildMeshes(false)
+    .filter((m) => !before.has(m)) as AbstractMesh[];
   for (const m of meshes) {
     m.isPickable = true;
     // 화면에서 몇 픽셀도 안 되는 조각(발톱·눈 등)은 멀리서 그리지 않음 — 그리기 호출 약 1/4 감소
@@ -839,16 +845,23 @@ export function createVillage(
     const node = new TransformNode(`${parent.name}:glb`, scene);
     node.parent = parent;
     node.position.y = offsetY;
-    const v = instantiate(
-      asset,
-      node,
-      kind === "building"
-        ? BUILDING_SCALE * (1 + (level - 1) * 0.06)
-        : RESIDENT_SCALE,
-      shadow,
-      kind === "building" ? 4.2 : 1.3,
-      kind === "building" ? 4 : 2,
-    );
+    // Many nests share one model: draw them as instances. The representative nest keeps
+    // its own copy for the winter door glow, which lights only its own meshes.
+    const instanced = kind === "building" && parent.id !== "example-building-1";
+    const make = (copy: boolean) =>
+      instantiate(
+        asset,
+        node,
+        kind === "building"
+          ? BUILDING_SCALE * (1 + (level - 1) * 0.06)
+          : RESIDENT_SCALE,
+        shadow,
+        kind === "building" ? 4.2 : 1.3,
+        kind === "building" ? 4 : 2,
+        !copy && instanced,
+      );
+    let v = make(false);
+    let outlined = false;
     const lamp =
       kind === "building" && light
         ? CreateBox(
@@ -893,6 +906,13 @@ export function createVillage(
         lamp?.setEnabled(value);
       },
       setOutline(value) {
+        // An outline applies to all instances of a mesh, so a selected nest
+        // switches to its own copy while it is selected.
+        if (instanced && value !== outlined) {
+          v.dispose();
+          v = make(value);
+        }
+        outlined = value;
         for (const m of v.meshes) {
           m.outlineColor = OUTLINE;
           m.outlineWidth = 0.025;

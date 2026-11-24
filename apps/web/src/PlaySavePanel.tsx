@@ -24,7 +24,7 @@ export function PlaySavePanel({
         disabled={off}
         onClick={onSave}
       >
-        <img src="/ui/cmd/records.png" alt="" />
+        <img src="/ui/cmd/records.webp" alt="" />
         게임 저장
       </button>
       <div className="g-save__slots">

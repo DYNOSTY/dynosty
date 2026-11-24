@@ -111,7 +111,7 @@ export function PlayPanel({
             >
               <img
                 className="resource-icon"
-                src={`/ui/resources-3d/${id === "RES_IRON_ORE" ? "RES_METAL" : id === "RES_STONE" ? "RES_COAL" : id}.png`}
+                src={`/ui/resources-3d/${id === "RES_IRON_ORE" ? "RES_METAL" : id === "RES_STONE" ? "RES_COAL" : id}.webp`}
                 alt=""
                 width={32}
                 height={32}
