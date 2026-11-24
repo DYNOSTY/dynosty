@@ -41,6 +41,7 @@ import { createLandmarks } from "./landmarks.js";
 import { type MarkerRect, placeMarker } from "./marker-layout.js";
 import { loadModelAssets } from "./model-assets.js";
 import { createQualityVisual } from "./quality-scene.js";
+import { createResourceSites } from "./resource-sites.js";
 import { createSceneEntities } from "./scene-entities.js";
 import { observeSceneClicks } from "./scene-input.js";
 import { SCOUT_SITES } from "./scout-sites.js";
@@ -209,6 +210,10 @@ export function mountScene(
   );
   const fog = createFog(scene, SCOUT_SITES);
   const landmarks = createLandmarks(scene, SCOUT_SITES, glow, warmMat);
+  // 깎은 자원 터 모델 (#47): 복홀 지도의 광맥·물고기 못에 앉힘. 마을 상태가 있을 때만 보임
+  const resourceSites = createResourceSites(scene, worldRoot, () => {
+    if (!disposed) onAssetWarning("자원 터 모델을 불러오지 못했습니다.");
+  });
   for (const node of [...scene.meshes, ...scene.transformNodes])
     if (node !== worldRoot && !node.parent) node.parent = worldRoot;
   const demoGround = CreateGround(
@@ -299,7 +304,7 @@ export function mountScene(
       s?.construction?.position,
       s?.construction?.headingRadians,
     ]);
-    if (key === terrainKey) return;
+    if (key === terrainKey) return false;
     terrainKey = key;
     const positions = ground.getVerticesData(VertexBuffer.PositionKind),
       indices = ground.getIndices();
@@ -315,6 +320,7 @@ export function mountScene(
       ground.updateVerticesData(VertexBuffer.NormalKind, normals);
       ground.refreshBoundingInfo();
     }
+    return true;
   };
   updateGround(null);
   const entities = createSceneEntities(
@@ -902,8 +908,9 @@ export function mountScene(
         if (!active) resetWorldCamera();
       }
       if (state && !villageState) resetWorldCamera();
-      updateGround(state);
+      const terrainChanged = updateGround(state);
       entities.setElevation(elevation);
+      resourceSites.update(state, elevation, terrainChanged);
       const decree = state?.decree;
       const priorDecree = villageState?.decree;
       if (
@@ -1022,6 +1029,7 @@ export function mountScene(
         homePreview.cancel();
         updateGround(null, true);
         entities.setElevation(() => 0);
+        resourceSites.update(null, () => 0, false);
         entities.setObstacles([]);
         legacyVisual.update({ ...state.timber, stock: laborStock(state) });
       } else if (legacyVisual) {
@@ -1202,6 +1210,7 @@ export function mountScene(
       townVisual.dispose();
       entities.dispose();
       village.dispose();
+      resourceSites.dispose();
       fog.dispose();
       scene.dispose();
       engine.dispose();

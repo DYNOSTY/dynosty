@@ -13,6 +13,7 @@ import {
   productionSiteDefinition,
   type TimberState,
 } from "@dynosty/game-core";
+import { depositCarved } from "./resource-sites.js";
 import { terrainElevation } from "./terrain.js";
 
 export function createLoggingVisual(scene: Scene) {
@@ -141,6 +142,7 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
   );
   const deposit = new TransformNode(unique("mineral-deposit"), scene);
   deposit.position.set(patch.x, 0, patch.z);
+  const rocks: ReturnType<typeof box>[] = [];
   if (!isForest) {
     for (let i = 0; i < 8; i++) {
       const rock = box(
@@ -156,6 +158,7 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
       );
       rock.rotation.y = i * 0.8;
       rock.rotation.z = i % 2 ? 0.15 : -0.15;
+      rocks.push(rock);
     }
     if (patch.kind !== "stone") {
       box("mine-dark-mouth", [3.8, 2.5, 0.3], [8, 1.1, 0], tile, deposit);
@@ -207,6 +210,9 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
       const height = terrainElevation(s);
       deposit.setEnabled(!!s && !isForest);
       deposit.position.y = height(patch.x, patch.z);
+      // 깎은 자원 터 모델(resource-sites.ts)이 선 광맥은 자리 표시용 바위를 숨김
+      const carved = depositCarved(scene, siteId);
+      for (const rock of rocks) rock.setEnabled(!carved);
       for (const { mesh, base } of depositPieces) {
         const local = mesh.position;
         local.y =

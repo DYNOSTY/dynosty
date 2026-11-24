@@ -346,15 +346,9 @@ export function createVillage(
     for (const [col, x] of [-30, 30].entries()) {
       const model = ["BLD_NEST", "BLD_WAREHOUSE", "BLD_WORKSHOP"][
         (row + col) % 3
-      ];
+      ] as string;
       jobs.push(
-        place(
-          `/models/buildings/${model}.glb`,
-          x,
-          z,
-          face(x, z),
-          BUILDING_SCALE,
-        ).then((node) => {
+        place(model, x, z, face(x, z), BUILDING_SCALE).then((node) => {
           if (node) {
             lostQuarter.add(node);
             node.setEnabled(exodusVisible);
