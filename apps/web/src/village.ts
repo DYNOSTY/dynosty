@@ -329,6 +329,7 @@ export function createVillage(
   const face = (x: number, z: number) => Math.atan2(-x, -z); // +Z가 마당 쪽
   const permanent = new Map<string, TransformNode>();
   let missing = new Set<string>();
+  let townDestroyed = false;
   const lostQuarter = new Set<TransformNode>();
   let exodusVisible = false;
   let previewResidentsVisible = true;
@@ -344,7 +345,7 @@ export function createVillage(
     ).then((node) => {
       if (node) {
         permanent.set(id, node);
-        node.setEnabled(!missing.has(id));
+        node.setEnabled(!townDestroyed && !missing.has(id));
       }
     }),
   );
@@ -478,19 +479,14 @@ export function createVillage(
   pc.fillRect(0, 0, 64, 64);
   puff.update();
   puff.hasAlpha = true;
-  const fires = [
-    [-30, 0],
-    [30, -14],
-    [-8, -20],
-    [16, 0],
-    [-10, -8],
-  ].map(([x = 0, z = 0], i) => {
-    const fire = new ParticleSystem("처마 불길-" + i, 90, scene);
+  const incidentFires = new Map<string, ParticleSystem>();
+  function createFire(name: string, emitter: Vector3) {
+    const fire = new ParticleSystem(name, 90, scene);
     fire.particleTexture = puff;
     fire.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     fire.minScaleY = 1.2;
     fire.maxScaleY = 1.9;
-    fire.emitter = new Vector3(x, elevation(x, z) + 1.8, z);
+    fire.emitter = emitter;
     fire.minEmitBox = new Vector3(-1, 0, -0.5);
     fire.maxEmitBox = new Vector3(1, 0, 0.5);
     fire.direction1 = new Vector3(-0.4, 1.8, -0.2);
@@ -505,7 +501,16 @@ export function createVillage(
     fire.addColorGradient(0.72, new Color4(0.24, 0.17, 0.14, 0.64));
     fire.addColorGradient(1, new Color4(0.18, 0.17, 0.16, 0));
     return fire;
-  });
+  }
+  const fires = [
+    [-30, 0],
+    [30, -14],
+    [-8, -20],
+    [16, 0],
+    [-10, -8],
+  ].map(([x = 0, z = 0], i) =>
+    createFire("처마 불길-" + i, new Vector3(x, elevation(x, z) + 1.8, z)),
+  );
   const CHIMNEY: Record<string, number> = {
     BLD_OFFICE: 2.5,
     BLD_WORKSHOP: 3,
@@ -944,20 +949,39 @@ export function createVillage(
       burned: boolean,
       burning: boolean,
       removed: readonly string[] = [],
+      active: readonly { id: string; x: number; z: number }[] = [],
+      destroyed = false,
     ) {
+      townDestroyed = destroyed;
       missing = new Set(removed);
       if (burned) {
         missing.add("BLD_WORKSHOP");
         missing.add("BLD_CLINIC");
       }
-      for (const [id, node] of permanent) node.setEnabled(!missing.has(id));
+      for (const [id, node] of permanent)
+        node.setEnabled(!destroyed && !missing.has(id));
+      for (const [id, fire] of incidentFires)
+        if (!active.some((b) => b.id === id)) {
+          fire.dispose(false);
+          incidentFires.delete(id);
+        }
+      for (const b of active) {
+        if (incidentFires.has(b.id)) continue;
+        // DynamicTexture.clone()은 그려 둔 픽셀을 복사하지 않으므로 원본을 공유한다.
+        const fire = createFire(
+          "건물 화재-" + b.id,
+          new Vector3(b.x, elevation(b.x, b.z) + 1.2, b.z),
+        );
+        incidentFires.set(b.id, fire);
+        fire.start();
+      }
       exodusVisible = burning;
       for (const w of walkers)
         if (w.haul) w.node.setEnabled(burning || previewResidentsVisible);
       for (const node of lostQuarter) node.setEnabled(burning);
       for (const fire of fires) {
-        if (burning && !fire.isStarted()) fire.start();
-        if (!burning && fire.isStarted()) fire.stop();
+        if (burning && !active.length && !fire.isStarted()) fire.start();
+        if ((!burning || active.length) && fire.isStarted()) fire.stop();
       }
     },
     setPreviewResidentsVisible(visible: boolean) {
@@ -996,6 +1020,7 @@ export function createVillage(
       ink.dispose();
       paper.dispose();
       plinthMat.dispose();
+      for (const fire of incidentFires.values()) fire.dispose(false);
       for (const fire of fires) fire.dispose(false);
       for (const ps of smokes) ps.dispose();
       for (const p of parties.values())

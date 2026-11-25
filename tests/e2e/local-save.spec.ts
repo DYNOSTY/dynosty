@@ -94,13 +94,21 @@ for (const damage of ["json", "version", "day"] as const) {
     await page
       .getByRole("button", { name: "저장 불러오기", exact: true })
       .click();
-    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(
+      page
+        .getByRole("region", { name: "로컬 저장", exact: true })
+        .getByRole("alert"),
+    ).toBeVisible();
     await expect(page.getByText("2일차", { exact: true })).toBeVisible();
     await expect(page.getByTestId("scene-example-motion")).toHaveText(
       "걷기 표시",
     );
     await page.getByRole("button", { name: "예제 저장", exact: true }).click();
-    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(
+      page
+        .getByRole("region", { name: "로컬 저장", exact: true })
+        .getByRole("alert"),
+    ).toBeVisible();
     expect(
       await page.evaluate((key) => localStorage.getItem(key), saveKey),
     ).toBe(corrupted);
@@ -131,7 +139,11 @@ test("브라우저 쓰기 실패 후에도 최근·직전 저장을 모두 불�
   }, saveKey);
   await page.getByRole("button", { name: "하루 진행", exact: true }).click();
   await page.getByRole("button", { name: "예제 저장", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("여유 공간");
+  await expect(
+    page
+      .getByRole("region", { name: "로컬 저장", exact: true })
+      .getByRole("alert"),
+  ).toContainText("여유 공간");
   await expect(page.getByText("4일차", { exact: true })).toBeVisible();
   expect(await page.evaluate((key) => localStorage.getItem(key), saveKey)).toBe(
     before,

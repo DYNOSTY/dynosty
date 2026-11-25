@@ -6,6 +6,7 @@ import {
   createCapital,
   createTimberSave,
   createVillageGame,
+  departureBuildings,
   parseTimberSave,
   recordResearchStory,
   type TimberState,
@@ -511,11 +512,12 @@ it.each([true, false])(
     );
     expect(campaignOf(departure).beat).toBe("departure");
     const page = campaignPage({ ...departure, restaurantBuilt });
-    expect(page.lines.filter(([speaker]) => speaker === "돌쇠")).toEqual([
-      [
-        "돌쇠",
-        "공자님! 병원 처마에 불이 붙었습니다. 불씨가 공방 지붕으로 넘어갑니다!",
-      ],
-    ]);
+    const losses = campaignOf(departure).openingLosses;
+    expect(losses?.length).toBeGreaterThan(0);
+    const line = page.lines.find(([speaker]) => speaker === "돌쇠")?.[1];
+    for (const id of losses ?? []) {
+      const building = departureBuildings[id];
+      expect(line).toContain(building?.name + (building?.roof ? " 지붕" : ""));
+    }
   },
 );

@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
+  AMOUNT_SCALE,
   advanceTimber,
   commandTimber,
   createPlayState,
@@ -18,13 +19,19 @@ function fixture(
   completed: string[],
   pending?: string,
 ) {
-  // 제출본 건물·연구 비용은 기본 재고(목재 120·철재 40)를 넘으므로 자재를 넉넉히 둔다.
-  const w = createPlayState();
-  let s = createTimberState({
-    ...w,
-    minute: 540,
-    resources: { ...w.resources, RES_WOOD: 5000000, RES_METAL: 5000000 },
+  const world = createPlayState();
+  const resources = { ...world.resources };
+  const funded = [...completed, ...(pending ? [pending] : [])].map((id) => {
+    const research = RESEARCH_CATALOG.find((entry) => entry.id === id);
+    if (!research) throw Error("연구 없음");
+    return research;
   });
+  for (const research of funded) {
+    for (const [key, units] of Object.entries(research.cost)) {
+      resources[key as keyof typeof resources] += units * AMOUNT_SCALE;
+    }
+  }
+  let s = createTimberState({ ...world, resources, minute: 540 });
   s = commandTimber(
     s,
     {
@@ -42,11 +49,7 @@ function fixture(
     "staff",
   );
   s = advanceTimber(s, 30);
-  for (const id of [...completed, ...(pending ? [pending] : [])]) {
-    const r = RESEARCH_CATALOG.find((r) => r.id === id);
-    if (!r) throw Error("연구 없음");
-    s = payTown(s, r.cost);
-  }
+  for (const research of funded) s = payTown(s, research.cost);
   const r = RESEARCH_CATALOG.find((r) => r.id === pending);
   return {
     ...s,
@@ -165,7 +168,7 @@ test("독재 노선에서 시설을 지정해야 강제 작업과 새 삽화가 
     {
       type: "plan-building",
       kind: "fishery",
-      position: { x: 46, z: 32 },
+      position: { x: 28, z: 48 },
       headingRadians: Math.PI,
     },
     "fish",

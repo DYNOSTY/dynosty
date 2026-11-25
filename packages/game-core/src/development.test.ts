@@ -59,7 +59,7 @@ function staffed(s: TimberState, id: string, count = 2) {
   return advanceTimber(s, 30);
 }
 it("시설1~3단계 개량은 재료를 확보하고 공사하며 생산 배율만 바꾼다", () => {
-  let s = build(start(), "fishery", 46, 32);
+  let s = build(start(), "fishery", 28, 48);
   expect(() => cmd(s, { type: "upgrade-facility", id: "build-1" })).toThrow(
     /연구/,
   );
@@ -145,7 +145,7 @@ it("명시하지 않은 시설은 쉬고 지정 시설만18~21시에 일하며 �
   expect(s.town.facilities[0]?.buffer).toBe(buffer);
 }, 20000);
 it("야근 중단/재지정은 누적 시간을 초기화하지 않고 다음 날 자동 연장되지 않는다", () => {
-  let s = staffed(build(start(), "fishery", 46, 32), "build-1");
+  let s = staffed(build(start(), "fishery", 28, 48), "build-1");
   s = advanceTimber(s, 1080 - s.world.minute);
   s = cmd(s, { type: "set-overtime", target: "build-1", enabled: true });
   s = advanceTimber(s, 30);
@@ -257,7 +257,7 @@ it("야근 부상은 공통 건강 사건으로 반영하며 저장·재개시 �
   expect(n.world.citizens.find((r) => r.id === injured)?.health).toBe("sick");
 }, 20000);
 it("v14 시설은1단계로 변환하고 잘못된 단계·연구·난수 기록을 거부한다", () => {
-  const s = build(start(), "fishery", 46, 32);
+  const s = build(start(), "fishery", 28, 48);
   const old = JSON.parse(JSON.stringify(s));
   old.version = 14;
   delete old.town.development;
@@ -403,7 +403,7 @@ it("최고 온상과 연구가 겹쳐도 생산2배를 넘지 않고 정찰2단�
 });
 
 it("같은 어장의 한 분 생산 진척이 난이도 배율을 따른다", () => {
-  const base = staffed(build(start(), "fishery", 46, 32), "build-1", 1);
+  const base = staffed(build(start(), "fishery", 28, 48), "build-1", 1);
   const before = first(base).progress;
   const work = (difficulty: "easy" | "normal" | "hard") => {
     const state = advanceTimber(

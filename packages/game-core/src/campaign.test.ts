@@ -170,7 +170,7 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
   expect(s.homes).toHaveLength(2);
   expect(s.residents).toHaveLength(60);
   expect(new Set(Object.values(s.world.resources))).toEqual(
-    new Set([1000 * AMOUNT_SCALE, 20 * AMOUNT_SCALE]),
+    new Set([1000 * AMOUNT_SCALE, 200 * AMOUNT_SCALE]),
   );
   s = act(s, "next");
   s = commandTimber(
@@ -334,6 +334,33 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
   try {
     // Hold nightly incidents constant to compare the three choices on the same arriving convoy.
     s = act(s, "coexist");
+    s = command(s, { type: "set-gate", count: 16 });
+    if (!s.restaurantBuilt) {
+      s = command(s, { type: "build-restaurant" });
+      for (let i = 0; i < 12 && !s.restaurantBuilt; i++)
+        s = command(s, { type: "advance", minutes: 30 });
+    }
+    s = command(s, { type: "set-restaurant-workers", count: 4 });
+    s = command(s, { type: "set-ration-policy", policy: "cap" });
+    for (const [kind, x, z, count] of [
+      ["fishery", 28, 48, 5],
+      ["farm", 0, -6, 8],
+      ["waterworks", 22, 48, 6],
+    ] as const) {
+      s = command(s, {
+        type: "plan-building",
+        kind,
+        position: { x, z },
+        headingRadians: Math.PI,
+      });
+      for (let n = 0; n < 96 && s.town.orders.length; n++)
+        s = command(s, { type: "advance", minutes: 30 });
+      const facility = requireValue(
+        s.town.facilities.find((f) => f.kind === kind),
+        kind,
+      );
+      s = command(s, { type: "facility-staff", id: facility.id, count });
+    }
     for (
       let d = 0;
       d < 6 && minutesUntilCoup(s) > 1 && s.campaign?.beat === "forecast";
@@ -375,7 +402,7 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
           run.town.facilities.find((f) => f.kind === "workshop"),
           "시나리오 대상",
         );
-        run = command(run, { type: "facility-staff", id: lab.id, count: 2 });
+        run = command(run, { type: "facility-staff", id: lab.id, count: 4 });
         for (const tech of ["R17", "R18", "TECH_MECHA2"]) {
           expect(run.campaign?.ending).toBeNull();
           run = restore(command(run, { type: "start-research", tech }));
@@ -383,8 +410,11 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
             let d = 0;
             d < 10 && !run.town.development.completed.includes(tech);
             d++
-          )
+          ) {
+            if (run.mutantDamage?.[lab.id])
+              run = command(run, { type: "repair-mutant", building: lab.id });
             run = day(run);
+          }
           expect(run.town.development.completed).toContain(tech);
         }
       }
@@ -615,7 +645,7 @@ it("온돌 연료를 매시간 결제하고 성문 전투 결과와 삽화를 �
   for (const [difficulty, threshold] of [
     ["easy", 0.075],
     ["normal", 0.15],
-    ["hard", 0.75],
+    ["hard", 0.225],
   ] as const) {
     const state = { ...s, campaign: { ...campaignOf(s), difficulty } };
     expect(gateRaid(state, () => threshold)).toBe(state);
@@ -625,9 +655,14 @@ it("온돌 연료를 매시간 결제하고 성문 전투 결과와 삽화를 �
     gateRaid(s, vi.fn().mockReturnValueOnce(0).mockReturnValue(0.99)),
   );
   expect(safe.raid).toMatchObject({ picture: 5, dead: 0, injured: 0 });
-  const raid = restore(gateRaid(s, () => 0));
-  expect(raid.raid).toMatchObject({ picture: 0, dead: 2, injured: 0 });
-  expect(raid.world.citizens.filter((r) => !r.alive)).toHaveLength(2);
+  const raid = restore(
+    gateRaid(
+      commandTimber(s, { type: "set-gate", count: 0 }, "recall-gate"),
+      () => 0,
+    ),
+  );
+  expect(raid.raid).toMatchObject({ picture: 0, dead: 10, injured: 0 });
+  expect(raid.world.citizens.filter((r) => !r.alive)).toHaveLength(10);
   expect(
     commandTimber(raid, { type: "dismiss-raid" }, "read").raid,
   ).toBeUndefined();
@@ -656,7 +691,7 @@ it("영상, 충분한 난방, 연료 부족과 장기 굶주림을 구별한다"
   const hungry = {
     ...s,
     residents: s.residents.map((r, i) =>
-      i === 0 ? { ...r, hunger: 2880 } : r,
+      i === 0 ? { ...r, hunger: 7200 } : r,
     ),
   };
   expect(villageFatalIncident(hungry, () => 0).history.at(-1)?.text).toContain(
@@ -984,29 +1019,17 @@ it.each([
       const after = commandTimber(before, command, "night-tick");
       expect(after.elapsed).toBe(660);
       expect(after.world.minute).toBe(1260);
-      expect(after.raid).toMatchObject({ minute: 660, dead: 1, injured: 1 });
-      expect(after.world.citizens.filter((r) => !r.alive)).toHaveLength(1);
-      expect(
-        after.world.citizens.filter((r) => r.health === "sick"),
-      ).toHaveLength(1);
+      expect(after.raid).toMatchObject({ minute: 660, dead: 10, injured: 0 });
+      expect(after.world.citizens.filter((r) => !r.alive)).toHaveLength(10);
       expect(after.residents.filter((r) => r.health === "dead")).toHaveLength(
-        1,
+        10,
       );
-      expect(after.residents.filter((r) => r.health === "sick")).toHaveLength(
-        1,
-      );
-      expect(after.town.patients).toEqual([
-        expect.objectContaining({ severity: "major" }),
-      ]);
+      expect(after.town.patients).toHaveLength(0);
       expect(after.processed).toEqual([...before.processed, "night-tick"]);
       expect(after.world.citizenEvents).toEqual(
         events === 2000
           ? before.world.citizenEvents
-          : [
-              ...(before.world.citizenEvents ?? []),
-              "gate-raid-660-0",
-              "gate-raid-660-1",
-            ],
+          : [...(before.world.citizenEvents ?? []), "raid-660"],
       );
       const resumed = restore(after);
       expect(resumed).toEqual(after);

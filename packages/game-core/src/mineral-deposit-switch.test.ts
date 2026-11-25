@@ -12,7 +12,7 @@ import {
 import { buildingIssue, connectedDeposits } from "./town.js";
 
 // 실제 지도에는 같은 종류의 광맥이 연결 반경 안에 붙어 있지 않다.
-// 이웃 광맥으로 넘어가는 규칙만 확인하려고 한 광맥을 옆으로 옮긴다.
+// 평지에서 이웃 광맥이 있어도 원래 채석장이 이동하지 않는지 검증한다.
 vi.mock("./bokhol.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./bokhol.js")>();
   const anchor = actual.BOKHOL_MINERALS.find(
@@ -21,6 +21,7 @@ vi.mock("./bokhol.js", async (importOriginal) => {
   if (!anchor) throw Error("기준 광맥 없음");
   return {
     ...actual,
+    bokholElevation: () => 0,
     BOKHOL_MINERALS: actual.BOKHOL_MINERALS.map((m) =>
       m.id === "stone-east" ? { ...m, x: anchor.x + 20, z: anchor.z } : m,
     ),
@@ -36,7 +37,7 @@ const remaining = (s: TimberState, siteId: string) =>
     siteId,
   ).remaining;
 
-it("채석장도 벌목처럼 고갈된 광맥 대신 연결된 이웃 광맥에서 계속 캔다", () => {
+it("광맥이 고갈되면 채석장은 이웃 광맥을 캐지 않고 배치 인력을 유지한다", () => {
   const w = createPlayState();
   let s = createTimberState({
     ...w,
@@ -90,7 +91,10 @@ it("채석장도 벌목처럼 고갈된 광맥 대신 연결된 이웃 광맥에
     },
   };
   s = advanceTimber(s, 1440);
-  expect(s.town.facilities[0]?.sourceId).toBe("stone-east");
-  expect(remaining(s, "stone-east")).toBeLessThan(neighbour);
+  expect(s.town.facilities[0]?.sourceId).toBe("stone-bokhol-south");
+  expect(
+    s.residents.filter((r) => r.workplaceId === "facility:" + quarry.id),
+  ).toHaveLength(4);
+  expect(remaining(s, "stone-east")).toBe(neighbour);
   expect(remaining(s, "stone-bokhol-south")).toBe(0);
 });

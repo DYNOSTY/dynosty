@@ -32,7 +32,7 @@ it.each([
     const plan = mealPlan(citizen(species), "needs", 0, stock);
     expect(plan.foods).toEqual({ [alternative]: amount });
     expect(plan.amount).toBe(amount);
-    expect(plan.relief).toBe(360);
+    expect(plan.relief).toBe(7200);
     expect(stock[alternative]).toBe(1200000);
   },
 );
@@ -50,11 +50,11 @@ it("선호 먹이부터 쓰고 부족분만 대체하며 초식 주민에게는 
 it("종별 정량·하루 상한을 지키며 덜 배급받은 큰 주민의 허기는 남는다", () => {
   expect(mealPlan(citizen("R02"), "needs", 0, resources())).toMatchObject({
     amount: 50000,
-    relief: 360,
+    relief: 7200,
   });
   expect(mealPlan(citizen("R02"), "cap", 0, resources())).toMatchObject({
     amount: 25000,
-    relief: 180,
+    relief: 7200,
   });
   expect(rationLimit("R02", "needs")).toBe(200000);
   expect(rationLimit("R03", "needs")).toBe(100000);
@@ -63,8 +63,8 @@ it("종별 정량·하루 상한을 지키며 덜 배급받은 큰 주민의 허
   stock.RES_FISH = 0;
   stock.RES_MEAT = 10000;
   expect(mealPlan(citizen("SPINO"), "needs", 0, stock)).toMatchObject({
-    amount: 10000,
-    relief: 72,
+    amount: 0,
+    relief: 0,
   });
 });
 it("식당은 건물만 있어서는 배급하지 않고 직원이 도착한 뒤 운영한다", () => {
@@ -82,27 +82,40 @@ it("식당은 건물만 있어서는 배급하지 않고 직원이 도착한 뒤
   expect(restaurantStaff(s).assigned).toBe(1);
   expect(s.residents.some((r) => r.lastMeal !== null)).toBe(true);
   expect(() =>
-    commandTimber(s, { type: "set-restaurant-workers", count: 3 }, "bad"),
+    commandTimber(s, { type: "set-restaurant-workers", count: 5 }, "bad"),
   ).toThrow();
 });
-it("직원은 영업 중 자기 식당에서 먹고 배급 기록은 저장 복원 후에도 중복되지 않는다", () => {
+it("비번 직원은 교대 후 자기 식당에서 먹고 배급 기록은 저장 복원 후에도 중복되지 않는다", () => {
   let s = commandTimber(
     { ...createTimberState(), restaurantBuilt: true },
-    { type: "set-restaurant-workers", count: 1 },
+    { type: "set-restaurant-workers", count: 2 },
     "staff",
   );
   s = advanceTimber(s, 25);
-  const employee = s.residents.find((r) => r.workplaceId === "restaurant");
+  const employee = s.residents.filter((r) => r.workplaceId === "restaurant")[1];
   if (!employee) throw Error("직원 없음");
   s = {
     ...s,
     residents: s.residents.map((r) =>
       r.id === employee.id
-        ? { ...r, hunger: 400, rationUsed: 0, lastMeal: null }
+        ? {
+            ...r,
+            routine: "idle",
+            eatingUntil: null,
+            hunger: 720,
+            rationUsed: 0,
+            lastMeal: null,
+          }
         : r,
     ),
   };
-  s = advanceTimber(s, 1);
+  for (
+    let i = 0;
+    i < 120 &&
+    !s.residents.some((r) => r.id === employee.id && r.lastMeal !== null);
+    i++
+  )
+    s = advanceTimber(s, 1);
   const eating = s.residents.find((r) => r.id === employee.id);
   expect(eating?.routine).toBe("eating");
   expect(eating?.workplaceId).toBe("restaurant");
@@ -207,7 +220,7 @@ it("거주·배급·직원 기록이 손상된 저장을 거부한다", () => {
     const bad = JSON.parse(JSON.stringify(createTimberSave(s)));
     if (damage === "home") bad.state.residents[0].homeId = "missing";
     if (damage === "ration") bad.state.residents[0].rationUsed = 300000;
-    if (damage === "staff") bad.state.restaurantWorkerTarget = 3;
+    if (damage === "staff") bad.state.restaurantWorkerTarget = 5;
     expect(() => parseTimberSave(bad)).toThrow();
   }
 });

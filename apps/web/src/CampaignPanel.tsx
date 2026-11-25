@@ -95,7 +95,10 @@ function SceneDialog({
   const frameIndex = cursor - page.lines.length;
   const frame = page.frames?.[frameIndex];
   const flashback = page.key === "summit" && page.lines[cursor]?.[1] === "";
-  const familyScene = page.key === "summit" && cursor > 0 && cursor <= 5;
+  const familyScene =
+    page.summitFamily &&
+    cursor >= page.summitFamily.from &&
+    cursor <= page.summitFamily.through;
   const storyLength = page.lines.length + (page.frames?.length ?? 0);
   const total = storyLength + Number(!!page.resultQuote);
   const result = cursor === storyLength ? page.resultQuote : undefined;
@@ -408,7 +411,7 @@ function SceneDialog({
                 src={`/story/campaign/${familyScene ? "royal-family" : (later?.image ?? page.illustration)}.webp`}
               />
             )}
-          {page.key === "summit" && cursor === 1 && (
+          {cursor === page.summitFamily?.from && (
             <section className="prince-greetings" aria-label="두 왕자의 인사">
               <p>
                 <strong>포</strong> 복홀 어른들, 안녕하세요! 쥬신의 왕자 포예요!

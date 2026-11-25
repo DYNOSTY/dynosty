@@ -199,7 +199,11 @@ test("잘못된 영상과 재생 거부를 안내하고 올바른 파일로 복�
     mimeType: "text/plain",
     buffer: Buffer.from("text"),
   });
-  await expect(page.getByRole("alert")).toContainText("영상 파일");
+  await expect(
+    page
+      .getByRole("region", { name: "영상 재생", exact: true })
+      .getByRole("alert"),
+  ).toContainText("영상 파일");
   await expect(
     page.getByText("test-video.webm", { exact: true }),
   ).toBeVisible();
@@ -210,7 +214,11 @@ test("잘못된 영상과 재생 거부를 안내하고 올바른 파일로 복�
   });
   await play.click();
   await expect(page.getByTestId("video-status")).toHaveText("재생 실패");
-  await expect(page.getByRole("alert")).toContainText("재생하지 못했습니다");
+  await expect(
+    page
+      .getByRole("region", { name: "영상 재생", exact: true })
+      .getByRole("alert"),
+  ).toContainText("재생하지 못했습니다");
   await input.setInputFiles(videoPath);
   await page.evaluate(() => {
     const original = HTMLMediaElement.prototype.play;
@@ -229,5 +237,9 @@ test("잘못된 영상과 재생 거부를 안내하고 올바른 파일로 복�
   await expect(page.getByTestId("video-status")).toHaveText("재생 실패");
   await play.click();
   await expect(page.getByTestId("video-status")).toHaveText("재생 중");
-  await expect(page.getByRole("alert")).not.toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "영상 재생", exact: true })
+      .getByRole("alert"),
+  ).not.toBeVisible();
 });

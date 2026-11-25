@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
+  AMOUNT_SCALE,
   advanceTimber,
   BUILDING_RULES,
   commandTimber,
@@ -12,6 +13,7 @@ import {
   TIMBER_RULES,
   VILLAGE_RULES,
 } from "../../packages/game-core/dist/index.js";
+import { advanceVillageMinutes } from "./read-village.js";
 import { hoverNode, nodePoint, worldPoint } from "./scene-picking.js";
 
 const button = (page: Page, name: string) =>
@@ -334,7 +336,8 @@ test("다른 숲 권역의 자유 배치 시설과 기존 시설의 자원을 �
     {
       type: "plan-building",
       kind: "logging",
-      position: { x: 41, z: 28 },
+      // 중앙 숲 동쪽의 평탄한 격자점. x=41은 가파른 x=42로 보정된다.
+      position: { x: 40, z: 28 },
       headingRadians: Math.PI,
     },
     "central",
@@ -344,12 +347,10 @@ test("다른 숲 권역의 자유 배치 시설과 기존 시설의 자원을 �
   await loadFixture(page, createTimberSave(s));
   await dev(page);
   await page.getByLabel("작업장 권역", { exact: true }).selectOption("central");
-  await page.getByLabel("작업 인원", { exact: true }).selectOption("2");
-  for (let i = 0; i < 30; i++) {
-    const before = await page.getByTestId("timber-clock").textContent();
-    await button(page, "5분 진행").click();
-    await expect(page.getByTestId("timber-clock")).not.toHaveText(before ?? "");
-  }
+  const workers = page.getByLabel("작업 인원", { exact: true });
+  await workers.selectOption("2");
+  await expect(workers).toHaveValue("2");
+  await advanceVillageMinutes(page, 150);
   await expect(page.getByTestId("logging-panel")).toContainText(
     /누적 입고 [1-9]/,
   );
@@ -431,8 +432,9 @@ test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각
   if (!point)
     throw new Error("식당을 배치할 평탄한 빈 부지를 찾지 못했습니다.");
   await page.mouse.click(point.x, point.y);
+  // 새 식당은 주야 교대를 위해 운영 인원 4명으로 시작한다.
   await expect(page.getByLabel("식당 운영 인원", { exact: true })).toHaveValue(
-    "2",
+    "4",
     { timeout: 30_000 },
   );
   await expect(page.getByTestId("restaurant-status")).toHaveText("영업 중", {
@@ -671,7 +673,11 @@ test("손상 저장과 저장 공간 오류는 현재 상태·기존 원본을 �
     localStorage.setItem("dynosty.timber.saves.v17", "{broken"),
   );
   await button(page, "진행 불러오기").click();
-  await expect(page.getByRole("alert")).toContainText("손상");
+  await expect(
+    page
+      .getByRole("region", { name: "목재 조달", exact: true })
+      .getByRole("alert"),
+  ).toContainText("손상");
   await button(page, "진행 저장").click();
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.timber.saves.v17")),
@@ -692,7 +698,11 @@ test("손상 저장과 저장 공간 오류는 현재 상태·기존 원본을 �
     };
   });
   await button(page, "진행 저장").click();
-  await expect(page.getByRole("alert")).toContainText("현재 진행");
+  await expect(
+    page
+      .getByRole("region", { name: "목재 조달", exact: true })
+      .getByRole("alert"),
+  ).toContainText("현재 진행");
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.timber.saves.v17")),
   ).toBe(original);
@@ -723,15 +733,16 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
 }) => {
   let s = createTimberState();
   const employee = s.residents.find(
-    (r) => s.world.citizens.find((c) => c.id === r.id)?.species === "R03",
+    (r, i) =>
+      i > 0 && s.world.citizens.find((c) => c.id === r.id)?.species === "R03",
   );
   if (!employee) throw Error("직원 없음");
   s = {
     ...s,
     restaurantBuilt: true,
-    restaurantWorkerTarget: 1,
+    restaurantWorkerTarget: 2,
     world: { ...s.world, resources: { ...s.world.resources, RES_MEAT: 0 } },
-    residents: s.residents.map((r) =>
+    residents: s.residents.map((r, i) =>
       r.id === employee.id
         ? {
             ...r,
@@ -740,11 +751,13 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
               x: TIMBER_RULES.restaurant.x,
               z: TIMBER_RULES.restaurant.z + 4.4,
             },
-            routine: "working",
-            hunger: 400,
+            routine: "idle",
+            hunger: 720,
             insideHome: false,
           }
-        : { ...r, hunger: 0 },
+        : i === 0
+          ? { ...r, workplaceId: "restaurant", hunger: 0 }
+          : { ...r, hunger: 0 },
     ),
   };
   await enter(page);
@@ -755,19 +768,24 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
   );
   await expect(page.getByTestId("timber-clock")).toContainText("현재 07:00");
   await page.getByText("종별 배급", { exact: true }).click();
-  // 제출본 배급표: 필요량은 종별 한 끼(풀 5·고기 2.5·어류 5), 상한은 모두 2.5.
-  const table = page.getByTestId("ration-table");
-  await expect(table).toContainText("트리케라톱스520벨로키랍토르2.510");
+  const plantEater = page
+    .getByTestId("ration-table")
+    .getByRole("row", { name: /트리케라톱스/ });
+  await expect(plantEater.getByRole("cell")).toHaveText(["5", "20"]);
   await button(page, "식단별 상한").click();
-  await expect(table).toContainText("트리케라톱스2.510벨로키랍토르2.510");
-  await expect(button(page, "식단별 상한 · 시행 중")).toBeDisabled();
-  // 불러온 마을은 캠페인 규칙을 따르므로 정책을 바꾼 뒤 12시간 동안 다시 바꿀 수 없다.
+  await expect(plantEater.getByRole("cell")).toHaveText(["2.5", "10"]);
+  await expect(
+    page.getByRole("button", { name: "식단별 상한 · 시행 중" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(button(page, "필요량 배급")).toBeDisabled();
   await button(page, "시간 재개").click();
-  // 고기 없는 벨로키랍토르 직원이 상한 배급(2.5)으로 어류 2.5를 먹는다(상단 재고는 정수로 표시).
-  await expect(page.getByTestId("resource-RES_FISH")).toHaveText("117", {
-    timeout: 5000,
-  });
+  await advanceVillageMinutes(page, 10);
+  await expect(page.getByTestId("resource-RES_FISH")).toHaveText(
+    String(Math.floor(s.world.resources.RES_FISH / AMOUNT_SCALE - 2.5)),
+    {
+      timeout: 5000,
+    },
+  );
   await button(page, "일시정지").click();
   await page.getByText("주민 생활 동선", { exact: true }).click();
   await expect(page.getByTestId("resident-routines")).toContainText(
@@ -777,12 +795,14 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
   await expect(page.getByTestId("timber-save-status")).toContainText(
     "저장했습니다",
   );
-  const record = await page.evaluate(() =>
-    JSON.parse(
-      localStorage.getItem("dynosty.timber.saves.v17") ?? "null",
-    ).current.state.residents.find(
-      (r: { workplaceId: string | null }) => r.workplaceId === "restaurant",
-    ),
+  const record = await page.evaluate(
+    (employeeId) =>
+      JSON.parse(
+        localStorage.getItem("dynosty.timber.saves.v17") ?? "null",
+      ).current.state.residents.find(
+        (r: { id: string }) => r.id === employeeId,
+      ),
+    employee.id,
   );
   expect(record.rationUsed).toBe(25000);
   expect(record.lastMeal).toEqual({ RES_FISH: 25000 });
@@ -846,7 +866,7 @@ test("주민의 느낌표에 마우스를 올리면 요구 사유를 읽을 수 
             ...r,
             position: { x: 0, z: -6 },
             insideHome: false,
-            hunger: 400,
+            hunger: 720,
             request: "no-restaurant",
             routine: "home",
           }

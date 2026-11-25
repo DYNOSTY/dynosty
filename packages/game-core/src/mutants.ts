@@ -5,7 +5,7 @@ import {
   note,
   type TimberState,
 } from "./timber.js";
-import { BUILDING_RULES, payTown } from "./town.js";
+import { BUILDING_RULES, landmarkKinds, payTown } from "./town.js";
 import { assignHomes } from "./village-services.js";
 
 export const mutantNames: Record<string, string> = {
@@ -17,7 +17,8 @@ export function mutantStructure(s: TimberState, id: string) {
   const facility = s.town.facilities.find((f) => f.id === id);
   if (facility) return BUILDING_RULES[facility.kind];
   if (s.homes.some((h) => h.id === id)) return BUILDING_RULES.home;
-  return undefined;
+  const kind = landmarkKinds[id];
+  return kind ? BUILDING_RULES[kind] : undefined;
 }
 export function mutantRepairCost(s: TimberState, id: string) {
   const building = mutantStructure(s, id),

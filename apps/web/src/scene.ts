@@ -1,5 +1,6 @@
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
+import { fireBuildings, VILLAGE_LAYOUT } from "@dynosty/game-core";
 import { createHomePlacementVisual } from "./home-placement-scene.js";
 import { createLegacyTimberVisual } from "./legacy-timber-scene.js";
 import { terrainElevation } from "./terrain.js";
@@ -884,6 +885,7 @@ export function mountScene(
     cancelHomePlacement: homePreview.cancel,
     updateTimber(state) {
       if (legacyVisual) {
+        worldRoot.setEnabled(true);
         disposeLaborLayers();
         legacyVisual.dispose();
         legacyVisual = null;
@@ -920,9 +922,18 @@ export function mountScene(
         village.postDecree(decree.title, !!villageState);
       if (!decree && priorDecree) village.clearDecree();
       village.setFireDamage(
-        !!state?.rebuilding,
+        !!state?.rebuilding && !state.campaign?.openingLosses,
         state?.campaign?.beat === "departure",
         state?.removedLandmarks,
+        state?.campaign?.beat === "departure" && state.campaign.openingLosses
+          ? VILLAGE_LAYOUT.filter(([id]) =>
+              state.campaign?.openingLosses?.includes(id),
+            ).map(([id, x, z]) => ({ id, x, z }))
+          : state?.nightFires?.flatMap((f) => {
+              const b = fireBuildings(state).find((b) => b.id === f.id);
+              return b ? [{ id: b.id, ...b.position }] : [];
+            }),
+        state?.raidFailures === 3,
       );
       villageState = state;
       animationSpeed = state?.speed ?? 1;
@@ -1010,6 +1021,7 @@ export function mountScene(
     updateLabor(state) {
       if (state) {
         if (!legacyVisual) {
+          worldRoot.setEnabled(false);
           disposeLaborLayers();
           timberVisual.dispose();
           legacyVisual = createLegacyTimberVisual(scene);
@@ -1018,7 +1030,6 @@ export function mountScene(
           resetSceneCamera(camera);
         }
         if (!demoActive) {
-          worldRoot.setEnabled(false);
           demoGround.setEnabled(true);
           demoActive = true;
           resetSceneCamera(camera);
@@ -1032,6 +1043,7 @@ export function mountScene(
         entities.setObstacles([]);
         legacyVisual.update({ ...state.timber, stock: laborStock(state) });
       } else if (legacyVisual) {
+        worldRoot.setEnabled(true);
         disposeLaborLayers();
         legacyVisual.dispose();
         legacyVisual = null;

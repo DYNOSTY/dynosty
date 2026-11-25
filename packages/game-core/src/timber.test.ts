@@ -349,6 +349,7 @@ it("야적 식량은 저장을 이어 하루 지나면 줄고 저장소로 옮�
   const protectedStock = advanceTimber(
     {
       ...resumed,
+      coveredStock: { ...resumed.coveredStock, RES_FISH: 600 },
       logging: { ...resumed.logging, storageBuilt: true },
       loggingSites: resumed.loggingSites.map((site, i) =>
         i === 0 ? { ...site, storageBuilt: true } : site,
@@ -359,7 +360,7 @@ it("야적 식량은 저장을 이어 하루 지나면 줄고 저장소로 옮�
   expect(exposed.world.resources.RES_FISH).toBe(
     protectedStock.world.resources.RES_FISH - AMOUNT_SCALE,
   );
-  expect(protectedStock.yardFoodSince).toBeUndefined();
+  expect(protectedStock.yardFoodSince?.RES_FISH).toBeUndefined();
   expect(exposed.yardFoodSince?.RES_FISH).toBe(1440);
 });
 
