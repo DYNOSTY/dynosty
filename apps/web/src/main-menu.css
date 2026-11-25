@@ -288,7 +288,16 @@ dialog.campaign-dialog.pause-menu[open] {
   width: min(17rem, 85vw);
 }
 .pause-menu::backdrop {
-  background: #0b1019bd;
+  background: #100f0d;
+}
+
+/* Keep the village out of the transition even while a film or menu fades. */
+body:has(> dialog[data-view], > dialog.film-screen, > dialog.campaign-dialog)
+  > #root {
+  visibility: hidden;
+}
+dialog:is([data-view], .film-screen, .scene-cinema, .result-screen)::backdrop {
+  background: #100f0d;
 }
 dialog.pause-menu footer {
   display: grid;
