@@ -7,6 +7,7 @@ import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
+import { CreateDisc } from "@babylonjs/core/Meshes/Builders/discBuilder";
 import { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { Tools } from "@babylonjs/core/Misc/tools";
@@ -110,6 +111,10 @@ it("겨울 실패 시 같은 종 여름 GLB로 클릭·걷기·개별 선택·�
     const base = createSceneExample();
     const resident = base.entities.find((e) => e.kind === "resident");
     if (!resident) throw Error("주민 없음");
+    const disc = CreateDisc("shadow-source", { radius: 1 }, scene);
+    disc.rotation.x = Math.PI / 2;
+    disc.bakeCurrentTransformIntoVertices();
+    disc.isPickable = disc.isVisible = false;
     entities.setGlb((_kind, parent, off, _level, species) =>
       createResidentVisual(
         scene,
@@ -117,7 +122,13 @@ it("겨울 실패 시 같은 종 여름 GLB로 클릭·걷기·개별 선택·�
         off,
         species ?? "unknown",
         "winter",
-        () => null,
+        (at, radius, depth) => {
+          const blob = disc.createInstance("contact-shadow");
+          blob.parent = at;
+          blob.scaling.set(radius, 1, depth);
+          blob.position.set(radius * 0.25, 0.03, radius * 0.15);
+          return blob;
+        },
         load,
       ),
     );
@@ -139,9 +150,17 @@ it("겨울 실패 시 같은 종 여름 GLB로 클릭·걷기·개별 선택·�
         root.getChildMeshes().some((m) => m instanceof InstancedMesh),
       ).toBe(true),
     );
-    const [crowd] = root.getChildMeshes();
+    const crowd = root.getChildMeshes().find((m) => m.name.endsWith(":crowd"));
     if (!crowd) throw Error("군중 메시 없음");
     scene.render();
+    const [shadow] = disc.instances;
+    expect(shadow).toBeInstanceOf(InstancedMesh);
+    const edge = new Ray(new Vector3(6.15, 4, 0), Vector3.Down());
+    expect(scene.pickWithRay(edge, (m) => m === shadow)?.pickedMesh).toBe(
+      shadow,
+    );
+    entities.selectMesh(scene.pickWithRay(edge)?.pickedMesh ?? null);
+    expect(selected).not.toHaveBeenCalled();
     const hit = scene.pickWithRay(
       new Ray(new Vector3(5, 1, -8), new Vector3(0, 0, 1)),
     );
@@ -194,7 +213,10 @@ it("겨울 실패 시 같은 종 여름 GLB로 클릭·걷기·개별 선택·�
     entities.select(null);
     expect(crowd.isEnabled()).toBe(true);
     expect(scene.animationGroups).toHaveLength(0);
-    expect(root.getChildMeshes()).toEqual([crowd]);
+    expect(root.getChildMeshes()).toEqual(
+      expect.arrayContaining([crowd, shadow]),
+    );
+    expect(root.getChildMeshes()).toHaveLength(2);
   } finally {
     entities.dispose();
     for (const a of assets) a.dispose();

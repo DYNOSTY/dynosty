@@ -17,7 +17,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
 import { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
-import { createResidentVisual, residentGlb } from "./resident-visual.js";
+import { createResidentVisual } from "./resident-visual.js";
 import { loadSceneAsset as load } from "./scene-assets.js";
 import { hasWinterModel, seasonalModelUrl } from "./seasonal-model.js";
 import { elevation, rng, type Season } from "./world.js";
@@ -855,19 +855,16 @@ export function createVillage(
         season,
         shadow,
       );
-    const resident =
-      kind === "resident" ? residentGlb(species ?? "R02", season) : null;
-    if (kind === "resident" && !resident)
-      throw new Error("알 수 없는 주민 종입니다.");
     const asset = await load(
       scene,
-      resident?.url ?? "/models/buildings/BLD_NEST.glb",
+      kind === "resident"
+        ? "/models/residents/R02_Triceratops.glb"
+        : "/models/buildings/BLD_NEST.glb",
     );
     if (disposed || parent.isDisposed()) throw new Error("종료한 대상입니다.");
     const node = new TransformNode(`${parent.name}:glb`, scene);
     node.parent = parent;
-    node.position.y =
-      offsetY - (resident ? resident.bottom * resident.scale : 0);
+    node.position.y = offsetY;
     // Many nests share one model: draw them as instances. The representative nest keeps
     // its own copy for the winter door glow, which lights only its own meshes.
     const instanced = kind === "building" && parent.id !== "example-building-1";
@@ -877,7 +874,7 @@ export function createVillage(
         node,
         kind === "building"
           ? BUILDING_SCALE * (1 + (level - 1) * 0.06)
-          : (resident?.scale ?? RESIDENT_SCALE),
+          : RESIDENT_SCALE,
         shadow,
         kind === "building" ? 4.2 : 1.3,
         kind === "building" ? 4 : 2,

@@ -89,7 +89,10 @@ export async function createResidentVisual(
   crowd.isPickable = true;
   // Anchor the contact shadow to the ground, not the animated body pivot.
   const blob = shadow(parent, 1.3 * model.scale, 2 * model.scale);
-  if (blob) blob.position.y += offsetY;
+  if (blob) {
+    blob.isPickable = false;
+    blob.position.y += offsetY;
+  }
   let proxy: Mesh | null = null,
     detail: InstantiatedEntries | null = null;
   let generation = 0,

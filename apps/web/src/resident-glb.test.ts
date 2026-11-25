@@ -1,7 +1,76 @@
+import { AssetContainer } from "@babylonjs/core/assetContainer";
+import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { Scene } from "@babylonjs/core/scene";
 import { NodeIO } from "@gltf-transform/core";
 import { getBounds } from "@gltf-transform/functions";
-import { describe, expect, it } from "vitest";
-import { residentGlb } from "./village.js";
+import { describe, expect, it, vi } from "vitest";
+import * as assets from "./scene-assets.js";
+import { createVillage, residentGlb } from "./village.js";
+
+it.each(["summer", "winter"] as const)(
+  "%s 법령 배달 포졸은 일반 R02 모델로 나타난다",
+  async (season) => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    // NullEngine has no canvas for drawing the smoke texture and decree text.
+    vi.stubGlobal(
+      "OffscreenCanvas",
+      class {
+        getContext() {
+          return {
+            createRadialGradient: () => ({ addColorStop() {} }),
+            fillRect() {},
+            fillText() {},
+          };
+        }
+      },
+    );
+    const load = vi
+      .spyOn(assets, "loadSceneAsset")
+      .mockRejectedValue(Error("missing asset"));
+    try {
+      const village = createVillage(
+        scene,
+        () => null,
+        {
+          glow: { addIncludedOnlyMesh() {} },
+          warmMat: new StandardMaterial("warm", scene),
+        },
+        new TransformNode("world", scene),
+        season,
+      );
+      await village.ready;
+      load.mockClear();
+      const regular = new AssetContainer(scene);
+      regular.meshes.push(CreateBox("R02", {}, scene));
+      regular.removeAllFromScene();
+      load.mockImplementation(async (_, url) => {
+        if (url === "/models/residents/R02_Triceratops.glb") return regular;
+        throw Error("missing asset");
+      });
+      village.postDecree("법령", true);
+      village.animate(0.1);
+      expect(load.mock.calls.map(([, url]) => url)).toEqual([
+        "/models/residents/R02_Triceratops.glb",
+      ]);
+      await vi.waitFor(() =>
+        expect(scene.getMeshByName("관아 포졸:glb:R02")?.isEnabled()).toBe(
+          true,
+        ),
+      );
+      village.dispose();
+      regular.dispose();
+    } finally {
+      load.mockRestore();
+      vi.unstubAllGlobals();
+      scene.dispose();
+      engine.dispose();
+    }
+  },
+);
 
 describe("게임 주민 GLB", () => {
   it.each([

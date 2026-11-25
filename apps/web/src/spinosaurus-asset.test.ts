@@ -12,6 +12,19 @@ function glb(name: string) {
 
 describe("후속 제작 스피노사우루스", () => {
   it.each(["SPINO_Spinosaurus", "SPINO_Spinosaurus_v2"])(
+    "%s 상세 모델의 모든 재질은 비금속이다",
+    (name) => {
+      const { materials } = glb(name);
+      expect(materials.length).toBeGreaterThan(0);
+      for (const material of materials) {
+        expect(
+          material.pbrMetallicRoughness?.metallicFactor ?? 1,
+          material.name,
+        ).toBe(0);
+      }
+    },
+  );
+  it.each(["SPINO_Spinosaurus", "SPINO_Spinosaurus_v2"])(
     "%s에 고유 형상과 움직이는 팔다리가 있다",
     (name) => {
       const model = glb(name);

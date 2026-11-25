@@ -18,6 +18,7 @@ for (const winter of [false, true]) {
     doc
       .createMaterial(name)
       .setBaseColorFactor([...color, 1])
+      .setMetallicFactor(0)
       .setRoughnessFactor(0.9);
   const skin = mat("moss skin", [0.32, 0.43, 0.36]);
   const sail = mat("rust sail", [0.58, 0.29, 0.19]);
