@@ -27,6 +27,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -581,10 +582,17 @@ export function CampaignPanel({
     c.beat === "opening" && !filmSeen("opening"),
   );
   const [preparingNewGame, setPreparingNewGame] = useState(false);
+  const [startingGame, setStartingGame] = useState(false);
+  useLayoutEffect(() => {
+    if (startingGame && c.beat === "departure") {
+      setStartingGame(false);
+      setPreparingNewGame(false);
+    }
+  }, [startingGame, c.beat]);
   const [pauseMenu, setPauseMenu] = useState(false);
   const wasRunning = useRef(false);
   const introDialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (intro) introDialog.current?.showModal();
   }, [intro]);
   function finishIntro() {
@@ -845,6 +853,8 @@ export function CampaignPanel({
         advisory={null}
         close={() => setPreparingNewGame(false)}
         act={(action, difficulty) => {
+          if (startingGame) return;
+          setStartingGame(true);
           resetView?.();
           setPetition(false);
           setSouth(false);
@@ -860,7 +870,6 @@ export function CampaignPanel({
           setDismissed(null);
           setOpened(null);
           setMainMenu(false);
-          setPreparingNewGame(false);
           wasRunning.current = false;
         }}
       />,
