@@ -271,8 +271,9 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   await page
     .getByRole("button", { name: "시점을 가운데로", exact: true })
     .click();
-  await expect(page.getByTestId("camera-distance")).toHaveText("56.00");
-  await expect(page.getByTestId("camera-angle")).toHaveText("54.00");
+  // 복홀 마을이 열려 있으면 기본 시점은 마을용 값(거리 32, 각도 60°)이다(scene.ts resetCamera).
+  await expect(page.getByTestId("camera-distance")).toHaveText("32.00");
+  await expect(page.getByTestId("camera-angle")).toHaveText("60.00");
   // 복홀 방 게시판(notice-board)의 현재 위치를 장면에서 읽어 실제로 누른다.
   await clickNode(page, EXAMPLE_IDS.board);
   await expect(
