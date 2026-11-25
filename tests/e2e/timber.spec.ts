@@ -10,6 +10,7 @@ import {
   TIMBER_RULES,
 } from "../../packages/game-core/dist/index.js";
 
+import { advanceVillageMinutes } from "./read-village.js";
 import { worldPoint } from "./scene-picking.js";
 
 const button = (page: Page, name: string) =>
@@ -735,10 +736,14 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
   await expect(plantEater.getByRole("cell")).toHaveText(["5", "20"]);
   await button(page, "식단별 상한").click();
   await expect(plantEater.getByRole("cell")).toHaveText(["2.5", "10"]);
-  await button(page, "필요량 배급").click();
+  await expect(
+    page.getByRole("button", { name: "식단별 상한 · 시행 중" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(button(page, "필요량 배급")).toBeDisabled();
   await button(page, "시간 재개").click();
+  await advanceVillageMinutes(page, 10);
   await expect(page.getByTestId("resource-RES_FISH")).toHaveText(
-    String(s.world.resources.RES_FISH / AMOUNT_SCALE - 2.5),
+    String(Math.floor(s.world.resources.RES_FISH / AMOUNT_SCALE - 2.5)),
     {
       timeout: 5000,
     },
