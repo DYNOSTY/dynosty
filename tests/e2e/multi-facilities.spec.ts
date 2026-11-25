@@ -254,14 +254,10 @@ test("방문 상인의 초상과 재협상 · 계약 입고", async ({ page }) =
   await visit.getByRole("button", { name: "나중에 보기" }).click();
   await b(page, "입촌 요청").click();
   await expect(b(page, "받아준다")).toBeFocused();
-  const gatePortrait = page.getByRole("img", {
-    name: "아픈 주민을 걱정하는 달이",
-  });
-  await expect
-    .poll(() =>
-      gatePortrait.evaluate((img) => (img as HTMLImageElement).naturalWidth),
-    )
-    .toBeGreaterThan(0);
+  // 제출본의 입촌 요청은 초상 없이 마을 소식 카드(VillageBulletin)로 뜬다.
+  const arrival = page.getByRole("region", { name: "주민 도착" });
+  await expect(arrival).toContainText("달이 · 성문");
+  await expect(arrival).toContainText("마을 문에 주민 3명이 도착했습니다");
   await b(page, "교역소 상인 방문").click();
   await expect(visit).toContainText("거친손");
   const portrait = visit.getByRole("img", { name: "목재 상인 거친손의 초상" });
