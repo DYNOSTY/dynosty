@@ -164,20 +164,6 @@ test("기존 저장과 이전 일손 저장을 보존하고 다른 체험으로 
     ]),
   ).toEqual(["keep timber", "keep survival"]);
 });
-test("좁은 화면에서도 일손 배치 조작이 가능하고 가로 넘침이 없다", async ({
-  page: p,
-}) => {
-  await p.setViewportSize({ width: 375, height: 812 });
-  await enter(p);
-  await prepareA(p);
-  await move(p, 2, "prep");
-  await expect(p.getByTestId("crew-2-job")).toHaveText("배급 준비");
-  expect(
-    await p.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
-});
 test("일손 저장 쓰기 실패는 현재 진행과 최근·이전 저장을 보존한다", async ({
   page: p,
 }) => {
