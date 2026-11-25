@@ -626,7 +626,11 @@ test("손상 저장과 저장 공간 오류는 현재 상태·기존 원본을 �
     localStorage.setItem("dynosty.timber.saves.v17", "{broken"),
   );
   await button(page, "진행 불러오기").click();
-  await expect(page.getByRole("alert")).toContainText("손상");
+  await expect(
+    page
+      .getByRole("region", { name: "목재 조달", exact: true })
+      .getByRole("alert"),
+  ).toContainText("손상");
   await button(page, "진행 저장").click();
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.timber.saves.v17")),
@@ -647,7 +651,11 @@ test("손상 저장과 저장 공간 오류는 현재 상태·기존 원본을 �
     };
   });
   await button(page, "진행 저장").click();
-  await expect(page.getByRole("alert")).toContainText("현재 진행");
+  await expect(
+    page
+      .getByRole("region", { name: "목재 조달", exact: true })
+      .getByRole("alert"),
+  ).toContainText("현재 진행");
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.timber.saves.v17")),
   ).toBe(original);
