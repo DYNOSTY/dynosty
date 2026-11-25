@@ -1,14 +1,17 @@
 import { expect, test } from "@playwright/test";
 import {
+  CONVOY_GOALS,
   campaignOf,
+  createCapital,
   createTimberSave,
   createVillageGame,
+  requireValue,
 } from "../../packages/game-core/dist/index.js";
 import { readScene } from "./campaign-scene.js";
 import { advanceVillageDay } from "./read-village.js";
 
-// 대사·삽화만 확인한다. 검사 서버의 소프트웨어 3D 렌더가 대사 넘기기를 늦춰
-// 시간 제한을 넘기므로 이 파일은 WebGL을 끄고 돈다.
+// 대사·삽화만 확인하는 캠페인 장면 검사. 검사 서버의 소프트웨어 3D 렌더가 대사 넘기기를
+// 늦춰 시간 제한을 넘기거나 클릭이 밀리므로 이 파일은 WebGL을 끄고 돈다.
 test.use({
   launchOptions: { args: ["--disable-webgl"] },
   storageState: { cookies: [], origins: [] },
@@ -119,4 +122,91 @@ test("5단계 컷씬과 성안 변종 없는 반란을 이어 본다", async ({ 
   await expect
     .poll(() => tracks.some((url) => url.endsWith("/13.ogg")))
     .toBe(true);
+});
+
+test("기한 1분 전 세 번째 행렬을 보내면 왕의 결말에서 남하 호송으로 이어진다", async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  const village = createVillageGame();
+  const capital = createCapital({
+    ...village,
+    campaign: { ...campaignOf(village), beat: "roads" },
+  });
+  const save = createTimberSave({
+    ...capital,
+    paused: true,
+    elapsed:
+      requireValue(capital.campaign, "capital.campaign").since + 36 * 60 - 1,
+    campaign: {
+      ...campaignOf(capital),
+      relief: "report",
+      departures: 2,
+      evacuees: 200,
+      cargo: { ...CONVOY_GOALS },
+    },
+  });
+  await page.addInitScript(
+    (value) =>
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(value)),
+    save,
+  );
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "남문 · 피난 수레", exact: true })
+    .first()
+    .click();
+  const carts = page.getByRole("region", { name: "남문 피난 수레" });
+  const portrait = carts.getByRole("img", { name: /두 손자/ });
+  await expect
+    .poll(() =>
+      portrait.evaluate((el) => (el as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  await expect(carts).toContainText("양녕의 세 아들이 마지막 행렬에 올랐다");
+  await carts.getByRole("button", { name: "3차 수레 출발" }).click();
+  const ending = page.getByRole("dialog", {
+    name: "3단계 완료 · 남문에 남은 왕",
+  });
+  await expect(ending).toContainText("전하, 북문이 뚫렸습니다");
+  const next = ending.getByRole("button", { name: /^다음 대사/ });
+  await next.click();
+  await expect(ending.locator(".campaign-speech")).toHaveCount(0);
+  await expect(ending.locator("video")).toHaveAttribute("src", /ending-3\.mp4/);
+  await readScene(page, "먼저 남하한 충녕의 소식");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "두 번 접힌 봉서",
+  );
+  const letter = page.getByRole("dialog", { name: "두 번 접힌 봉서" });
+  const advance = letter.getByRole("button", { name: /^다음 대사/ });
+  for (const image of ["mokjin-night", "palace-letter", "road-letter"]) {
+    const still = letter.locator("img.campaign-still");
+    await expect(still).toHaveAttribute(
+      "src",
+      "/story/campaign/" + image + ".webp",
+    );
+    await expect(still).toBeVisible();
+    await expect
+      .poll(() => still.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    await expect(letter.locator("video")).toHaveCount(0);
+    if (image === "road-letter") {
+      await expect(letter.locator(".campaign-speech")).toContainText(
+        "호위무사",
+      );
+      await expect(letter.locator(".campaign-speech")).toContainText(
+        "공주마마, 복홀에 닿으면 그 봉서를 먼저 전할까요?",
+      );
+    } else {
+      await expect(letter.locator(".campaign-speech")).toHaveCount(0);
+    }
+    await advance.click();
+  }
+  await expect(letter.locator(".campaign-speech")).toContainText(
+    "아직은요. 그분을 먼저 만나 보고 싶어요.",
+  );
+  await readScene(page, "남하 호송에 동행할까요?");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName(
+    "길가에서 기다린 목진",
+  );
 });

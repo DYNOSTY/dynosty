@@ -102,9 +102,18 @@ test("실제 Worker 시간이 흐르고 일시정지·탭 비활성 뒤 수동 �
   await page.getByRole("button", { name: "게임 시작", exact: true }).click();
   await expect(page.getByTestId("play-clock")).not.toHaveText(start ?? "");
   await page.getByRole("button", { name: "일시정지", exact: true }).click();
-  const clock = await page.getByTestId("play-clock").textContent();
+  // 일시정지는 Worker에 메시지로 전달되므로, 누르는 순간 이미 넘어가던 1분이 뒤늦게 반영될 수
+  // 있다. 시계가 실제로 멈춘(두 번 읽어 같은) 뒤의 시각을 기준으로 삼는다.
+  let clock = "";
+  await expect
+    .poll(async () => {
+      const previous = clock;
+      clock = (await page.getByTestId("play-clock").textContent()) ?? "";
+      return previous === clock;
+    })
+    .toBe(true);
   await page.waitForTimeout(1200);
-  await expect(page.getByTestId("play-clock")).toHaveText(clock ?? "");
+  await expect(page.getByTestId("play-clock")).toHaveText(clock);
   await page.getByRole("button", { name: "게임 시작", exact: true }).click();
   await page.evaluate(() => {
     Object.defineProperty(document, "hidden", {
