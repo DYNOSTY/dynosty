@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
   advanceTimber,
+  AMOUNT_SCALE,
   commandTimber,
   createTimberSave,
   createTimberState,
@@ -8,6 +9,8 @@ import {
   productionSiteDefinition,
   TIMBER_RULES,
 } from "../../packages/game-core/dist/index.js";
+
+import { worldPoint } from "./scene-picking.js";
 
 const button = (page: Page, name: string) =>
   page.getByRole("button", { name, exact: true });
@@ -150,7 +153,7 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   const s = advanceTimber(createTimberState(), 120);
   await enter(page);
   await loadFixture(page, createTimberSave(s));
-  await button(page, "온돌 둥지 증설 · 목재20").click();
+  await button(page, "온돌 둥지 증설 · 목재50").click();
   const invalid = await homeCursor(page, 0, -1);
   await expect(page.getByTestId("home-placement-status")).toContainText("겹");
   await page.mouse.click(invalid.x, invalid.y);
@@ -166,11 +169,11 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   await expect(page.getByTestId("home-placement-status")).toContainText("180°");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("home-placement-status")).toHaveCount(0);
-  await button(page, "온돌 둥지 증설 · 목재20").click();
+  await button(page, "온돌 둥지 증설 · 목재50").click();
   await homeCursor(page, 12, 12);
   await page.keyboard.press("ArrowRight");
   await page.mouse.click(point.x, point.y);
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("100");
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("70");
   await expect(page.getByTestId("building-queue")).toContainText("자재 운반");
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
   await expect(page.getByTestId("housing-status")).toContainText("둥지 7곳", {
@@ -684,15 +687,16 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
 }) => {
   let s = createTimberState();
   const employee = s.residents.find(
-    (r) => s.world.citizens.find((c) => c.id === r.id)?.species === "R03",
+    (r, i) =>
+      i > 0 && s.world.citizens.find((c) => c.id === r.id)?.species === "R03",
   );
   if (!employee) throw Error("직원 없음");
   s = {
     ...s,
     restaurantBuilt: true,
-    restaurantWorkerTarget: 1,
+    restaurantWorkerTarget: 2,
     world: { ...s.world, resources: { ...s.world.resources, RES_MEAT: 0 } },
-    residents: s.residents.map((r) =>
+    residents: s.residents.map((r, i) =>
       r.id === employee.id
         ? {
             ...r,
@@ -701,11 +705,13 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
               x: TIMBER_RULES.restaurant.x,
               z: TIMBER_RULES.restaurant.z + 4.4,
             },
-            routine: "working",
-            hunger: 400,
+            routine: "idle",
+            hunger: 720,
             insideHome: false,
           }
-        : { ...r, hunger: 0 },
+        : i === 0
+          ? { ...r, workplaceId: "restaurant", hunger: 0 }
+          : { ...r, hunger: 0 },
     ),
   };
   await enter(page);
@@ -715,14 +721,20 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
   );
   await expect(page.getByTestId("timber-clock")).toContainText("현재 07:00");
   await page.getByText("종별 배급", { exact: true }).click();
-  await expect(page.getByTestId("ration-table")).toContainText("0.5");
-  await page.getByLabel("배급 방식", { exact: true }).selectOption("cap");
-  await expect(page.getByTestId("ration-table")).not.toContainText("0.5");
-  await page.getByLabel("배급 방식", { exact: true }).selectOption("needs");
+  const plantEater = page
+    .getByTestId("ration-table")
+    .getByRole("row", { name: /트리케라톱스/ });
+  await expect(plantEater.getByRole("cell")).toHaveText(["5", "20"]);
+  await button(page, "식단별 상한").click();
+  await expect(plantEater.getByRole("cell")).toHaveText(["2.5", "10"]);
+  await button(page, "필요량 배급").click();
   await button(page, "시간 재개").click();
-  await expect(page.getByTestId("resource-RES_FISH")).toHaveText("119.75", {
-    timeout: 5000,
-  });
+  await expect(page.getByTestId("resource-RES_FISH")).toHaveText(
+    String(s.world.resources.RES_FISH / AMOUNT_SCALE - 2.5),
+    {
+      timeout: 5000,
+    },
+  );
   await button(page, "일시정지").click();
   await page.getByText("주민 생활 동선", { exact: true }).click();
   await expect(page.getByTestId("resident-routines")).toContainText(
@@ -732,15 +744,17 @@ test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직�
   await expect(page.getByTestId("timber-save-status")).toContainText(
     "저장했습니다",
   );
-  const record = await page.evaluate(() =>
-    JSON.parse(
-      localStorage.getItem("dynosty.timber.saves.v17") ?? "null",
-    ).current.state.residents.find(
-      (r: { workplaceId: string | null }) => r.workplaceId === "restaurant",
-    ),
+  const record = await page.evaluate(
+    (employeeId) =>
+      JSON.parse(
+        localStorage.getItem("dynosty.timber.saves.v17") ?? "null",
+      ).current.state.residents.find(
+        (r: { id: string }) => r.id === employeeId,
+      ),
+    employee.id,
   );
-  expect(record.rationUsed).toBe(2500);
-  expect(record.lastMeal).toEqual({ RES_FISH: 2500 });
+  expect(record.rationUsed).toBe(25000);
+  expect(record.lastMeal).toEqual({ RES_FISH: 25000 });
 });
 test("거주 공간이 부족한 합류 주민을 둥지 증설 후 자동 입주시킨다", async ({
   page,
@@ -761,7 +775,7 @@ test("거주 공간이 부족한 합류 주민을 둥지 증설 후 자동 입�
   await enter(page);
   await loadFixture(page, createTimberSave(s));
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
-  await button(page, "온돌 둥지 증설 · 목재20").click();
+  await button(page, "온돌 둥지 증설 · 목재50").click();
   const point = await homeCursor(page, 12, 12);
   await expect(page.getByTestId("home-placement-status")).toContainText(
     "배치 가능",
@@ -799,7 +813,7 @@ test("주민의 느낌표에 마우스를 올리면 요구 사유를 읽을 수 
             ...r,
             position: { x: 0, z: -6 },
             insideHome: false,
-            hunger: 400,
+            hunger: 720,
             request: "no-restaurant",
             routine: "home",
           }
@@ -813,26 +827,12 @@ test("주민의 느낌표에 마우스를 올리면 요구 사유를 읽을 수 
   };
   await enter(page);
   await loadFixture(page, createTimberSave(s));
-  const box = await page.locator("canvas").boundingBox();
-  if (!box) throw Error("장면 없음");
-  // 현재 기본 카메라(거리32·고도60도·수직시야각0.8)의 전경 표식 위치.
-  const beta = Math.PI / 3,
-    depth = 32 - 2 * Math.cos(beta) - 6 * Math.sin(beta);
-  const point = {
-    x: box.width / 2,
-    y:
-      box.height / 2 -
-      ((2 * Math.sin(beta) - 6 * Math.cos(beta)) * box.height) /
-        (2 * depth * Math.tan(0.4)),
-  };
+  const point = await worldPoint(page, [0, 2, -6]);
   let offset = 0;
   await expect
     .poll(
       async () => {
-        await page.mouse.move(
-          box.x + point.x + (offset++ % 2),
-          box.y + point.y,
-        );
+        await page.mouse.move(point.x + (offset++ % 2), point.y);
         return await page
           .getByRole("tooltip")
           .textContent({ timeout: 300 })
@@ -840,5 +840,5 @@ test("주민의 느낌표에 마우스를 올리면 요구 사유를 읽을 수 
       },
       { timeout: 10000 },
     )
-    .toContain("지휘관님, 배가 고파요. 식당을 지어 주세요!");
+    .toContain("공자님, 배가 고파요. 식당을 지어 주세요!");
 });

@@ -55,7 +55,7 @@ async function load(page: Page, s: TimberState) {
 test("시설 개량 버튼으로2단계 생산 배율과 저장 복원을 확인한다", async ({
   page,
 }) => {
-  let unlocked = payTown(built("fishery", 46, 32), {
+  let unlocked = payTown(built("fishery", 28, 48), {
     RES_WOOD: 24,
     RES_METAL: 6,
   });

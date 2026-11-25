@@ -129,7 +129,7 @@ test("결빙 수역과 어획막을 표시하고 물가의 직원이 어류를 �
     {
       type: "plan-building",
       kind: "fishery",
-      position: { x: 46, z: 32 },
+      position: { x: 28, z: 48 },
       headingRadians: Math.PI,
     },
     "fish",

@@ -158,7 +158,7 @@ test("두 연구소의 동시 연구 완료와 저장 복원은 연구를 중복
 test("어획막의 다섯 인원으로 별도 운반 없이 공동 어류가 즉시 증가한다", async ({
   page,
 }) => {
-  let s = build(start(), "fishery", 46, 32);
+  let s = build(start(), "fishery", 28, 48);
   s = {
     ...s,
     residents: s.residents.map((r, i) => ({
