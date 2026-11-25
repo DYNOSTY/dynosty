@@ -23,3 +23,9 @@ export async function openLaborPanel(page: Page) {
     .getByRole("button", { name: "일손 배치·배급", exact: true })
     .click();
 }
+
+// 제출본은 명령 콘솔을 펼친 채 시작한다. 접혀 있을 때만 연다.
+export async function openCommandConsole(page: Page) {
+  const open = page.getByRole("button", { name: "명령 열기", exact: true });
+  if (await open.isVisible()) await open.click();
+}

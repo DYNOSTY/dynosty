@@ -3653,6 +3653,9 @@ function applyTimberCommand(
       break;
     case "facility-staff":
       n = setFacilityStaff(s, command.id, command.count);
+      // 첫 식당의 인원은 식당 직원 배정과 같은 목표를 쓰므로 바로 맞춘다.
+      if (n.restaurantWorkerTarget !== s.restaurantWorkerTarget)
+        n = staffRestaurant(n);
       break;
     case "dispatch-food":
       n = dispatchFood(s, command.id, command.food, command.rank);

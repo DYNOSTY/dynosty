@@ -18,7 +18,11 @@ test("브라우저에서 API·Worker·3D 연결을 확인한다", async ({ page 
   await page.goto("/");
   await openWorkspace(page);
   await expect(page.getByRole("heading", { name: "DYNOSTY" })).toBeVisible();
-  await expect(page.getByRole("status")).toHaveText("연결 완료");
+  await expect(
+    page
+      .getByRole("region", { name: "개발 환경 연결 상태" })
+      .getByRole("status"),
+  ).toHaveText("연결 완료");
   await expect(page.getByText("준비 완료", { exact: true })).toBeVisible();
   await expect(page.getByText("1일차", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "하루 진행", exact: true }).click();
