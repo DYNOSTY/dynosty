@@ -135,7 +135,8 @@ test("이름 변경은 재생을 유지하고 여러 음원의 연결을 전환�
   await page
     .getByLabel("BGM 파일", { exact: true })
     .setInputFiles(file("new-morning.wav"));
-  expect((await output(page)).paused).toEqual([]);
+  // 새로고침 뒤 타이틀 BGM 요소가 멈춘 채 연결돼 있을 수 있다. 파일 선택만으로는 재생하지 않는다.
+  expect((await output(page)).paused).not.toContain(false);
   await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
   expect(JSON.parse((await stored(page)) ?? "{}").entries[0]).toMatchObject({

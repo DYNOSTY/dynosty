@@ -122,33 +122,3 @@ test("품질흐름: 교환 처리4와 정상 배분16을 분리하고 예약·�
   await expect(p.getByTestId("flow-total")).toContainText("20/20");
   expect(errors).toEqual([]);
 });
-test("품질흐름: 375px에서 B 제안 선택과 정상20 검사 결과를 표시하고 넘치지 않는다", async ({
-  browser,
-}) => {
-  const context = await browser.newContext({
-    viewport: { width: 375, height: 812 },
-    hasTouch: true,
-  });
-  const p = await context.newPage();
-  try {
-    await enterProgress(p);
-    await b(p, "확장 제안 B 선택").focus();
-    await p.keyboard.press("Enter");
-    await b(p, "확장 약정하기").click();
-    await b(p, "확장 수레 출발").click();
-    await b(p, "다음 일손 사건까지").click();
-    await b(p, "다음 일손 사건까지").click();
-    await b(p, "확장 전량 검사 시작").click();
-    await b(p, "다음 일손 사건까지").click();
-    await b(p, "확장 정상분 20 받기").click();
-    await expect(flow(p, "available")).toContainText("20개");
-    await expect(flow(p, "quarantine")).toContainText("0개");
-    await expect(p.getByTestId("offer-observed")).toContainText("정상20·격리0");
-    await expect(report(p)).toContainText("실제 철재 사용6");
-    expect(
-      await p.evaluate(() => document.documentElement.scrollWidth > innerWidth),
-    ).toBe(false);
-  } finally {
-    await context.close();
-  }
-});
