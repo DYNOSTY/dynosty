@@ -1,4 +1,3 @@
-import { departureBuildings } from "@dynosty/game-core";
 import { readFileSync } from "node:fs";
 import {
   AMOUNT_SCALE,
@@ -7,6 +6,7 @@ import {
   createCapital,
   createTimberSave,
   createVillageGame,
+  departureBuildings,
   parseTimberSave,
   recordResearchStory,
   type TimberState,

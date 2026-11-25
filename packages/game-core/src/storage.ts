@@ -1,9 +1,9 @@
 import { loggingSiteRules, productionSites } from "./logging.js";
 import { AMOUNT_SCALE, type ResourceId } from "./play.js";
 import type { GroundPoint } from "./resident-path.js";
-import type { TimberState } from "./timber.js";
 import { moveOnGround } from "./resident-path.js";
 import { workplaceOpen } from "./resident-routine.js";
+import type { TimberState } from "./timber.js";
 import { facilityDoor } from "./town.js";
 
 export const STORAGE_SPACE = [500, 1000, 2000] as const;

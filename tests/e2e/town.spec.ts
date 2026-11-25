@@ -109,7 +109,10 @@ test("시설 완성 모습으로 회전 배치하고 자재를 확보한 두 공
   await expect(dialog).toContainText("슬롯 1에 저장했습니다");
   await dialog.getByRole("button", { name: "뒤로" }).click();
   await dialog.getByRole("button", { name: "불러오기" }).click();
+  // 슬롯을 불러오면 페이지가 다시 열리므로 새 문서가 뜬 뒤 기록을 읽는다.
+  const reloaded = page.waitForEvent("load");
   await dialog.getByRole("button", { name: /슬롯 1 ·/ }).click();
+  await reloaded;
   await expect
     .poll(async () => (await read()).town.orders)
     .toEqual(pausedOrders);
@@ -143,6 +146,8 @@ test("결빙 수역과 어획막을 표시하고 물가의 직원이 어류를 �
   s = commandTimber(s, { type: "cold-weather", cold: true }, "cold");
   s = advanceTimber(s, 100);
   await fixture(page, s);
+  // 제출본은 운영 장부를 메뉴별로 나눠 보여 준다. 개발 도구를 열면 전체 장부와 시간 조작이 보인다.
+  await button(page, "개발 도구").click();
   await expect(
     page.getByText("수역: 결빙 · 얼음 구멍 낚시 가능", { exact: true }),
   ).toBeVisible();

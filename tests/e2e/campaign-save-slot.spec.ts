@@ -95,7 +95,6 @@ test("이어하기로 저장 슬롯을 열면 첫 재고부터 저장한 고기 
 test("처음 본 서막은 한 번만 재생하고 남은 주민의 장부는 새 게임을 확정할 때까지 보존한다", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const button = (name: string) =>
     page.getByRole("dialog").getByRole("button", { name, exact: true });

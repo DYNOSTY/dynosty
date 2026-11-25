@@ -1,5 +1,7 @@
 import { expect, it } from "vitest";
+import { AMOUNT_SCALE } from "./play.js";
 import { encounterReady } from "./scout-sites.js";
+import { yardStock } from "./storage.js";
 import {
   advanceTimber,
   commandTimber,
@@ -9,8 +11,6 @@ import {
   parseTimberSave,
 } from "./timber.js";
 import { mealPlan } from "./village-services.js";
-import { AMOUNT_SCALE } from "./play.js";
-import { yardStock } from "./storage.js";
 
 it("성문에 배치된 네 명이 보통 습격을 막고 첫 실패는 열 명을 잃는다", () => {
   const base = createVillageGame(false, true);

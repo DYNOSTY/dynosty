@@ -1,7 +1,6 @@
 import {
   BOKHOL_FORESTS,
   BOKHOL_MAP,
-  VILLAGE_LAYOUT,
   BOKHOL_MINERALS,
   BOKHOL_PRODUCTION_SITES,
   constructionPlot,
@@ -9,6 +8,7 @@ import {
   productionSiteDefinition,
   reservedVillageLand,
   sawmillHasForest,
+  VILLAGE_LAYOUT,
 } from "./bokhol.js";
 import {
   actCampaign,
@@ -16,8 +16,8 @@ import {
   type Campaign,
   type CampaignCommand,
   campaignOf,
-  departureBuildings,
   campaignValid,
+  departureBuildings,
   minutesUntilCoup,
   newCampaign,
   policyWait,
@@ -83,12 +83,12 @@ import {
   createPlayState,
   FOOD_IDS,
   type FoodId,
-  type ResourceId,
   GAME_RULES,
   incidentChance,
   isDifficulty,
   type PlayState,
   parsePlayState,
+  type ResourceId,
 } from "./play.js";
 import { requireValue } from "./require-value.js";
 import {
@@ -134,9 +134,8 @@ import {
   BUILDING_RULES,
   type BuildingKind,
   createTown,
-  demolishBuilding,
   demolishableLandmark,
-  landmarkKinds,
+  demolishBuilding,
   deposit,
   directStaff,
   dispatchFood,
@@ -144,6 +143,7 @@ import {
   facilityDoor,
   facilityResource,
   facilityStaffLimit,
+  landmarkKinds,
   mineralWorksites,
   orderResting,
   originalBuildingCost,

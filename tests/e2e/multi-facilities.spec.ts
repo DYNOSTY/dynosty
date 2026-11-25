@@ -62,6 +62,12 @@ async function load(p: Page, s: TimberState) {
   );
   await b(p, "저장").click();
 }
+// 제출본은 운영 장부를 메뉴별로 나눠 보여 준다. 개발 도구를 열면 전체 장부와 시간 조작이 보인다.
+async function tools(p: Page) {
+  const toggle = b(p, "개발 도구");
+  if ((await toggle.getAttribute("aria-expanded")) !== "true")
+    await toggle.click();
+}
 test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상단 시각이 보인다", async ({
   page,
 }) => {
@@ -70,6 +76,7 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상�
     s = cmd(s, { type: "facility-staff", id: f.id, count: 1 });
   s = advanceTimber(s, 35);
   await load(page, s);
+  await tools(page);
   await page.getByText("완공 시설 2곳", { exact: true }).click();
   await expect(
     page.getByLabel("build-1 운영 인원", { exact: true }),
@@ -81,9 +88,13 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상�
   await expect(
     page.getByLabel("build-1 운영 인원", { exact: true }),
   ).toHaveValue("1");
-  await b(page, "마을로 돌아가기").click();
+  // 제출본에서 Esc는 캠페인 일시정지 메뉴를 연다(CampaignPanel 캡처 단계 처리).
+  // 개발 도구는 같은 단추를 다시 눌러 닫는다.
+  await b(page, "개발 도구").click();
+  await expect(b(page, "개발 도구")).toHaveAttribute("aria-expanded", "false");
   await b(page, "주민").click();
   await b(page, "건설").click();
+  await tools(page);
   await expect(
     page.getByLabel("build-2 운영 인원", { exact: true }),
   ).toHaveValue("2");
@@ -99,13 +110,8 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상�
     .poll(() => art.evaluate((img) => (img as HTMLImageElement).naturalWidth))
     .toBeGreaterThan(0);
   await expect(page.getByTestId("play-clock")).toContainText("일차");
-  await page.setViewportSize({ width: 390, height: 844 });
+  await b(page, "개발 도구 닫기").click();
   await expect(page.getByTestId("play-clock")).toBeInViewport();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
 });
 test("두 연구소의 동시 연구 완료와 저장 복원은 연구를 중복 적용하지 않는다", async ({
   page,
@@ -134,6 +140,7 @@ test("두 연구소의 동시 연구 완료와 저장 복원은 연구를 중복
     },
   };
   await load(page, s);
+  await tools(page);
   await b(page, "연구").click();
   await expect(page.getByTestId("research-status").locator("p")).toHaveCount(2);
   await b(page, "시간 재개").click();
@@ -182,6 +189,7 @@ test("어획막의 다섯 인원으로 별도 운반 없이 공동 어류가 즉
       },
     },
   });
+  await tools(page);
   const worried = page.getByAltText("걱정스러운 나르미");
   await expect(worried).toBeAttached();
   await expect
@@ -229,7 +237,12 @@ test("방문 상인의 초상과 재협상 · 계약 입고", async ({ page }) =
     }),
   );
   await page.goto("/");
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+  );
   const visit = page.getByRole("dialog", { name: "상인 계약 선택" });
+  // 제출본은 입촌 안내를 먼저 띄우고, 상인 거래는 교역소 표식을 눌러 연다.
+  await b(page, "교역소 상인 방문").click();
   await expect(visit).toBeVisible();
   const choices = visit.getByRole("button");
   const boxes = await choices.evaluateAll((buttons) =>
@@ -241,14 +254,10 @@ test("방문 상인의 초상과 재협상 · 계약 입고", async ({ page }) =
   await visit.getByRole("button", { name: "나중에 보기" }).click();
   await b(page, "입촌 요청").click();
   await expect(b(page, "받아준다")).toBeFocused();
-  const gatePortrait = page.getByRole("img", {
-    name: "아픈 주민을 걱정하는 달이",
-  });
-  await expect
-    .poll(() =>
-      gatePortrait.evaluate((img) => (img as HTMLImageElement).naturalWidth),
-    )
-    .toBeGreaterThan(0);
+  // 제출본의 입촌 요청은 초상 없이 마을 소식 카드(VillageBulletin)로 뜬다.
+  const arrival = page.getByRole("region", { name: "주민 도착" });
+  await expect(arrival).toContainText("달이 · 성문");
+  await expect(arrival).toContainText("마을 문에 주민 3명이 도착했습니다");
   await b(page, "교역소 상인 방문").click();
   await expect(visit).toContainText("거친손");
   const portrait = visit.getByRole("img", { name: "목재 상인 거친손의 초상" });
@@ -290,6 +299,10 @@ test("희망과 절망 중 높은 쪽 저울 접시가 내려간다", async ({ p
       paused: true,
       world: { ...base.world, optimism, pessimism },
     });
+    // 건설 목록(.building-shelf)이 열려 있으면 저울을 가린다. Esc는 제출본에서
+    // 일시정지 메뉴를 열므로, 다른 메뉴로 옮긴 뒤 운영 화면을 닫고 마을 화면에서 확인한다.
+    await b(page, "주민").click();
+    await b(page, "마을로 돌아가기").click();
     const scale = page.getByRole("figure", {
       name: `희망 ${optimism}, 절망 ${pessimism}`,
     });

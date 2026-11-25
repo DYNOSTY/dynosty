@@ -367,3 +367,17 @@ it("파견 인력이 회복하면 임시 대체 직원과 중복 배치되지 �
   );
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
+it("첫 식당의 인원을 시설 목록에서 줄이면 남는 직원을 바로 내보낸다", () => {
+  let s = build(start(), "restaurant");
+  const id = s.town.facilities[0]?.id;
+  if (!id) throw Error("식당 없음");
+  expect(
+    s.residents.filter((r) => r.workplaceId === "restaurant"),
+  ).toHaveLength(s.restaurantWorkerTarget);
+  s = cmd(s, { type: "facility-staff", id, count: 1 });
+  expect(s.restaurantWorkerTarget).toBe(1);
+  expect(
+    s.residents.filter((r) => r.workplaceId === "restaurant"),
+  ).toHaveLength(1);
+  expect(() => parseTimberState(JSON.parse(JSON.stringify(s)))).not.toThrow();
+});

@@ -79,6 +79,8 @@ type Props = {
   selectedWorkplace?: string | null;
   showDevTools?: boolean;
   saveOpen?: boolean;
+  savePanelId?: string;
+  onCloseSave?: () => void;
   onState: (state: TimberState, lines?: string[], reset?: boolean) => void;
   world: PlayState | null;
   onExit: (world: PlayState) => void;
@@ -108,6 +110,8 @@ export function TimberDemo({
   onCancelHomePlacement,
   showDevTools = false,
   saveOpen = false,
+  savePanelId,
+  onCloseSave,
   world,
 }: Props) {
   const [laborMode, setLaborMode] = useState(false);
@@ -134,8 +138,18 @@ export function TimberDemo({
     if (
       focusSection.label === "교역소 방문" ||
       focusSection.label === "다음 임무"
-    )
-      section?.querySelector("button")?.focus({ preventScroll: true });
+    ) {
+      // 캠페인에서는 입촌 요청이 조달 패널 대신 마을 소식 카드(VillageBulletin)에 뜬다.
+      // 사용자가 표식을 눌러 열었을 때만 여기로 오므로, 카드가 저절로 뜰 때는 초점을 뺏지 않는다.
+      const target =
+        section ??
+        (focusSection.label === "다음 임무"
+          ? document.querySelector<HTMLElement>(
+              '.village-bulletin[aria-label="주민 도착"]',
+            )
+          : null);
+      target?.querySelector("button")?.focus({ preventScroll: true });
+    }
   }, [active, ready, focusSection]);
   const selectedFacility = state?.town.facilities.find(
     (f) => f.sourceId === selectedSiteId,
@@ -368,8 +382,8 @@ export function TimberDemo({
   }, [state?.construction, error, active, placingHome, onCancelHomePlacement]);
   useEffect(() => () => onCancelHomePlacement(), [onCancelHomePlacement]);
   useEffect(() => {
-    if (!active) setLaborMode(false);
-  }, [active]);
+    if (!active || saveOpen) setLaborMode(false);
+  }, [active, saveOpen]);
   const merchant =
     state?.merchantItem === undefined
       ? undefined
@@ -393,7 +407,7 @@ export function TimberDemo({
     <section
       hidden={!active || laborMode}
       className="timber-demo"
-      data-service={showDevTools ? undefined : service}
+      data-service={showDevTools || saveOpen ? undefined : service}
       aria-label="목재 조달"
     >
       <button
@@ -427,6 +441,53 @@ export function TimberDemo({
         <p>마을을 불러오는 중입니다.</p>
       ) : (
         <>
+          {saveOpen ? (
+            <div className="timber-controls" id={savePanelId}>
+              <button type="button" onClick={onCloseSave}>
+                저장 닫기
+              </button>
+              <button type="button" onClick={() => setSlotPicker(true)}>
+                슬롯에 저장하기
+              </button>
+              {slotPicker && (
+                <EndingMenu
+                  state={state}
+                  initialView="save"
+                  limit={(state.chapter ?? 1) - 1}
+                  resume={() => setSlotPicker(false)}
+                  restart={() => {
+                    setSlotPicker(false);
+                    command({ type: "restart" });
+                  }}
+                />
+              )}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => access(false)}
+              >
+                진행 저장
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => access(true)}
+              >
+                진행 불러오기
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => access(true, true)}
+              >
+                이전 진행 불러오기
+              </button>
+              <p aria-live="polite" data-testid="timber-save-status">
+                {busy ? "저장 처리 중" : saveStatus}
+              </p>
+              {error ? <p role="alert">{error}</p> : null}
+            </div>
+          ) : null}
           <p>
             공급안을 비교해 계약하세요. 주민 배정·운송·하역·검수·복귀·공동 재고
             정산은 자동으로 이어집니다.
@@ -561,7 +622,7 @@ export function TimberDemo({
                 }
                 onClick={() => placeBuilding("restaurant")}
               >
-                공동 식당 배치 · 목재30 · 철재2
+                공동 식당 배치 · {buildingCost("restaurant")}
               </button>
             ) : null}
             <label>
@@ -1348,49 +1409,6 @@ export function TimberDemo({
               ) : null}
             </details>
           )}
-          {saveOpen ? (
-            <div className="timber-controls">
-              <button type="button" onClick={() => setSlotPicker(true)}>
-                슬롯에 저장하기
-              </button>
-              {slotPicker && (
-                <EndingMenu
-                  state={state}
-                  initialView="save"
-                  limit={(state.chapter ?? 1) - 1}
-                  resume={() => setSlotPicker(false)}
-                  restart={() => {
-                    setSlotPicker(false);
-                    command({ type: "restart" });
-                  }}
-                />
-              )}
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => access(false)}
-              >
-                진행 저장
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => access(true)}
-              >
-                진행 불러오기
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => access(true, true)}
-              >
-                이전 진행 불러오기
-              </button>
-            </div>
-          ) : null}
-          <p aria-live="polite" data-testid="timber-save-status">
-            {busy ? "저장 처리 중" : saveStatus}
-          </p>
           {showDevTools ? (
             <section aria-label="조달 개발 검사">
               <h3>조달 개발 검사</h3>
@@ -1500,7 +1518,7 @@ export function TimberDemo({
           </details>
         </>
       )}
-      {error ? <p role="alert">{error}</p> : null}
+      {error && (!saveOpen || !state) ? <p role="alert">{error}</p> : null}
     </section>
   );
   return (

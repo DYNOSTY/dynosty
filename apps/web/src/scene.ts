@@ -1,6 +1,6 @@
-import { fireBuildings, VILLAGE_LAYOUT } from "@dynosty/game-core";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
+import { fireBuildings, VILLAGE_LAYOUT } from "@dynosty/game-core";
 import { createHomePlacementVisual } from "./home-placement-scene.js";
 import { createLegacyTimberVisual } from "./legacy-timber-scene.js";
 import { terrainElevation } from "./terrain.js";
