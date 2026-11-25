@@ -885,6 +885,7 @@ export function mountScene(
     cancelHomePlacement: homePreview.cancel,
     updateTimber(state) {
       if (legacyVisual) {
+        worldRoot.setEnabled(true);
         disposeLaborLayers();
         legacyVisual.dispose();
         legacyVisual = null;
@@ -1020,6 +1021,7 @@ export function mountScene(
     updateLabor(state) {
       if (state) {
         if (!legacyVisual) {
+          worldRoot.setEnabled(false);
           disposeLaborLayers();
           timberVisual.dispose();
           legacyVisual = createLegacyTimberVisual(scene);
@@ -1028,7 +1030,6 @@ export function mountScene(
           resetSceneCamera(camera);
         }
         if (!demoActive) {
-          worldRoot.setEnabled(false);
           demoGround.setEnabled(true);
           demoActive = true;
           resetSceneCamera(camera);
@@ -1042,6 +1043,7 @@ export function mountScene(
         entities.setObstacles([]);
         legacyVisual.update({ ...state.timber, stock: laborStock(state) });
       } else if (legacyVisual) {
+        worldRoot.setEnabled(true);
         disposeLaborLayers();
         legacyVisual.dispose();
         legacyVisual = null;
