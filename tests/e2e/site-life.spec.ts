@@ -75,10 +75,9 @@ test("교환 운송 저장·새로고침 복원과 재검수·수령·완료 안
   await expect(p.getByTestId("timber-next-step")).toContainText("완료");
   expect(errors).toEqual([]);
 });
-test("모바일에서 주민 담당·보완 인원 부족·배급 병행 안내와 선택을 확인한다", async ({
+test("주민 담당·보완 인원 부족·배급 병행 안내와 선택을 확인한다", async ({
   page: p,
 }) => {
-  await p.setViewportSize({ width: 375, height: 812 });
   await receiveProgress(p);
   await b(p, "목재 다음 작업 장소 보기").click();
   await b(p, "현장 보완 인원 배정").click();

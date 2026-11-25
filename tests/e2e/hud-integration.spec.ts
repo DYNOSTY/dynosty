@@ -7,7 +7,7 @@ import {
 } from "../../packages/game-core/dist/index.js";
 import { advanceVillageDay } from "./read-village.js";
 import { clickExample } from "./scene-picking.js";
-import { openLaborPanel } from "./workspace.js";
+import { openCommandConsole, openLaborPanel } from "./workspace.js";
 
 type SceneMesh = {
   isVisible: boolean;
@@ -23,6 +23,7 @@ async function ready(p: Page) {
     timeout: 90_000,
   });
 }
+
 async function islandVisible(p: Page) {
   return p.evaluate(() =>
     (
@@ -36,6 +37,17 @@ async function islandVisible(p: Page) {
       ?.isEnabled(),
   );
 }
+// 조달 현장(검수대·배급소)은 좁은 현장 카메라(최대 48m)를, 복홀 마을은 720m를 쓴다(scene.ts).
+async function zoomLimit(p: Page) {
+  return p.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __scene: { activeCamera: { upperRadiusLimit: number } };
+        }
+      ).__scene.activeCamera.upperRadiusLimit,
+  );
+}
 
 test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은 마을·캔버스로 돌아온다", async ({
   page,
@@ -45,6 +57,7 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   await ready(page);
   await expect(page.getByRole("region", { name: "명령 콘솔" })).toBeVisible();
   await expect.poll(() => islandVisible(page)).toBe(true);
+  await expect.poll(() => zoomLimit(page)).toBe(720);
   const renderer = await page.evaluate(() => {
     const scene = (
       window as unknown as {
@@ -78,9 +91,10 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
   });
   const canvas = await page.locator("canvas").elementHandle();
   await page.screenshot({ path: info.outputPath("integrated-hud.png") });
+  // 제출본의 조달(E)은 교역소 방문 업무를 열고, 현장 전환은 일손 배치·배급으로 한다.
   await button(page, "조달").click();
   await openLaborPanel(page);
-  await expect.poll(() => islandVisible(page)).toBe(false);
+  await expect.poll(() => zoomLimit(page)).toBe(48);
   await expect(
     page.getByRole("region", { name: "첫 플레이 안내" }),
   ).toBeVisible();
@@ -92,6 +106,7 @@ test("새 HUD와 실제 GLB 마을에서 조달 현장으로 전환하고 같은
     path: info.outputPath("integrated-procurement.png"),
   });
   await button(page, "마을로 돌아가기").click();
+  await expect.poll(() => zoomLimit(page)).toBe(720);
   await expect.poll(() => islandVisible(page)).toBe(true);
   expect(
     await canvas?.evaluate((c) => c === document.querySelector("canvas")),
@@ -229,9 +244,9 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
   });
   expect(fallback.glb).toBe(false);
   expect(fallback.meshes).toBeGreaterThan(0);
-  // 캔버스에서 직접 선택한 뒤 접혀 있는 명령 콘솔에서 결과를 확인한다.
+  // 캔버스에서 직접 선택한 뒤 명령 콘솔에서 결과를 확인한다.
   await clickExample(page, "building");
-  await button(page, "명령 열기").click();
+  await openCommandConsole(page);
   const selection = page.getByRole("region", {
     name: "선택 정보",
     exact: true,

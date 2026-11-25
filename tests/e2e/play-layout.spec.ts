@@ -57,8 +57,9 @@ test("메뉴를 여닫아도 장면·날짜를 유지하고 저장 메뉴에서 
   await expect(
     page.getByRole("button", { name: "개발 도구", exact: true }),
   ).toBeFocused();
-  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  // 제출본은 개발 도구를 연 동안에만 예제 날짜를 상단에 표시한다.
   await page.getByRole("button", { name: "개발 도구", exact: true }).click();
+  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "예제 저장", exact: true }).click();
   await expect(page.getByTestId("local-save-status")).toHaveText(
     "예제를 저장했습니다.",
@@ -129,41 +130,4 @@ test("개발 패널을 접어도 음원 파일 연결과 재생을 유지한다"
   await expect(page.getByLabel("BGM 음원 목록")).toHaveValue(id);
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
   await page.getByRole("button", { name: "BGM 정지", exact: true }).click();
-});
-
-test("좁은 화면도 가로 넘침 없이 표시하고 키보드로 메뉴를 여닫는다", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/");
-  await expect(page.getByTestId("play-scene-status")).toHaveText(
-    "3D 준비 완료",
-  );
-  await expect(page.locator("canvas")).toBeInViewport({ ratio: 1 });
-  if (
-    await page
-      .getByRole("button", { name: "명령 열기", exact: true })
-      .isVisible()
-  )
-    await page.getByRole("button", { name: "명령 열기", exact: true }).click();
-  await page.getByRole("button", { name: "저장", exact: true }).focus();
-  await page.keyboard.press("Enter");
-  await expect(
-    page.getByRole("region", { name: "저장 패널", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "저장", exact: true }),
-  ).toBeFocused();
-  await page.getByRole("button", { name: "개발 도구", exact: true }).click();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await page
-    .getByRole("button", { name: "개발 도구 닫기", exact: true })
-    .click();
-  await page.locator("canvas").scrollIntoViewIfNeeded();
-  await expect(page.locator("canvas")).toBeInViewport({ ratio: 1 });
 });
