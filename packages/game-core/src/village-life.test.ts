@@ -103,7 +103,7 @@ it("식당은 개인별로 이용하며 근무 중인 주민은 작업장을 이
     20,
   );
   expect(
-    s.residents.every((r) => r.routine === "working" && r.hunger === 420),
+    s.residents.every((r) => r.routine === "working" && r.hunger === 740),
   ).toBe(true);
   expect(s.world.resources.RES_PLANT).toBe(base.world.resources.RES_PLANT);
   const after = advanceTimber(
@@ -112,10 +112,10 @@ it("식당은 개인별로 이용하며 근무 중인 주민은 작업장을 이
         ...s,
         world: { ...s.world, minute: 19 * 60 },
         residents: s.residents.map((r, i) =>
-          i === 0 ? { ...r, workplaceId: null } : r,
+          i < 2 ? { ...r, workplaceId: null } : r,
         ),
       },
-      { type: "set-restaurant-workers", count: 1 },
+      { type: "set-restaurant-workers", count: 2 },
       "evening-staff",
     ),
     30,

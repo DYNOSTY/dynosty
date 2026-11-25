@@ -135,7 +135,7 @@ it("병원 단계별5/15/25병상과 경상12/8/4시간, 경중2/4배를 실제 
   ]);
 });
 it("채집 연구는 건물 단계와 곱하지 않고2배까지만 적용하며 기존 연구를 반복할 수 없다", () => {
-  let s = build(lab(), "fishery", 46, 32);
+  let s = build(lab(), "fishery", 28, 48);
   s = finishResearch(s, "GATHER_RES_FISH_1");
   expect(collectionRate(s, secondFacility(s))).toBe(1.5);
   s = finishResearch(s, "GATHER_RES_FISH_2");
@@ -196,7 +196,7 @@ it("저장 용량을 넘긴 수레 화물도 야적장 재고에 한 번만 더�
     minute: 540,
     resources: { ...w.resources, RES_WOOD: 3000000, RES_PLANT: 5000000 },
   });
-  s = build(s, "farm", 46, 32);
+  s = build(s, "farm", 12, 12);
   s = cmd(s, { type: "facility-staff", id: "build-1", count: 2 });
   s = advanceTimber(s, 180);
   const f = s.town.facilities[0];
@@ -262,7 +262,7 @@ it("메카2는 충녕 시해 분기에서 부활시키고 사망자의 뼈를 �
   ).toThrow();
 });
 it("전기자극기는 독재 루트에서 지정 시설만 기본200%로 바꾸고 중복4배를 만들지 않는다", () => {
-  let s = build(lab(), "fishery", 46, 32);
+  let s = build(lab(), "fishery", 28, 48);
   expect(() =>
     cmd(s, { type: "electrical-work", id: "build-2", enabled: true }),
   ).toThrow();
@@ -331,7 +331,7 @@ it("구v16 저장의 개량·회복비율을 승계하고 병상이 줄면 회�
 });
 
 it("메카는 야간에도 배치된 시설에서 일하고 배급·수면·둥지를 요구하지 않는다", () => {
-  let s = build(lab(), "fishery", 46, 32);
+  let s = build(lab(), "fishery", 28, 48);
   s = cmd(s, { type: "story-event", event: "rebellion-started" });
   s = cmd(s, { type: "story-event", event: "chungnyeong-assassinated" });
   s = finishResearch(s, "R17");

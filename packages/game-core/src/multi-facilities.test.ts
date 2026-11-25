@@ -164,7 +164,7 @@ it("두 연구소는 서로 다른 연구를 동시에 진행하고 선행·중�
   expect(() => parseTimberState(bad)).toThrow();
 });
 it("어획막은 물가에 지어 배치 인원만으로 운반 없이 즉시 입고한다", () => {
-  let s = build(start(), "fishery", 46, 32);
+  let s = build(start(), "fishery", 28, 48);
   const f = s.town.facilities[0];
   if (!f) throw Error("어획막 없음");
   expect(

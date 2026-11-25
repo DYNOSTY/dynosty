@@ -100,7 +100,7 @@ it("건물 겹침·숲·광맥·지도 밖·자원 부족을 거부하고 재고
     expect(s.world.resources.RES_WOOD).toBe(1200000);
   }
   expect(
-    homePlacementIssue(s, { ...pose, position: { x: 50, z: 20 } }),
+    homePlacementIssue(s, { ...pose, position: { x: 48, z: 18 } }),
   ).toBeNull();
   const world = createPlayState();
   const poor = advanceTimber(

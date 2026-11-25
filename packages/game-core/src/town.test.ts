@@ -310,7 +310,7 @@ it("새 마을의 첫 식당은 공사 인부가 배식을 맡고 주민이 식�
       .every((id) => crew.includes(id)),
   ).toBe(true);
   expect(s.restaurantWorkerTarget).toBe(4);
-  s = advanceTimber(s, 180);
+  s = advanceTimber(s, 1440);
   expect(
     s.residents.some(
       (r) =>
@@ -376,7 +376,7 @@ it("물 보유량으로 농장 착공을 제한하고 물을 받기 전의 옛 �
   };
   expect(
     parseTimberSave(createTimberSave(previous)).state.world.resources.RES_WATER,
-  ).toBe(20 * 10000);
+  ).toBe(200 * 10000);
 });
 
 it("건설 중에는 정지 상태를 유지하고 완공 뒤 한 번만 자재의 90%를 돌려준다", () => {
@@ -415,7 +415,7 @@ it("둥지를 철거하면 거주지를 재배정하고 빈 마을도 저장할 
 it("제재소는 벌목권 안의 숲을 차례로 쓰고 고갈한 숲을 다시 차감하지 않는다", () => {
   let s = finish(
     plan(start(), "logging", {
-      position: { x: -44, z: -32 },
+      position: { x: -42, z: -28 },
       headingRadians: 0,
     }),
   );
