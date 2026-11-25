@@ -45,6 +45,7 @@ import {
   moraleAdvice,
   PATROL_NAMES,
   type ScenePage,
+  supplyAdvice,
 } from "./campaign-scenes.js";
 import { EndingMenu } from "./EndingMenu.js";
 import { completedChapters } from "./stage-replay.js";
@@ -904,6 +905,13 @@ export function CampaignPanel({
   }
   return (
     <div className="campaign-quest">
+      <aside className="supply-advice" aria-label="나르미의 곳간 소식">
+        {supplyAdvice(s).map((words) => (
+          <p className="campaign-advisory" role="status" key={words}>
+            <strong>나르미</strong> {words}
+          </p>
+        ))}
+      </aside>
       {!["opening", "departure", "after", "finished", "ending"].includes(
         c.beat,
       ) && (
@@ -957,6 +965,12 @@ export function CampaignPanel({
                     왕 “내 겨울 몫까지 풀어라. 양녕아, 남쪽 길에 솥을 걸거든
                     뒤처진 이들도 먹이고 가거라.”
                   </p>
+                  {(c.cargo?.RES_COAL ?? 0) < CONVOY_GOALS.RES_COAL && (
+                    <p>
+                      인수한 석탄은 도성 난방에도 쓰입니다. 물자를 받을 때마다
+                      호송할 석탄부터 수레에 실어 두세요.
+                    </p>
+                  )}
                   {(c.storeBatches ?? 0) < 4 && (
                     <button
                       type="button"

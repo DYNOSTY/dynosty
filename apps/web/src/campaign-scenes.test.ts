@@ -17,8 +17,29 @@ import {
   firstVillageTask,
   gatheringRumor,
   moraleAdvice,
+  supplyAdvice,
   villageAdvice,
 } from "./campaign-scenes.js";
+
+it("식량과 물을 따로 알리고 비축이 회복되면 안내를 거둔다", () => {
+  const s = createVillageGame();
+  const resources = { ...s.world.resources, RES_PLANT: 0, RES_WATER: 0 };
+  const low = { ...s, world: { ...s.world, resources } };
+  expect(supplyAdvice(low)).toEqual([
+    expect.stringContaining("온상 재배소"),
+    expect.stringContaining("취수장"),
+  ]);
+  expect(
+    supplyAdvice({
+      ...low,
+      world: {
+        ...low.world,
+        resources: { ...resources, RES_MEAT: 0, RES_FISH: 0 },
+      },
+    }),
+  ).toHaveLength(3);
+  expect(supplyAdvice(s)).toEqual([]);
+});
 
 const loadDevSave = (state: TimberState) =>
   parseTimberSave(
