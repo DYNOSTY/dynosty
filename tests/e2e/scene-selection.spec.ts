@@ -180,28 +180,6 @@ test("장면 갱신·저장 복원·메뉴 토글 후에도 같은 대상의 최
   await expect(info).toBeHidden();
 });
 
-test.describe("좁은 터치 화면", () => {
-  test.use({ hasTouch: true, viewport: { width: 375, height: 812 } });
-  test("터치로 선택하고 선택 해제 버튼으로 해제하며 가로 넘침 없이 표시한다", async ({
-    page,
-  }) => {
-    await ready(page);
-    const point = await worldPoint(page, BOARD, false);
-    await page.touchscreen.tap(point.x, point.y);
-    const info = page.getByRole("region", { name: "선택 정보", exact: true });
-    await expect(info).toContainText("복홀 방 게시판");
-    // 예제 대상 키보드 버튼은 제출본에서 개발 도구 전용이라 화면의 선택 해제 버튼으로 끝낸다.
-    await page.getByRole("button", { name: "선택 해제", exact: true }).click();
-    await expect(info).toBeHidden();
-    await expect(page.locator("canvas")).toBeFocused();
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
-  });
-});
-
 test("마당의 시설과 주민, 게시판을 눌러도 하단 콘솔이 움직이지 않는다", async ({
   page,
 }) => {

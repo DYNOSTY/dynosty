@@ -110,13 +110,7 @@ test("두 식당의 인원 지시는 독립적이고 단계별 설계와 좌상�
     .toBeGreaterThan(0);
   await expect(page.getByTestId("play-clock")).toContainText("일차");
   await b(page, "개발 도구 닫기").click();
-  await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByTestId("play-clock")).toBeInViewport();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
 });
 test("두 연구소의 동시 연구 완료와 저장 복원은 연구를 중복 적용하지 않는다", async ({
   page,

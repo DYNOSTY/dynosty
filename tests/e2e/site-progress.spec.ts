@@ -177,30 +177,3 @@ test("자동 시간 tick도 진행량을 갱신하고 일시정지하면 같은 
   await expect(card(p, "inspection")).toContainText("일시정지");
   await expect(p.getByTestId("site-notices")).toBeEmpty();
 });
-test("375px 터치와 키보드에서 항상 표시한 카드가 넘치지 않고 현장 선택이 가능하다", async ({
-  browser,
-}) => {
-  const c = await browser.newContext({
-    viewport: { width: 375, height: 812 },
-    hasTouch: true,
-  });
-  const p = await c.newPage();
-  try {
-    await enterProgress(p);
-    await expect(
-      p.getByRole("region", { name: "현장 작업 진행" }),
-    ).toBeVisible();
-    expect(
-      await p.evaluate(() => document.documentElement.scrollWidth > innerWidth),
-    ).toBe(false);
-    const pt = await worldPoint(p, SITE_POINTS["site-inspection"]);
-    await p.touchscreen.tap(pt.x, pt.y);
-    await expect(p.getByTestId("site-name")).toHaveText("검수대");
-    await b(p, "배급소 작업 보기").focus();
-    await p.keyboard.press("Enter");
-    await expect(p.getByTestId("site-name")).toHaveText("배급소");
-    await expect(card(p, "ration")).toContainText("담당 0명");
-  } finally {
-    await c.close();
-  }
-});

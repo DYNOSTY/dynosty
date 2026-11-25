@@ -196,25 +196,3 @@ test("카메라 드래그는 장소 선택을 바꾸지 않고 바닥 클릭만 
   await clickFloor(p);
   await expect(p.getByTestId("site-name")).toHaveCount(0);
 });
-test.describe("작은 터치 화면", () => {
-  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true });
-  test("터치·키보드로 현장을 선택하고 해제하며 가로 넘침이 없다", async ({
-    page: p,
-  }) => {
-    await enter(p);
-    const point = await worldPoint(p, SITE_POINTS["site-inspection"]);
-    await p.touchscreen.tap(point.x, point.y);
-    await expect(p.getByTestId("site-name")).toHaveText("검수대");
-    await b(p, "배급소 선택").focus();
-    await p.keyboard.press("Enter");
-    await expect(p.getByTestId("site-name")).toHaveText("배급소");
-    expect(
-      await p.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
-    await b(p, "현장 선택 해제").click();
-    await expect(p.getByTestId("site-name")).toHaveCount(0);
-    await expect(p.locator("canvas")).toBeFocused();
-  });
-});

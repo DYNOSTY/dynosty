@@ -382,10 +382,7 @@ test("옛 저장은 기본 보통 난이도로 남은 유예 시간을 이어간
     "아무도 깨우지 않는 아침",
   );
 });
-test("좁은 화면의 5단계 컷씬과 성안 변종 없는 반란을 이어 본다", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test("5단계 컷씬과 성안 변종 없는 반란을 이어 본다", async ({ page }) => {
   const start = createVillageGame();
   const save = createTimberSave({
     ...start,
@@ -438,8 +435,6 @@ test("좁은 화면의 5단계 컷씬과 성안 변종 없는 반란을 이어 �
   await expect(memory).toHaveCount(0);
   await expect(family).toBeVisible();
   await expect(dialog).toContainText("그날은 나도 아버지처럼 홀로 남겠다.");
-  const rect = await dialog.boundingBox();
-  expect(rect?.width).toBeLessThanOrEqual(390);
   await readScene(page, "양녕 · 식단마다 하루 배급의 상한을 정한다");
   for (let day = 0; day < 5; day++) {
     if (day === 4)

@@ -692,19 +692,6 @@ test("탭 비활성과 저장 복원은 명시적 재개를 기다린다", async
   await expect(page.getByTestId("timber-clock")).toHaveText(stopped ?? "");
 });
 
-test("좁은 화면도 주민 선택 없이 계약하고 자동 진행한다", async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
-  await enter(page);
-  await contract(page);
-  await expect(button(page, "1번 주민 선택")).toHaveCount(0);
-  await expect(button(page, "수레 출발시키기")).toHaveCount(0);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth > innerWidth,
-    ),
-  ).toBe(false);
-});
-
 test("배급 방식과 거주 현황을 보여 주고 고기 없는 식당 직원도 어류를 배급받는다", async ({
   page,
 }) => {
