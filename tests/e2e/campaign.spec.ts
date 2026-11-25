@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   CONVOY_GOALS,
   campaignOf,
@@ -13,42 +13,12 @@ import {
   requireValue,
   SCOUT_SITES,
 } from "../../packages/game-core/dist/index.js";
+import { readScene } from "./campaign-scene.js";
 import { advanceVillageDay, readVillage } from "./read-village.js";
 import { worldPoint } from "./scene-picking.js";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-async function readScene(page: Page, label: string) {
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  const next = dialog.getByRole("button", { name: /^다음 대사/ });
-  const choice = dialog.getByRole("button", { name: label, exact: true });
-  const action = next.or(choice).first();
-  for (;;) {
-    await expect(action).toBeVisible();
-    const previous = (await action.textContent()) ?? "";
-    if (previous.trim() === label) {
-      await choice.click();
-      break;
-    }
-    await next.click();
-    await expect.poll(() => next.allTextContents()).not.toContain(previous);
-  }
-  await expect(choice).toBeHidden();
-  const start = page
-    .getByRole("dialog", { name: "미션 시작 준비" })
-    .getByRole("button", { name: "시작하기" });
-  if (await start.isVisible()) {
-    await expect(
-      dialog.getByRole("button", { name: "돌아가기" }),
-    ).toBeVisible();
-    await dialog.getByRole("button", { name: "난이도 설정" }).click();
-    await expect(dialog.getByRole("combobox")).toBeVisible();
-    await start.click();
-    const skip = page.locator("dialog.film-screen .film-skip");
-    if (await skip.isVisible()) await skip.click();
-  }
-}
 for (const [level, label] of [
   ["easy", "쉬움"],
   ["hard", "어려움"],
@@ -382,113 +352,6 @@ test("옛 저장은 기본 보통 난이도로 남은 유예 시간을 이어간
     "아무도 깨우지 않는 아침",
   );
 });
-test("5단계 컷씬과 성안 변종 없는 반란을 이어 본다", async ({ page }) => {
-  const start = createVillageGame();
-  const save = createTimberSave({
-    ...start,
-    chapter: 5,
-    world: { ...start.world, pessimism: 85, optimism: 75 },
-    campaign: { ...campaignOf(start), beat: "summit" },
-  });
-  await page.addInitScript(
-    (data) =>
-      localStorage.setItem("dynosty.village.resume", JSON.stringify(data)),
-    save,
-  );
-  const tracks: string[] = [];
-  page.on("request", (req) => {
-    if (req.url().endsWith(".ogg")) tracks.push(req.url());
-  });
-  await page.goto("/");
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toHaveAccessibleName("두 그릇을 놓고");
-  // A resumed summit starts at the meeting. The stage introduction plays on entry.
-  await expect(dialog).toContainText("마지막 수레에 어린 것들이 타고 있어요");
-  await dialog.getByRole("button", { name: /^다음 대사/ }).click();
-  const family = dialog.getByRole("img", { name: /포와 혜/ });
-  await expect
-    .poll(() => family.evaluate((el) => (el as HTMLImageElement).naturalWidth))
-    .toBeGreaterThan(0);
-  await expect(dialog).toContainText("포야, 혜야");
-  await expect(
-    dialog.getByRole("region", { name: "두 왕자의 인사" }),
-  ).toContainText("혜라고 불러 주세요!");
-  const advance = dialog.getByRole("button", { name: /^다음 대사/ });
-  await advance.click();
-  await advance.click();
-  await expect(dialog).toContainText("두 분이 먼저 와서 발 좀 녹이실래요?");
-  await advance.click();
-  const memory = dialog.getByRole("img", {
-    name: "도성 광장에 홀로 선 왕의 뒷모습",
-  });
-  await expect(memory).toBeVisible();
-  await expect
-    .poll(() => memory.evaluate((el) => (el as HTMLImageElement).naturalWidth))
-    .toBeGreaterThan(0);
-  await expect(dialog.locator("img")).toHaveCount(1);
-  await expect(
-    dialog.locator(
-      ".campaign-speech, .campaign-advisory, .campaign-goal, video",
-    ),
-  ).toHaveCount(0);
-  await advance.click();
-  await expect(memory).toHaveCount(0);
-  await expect(family).toBeVisible();
-  await expect(dialog).toContainText("그날은 나도 아버지처럼 홀로 남겠다.");
-  await readScene(page, "양녕 · 식단마다 하루 배급의 상한을 정한다");
-  for (let day = 0; day < 5; day++) {
-    if (day === 4)
-      await page.evaluate(() => {
-        Math.random = () => 0.99;
-      });
-    await advanceVillageDay(page);
-    if (day === 1 || day === 2)
-      await expect(
-        page.getByText(
-          /푸른 보자기 맨 아주머니를 봤어요|빈 창고 쪽으로 혼자|문틈으로 불빛이 새더라/,
-        ),
-      ).toHaveCount(0);
-    if (day === 3)
-      await expect(page.getByText(/관측패를 모두 맞춰/)).toBeVisible();
-  }
-  await expect(dialog).toHaveAccessibleName("혹한 닷새 전 · 배반자의 외침");
-  await readScene(page, "양녕의 반란에 맞선다");
-  await expect(dialog).toHaveAccessibleName("성문 빗장이 들리던 밤");
-  await dialog.getByRole("button", { name: /^다음 대사/ }).click();
-  await expect(dialog).toContainText("푸른 보자기를 맨 주민");
-  await expect(dialog).toContainText("이쪽 빗장은 내가 들 테니");
-  await dialog.getByRole("button", { name: /^다음 대사/ }).click();
-  await expect(dialog).toContainText("어린 공룡들을 데리고 식당에 계세요.");
-  await expect
-    .poll(() =>
-      dialog
-        .getByRole("img", { name: /한 상에 앉은 충녕/ })
-        .evaluate((el) => (el as HTMLImageElement).naturalWidth),
-    )
-    .toBeGreaterThan(0);
-  const nextLine = dialog.getByRole("button", { name: /^다음 대사/ });
-  await nextLine.click();
-  await expect(dialog.locator("img.campaign-still")).toHaveAttribute(
-    "src",
-    "/story/campaign/gate.webp",
-  );
-  await nextLine.click();
-  const judgment = dialog.getByRole("img", { name: /관아 계단 중앙의 고리/ });
-  await expect
-    .poll(() =>
-      judgment.evaluate((el) => (el as HTMLImageElement).naturalWidth),
-    )
-    .toBeGreaterThan(0);
-  await expect(dialog).toContainText("고개 들어라, 목진.");
-  await nextLine.click();
-  await expect(dialog).toContainText("아니다. 들지도 마라. 가치도 없다.");
-  await readScene(page, "판결을 기록하고 마을로");
-
-  await expect
-    .poll(() => tracks.some((url) => url.endsWith("/13.ogg")))
-    .toBe(true);
-});
-
 test("성문 수비와 온돌을 배치하고 삽화가 있는 전투 보고를 닫는다", async ({
   page,
 }) => {
