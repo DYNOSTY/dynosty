@@ -120,11 +120,18 @@ it("기본 공사량은4명 표준 체격 기준30~50초이며 체격에 따른 
   for (const rule of Object.values(BUILDING_RULES))
     expect(rule.work / 6).toBeGreaterThanOrEqual(30);
 });
-it.each(["farm", "ranch", "fishery", "logging", "quarry"] as const)(
+it.each([
+  "farm",
+  "ranch",
+  "fishery",
+  "waterworks",
+  "logging",
+  "quarry",
+] as const)(
   "%s 운영·소모와 입고 경로를 따르고 어획은 즉시 입고한다",
   (kind) => {
     const point =
-      kind === "fishery"
+      kind === "fishery" || kind === "waterworks"
         ? { x: 46, z: 32 }
         : kind === "logging"
           ? { x: -24, z: -8 }

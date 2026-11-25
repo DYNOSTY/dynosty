@@ -330,6 +330,7 @@ export function TownPanel({
                 "coal",
                 "iron",
                 "quarry",
+                "waterworks",
                 "fishery",
                 "farm",
                 "ranch",
