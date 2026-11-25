@@ -58,19 +58,37 @@ export async function worldPoint(
   );
 }
 
+// 3D 장면을 실제 포인터로 누른다. 누르기 전에 그 좌표의 맨 위 요소가 캔버스인지 보고,
+// 창이나 HUD가 가리면 30초 대기 대신 가린 요소를 알려 주며 바로 실패한다.
+export async function clickScene(page: Page, point: { x: number; y: number }) {
+  const cover = await page.evaluate(({ x, y }) => {
+    const el = document.elementFromPoint(x, y);
+    if (!el || el.tagName === "CANVAS") return null;
+    const named = el.closest("[aria-label]")?.getAttribute("aria-label");
+    const cls =
+      typeof el.className === "string" ? el.className.split(" ")[0] : "";
+    return [el.tagName.toLowerCase() + (cls ? `.${cls}` : ""), named]
+      .filter(Boolean)
+      .join(" · ");
+  }, point);
+  if (cover)
+    throw new Error(
+      `3D 장면 클릭 위치(${Math.round(point.x)}, ${Math.round(point.y)})를 다른 요소가 가립니다: ${cover}`,
+    );
+  await page.mouse.click(point.x, point.y);
+}
+
 export async function clickExample(
   page: Page,
   kind: "building" | "resident",
   updated = false,
 ) {
-  const point = await examplePoint(page, kind, updated);
-  await page.mouse.click(point.x, point.y);
+  await clickScene(page, await examplePoint(page, kind, updated));
 }
 
 export async function clickFloor(page: Page) {
   if (!(await page.locator(".is-procurement").count())) {
-    const point = await worldPoint(page, [3, 0, -3]);
-    await page.mouse.click(point.x, point.y);
+    await clickScene(page, await worldPoint(page, [3, 0, -3]));
     return;
   }
   const canvas = page.locator("canvas");
@@ -90,7 +108,7 @@ export async function clickFloor(page: Page) {
     if (bar && x >= bar.x && x <= bar.x + bar.width && bar.y > box.y)
       bottom = Math.min(bottom, bar.y);
   }
-  await page.mouse.click(x, box.y + (bottom - box.y) * 0.85);
+  await clickScene(page, { x, y: box.y + (bottom - box.y) * 0.85 });
 }
 
 export function outlinePixels(buffer: Buffer) {

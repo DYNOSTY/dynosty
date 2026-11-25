@@ -1,7 +1,12 @@
 import { expect, type Page, test } from "@playwright/test";
 import { SITE_POINTS, type SiteId } from "../../apps/web/src/site-targets.js";
-import { clickFloor, outlinePixels, worldPoint } from "./scene-picking.js";
-import { openLaborPanel } from "./workspace.js";
+import {
+  clickFloor,
+  clickScene,
+  outlinePixels,
+  worldPoint,
+} from "./scene-picking.js";
+import { closeWorkspace, openLaborPanel, openWorkspace } from "./workspace.js";
 
 const b = (p: Page, n: string) =>
   p.getByRole("button", { name: n, exact: true });
@@ -12,8 +17,7 @@ async function enter(p: Page) {
   await expect(p.getByTestId("labor-clock")).toContainText("0시간 0분");
 }
 async function clickSite(p: Page, id: SiteId) {
-  const point = await worldPoint(p, SITE_POINTS[id]);
-  await p.mouse.click(point.x, point.y);
+  await clickScene(p, await worldPoint(p, SITE_POINTS[id]));
 }
 async function initial(p: Page) {
   await enter(p);
@@ -49,8 +53,14 @@ test("검수대·배급소 실제 클릭의 테두리·정보·단일 선택과 
   await example.click();
   await expect(p.getByTestId("site-name")).toHaveCount(0);
   await expect(example).toHaveAttribute("aria-pressed", "true");
+  // 제출본의 개발 도구 창은 예제 선택 뒤 3D 화면을 덮는다. 닫기 버튼으로 닫고 장면을 누른다
+  // (Esc는 일시정지 메뉴를 연다).
+  await closeWorkspace(p);
   await clickSite(p, "site-inspection");
+  await expect(p.getByTestId("site-name")).toHaveText("검수대");
+  await openWorkspace(p);
   await expect(example).toHaveAttribute("aria-pressed", "false");
+  await closeWorkspace(p);
   await clickFloor(p);
   await expect(p.getByTestId("site-name")).toHaveCount(0);
   await expect(b(p, "검수대 선택")).toHaveAttribute("aria-pressed", "false");
