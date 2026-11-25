@@ -5,7 +5,7 @@ import {
   requireValue,
 } from "../../packages/game-core/dist/index.js";
 import { advanceVillageDay, readVillage } from "./read-village.js";
-import { clickExample } from "./scene-picking.js";
+import { clickExample, clickNode, EXAMPLE_IDS } from "./scene-picking.js";
 
 async function ready(page: Page) {
   await page.goto("/");
@@ -258,10 +258,13 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
       Number(await page.getByTestId("camera-height").textContent()),
     )
     .toBeGreaterThan(0.8);
+  // 기본 시점 버튼은 개발 도구가 열려 있을 때만 보인다(App.tsx hidden={!toolsOpen}).
+  await tools(page);
   await page.getByRole("button", { name: "기본 시점", exact: true }).click();
   await expect(page.getByTestId("camera-distance")).toHaveText("56.00");
   await expect(page.getByTestId("camera-angle")).toHaveText("54.00");
-  await clickExample(page, "building");
+  // 복홀 방 게시판(notice-board)의 현재 위치를 장면에서 읽어 실제로 누른다.
+  await clickNode(page, EXAMPLE_IDS.board);
   await expect(
     page.getByRole("region", { name: "선택 정보", exact: true }),
   ).toContainText("복홀 방 게시판");
