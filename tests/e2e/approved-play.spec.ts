@@ -258,6 +258,14 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
       Number(await page.getByTestId("camera-height").textContent()),
     )
     .toBeGreaterThan(0.8);
+  // 거리 110 이상에서 더 멀리 굴리면 기획대로 복홀 주변 지도가 열린다(App.tsx canvas onWheel).
+  // 지도는 화면을 덮으므로 실제 사용자처럼 「복홀로 돌아가기」로 닫는다.
+  const regionMap = page.getByRole("dialog", { name: "복홀 주변 지도" });
+  await expect(regionMap).toBeVisible();
+  await regionMap
+    .getByRole("button", { name: "복홀로 돌아가기", exact: true })
+    .click();
+  await expect(regionMap).toBeHidden();
   // 기본 시점 버튼은 개발 도구가 열려 있을 때만 보인다(App.tsx hidden={!toolsOpen}).
   await tools(page);
   await page.getByRole("button", { name: "기본 시점", exact: true }).click();
