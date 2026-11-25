@@ -638,6 +638,9 @@ export function mountScene(
   window.addEventListener("blur", onBlur);
   let cameraKey = "";
   let lastW = 0;
+  let lastH = 0;
+  let lastProjection = -1;
+  let lastTerrainKey = "";
   let trackTick = 0;
   let runningNow = false;
   let infoDirty = true,
@@ -696,27 +699,33 @@ export function mountScene(
     const key = `${camera.radius.toFixed(2)}:${camera.beta.toFixed(3)}:${camera.alpha.toFixed(3)}:${t.x.toFixed(1)}:${t.z.toFixed(1)}`;
     trackTick = (trackTick + 1) % 15;
     const partyPts = village.partyPoints();
-    if (
-      onTrack &&
-      (key !== cameraKey ||
-        canvas.clientWidth !== lastW ||
-        trackTick === 0 ||
-        partyPts.some((p) => p.visible))
-    ) {
-      lastW = canvas.clientWidth;
-      const w = canvas.clientWidth,
-        h = canvas.clientHeight,
-        vm = scene.getTransformMatrix(),
-        vp = camera.viewport.toGlobal(w, h);
+    // Refresh fixed pins periodically for HUD layout changes, but a walking
+    // party by itself needs only its own projection and DOM update.
+    const w = canvas.clientWidth,
+      h = canvas.clientHeight,
+      vm = scene.getTransformMatrix();
+    const refreshFixed =
+      key !== cameraKey ||
+      w !== lastW ||
+      h !== lastH ||
+      vm.updateFlag !== lastProjection ||
+      terrainKey !== lastTerrainKey ||
+      trackTick === 0;
+    if (onTrack && (refreshFixed || partyPts.some((p) => p.visible))) {
+      lastW = w;
+      lastH = h;
+      lastProjection = vm.updateFlag;
+      lastTerrainKey = terrainKey;
+      const vp = camera.viewport.toGlobal(w, h);
       const out: Record<string, ScreenPoint> = {};
-      for (const pt of [...tracked, ...partyPts]) {
+      for (const pt of refreshFixed ? [...tracked, ...partyPts] : partyPts) {
         const sp = Vector3.Project(
           new Vector3(
             pt.x,
             pt.y + (pt.id.startsWith("visitor-") ? elevation(pt.x, pt.z) : 0),
             pt.z,
           ),
-          Matrix.Identity(),
+          markerIdentity,
           vm,
           vp,
         );

@@ -47,6 +47,7 @@ import type { SiteId } from "./site-targets.js";
 import { saveStageStart } from "./stage-replay.js";
 import { buildingCost, TownPanel } from "./TownPanel.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
+import { readWorkerSnapshot } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
 
 const time = (m: number) => `${Math.floor(m / 60)}시간 ${m % 60}분`;
@@ -218,36 +219,30 @@ export function TimberDemo({
     w.onmessage = (e: MessageEvent<TimberResponse>) => {
       const m = e.data;
       if (m.type === "state") {
-        const stage = m.state.chapter ?? 1;
-        const campaign = m.state.campaign;
+        const state = readWorkerSnapshot(m.resumeJson);
+        const stage = state.chapter ?? 1;
+        const campaign = state.campaign;
         if (
           campaign &&
           stage !== previousChapter &&
-          campaign.since === m.state.elapsed &&
+          campaign.since === state.elapsed &&
           campaign.beat ===
             ["opening", "roads", "capital", "arrival", "summit"][stage - 1] &&
           (stage !== 2 || (!campaign.caravan && !campaign.treaties.length)) &&
           (stage !== 3 || !campaign.relief)
         ) {
-          void saveStageStart(m.state).catch(() =>
+          void saveStageStart(state).catch(() =>
             setError("단계 시작 기록을 저장하지 못했습니다."),
           );
         }
         previousChapter = stage;
         try {
-          localStorage.setItem(
-            "dynosty.village.resume",
-            JSON.stringify({
-              format: "dynosty-timber",
-              saveVersion: 1,
-              state: m.state,
-            }),
-          );
+          localStorage.setItem("dynosty.village.resume", m.resumeJson);
         } catch {
           setError("자동 저장 공간을 확인해 주세요.");
         }
-        setState(m.state);
-        onState(m.state, m.completions, m.resetNotices);
+        setState(state);
+        onState(state, m.completions, m.resetNotices);
       } else if (m.type === "exited") {
         exitCallback.current(m.world);
       } else if (m.type === "error") {

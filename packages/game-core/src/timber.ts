@@ -75,6 +75,7 @@ import {
 } from "./mutants.js";
 import {
   AMOUNT_SCALE,
+  advanceParsedClock,
   advancePlayClock,
   applyCitizenEvent,
   type Citizen,
@@ -995,6 +996,8 @@ function diningSeats(s: TimberState): Map<string, number> {
   const candidates = s.residents.filter(
     (r) =>
       r.health !== "dead" &&
+      (r.hunger >= RESIDENT_ROUTINE_RULES.hungryAt || r.routine === "eating") &&
+      !r.nextWork &&
       !admitted.has(r.id) &&
       !s.workerIds.includes(r.id) &&
       (!r.task ||
@@ -1004,15 +1007,14 @@ function diningSeats(s: TimberState): Map<string, number> {
             s.construction?.workerId === r.id))) &&
       !(isDiningEmployee(s, r) && diningShift(s, r)) &&
       (residentMeal(s, r).amount > 0 || r.routine === "eating") &&
-      !r.nextWork &&
       !(
         r.workplaceId &&
         (isDiningEmployee(s, r)
           ? diningShift(s, r)
           : residentShiftOpen(s, r.id))
-      ) &&
-      (r.hunger >= RESIDENT_ROUTINE_RULES.hungryAt || r.routine === "eating"),
+      ),
   );
+  if (!candidates.length) return seats;
   const facilities = restaurants(s);
   const available = facilities.length
     ? facilities.flatMap((f, index) =>
@@ -1024,31 +1026,32 @@ function diningSeats(s: TimberState): Map<string, number> {
           : [],
       )
     : Array.from({ length: 10 }, (_, i) => i);
+  const freeSeats = new Set(available);
+  const capacity = restaurantSeats(s);
+  for (const seat of seats.values()) freeSeats.delete(seat);
   for (const r of candidates)
-    if (
-      r.diningSeat !== null &&
-      available.includes(r.diningSeat) &&
-      ![...seats.values()].includes(r.diningSeat)
-    )
+    if (r.diningSeat !== null && freeSeats.delete(r.diningSeat))
       seats.set(r.id, r.diningSeat);
   for (const r of candidates.sort(
     (a, b) => b.hunger - a.hunger || a.id.localeCompare(b.id),
   )) {
-    if (seats.size >= restaurantSeats(s)) break;
+    if (!freeSeats.size || seats.size >= capacity) break;
     if (seats.has(r.id)) continue;
-    const free = available
-      .filter((i) => ![...seats.values()].includes(i))
-      .sort((a, b) => {
-        const x =
-          facilities[Math.floor(a / 40)]?.position ?? TIMBER_RULES.restaurant;
-        const y =
-          facilities[Math.floor(b / 40)]?.position ?? TIMBER_RULES.restaurant;
-        return (
-          Math.hypot(r.position.x - x.x, r.position.z - x.z) -
-          Math.hypot(r.position.x - y.x, r.position.z - y.z)
-        );
-      })[0];
-    if (free !== undefined) seats.set(r.id, free);
+    let nearest: number | undefined;
+    let distance = Infinity;
+    for (const seat of freeSeats) {
+      const p =
+        facilities[Math.floor(seat / 40)]?.position ?? TIMBER_RULES.restaurant;
+      const d = Math.hypot(r.position.x - p.x, r.position.z - p.z);
+      if (d < distance) {
+        nearest = seat;
+        distance = d;
+      }
+    }
+    if (nearest !== undefined) {
+      seats.set(r.id, nearest);
+      freeSeats.delete(nearest);
+    }
   }
   return seats;
 }
@@ -1060,6 +1063,7 @@ function routineShared(s: TimberState) {
   >();
   return {
     obstacles: villageObstacles(s),
+    restaurants: restaurants(s),
     staff(facilityId: string | undefined) {
       let value = staff.get(facilityId);
       if (!value) {
@@ -1075,13 +1079,18 @@ function routinePlaces(
   id: string,
   seats = diningSeats(s),
   shared = routineShared(s),
+  index = indexById(s.residents, id),
 ) {
-  const index = indexById(s.residents, id);
+  const resident = s.residents[index] ?? fail();
   const seat = seats.get(id) ?? -1;
-  const employee = isDiningEmployee(s, s.residents[index] ?? fail());
-  const facilities = restaurants(s);
+  const employee = isDiningEmployee(s, resident);
+  const facilities = shared.restaurants;
   const diningPlace =
-    employeeRestaurant(s, id) ??
+    (employee && resident.workplaceId === "restaurant"
+      ? facilities[0]
+      : employee
+        ? facilities.find((f) => resident.workplaceId === `facility:${f.id}`)
+        : undefined) ??
     (seat >= 0
       ? facilities[Math.floor(seat / 40)]
       : [...facilities].sort(
@@ -1154,7 +1163,7 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
   const seats = diningSeats(s);
   const shared = routineShared(s);
   const poorMeals: string[] = [];
-  const residents = s.residents.map((r) => {
+  const residents = s.residents.map((r, index) => {
     const current = {
       ...r,
       diningSeat: seats.get(r.id) ?? null,
@@ -1242,7 +1251,7 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
       minutes,
       TIMBER_RULES.walkSpeed,
       {
-        ...routinePlaces(s, r.id, seats, shared),
+        ...routinePlaces(s, r.id, seats, shared, index),
         ...(isMechanical(s, r.id) ? { minute: 720 } : {}),
         hungerRelief: meal.relief,
       },
@@ -3625,7 +3634,11 @@ function advanceParsedTimber(
     s = {
       ...s,
       elapsed: nextTime,
-      world: advancePlayClock(s.world, elapsed),
+      // Normalize the incoming world once (including older save shapes).
+      world:
+        count === 1
+          ? advancePlayClock(s.world, elapsed)
+          : advanceParsedClock(s.world, elapsed),
     };
     for (const [site, e] of Object.entries(s.scoutFinds ?? {})) {
       if (

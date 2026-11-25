@@ -178,7 +178,6 @@ export function staffLogging(s: TimberState, choose: Choose): TimberState {
   return mapLogging(s, (context) => staffOneLogging(context, choose));
 }
 function staffOneLogging(s: TimberState, choose: Choose): TimberState {
-  const rules = loggingSiteRules(s.logging.siteId);
   const haul = s.logging.haul;
   if (
     haul?.workerId &&
@@ -213,7 +212,10 @@ function staffOneLogging(s: TimberState, choose: Choose): TimberState {
         ),
       }
     : s;
-  for (let i = loggingStaff(next).assigned; i < next.logging.target; i++) {
+  // The scan above already counted healthy assignees; surplus staff were released.
+  if (retained >= next.logging.target) return next;
+  const rules = loggingSiteRules(next.logging.siteId);
+  for (let i = retained; i < next.logging.target; i++) {
     const id = choose(next, rules.workshop, 1)[0];
     if (!id) break;
     next = {
