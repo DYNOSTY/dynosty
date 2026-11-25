@@ -2,7 +2,6 @@ import {
   BOKHOL_FORESTS,
   BOKHOL_MAP,
   BOKHOL_MINERALS,
-  bokholElevation,
   reservedVillageLand,
 } from "./bokhol.js";
 import { loggingSiteRules, loggingSites, productionSites } from "./logging.js";
@@ -13,6 +12,7 @@ import {
   residentPath,
 } from "./resident-path.js";
 import { warehouseDoor } from "./storage.js";
+import { terrainElevation } from "./terrain.js";
 import type { TimberState } from "./timber.js";
 import { VILLAGE_RULES } from "./village-services.js";
 
@@ -64,10 +64,8 @@ export function steepFoundation(
   s: TimberState,
   samples: readonly GroundPoint[],
 ) {
-  const forests = Object.fromEntries(
-    productionSites(s).map((l) => [l.siteId, l.remaining]),
-  );
-  const levels = samples.map((q) => bokholElevation(q.x, q.z, forests));
+  const elevation = terrainElevation(s);
+  const levels = samples.map((q) => elevation(q.x, q.z));
   return Math.max(...levels) - Math.min(...levels) > 1;
 }
 type Rectangle = HomePlacement & { halfWidth: number; halfDepth: number };

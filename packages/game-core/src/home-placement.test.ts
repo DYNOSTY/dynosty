@@ -4,6 +4,7 @@ import {
   homeEntrance,
   homePlacementIssue,
   rectanglesOverlap,
+  steepFoundation,
 } from "./home-placement.js";
 import { createPlayState } from "./play.js";
 import { residentPath } from "./resident-path.js";
@@ -246,4 +247,17 @@ it("현장 작업자가 모두 아프면 교대 인력이 실제로 도착하기
   expect(s.construction?.finishAt).toBeNull();
   s = advanceTimber(s, 70);
   expect(s.homes).toHaveLength(7);
+});
+
+it("기존 건물이 평탄화한 지면을 다음 건설 격자의 경사 판정에도 사용한다", () => {
+  const s = createTimberState();
+  const base = s.homes[0];
+  if (!base) throw Error("기존 둥지 없음");
+  const samples = [
+    { x: -10, z: 42 },
+    { x: -6, z: 42 },
+  ];
+  expect(steepFoundation(s, samples)).toBe(true);
+  const home = { ...base, position: { x: -8, z: 42 }, headingRadians: 0 };
+  expect(steepFoundation({ ...s, homes: [home] }, samples)).toBe(false);
 });

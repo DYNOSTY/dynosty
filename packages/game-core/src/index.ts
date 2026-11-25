@@ -150,3 +150,5 @@ export * from "./story-research.js";
 export * from "./timber.js";
 export * from "./town.js";
 export * from "./village-services.js";
+
+export { terrainElevation } from "./terrain.js";
