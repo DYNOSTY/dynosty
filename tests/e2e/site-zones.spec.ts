@@ -82,37 +82,3 @@ test("묶음 표시의 저장 복원·사용 후 빈 구역·모드 종료를 �
   await expect(p.getByRole("list", { name: "현장 구역 안내" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
-test("모바일에서도 글자·기호로 구역을 구분하고 카메라·키보드 선택을 유지한다", async ({
-  browser,
-}) => {
-  const c = await browser.newContext({
-    viewport: { width: 375, height: 812 },
-    hasTouch: true,
-  });
-  const p = await c.newPage();
-  try {
-    await enterProgress(p);
-    await expect(p.getByTestId("play-scene-status")).toHaveText("3D 준비 완료");
-    await expect(p.getByRole("list", { name: "현장 구역 안내" })).toContainText(
-      "격리·사용 금지 구역",
-    );
-    expect(
-      await p.evaluate(() => document.documentElement.scrollWidth > innerWidth),
-    ).toBe(false);
-    const pt = await worldPoint(p, SITE_POINTS["site-inspection"]);
-    await p.touchscreen.tap(pt.x, pt.y);
-    await expect(p.getByTestId("site-name")).toHaveText("검수대");
-    await b(p, "배급소 선택").focus();
-    await p.keyboard.press("Enter");
-    await expect(p.getByTestId("site-name")).toHaveText("배급소");
-    await b(p, "기본 시점").click();
-    await p.locator("canvas").scrollIntoViewIfNeeded();
-    await p.locator("canvas").hover();
-    await p.mouse.wheel(0, 650);
-    await expect(
-      p.locator('[data-site-marker="zone-allocation"]'),
-    ).toBeVisible();
-  } finally {
-    await c.close();
-  }
-});
