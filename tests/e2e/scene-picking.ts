@@ -60,7 +60,7 @@ export async function worldPoint(
 
 // 3D 장면을 실제 포인터로 누른다. 누르기 전에 그 좌표의 맨 위 요소가 캔버스인지 보고,
 // 창이나 HUD가 가리면 30초 대기 대신 가린 요소를 알려 주며 바로 실패한다.
-export async function clickScene(page: Page, point: { x: number; y: number }) {
+async function assertSceneAt(page: Page, point: { x: number; y: number }) {
   const cover = await page.evaluate(({ x, y }) => {
     const el = document.elementFromPoint(x, y);
     if (!el || el.tagName === "CANVAS") return null;
@@ -75,7 +75,19 @@ export async function clickScene(page: Page, point: { x: number; y: number }) {
     throw new Error(
       `3D 장면 클릭 위치(${Math.round(point.x)}, ${Math.round(point.y)})를 다른 요소가 가립니다: ${cover}`,
     );
+}
+
+export async function clickScene(page: Page, point: { x: number; y: number }) {
+  await assertSceneAt(page, point);
   await page.mouse.click(point.x, point.y);
+}
+
+// 장면 노드 위에 실제 마우스를 올린다(가림 확인 포함). 격자로 더듬지 않고 노드 위치를 읽는다.
+export async function hoverNode(page: Page, id: string) {
+  const point = await nodePoint(page, id);
+  await assertSceneAt(page, point);
+  await page.mouse.move(point.x, point.y);
+  return point;
 }
 
 // 살아 있는 장면에서 노드(id)의 실제 위치를 읽고, 실제 카메라 광선이 그 노드(또는

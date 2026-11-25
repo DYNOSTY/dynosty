@@ -12,7 +12,7 @@ import {
   TIMBER_RULES,
   VILLAGE_RULES,
 } from "../../packages/game-core/dist/index.js";
-import { nodePoint, worldPoint } from "./scene-picking.js";
+import { hoverNode, nodePoint, worldPoint } from "./scene-picking.js";
 
 const button = (page: Page, name: string) =>
   page.getByRole("button", { name, exact: true });
@@ -569,24 +569,9 @@ async function loadFixture(
   );
 }
 async function hoverHouse(page: Page) {
-  const canvas = page.locator("canvas"),
-    box = await canvas.boundingBox();
-  if (!box) throw Error("장면이 없습니다.");
-  // 손상은 첫 둥지("온돌 둥지")에만 적용된다. 번호가 붙은 다른 둥지는 건너뛴다.
-  for (const dy of [-65, -50, -35, -20, 0, 15, 30, 45, 60, 80, 100])
-    for (const dx of [0, -15, 15, -40, 40, -70, 70, -100, 100]) {
-      await canvas.hover({
-        position: { x: box.width / 2 + dx, y: box.height / 2 + dy },
-      });
-      if (
-        (await page.getByRole("tooltip").isVisible()) &&
-        /^온돌 둥지(?!\d)/.test(
-          (await page.getByRole("tooltip").textContent()) ?? "",
-        )
-      )
-        return;
-    }
-  throw Error("건물 위 체력바가 표시되지 않습니다.");
+  // 손상은 첫 둥지("온돌 둥지", example-building-1)에만 적용된다. 화면을 격자로 더듬으면
+  // 느린 검사 서버에서 마우스 이동마다 2~3초가 걸려 시간 제한을 넘기므로 노드 위치를 읽는다.
+  await hoverNode(page, "example-building-1");
 }
 test("건물 체력은 마우스를 올리면 나타나며 화재 손상 뒤 직접 보수한다", async ({
   page,
