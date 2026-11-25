@@ -12,6 +12,7 @@ import {
   GAME_RULES,
   lostPatrol,
   minutesUntilCoup,
+  rationLimit,
   recoveryCrew,
   returnedScouts,
   SCOUT_SITES,
@@ -192,6 +193,45 @@ export function firstVillageTask(s: TimberState) {
     };
   return null;
 }
+export function supplyAdvice(s: TimberState): string[] {
+  const beat = campaignOf(s).beat;
+  if (["opening", "departure", "capital", "ending", "finished"].includes(beat))
+    return [];
+  const stock = s.world.resources;
+  let plant = 0;
+  let protein = 0;
+  for (const resident of s.world.citizens) {
+    if (!resident.alive || resident.mechanicalFrom) continue;
+    const twoMeals = rationLimit(resident.species, s.rationPolicy) / 2;
+    if (resident.diet === "RES_PLANT") plant += twoMeals;
+    else protein += twoMeals;
+  }
+  function assign(kind: "farm" | "fishery" | "waterworks") {
+    const name = BUILDING_RULES[kind].name;
+    if (s.town.facilities.some((f) => f.kind === kind))
+      return `${name}의 일손 배치를 열어 일할 분을 보내 주세요.`;
+    if (s.town.orders.some((o) => o.kind === kind))
+      return `${name} 공사가 끝나면 거기서 일할 분을 배치해 주세요.`;
+    return `건설에서 ‘${name}’ 터를 잡고 일손을 배치해 주세요.`;
+  }
+  const advice: string[] = [];
+  if (stock.RES_PLANT < plant)
+    advice.push(
+      "풀 먹는 이들에게 두 끼 돌릴 풀잎이 모자라요. " + assign("farm"),
+    );
+  if (stock.RES_MEAT + stock.RES_FISH < protein)
+    advice.push(
+      "고기와 생선을 합쳐도 두 끼를 못 채우겠어요. " + assign("fishery"),
+    );
+  if (stock.RES_WATER <= 10 * AMOUNT_SCALE)
+    advice.push(
+      (stock.RES_WATER === 0
+        ? "물독이 비었어요. "
+        : "남은 물이 열 몫 이하예요. ") + assign("waterworks"),
+    );
+  return advice;
+}
+
 export function villageAdvice(
   s: TimberState,
   daylight: boolean,
@@ -908,6 +948,10 @@ export function campaignPage(s: TimberState): ScenePage {
       line(
         "나르미",
         "고리야, 성문 좀 더 열어 주세요. 마지막 수레에 어린 것들이 타고 있어요.",
+      );
+      line(
+        "나르미",
+        "사람이 늘어 물독부터 봐야겠어요. 취수장과 온상 재배소에 일손을 보내고, 공동 식당에도 배식할 분을 남겨 주세요.",
       );
       line(
         "양녕",

@@ -404,3 +404,10 @@ dialog.result-screen::backdrop {
 .merchant-dialog::backdrop {
   background: #111a;
 }
+
+.supply-advice:empty {
+  display: none;
+}
+.supply-advice {
+  grid-column: 1 / -1;
+}
