@@ -6,6 +6,7 @@ import {
   type ProductionSiteId,
   reservedVillageLand,
   VILLAGE_LAYOUT,
+  VILLAGE_POND,
 } from "./bokhol.js";
 import {
   advanceDevelopment,
@@ -77,6 +78,7 @@ export type BuildingKind =
   | "coal"
   | "iron"
   | "quarry"
+  | "waterworks"
   | "fishery"
   | "farm"
   | "ranch"
@@ -152,6 +154,13 @@ const previousBuildingRules: Record<
     work: 240,
     staff: 4,
     site: "돌이 많은 암반 주변",
+  },
+  waterworks: {
+    name: "취수장",
+    cost: { RES_WOOD: 90, RES_METAL: 10 },
+    work: 180,
+    staff: 3,
+    site: "수원지 옆 육지에서 물을 길어 저장소로 운반",
   },
   fishery: {
     name: "어획막",
@@ -251,6 +260,7 @@ export const individualWorkplaces = [
   "logging",
   "workshop",
   "hospital",
+  "waterworks",
   "fishery",
   "farm",
   "quarry",
@@ -477,6 +487,13 @@ export function buildingIssue(
     if (source && mineralWorksites(s, source) >= 2)
       return "이 광맥에는 건설 중인 곳을 포함해 채굴 시설을 두 곳까지 지을 수 있어요.";
   }
+  if (
+    kind === "waterworks" &&
+    !waterAt(p.position, 8) &&
+    Math.hypot(p.position.x - VILLAGE_POND.x, p.position.z - VILLAGE_POND.z) >
+      VILLAGE_POND.r + 8
+  )
+    return "취수장은 수원지 옆 육지에 지어 주세요.";
   if (kind === "fishery" && !waterAt(p.position, 7))
     return "물고기가 모이는 물가에만 어획막을 지을 수 있어요.";
   if (
@@ -859,6 +876,7 @@ export const facilityResource = (f: Facility): ResourceId | null =>
       coal: "RES_COAL",
       iron: "RES_IRON_ORE",
       quarry: "RES_STONE",
+      waterworks: "RES_WATER",
       fishery: "RES_FISH",
       farm: "RES_PLANT",
       ranch: "RES_MEAT",
