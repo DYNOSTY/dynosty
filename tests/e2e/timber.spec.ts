@@ -478,18 +478,16 @@ test("계약 한 번으로 주민 선택 없이 전 과정과 공동 재고·다
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
   await button(page, "시간 재개").click();
   // 제출본 A안 운송·검수·건조는 게임 63분(3배속 실시간 약 21초)이 걸린다.
-  await expect(page.getByTestId("next-mission")).toContainText(
-    "마을 문에 주민",
-    { timeout: 45000 },
-  );
+  // 제출본(캠페인)의 다음 임무는 조달 패널 대신 마을 소식 카드(VillageBulletin)로 뜬다.
+  const arrival = page.getByRole("region", { name: "주민 도착" });
+  await expect(arrival).toContainText("마을 문에 주민", { timeout: 45000 });
   // 제출본 시작 재고(목재·철재 1,000)에 목재 20이 입고되고 A안 철재 4를 쓴다.
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,020");
   await expect(page.getByTestId("resource-RES_METAL")).toHaveText("996");
   await expect(page.getByTestId("timber-workers")).toHaveText(idle ?? "");
-  await button(page, "받아준다").click();
-  await expect(page.getByTestId("next-mission")).toContainText(
-    "현재 인구 63명",
-  );
+  await arrival.getByRole("button", { name: "받아준다", exact: true }).click();
+  await expect(arrival).toBeHidden();
+  await expect(page.getByTestId("play-population")).toHaveText("주민 63명");
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("1,020");
 });
 
