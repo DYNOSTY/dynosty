@@ -117,7 +117,8 @@ test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저�
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
   for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH", "RES_WOOD"] as const)
     await expect(stock(page, id)).toHaveText(shown(dayTwo[id]));
-  await page.keyboard.press("Escape");
+  // 캠페인에서 Esc는 일시정지 메뉴를 연다. 저장 창은 「저장 닫기」로 닫는다.
+  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   await expect(villagePanel).toBeHidden();
   await advanceVillageDay(page);
   await expect(page.getByText("3일차", { exact: true })).toBeVisible();
@@ -220,7 +221,8 @@ test("마을 저장 실패·손상은 현재 마을과 기존 원문을 보존�
     localStorage.getItem("dynosty.timber.saves.v17"),
   );
   const savedWood = (await page.evaluate(readVillage)).world.resources.RES_WOOD;
-  await page.keyboard.press("Escape");
+  // 캠페인에서 Esc는 일시정지 메뉴를 연다. 저장 창은 「저장 닫기」로 닫는다.
+  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   await advanceVillageDay(page);
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
   await expect
