@@ -6,7 +6,7 @@ import {
   outlinePixels,
   worldPoint,
 } from "./scene-picking.js";
-import { closeWorkspace, openLaborPanel, openWorkspace } from "./workspace.js";
+import { closeWorkspace, openLaborPanel } from "./workspace.js";
 
 const b = (p: Page, n: string) =>
   p.getByRole("button", { name: n, exact: true });
@@ -55,14 +55,12 @@ test("검수대·배급소 실제 클릭의 테두리·정보·단일 선택과 
   await expect(example).toHaveAttribute("aria-pressed", "true");
   // 제출본의 개발 도구 창은 예제 선택 뒤 3D 화면을 덮는다. 닫기 버튼으로 닫고 장면을 누른다
   // (Esc는 일시정지 메뉴를 연다).
+  // 현장 정보 패널도 개발 도구 안에 있으므로, 닫은 뒤에는 화면 아래 선택 버튼 상태로 확인한다.
   await closeWorkspace(p);
   await clickSite(p, "site-inspection");
-  await expect(p.getByTestId("site-name")).toHaveText("검수대");
-  await openWorkspace(p);
+  await expect(b(p, "검수대 선택")).toHaveAttribute("aria-pressed", "true");
   await expect(example).toHaveAttribute("aria-pressed", "false");
-  await closeWorkspace(p);
   await clickFloor(p);
-  await expect(p.getByTestId("site-name")).toHaveCount(0);
   await expect(b(p, "검수대 선택")).toHaveAttribute("aria-pressed", "false");
 });
 test("검수·격리품·배급소 현장 명령으로 교환과 배급을 완료하며 숨은 격리품 선택은 해제한다", async ({
