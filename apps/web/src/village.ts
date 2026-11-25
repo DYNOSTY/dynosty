@@ -80,6 +80,26 @@ const villageNames: Record<string, string> = {
   R10_Iguanodon: "이구아노돈",
   R12_Protoceratops: "프로토케라톱스",
 };
+// Source bounds include the Spinosaurus sail; scaling keeps each species legible
+// and bottom aligns the authored model with the existing resident ground anchor.
+export function residentGlb(species: string, season: Season) {
+  const models: Record<
+    string,
+    { file: string; scale: number; bottom: number }
+  > = {
+    R02: { file: "R02_Triceratops", scale: 0.75, bottom: -0.4445 },
+    R03: { file: "R03_Velociraptor", scale: 0.5, bottom: -0.9159 },
+    SPINO: { file: "SPINO_Spinosaurus", scale: 0.4, bottom: 0.04 },
+  };
+  const model = Object.hasOwn(models, species) ? models[species] : undefined;
+  return model
+    ? {
+        ...model,
+        url: seasonalModelUrl("residents", model.file, season === "winter"),
+      }
+    : null;
+}
+
 export interface GlbVisual {
   setOutline(value: boolean): void;
   setLit?(lit: boolean): void;
@@ -839,17 +859,21 @@ export function createVillage(
     parent: Node,
     offsetY: number,
     level = 1,
+    species?: string,
   ): Promise<GlbVisual> {
+    const resident =
+      kind === "resident" ? residentGlb(species ?? "R02", season) : null;
+    if (kind === "resident" && !resident)
+      throw new Error("알 수 없는 주민 종입니다.");
     const asset = await load(
       scene,
-      kind === "building"
-        ? "/models/buildings/BLD_NEST.glb"
-        : "/models/residents/R02_Triceratops.glb",
+      resident?.url ?? "/models/buildings/BLD_NEST.glb",
     );
     if (disposed || parent.isDisposed()) throw new Error("종료한 대상입니다.");
     const node = new TransformNode(`${parent.name}:glb`, scene);
     node.parent = parent;
-    node.position.y = offsetY;
+    node.position.y =
+      offsetY - (resident ? resident.bottom * resident.scale : 0);
     // Many nests share one model: draw them as instances. The representative nest keeps
     // its own copy for the winter door glow, which lights only its own meshes.
     const instanced = kind === "building" && parent.id !== "example-building-1";
@@ -859,7 +883,7 @@ export function createVillage(
         node,
         kind === "building"
           ? BUILDING_SCALE * (1 + (level - 1) * 0.06)
-          : RESIDENT_SCALE,
+          : (resident?.scale ?? RESIDENT_SCALE),
         shadow,
         kind === "building" ? 4.2 : 1.3,
         kind === "building" ? 4 : 2,
