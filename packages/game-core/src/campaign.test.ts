@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   CAPITAL_MINUTES,
   CONVOY_ITEMS,
@@ -158,7 +158,12 @@ it.each([
   ).toThrow();
 });
 
-it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 엔딩을 끝까지 진행한다", () => {
+const command = (
+  state: TimberState,
+  cmd: Parameters<typeof commandTimber>[1],
+) => commandTimber(state, cmd, "run-" + state.processed.length);
+
+function saveBeforeEndingChoice(): string {
   let s = restore(createVillageGame(true));
   expect(s.residents).toHaveLength(600);
   expect(new Set(Object.values(s.world.resources))).toEqual(
@@ -324,12 +329,6 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
   expect(s.world.citizens.filter((p) => p.alive)).toHaveLength(188);
   expect(s.town.received.RES_COAL).toBeGreaterThanOrEqual(1800);
   s = restore(s);
-  const command = (
-    state: TimberState,
-    cmd: Parameters<typeof commandTimber>[1],
-  ) => commandTimber(state, cmd, "run-" + state.processed.length);
-  const day = (state: TimberState) =>
-    command(state, { type: "advance", minutes: 1440 });
   const roll = vi.spyOn(Math, "random").mockReturnValue(0.99);
   try {
     // Hold nightly incidents constant to compare the three choices on the same arriving convoy.
@@ -372,59 +371,80 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
       });
     }
     expect(minutesUntilCoup(s)).toBe(1);
-    for (const [optimism, action, ending] of [
-      [69, "resist", "escape"],
-      [70, "resist", "hope"],
-      [70, "ally", "order"],
-    ] as const) {
-      const rally = restore(
-        command(
-          { ...s, world: { ...s.world, optimism } },
-          { type: "advance", minutes: 1 },
-        ),
-      );
-      let run = act(act(rally, action), "next");
-      if (ending === "escape") {
-        expect(run.town.development.story.chungnyeong).toBe("dead");
-        run = command(run, {
-          type: "plan-building",
-          kind: "workshop",
-          position: { x: 12, z: 12 },
-          headingRadians: Math.PI,
-        });
-        for (
-          let d = 0;
-          d < 3 && !run.town.facilities.some((f) => f.kind === "workshop");
-          d++
-        )
-          run = day(run);
-        const lab = requireValue(
-          run.town.facilities.find((f) => f.kind === "workshop"),
-          "시나리오 대상",
-        );
-        run = command(run, { type: "facility-staff", id: lab.id, count: 4 });
-        for (const tech of ["R17", "R18", "TECH_MECHA2"]) {
-          expect(run.campaign?.ending).toBeNull();
-          run = restore(command(run, { type: "start-research", tech }));
-          for (
-            let d = 0;
-            d < 10 && !run.town.development.completed.includes(tech);
-            d++
-          ) {
-            if (run.mutantDamage?.[lab.id])
-              run = command(run, { type: "repair-mutant", building: lab.id });
-            run = day(run);
-          }
-          expect(run.town.development.completed).toContain(tech);
-        }
-      }
-      for (let d = 0; d < 12 && !run.campaign?.ending; d++) run = day(run);
-      expect(restore(run).campaign?.ending).toBe(ending);
-    }
+    return JSON.stringify(createTimberSave(s));
   } finally {
     roll.mockRestore();
   }
-}, 120_000);
+}
+
+describe("남문 세 행렬을 인계한 뒤 같은 복홀에서 맞는 엔딩", () => {
+  let checkpoint: string;
+  beforeAll(() => {
+    checkpoint = saveBeforeEndingChoice();
+  }, 120_000);
+
+  it.each([
+    { title: "탈출", optimism: 69, action: "resist", ending: "escape" },
+    { title: "희망", optimism: 70, action: "resist", ending: "hope" },
+    { title: "질서", optimism: 70, action: "ally", ending: "order" },
+  ] as const)(
+    "$title 엔딩까지 실제로 진행한다",
+    ({ optimism, action, ending }) => {
+      const s = parseTimberSave(JSON.parse(checkpoint)).state;
+      const day = (state: TimberState) =>
+        command(state, { type: "advance", minutes: 1440 });
+      const roll = vi.spyOn(Math, "random").mockReturnValue(0.99);
+      try {
+        const rally = restore(
+          command(
+            { ...s, world: { ...s.world, optimism } },
+            { type: "advance", minutes: 1 },
+          ),
+        );
+        let run = act(act(rally, action), "next");
+        if (ending === "escape") {
+          expect(run.town.development.story.chungnyeong).toBe("dead");
+          run = command(run, {
+            type: "plan-building",
+            kind: "workshop",
+            position: { x: 12, z: 12 },
+            headingRadians: Math.PI,
+          });
+          for (
+            let d = 0;
+            d < 3 && !run.town.facilities.some((f) => f.kind === "workshop");
+            d++
+          )
+            run = day(run);
+          const lab = requireValue(
+            run.town.facilities.find((f) => f.kind === "workshop"),
+            "시나리오 대상",
+          );
+          run = command(run, { type: "facility-staff", id: lab.id, count: 4 });
+          for (const tech of ["R17", "R18", "TECH_MECHA2"]) {
+            expect(run.campaign?.ending).toBeNull();
+            run = restore(command(run, { type: "start-research", tech }));
+            for (
+              let d = 0;
+              d < 10 && !run.town.development.completed.includes(tech);
+              d++
+            ) {
+              if (run.mutantDamage?.[lab.id])
+                run = command(run, { type: "repair-mutant", building: lab.id });
+              run = day(run);
+            }
+            expect(run.town.development.completed).toContain(tech);
+          }
+        }
+        for (let d = 0; d < 12 && !run.campaign?.ending; d++) run = day(run);
+        expect(restore(run).campaign?.ending).toBe(ending);
+      } finally {
+        roll.mockRestore();
+      }
+    },
+    120_000,
+  );
+});
 
 it("도성은 민심과 관계없이 세 번째 수레를 보내지 못한 채 36시간이 지나면 함락된다", () => {
   const base = createVillageGame();

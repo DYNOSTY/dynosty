@@ -14,10 +14,22 @@ export type TimberResponse =
   | { type: "exited"; world: PlayState }
   | {
       type: "state";
-      state: TimberState;
+      resumeJson: string;
       completions?: string[];
       resetNotices?: boolean;
     }
   | { type: "saved"; requestId: number; save: TimberSave }
   | { type: "loaded"; requestId: number }
   | { type: "error"; message: string; requestId: number | null };
+
+// Private worker-to-UI snapshot. The same bytes are also the resume file.
+export function encodeVillageSnapshot(state: TimberState): string {
+  return JSON.stringify({
+    format: "dynosty-timber",
+    saveVersion: 1,
+    state,
+  } satisfies TimberSave);
+}
+export function readWorkerSnapshot(json: string): TimberState {
+  return (JSON.parse(json) as TimberSave).state;
+}

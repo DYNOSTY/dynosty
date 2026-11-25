@@ -14,6 +14,7 @@ type Box = {
   sin: number;
   halfWidth: number;
   halfDepth: number;
+  reach: number;
 };
 // Every resident in the same minute walks around the same obstacle list, so the
 // rotated boxes are prepared once per list instead of once per path request.
@@ -27,6 +28,8 @@ function boxesOf(buildings: readonly GroundObstacle[]): readonly Box[] {
       sin: Math.sin(p.headingRadians ?? 0),
       halfWidth: p.halfWidth ?? CLEARANCE,
       halfDepth: p.halfDepth ?? CLEARANCE,
+      // Conservative world-space extent for every rotation, including edge contact.
+      reach: (p.halfWidth ?? CLEARANCE) + (p.halfDepth ?? CLEARANCE) + 1e-8,
     }));
     prepared.set(buildings, boxes);
   }
@@ -48,6 +51,7 @@ export function residentPath(
     boxes.some((b) => {
       const dx = p.x - b.point.x,
         dz = p.z - b.point.z;
+      if (Math.abs(dx) > b.reach || Math.abs(dz) > b.reach) return false;
       return (
         Math.abs(dx * b.cos - dz * b.sin) <= b.halfWidth &&
         Math.abs(dx * b.sin + dz * b.cos) <= b.halfDepth
@@ -59,6 +63,13 @@ export function residentPath(
       az = a.z - box.point.z,
       bx = b.x - box.point.x,
       bz = b.z - box.point.z;
+    if (
+      (ax > box.reach && bx > box.reach) ||
+      (ax < -box.reach && bx < -box.reach) ||
+      (az > box.reach && bz > box.reach) ||
+      (az < -box.reach && bz < -box.reach)
+    )
+      return false;
     const fromX = ax * box.cos - az * box.sin,
       fromZ = ax * box.sin + az * box.cos,
       toX = bx * box.cos - bz * box.sin,

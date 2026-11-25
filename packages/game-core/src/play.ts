@@ -733,12 +733,14 @@ export function applyCitizenEvent(
   });
 }
 export function advancePlayClock(input: PlayState, minutes: number): PlayState {
+  return advanceParsedClock(parsePlayState(input), minutes);
+}
+
+// Internal simulation step: only the clock changes in an already parsed world.
+export function advanceParsedClock(s: PlayState, minutes: number): PlayState {
   number(minutes, 0, 10080, true);
-  const s = parsePlayState(input),
-    total = s.minute + minutes;
-  return parsePlayState({
-    ...s,
-    day: s.day + Math.floor(total / 1440),
-    minute: total % 1440,
-  });
+  const total = s.minute + minutes;
+  const day = s.day + Math.floor(total / 1440);
+  number(day, 1, 100_000, true);
+  return { ...s, day, minute: total % 1440 };
 }
