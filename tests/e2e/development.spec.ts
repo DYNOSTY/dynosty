@@ -81,9 +81,13 @@ test("시설 개량 버튼으로2단계 생산 배율과 저장 복원을 확인
   await page.getByRole("button", { name: /2단계 개량/ }).click();
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
   // 개량 명령 뒤 시간이 멈춰 있으면 재개한다. 생산 배율 확인에는 시간이 흘러야 한다.
-  if (await button(page, "시간 재개").isVisible())
-    await button(page, "시간 재개").click();
-  await expect(button(page, "일시정지")).toBeVisible();
+  // 게임이 공사 명령 뒤 스스로 재개하기도 해서(App.tsx resumeAfterConstruction), 「시간 재개」가
+  // 보였다가 누르기 전에 사라질 수 있다. 일시정지 버튼이 보일 때까지 다시 시도한다.
+  await expect(async () => {
+    const resume = button(page, "시간 재개");
+    if (await resume.isVisible()) await resume.click({ timeout: 2000 });
+    await expect(button(page, "일시정지")).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 20000 });
   await expect(
     page.getByText("어획막 · 2단계 · build-1", { exact: true }),
   ).toBeVisible({ timeout: 25000 });
