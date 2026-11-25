@@ -14,10 +14,10 @@ import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
 import { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
+import { createResidentVisual } from "./resident-visual.js";
 import { loadSceneAsset as load } from "./scene-assets.js";
 import { hasWinterModel, seasonalModelUrl } from "./seasonal-model.js";
 import { elevation, rng, type Season } from "./world.js";
@@ -80,6 +80,9 @@ const villageNames: Record<string, string> = {
   R10_Iguanodon: "이구아노돈",
   R12_Protoceratops: "프로토케라톱스",
 };
+
+export { residentGlb } from "./resident-visual.js";
+
 export interface GlbVisual {
   setOutline(value: boolean): void;
   setLit?(lit: boolean): void;
@@ -836,15 +839,27 @@ export function createVillage(
   // 게임 대상(둥지·대표 주민)용 GLB 표시
   async function entityVisual(
     kind: "building" | "resident",
-    parent: Node,
+    parent: TransformNode,
     offsetY: number,
     level = 1,
+    species?: string,
   ): Promise<GlbVisual> {
+    // The decree messenger is a scripted actor. Only selectable game residents
+    // use the crowd/detail switch; buildings and the messenger keep their rigs.
+    if (kind === "resident" && parent !== herald)
+      return createResidentVisual(
+        scene,
+        parent,
+        offsetY,
+        species ?? "R02",
+        season,
+        shadow,
+      );
     const asset = await load(
       scene,
-      kind === "building"
-        ? "/models/buildings/BLD_NEST.glb"
-        : "/models/residents/R02_Triceratops.glb",
+      kind === "resident"
+        ? "/models/residents/R02_Triceratops.glb"
+        : "/models/buildings/BLD_NEST.glb",
     );
     if (disposed || parent.isDisposed()) throw new Error("종료한 대상입니다.");
     const node = new TransformNode(`${parent.name}:glb`, scene);
