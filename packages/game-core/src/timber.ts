@@ -1,6 +1,7 @@
 import {
   BOKHOL_FORESTS,
   BOKHOL_MAP,
+  VILLAGE_LAYOUT,
   BOKHOL_MINERALS,
   BOKHOL_PRODUCTION_SITES,
   constructionPlot,
@@ -15,6 +16,7 @@ import {
   type Campaign,
   type CampaignCommand,
   campaignOf,
+  departureBuildings,
   campaignValid,
   minutesUntilCoup,
   newCampaign,
@@ -133,6 +135,8 @@ import {
   type BuildingKind,
   createTown,
   demolishBuilding,
+  demolishableLandmark,
+  landmarkKinds,
   deposit,
   directStaff,
   dispatchFood,
@@ -2615,14 +2619,21 @@ export function parseTimberState(value: unknown): TimberState {
   s = {
     ...s,
     coveredStock: Object.fromEntries(
-      (Object.keys(s.world.resources) as ResourceId[]).map((k) => [
-        k,
-        Math.min(
-          s.coveredStock?.[k] ?? (s.coveredStock ? 0 : capacity),
-          s.world.resources[k] / AMOUNT_SCALE,
-          capacity,
-        ),
-      ]),
+      (Object.keys(s.world.resources) as ResourceId[])
+        .filter(
+          (k) =>
+            (s.coveredStock?.[k] ?? (s.coveredStock ? 0 : capacity)) > 0 &&
+            s.world.resources[k] > 0 &&
+            capacity > 0,
+        )
+        .map((k) => [
+          k,
+          Math.min(
+            s.coveredStock?.[k] ?? (s.coveredStock ? 0 : capacity),
+            s.world.resources[k] / AMOUNT_SCALE,
+            capacity,
+          ),
+        ]),
     ),
   };
   if (
@@ -3153,6 +3164,19 @@ function onExpedition(s: TimberState, r: VillageResident) {
     s.town.trips.some((t) => t.ids.includes(r.id))
   );
 }
+export function fireBuildings(s: TimberState) {
+  const landmarks = VILLAGE_LAYOUT.flatMap(([id, x, z]) => {
+    const kind = landmarkKinds[id];
+    return kind && demolishableLandmark(s, `village:${id}:${x}:${z}`)
+      ? [{ id, kind, position: { x, z } }]
+      : [];
+  });
+  return [
+    ...s.homes.map((h) => ({ ...h, kind: "home" as const })),
+    ...s.town.facilities,
+    ...landmarks,
+  ];
+}
 export function gateRaid(s: TimberState, random = Math.random): TimberState {
   if (
     !s.campaign ||
@@ -3202,7 +3226,7 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
       id: "raid-" + s.elapsed,
       citizenIds: victims,
     });
-  const buildings = [...s.homes, ...s.town.facilities].filter(
+  const buildings = fireBuildings(s).filter(
     (b) => s.mutantDamage?.[b.id] !== 100,
   );
   const damage = { ...s.mutantDamage };
@@ -3236,19 +3260,21 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
       if (!target) break;
       near.splice(near.indexOf(target), 1);
       point = target.position;
-      const kind = "kind" in target ? target.kind : "home";
-      const roof = [
-        "home",
-        "restaurant",
-        "storage",
-        "workshop",
-        "hospital",
-        "trade",
-      ].includes(kind);
+      const kind = target.kind;
+      const roof =
+        departureBuildings[target.id]?.roof ??
+        [
+          "home",
+          "restaurant",
+          "storage",
+          "workshop",
+          "hospital",
+          "trade",
+        ].includes(kind);
       s = note(
         s,
         "돌쇠: " +
-          BUILDING_RULES[kind].name +
+          (departureBuildings[target.id]?.name ?? BUILDING_RULES[kind].name) +
           (roof ? " 지붕" : "") +
           (fires.length ? " 쪽으로 불이 번졌습니다!" : " 쪽에 불이 났습니다!"),
       );
@@ -3280,12 +3306,17 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
   );
 }
 function canFightFire(s: TimberState, r: VillageResident) {
+  const offDutyBuilder =
+    !workplaceOpen(s.world.minute) &&
+    (orderResting(s, r.id) ||
+      s.construction?.workerId === r.id ||
+      s.construction?.crew?.some((w) => w.id === r.id));
   return (
     r.health === "healthy" &&
-    !r.nextWork &&
+    (!r.nextWork || offDutyBuilder) &&
     !onExpedition(s, r) &&
     !s.workerIds.includes(r.id) &&
-    !r.task &&
+    (!r.task || offDutyBuilder) &&
     !s.town.patients.some((p) => p.resident === r.id) &&
     r.workplaceId !== "gate" &&
     r.workplaceId !== "office" &&
@@ -3297,7 +3328,7 @@ function canFightFire(s: TimberState, r: VillageResident) {
 }
 function fightNightFires(s: TimberState, minutes: number): TimberState {
   if (!s.nightFires?.length) return s;
-  const targets = [...s.homes, ...s.town.facilities];
+  const targets = fireBuildings(s);
   const active = s.nightFires.flatMap((f) => {
     const b = targets.find((b) => b.id === f.id);
     return b
@@ -3305,7 +3336,7 @@ function fightNightFires(s: TimberState, minutes: number): TimberState {
           {
             ...f,
             position: b.position,
-            name: BUILDING_RULES["kind" in b ? b.kind : "home"].name,
+            name: departureBuildings[b.id]?.name ?? BUILDING_RULES[b.kind].name,
           },
         ]
       : [];
@@ -3351,6 +3382,16 @@ function fightNightFires(s: TimberState, minutes: number): TimberState {
     ...s,
     mutantDamage: damage,
     residents,
+    removedLandmarks: [
+      ...new Set([
+        ...(s.removedLandmarks ?? []),
+        ...active
+          .filter(
+            (f) => damage[f.id] === 100 && Object.hasOwn(landmarkKinds, f.id),
+          )
+          .map((f) => f.id),
+      ]),
+    ],
     nightFires: dawn
       ? []
       : active.filter((f) => f.work > 0).map(({ id, work }) => ({ id, work })),
@@ -3964,6 +4005,7 @@ function applyTimberCommand(
       break;
     case "facility-staff":
       n = setFacilityStaff(s, command.id, command.count);
+      if (restaurants(s)[0]?.id === command.id) n = staffRestaurant(n);
       break;
     case "dispatch-food":
       n = dispatchFood(s, command.id, command.food, command.rank);

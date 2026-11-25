@@ -57,7 +57,7 @@ it("식당별10석과 배치 인력을 보존하고 두 곳에서 동시에 식�
     ...s,
     residents: s.residents.map((r, i) => ({
       ...r,
-      hunger: r.workplaceId ? 0 : 400,
+      hunger: r.workplaceId ? 0 : 720,
       rationUsed: 0,
       eatingUntil: null,
       diningSeat: null,
@@ -100,7 +100,7 @@ it("식당별10석과 배치 인력을 보존하고 두 곳에서 동시에 식�
   s = {
     ...s,
     residents: s.residents.map((r) =>
-      r.workplaceId ? { ...r, hunger: 400 } : r,
+      r.workplaceId ? { ...r, hunger: 720 } : r,
     ),
   };
   for (let i = 0; i < 40; i++) {
@@ -117,7 +117,7 @@ it("식당·어획막 정원은 단계별로 달라지고 둥지·저장소만 �
     [1, 2, 3].map((level) =>
       facilityStaffLimit({ kind: "restaurant", level: level as 1 | 2 | 3 }),
     ),
-  ).toEqual([2, 4, 6]);
+  ).toEqual([4, 4, 6]);
   expect(
     [1, 2, 3].map((level) =>
       facilityStaffLimit({ kind: "fishery", level: level as 1 | 2 | 3 }),
@@ -212,7 +212,7 @@ it("정찰·교역만 하나로 제한하고 재배소·목축장은 빈 구릉�
   for (const kind of ["farm", "ranch"] as const)
     expect(
       buildingIssue(start(), kind, {
-        position: { x: 46, z: 32 },
+        position: { x: 28, z: 48 },
         headingRadians: 0,
       }),
     ).toBeNull();
@@ -222,7 +222,7 @@ it("직원이 늘면 한 끼 체류가 짧아지고 어떤 입력도30분을 넘
   if (!initialResident) throw Error("주민 없음");
   const r = {
     ...initialResident,
-    hunger: 400,
+    hunger: 720,
     position: { x: 0, z: 0 },
   };
   const places = {
@@ -275,7 +275,7 @@ it("2단계 식당에4명을 배치해도 정수8분 식사와 저장 복원이 
     ...s,
     residents: s.residents.map((r) => ({
       ...r,
-      hunger: r.workplaceId ? 0 : 400,
+      hunger: r.workplaceId ? 0 : 720,
       rationUsed: 0,
       eatingUntil: null,
       diningSeat: null,
@@ -287,7 +287,7 @@ it("2단계 식당에4명을 배치해도 정수8분 식사와 저장 복원이 
   const diner = s.residents.find(
     (r) => r.routine === "eating" && r.workplaceId === null,
   );
-  expect(diner?.eatingUntil).toBe(s.elapsed + 8);
+  expect(diner?.eatingUntil).toBe(s.elapsed + 15);
   expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
 });
 it("입원한 주민이 식당 손님의 좌석을 차지하지 않는다", () => {
@@ -319,7 +319,7 @@ it("입원한 주민이 식당 손님의 좌석을 차지하지 않는다", () =
     ...s,
     residents: s.residents.map((r, i) => ({
       ...r,
-      hunger: r.workplaceId ? 0 : 400,
+      hunger: r.workplaceId ? 0 : 720,
       rationUsed: 0,
       eatingUntil: null,
       diningSeat: null,

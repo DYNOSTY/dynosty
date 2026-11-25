@@ -39,8 +39,7 @@ export function storageResearchLevel(s: TimberState): number {
 export function storageCapacity(s: TimberState): number {
   const rank = storageResearchLevel(s);
   const legacy = productionSites(s).filter((l) => l.storageBuilt).length;
-  // The starting yard keeps its shared space (campaign 1500, otherwise 500)
-  // until the built warehouses add up to more; overflow goes to the yard.
+  // Only a completed warehouse protects stock from exposure.
   return (
     legacy * (STORAGE_SPACE[rank - 1] ?? 500) +
     s.town.facilities

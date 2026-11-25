@@ -168,11 +168,13 @@ it("저장 공간500/1000/2000은 연구·건물의 높은 값으로 적용하�
   };
   expect(parseTimberState(legacy).world.resources.RES_FISH).toBe(30000000);
 });
-it("창고가 없어도 시작 적재 용량을 쓰고 창고 하나로 기존 용량이 줄지 않는다", () => {
+it("창고 없이 야적으로 시작하고 창고를 지어야 보호 용량이 생긴다", () => {
   const village = createVillageGame();
-  expect(storageCapacity(village)).toBe(1500);
-  expect(storageCapacity(start())).toBe(500);
-  expect(yardStock(village, "RES_WOOD")).toBe(0);
+  expect(storageCapacity(village)).toBe(0);
+  expect(storageCapacity(start())).toBe(0);
+  expect(yardStock(village, "RES_WOOD")).toBe(
+    village.world.resources.RES_WOOD / 10000,
+  );
   const crowded = {
     ...village,
     world: {
@@ -181,11 +183,11 @@ it("창고가 없어도 시작 적재 용량을 쓰고 창고 하나로 기존 �
     },
   };
   // 넘친 물량은 기획자 규칙대로 야적장에 둔다.
-  expect(yardStock(crowded, "RES_WOOD")).toBe(500);
+  expect(yardStock(crowded, "RES_WOOD")).toBe(2000);
   const warehouse = build(start(), "storage", 0, 16);
   expect(storageCapacity(warehouse)).toBe(500);
   const campaign = requireValue(village.campaign, "캠페인 기록");
-  expect(storageCapacity({ ...warehouse, campaign })).toBe(1500);
+  expect(storageCapacity({ ...warehouse, campaign })).toBe(500);
 });
 it("저장 용량을 넘긴 수레 화물도 야적장 재고에 한 번만 더한다", () => {
   const w = createPlayState();

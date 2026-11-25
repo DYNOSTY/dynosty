@@ -102,13 +102,13 @@ it("자원별 입지와 물 위 건설을 검사하고 채석장은 암반, 어�
     buildingIssue(s, "home", { ...pose, position: { x: 60, z: 32 } }),
   ).toContain("물 위");
   expect(
-    buildingIssue(s, "quarry", { ...pose, position: { x: 200, z: -40 } }),
+    buildingIssue(s, "quarry", { ...pose, position: { x: 202, z: -42 } }),
   ).toBeNull();
   expect(
-    buildingIssue(s, "fishery", { ...pose, position: { x: 46, z: 32 } }),
+    buildingIssue(s, "fishery", { ...pose, position: { x: 28, z: 48 } }),
   ).toBeNull();
   expect(
-    buildingIssue(s, "coal", { ...pose, position: { x: 200, z: -40 } }),
+    buildingIssue(s, "coal", { ...pose, position: { x: 202, z: -42 } }),
   ).toContain("자원");
 });
 it("기본 공사량은4명 표준 체격 기준30~50초이며 체격에 따른 작업 이점이 있다", () => {
@@ -120,16 +120,23 @@ it("기본 공사량은4명 표준 체격 기준30~50초이며 체격에 따른 
   for (const rule of Object.values(BUILDING_RULES))
     expect(rule.work / 6).toBeGreaterThanOrEqual(30);
 });
-it.each(["farm", "ranch", "fishery", "waterworks", "logging", "quarry"] as const)(
+it.each([
+  "farm",
+  "ranch",
+  "fishery",
+  "waterworks",
+  "logging",
+  "quarry",
+] as const)(
   "%s 운영·소모와 입고 경로를 따르고 어획은 즉시 입고한다",
   (kind) => {
     const point =
       kind === "fishery" || kind === "waterworks"
-        ? { x: 46, z: 32 }
+        ? { x: 28, z: 48 }
         : kind === "logging"
           ? { x: -24, z: -8 }
           : kind === "quarry"
-            ? { x: 200, z: -40 }
+            ? { x: 202, z: -42 }
             : pose.position;
     let s = finish(plan(start(), kind, { ...pose, position: point }));
     const f = s.town.facilities[0];
@@ -140,7 +147,7 @@ it.each(["farm", "ranch", "fishery", "waterworks", "logging", "quarry"] as const
       s = advanceTimber(s, 1);
       observedBuffer ||= (s.town.facilities[0]?.buffer ?? 0) > 0;
     }
-    expect(observedBuffer).toBe(kind !== "fishery");
+    expect(observedBuffer).toBe(kind !== "fishery" && kind !== "quarry");
     if (kind === "fishery") expect(s.town.facilities[0]?.haul).toBeNull();
     expect(s.town.facilities[0]?.delivered).toBeGreaterThan(0);
     expect(parseTimberSave(createTimberSave(s)).state).toEqual(s);
@@ -154,7 +161,7 @@ it.each(["farm", "ranch", "fishery", "waterworks", "logging", "quarry"] as const
 );
 it("얼어도 어획이 가능하고 야간에는 공사를 보존한 채 귀가한다", () => {
   let s = finish(
-    plan(start(), "fishery", { ...pose, position: { x: 46, z: 32 } }),
+    plan(start(), "fishery", { ...pose, position: { x: 28, z: 48 } }),
   );
   const f = s.town.facilities[0];
   if (!f) throw Error("시설 없음");
@@ -302,7 +309,7 @@ it("새 마을의 첫 식당은 공사 인부가 배식을 맡고 주민이 식�
       .map((r) => r.id)
       .every((id) => crew.includes(id)),
   ).toBe(true);
-  expect(s.restaurantWorkerTarget).toBe(2);
+  expect(s.restaurantWorkerTarget).toBe(4);
   s = advanceTimber(s, 180);
   expect(
     s.residents.some(
@@ -348,7 +355,7 @@ it("물 보유량으로 농장 착공을 제한하고 물을 받기 전의 옛 �
     expect(buildingIssue(dry, kind, pose)).toMatch(/물/);
   const farm = plan(village, "farm");
   const current = farm.world.resources.RES_WATER;
-  expect(current).toBe(19 * 10000);
+  expect(current).toBe(199 * 10000);
   const old = parseTimberSave(createTimberSave(farm)).state;
   requireValue(old.town.orders[0], "old.town.orders[0]").priceVersion = 2;
   delete old.town.spent.RES_WATER;

@@ -121,7 +121,7 @@ export function advanceResidentRoutine<T extends ResidentRoutine>(
         ? "no-restaurant"
         : !restaurantOpen(places.minute)
           ? "restaurant-closed"
-          : !employee && places.restaurantStaffed === false
+          : places.restaurantStaffed === false
             ? "no-staff"
             : places.rationAvailable === false
               ? "ration-exhausted"
@@ -137,7 +137,7 @@ export function advanceResidentRoutine<T extends ResidentRoutine>(
     places.restaurant !== null &&
     restaurantOpen(places.minute) &&
     places.rationAvailable !== false &&
-    (employee || places.restaurantStaffed !== false);
+    places.restaurantStaffed !== false;
   const goHome =
     r.health === "sick" || places.minute < 6 * 60 || places.minute >= 18 * 60;
   const goal = onShift

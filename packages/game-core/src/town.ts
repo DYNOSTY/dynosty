@@ -885,7 +885,7 @@ export const facilityResource = (f: Facility): ResourceId | null =>
       ranch: "RES_MEAT",
     }) as Partial<Record<BuildingKind, ResourceId>>
   )[f.kind] ?? null;
-const landmarkKinds: Record<string, BuildingKind> = {
+export const landmarkKinds: Record<string, BuildingKind> = {
   BLD_WAREHOUSE: "storage",
   BLD_WORKSHOP: "workshop",
   BLD_FORAGE: "farm",
@@ -901,7 +901,11 @@ export function demolishableLandmark(s: TimberState, target: string) {
       target === `village:${id}:${x}:${z}` &&
       Object.hasOwn(landmarkKinds, id) &&
       !s.removedLandmarks?.includes(id) &&
-      !(s.rebuilding && ["BLD_CLINIC", "BLD_WORKSHOP"].includes(id)),
+      !(
+        s.rebuilding &&
+        !s.campaign?.openingLosses &&
+        ["BLD_CLINIC", "BLD_WORKSHOP"].includes(id)
+      ),
   )?.[0];
 }
 export function salvageMaterials(s: TimberState, id: string): Cost {
@@ -1162,6 +1166,20 @@ export function deposit(s: TimberState, r: ResourceId, n: number): TimberState {
     },
   };
 }
+function deliver(s: TimberState, resource: ResourceId, amount: number) {
+  if (amount === 0) return s;
+  const next = deposit(s, resource, amount);
+  return {
+    ...next,
+    coveredStock: {
+      ...s.coveredStock,
+      [resource]: Math.min(
+        storageCapacity(s),
+        (s.coveredStock?.[resource] ?? 0) + amount,
+      ),
+    },
+  };
+}
 function advanceTownProduction(
   input: TimberState,
   minutes: number,
@@ -1260,18 +1278,7 @@ function advanceTownProduction(
     const immediate = ["fishery", "iron", "coal", "quarry"].includes(f.kind);
     if (immediate) {
       const amount = f.buffer;
-      s = deposit(s, resource, amount);
-      if (f.kind !== "fishery" && amount > 0)
-        s = {
-          ...s,
-          coveredStock: {
-            ...s.coveredStock,
-            [resource]: Math.min(
-              storageCapacity(s),
-              (s.coveredStock?.[resource] ?? 0) + amount,
-            ),
-          },
-        };
+      s = deliver(s, resource, amount);
       f.buffer -= amount;
       f.delivered += amount;
     }
@@ -1343,7 +1350,7 @@ function advanceTownProduction(
           if (h.stage === "pickup") h.stage = "store";
           else if (h.stage === "store") {
             const unloaded = h.cargo;
-            s = deposit(s, resource, unloaded);
+            s = deliver(s, resource, unloaded);
             f.delivered += unloaded;
             h = {
               ...h,

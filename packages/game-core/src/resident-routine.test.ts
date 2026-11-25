@@ -43,7 +43,7 @@ it("업무 뒤 집 또는 따뜻한 대기 장소로 돌아간다", () => {
   ).toEqual(places.warmth);
 });
 it("허기가 생긴 개인만 식당에 가고 먹고 난 뒤 귀가한다", () => {
-  let hungry = { ...resident(), hunger: 720 };
+  let hungry = { ...resident(), hunger: 7128 };
   const full = advanceResidentRoutine(resident(), 1, 1, 2, places, true);
   for (let i = 1; i <= 10; i++)
     hungry = advanceResidentRoutine(hungry, i, 1, 2, places, true);
@@ -131,7 +131,7 @@ it("배고픈 주민은 출근·예약 작업을 먼저 수행하고 퇴근 뒤 
   const job = { x: 4, z: 0 };
   const r = {
     ...resident(),
-    hunger: 500,
+    hunger: 720,
     routine: "restaurant" as const,
     request: "waiting-seat" as const,
   };

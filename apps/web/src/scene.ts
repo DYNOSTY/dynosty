@@ -1,4 +1,4 @@
-import { VILLAGE_LAYOUT } from "@dynosty/game-core";
+import { fireBuildings, VILLAGE_LAYOUT } from "@dynosty/game-core";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { createHomePlacementVisual } from "./home-placement-scene.js";
@@ -929,9 +929,7 @@ export function mountScene(
               state.campaign?.openingLosses?.includes(id),
             ).map(([id, x, z]) => ({ id, x, z }))
           : state?.nightFires?.flatMap((f) => {
-              const b =
-                state.homes.find((b) => b.id === f.id) ??
-                state.town.facilities.find((b) => b.id === f.id);
+              const b = fireBuildings(state).find((b) => b.id === f.id);
               return b ? [{ id: b.id, ...b.position }] : [];
             }),
         state?.raidFailures === 3,

@@ -61,9 +61,7 @@ it("식당이 닫혀 있거나 먹이가 없으면 먹지 않고 요구를 전�
       { ...base, restaurantBuilt: true, world: { ...base.world, minute } },
       3,
     );
-    expect(s.residents.some((r) => r.request === "restaurant-closed")).toBe(
-      true,
-    );
+    expect(s.residents.some((r) => r.request === "no-staff")).toBe(true);
     expect(s.world.resources).toEqual(base.world.resources);
   }
   const s = advanceTimber(
@@ -99,7 +97,7 @@ it("식당은 개인별로 이용하며 근무 중인 주민은 작업장을 이
       residents: base.residents.map((r) => ({
         ...r,
         workplaceId: "mill",
-        hunger: 400,
+        hunger: 720,
       })),
     },
     20,
