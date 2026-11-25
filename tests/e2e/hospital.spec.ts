@@ -6,6 +6,7 @@ import {
   createTimberSave,
   createTimberState,
 } from "../../packages/game-core/dist/index.js";
+import { worldPoint } from "./scene-picking.js";
 
 test("병원 클릭으로 주민별 회복을 보고 저장 후 야간 자동 퇴원한다", async ({
   page,
@@ -88,22 +89,26 @@ test("병원 클릭으로 주민별 회복을 보고 저장 후 야간 자동 �
     "불러왔습니다",
   );
   await page.locator("canvas").press("j");
-  await page.getByText("완공 시설 1곳", { exact: true }).click();
+  // 제출본의 시설 관리 경로: 건설 → 시설 운영(완공 시설 장부가 펼쳐진 채 열린다).
+  await button("건설").click();
+  await button("시설 운영").click();
+  await expect(page.getByText("완공 시설 1곳", { exact: true })).toBeVisible();
   await button("현장 보기").click();
-  const canvas = page.getByLabel(
-    "바닥과 건물이 있는 3D 예제. 마우스로 회전하고 확대할 수 있습니다.",
-    { exact: true },
-  );
+  const canvas = page.locator("canvas");
   const rect = await canvas.boundingBox();
   if (!rect) throw Error("3D 화면 없음");
-  await canvas.click({
-    position: { x: rect.width / 2, y: rect.height / 2 - 8 },
-  });
+  // 실제 카메라 행렬로 병원(12, 12) 몸체를 화면 좌표로 옮겨 누른다.
+  const hospital = await worldPoint(page, [12, 1.5, 12], false);
+  await page.mouse.click(hospital.x, hospital.y);
   const ward = page.getByTestId("hospital-build-1");
   await expect(ward).toHaveAttribute("open", "");
   await expect(ward.getByRole("listitem")).toHaveCount(3);
   await expect(ward).toContainText("회복 719/720");
   await expect(ward).toContainText("중상");
+  // 시설 운영 화면은 그 장부만 보여 준다. 저장·시간 조작은 개발 도구의 전체 장부에서 한다.
+  const tools = button("개발 도구");
+  if ((await tools.getAttribute("aria-expanded")) !== "true")
+    await tools.click();
   await canvas.press("j");
   await button("진행 저장").click();
   await expect(page.getByTestId("timber-save-status")).toContainText(
@@ -115,7 +120,6 @@ test("병원 클릭으로 주민별 회복을 보고 저장 후 야간 자동 �
   );
   await expect(ward).toContainText("회복 719/720");
   await canvas.press("j");
-  await button("개발 도구").click();
   const before = await page.getByTestId("timber-clock").textContent();
   await button("5분 진행").click();
   await expect(page.getByTestId("timber-clock")).not.toHaveText(before ?? "");
