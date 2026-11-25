@@ -266,9 +266,11 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
     .getByRole("button", { name: "복홀로 돌아가기", exact: true })
     .click();
   await expect(regionMap).toBeHidden();
-  // 기본 시점 버튼은 개발 도구가 열려 있을 때만 보인다(App.tsx hidden={!toolsOpen}).
-  await tools(page);
-  await page.getByRole("button", { name: "기본 시점", exact: true }).click();
+  // 개발 도구의 「기본 시점」은 창 뒤 어두운 막에 가려 누를 수 없다. 실제 화면의
+  // 미니맵 옆 ⌂(시점을 가운데로) 버튼이 같은 resetCamera를 부른다.
+  await page
+    .getByRole("button", { name: "시점을 가운데로", exact: true })
+    .click();
   await expect(page.getByTestId("camera-distance")).toHaveText("56.00");
   await expect(page.getByTestId("camera-angle")).toHaveText("54.00");
   // 복홀 방 게시판(notice-board)의 현재 위치를 장면에서 읽어 실제로 누른다.
