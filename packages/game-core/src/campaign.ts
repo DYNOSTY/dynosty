@@ -1,3 +1,4 @@
+import { VILLAGE_LAYOUT } from "./bokhol.js";
 import {
   AMOUNT_SCALE,
   COUP_SURVIVAL_HOPE,
@@ -21,6 +22,36 @@ import {
 } from "./timber.js";
 import { deposit, facilityResource, payTown } from "./town.js";
 
+export const departureBuildings: Record<
+  string,
+  { name: string; roof: boolean }
+> = {
+  BLD_WAREHOUSE: { name: "창고", roof: true },
+  BLD_FORAGE: { name: "채집장", roof: false },
+  BLD_GREENHOUSE: { name: "온상 재배소", roof: true },
+  BLD_WATER: { name: "취수장", roof: false },
+  BLD_FISHERY: { name: "어획막", roof: true },
+  BLD_WORKSHOP: { name: "공방", roof: true },
+  BLD_CLINIC: { name: "병원", roof: true },
+  BLD_SALVAGE: { name: "자재 회수장", roof: false },
+};
+function departureFire(random = Math.random) {
+  let point = { x: 0, z: 24 };
+  const losses: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    const choices = VILLAGE_LAYOUT.filter(
+      ([id, x, z]) =>
+        Object.hasOwn(departureBuildings, id) &&
+        !losses.includes(id) &&
+        Math.hypot(x - point.x, z - point.z) <= 24,
+    );
+    const next = choices[Math.floor(random() * choices.length)];
+    if (!next) break;
+    losses.push(next[0]);
+    point = { x: next[1], z: next[2] };
+  }
+  return losses;
+}
 export const CHAPTERS = [
   "복홀의 첫 명령",
   "끊어진 길을 잇다",
@@ -176,6 +207,7 @@ export interface Campaign {
   awakeningSeen?: boolean;
   lastHigh: number;
   difficulty?: Difficulty;
+  openingLosses?: readonly string[];
   pessimismExtremeSince?: number | null;
   optimismZeroSince?: number | null;
   ending: "hope" | "escape" | "order" | "collapse" | null;
@@ -217,6 +249,14 @@ export function campaignValid(c: unknown, elapsed: number) {
   const village = (n: unknown) => integer(n, SETTLEMENTS.length - 1);
   return (
     BEATS.includes(c.beat as Beat) &&
+    (c.openingLosses === undefined ||
+      (Array.isArray(c.openingLosses) &&
+        c.openingLosses.length <= 3 &&
+        new Set(c.openingLosses).size === c.openingLosses.length &&
+        c.openingLosses.every(
+          (id) =>
+            typeof id === "string" && Object.hasOwn(departureBuildings, id),
+        ))) &&
     (c.cargo === undefined ||
       (isRecord(c.cargo) &&
         Object.entries(c.cargo).every(
@@ -568,12 +608,14 @@ export function actCampaign(
       if (action === "next" || isDifficulty(action))
         return change("departure", {
           difficulty: isDifficulty(action) ? action : "normal",
+          openingLosses: departureFire(),
         });
       break;
     case "departure":
       if (action === "leave")
         return {
           ...createVillageGame(false, true),
+          ...(c.openingLosses ? { removedLandmarks: c.openingLosses } : {}),
           processed: s.processed,
           campaign: { ...c, beat: "after" },
         };

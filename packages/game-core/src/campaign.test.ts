@@ -170,7 +170,7 @@ it("남문 세 행렬을 인계한 뒤 같은 복홀에서 공방 연구와 세 
   expect(s.homes).toHaveLength(2);
   expect(s.residents).toHaveLength(60);
   expect(new Set(Object.values(s.world.resources))).toEqual(
-    new Set([1000 * AMOUNT_SCALE, 20 * AMOUNT_SCALE]),
+    new Set([1000 * AMOUNT_SCALE, 200 * AMOUNT_SCALE]),
   );
   s = act(s, "next");
   s = commandTimber(
@@ -615,7 +615,7 @@ it("온돌 연료를 매시간 결제하고 성문 전투 결과와 삽화를 �
   for (const [difficulty, threshold] of [
     ["easy", 0.075],
     ["normal", 0.15],
-    ["hard", 0.75],
+    ["hard", 0.225],
   ] as const) {
     const state = { ...s, campaign: { ...campaignOf(s), difficulty } };
     expect(gateRaid(state, () => threshold)).toBe(state);
@@ -656,7 +656,7 @@ it("영상, 충분한 난방, 연료 부족과 장기 굶주림을 구별한다"
   const hungry = {
     ...s,
     residents: s.residents.map((r, i) =>
-      i === 0 ? { ...r, hunger: 2880 } : r,
+      i === 0 ? { ...r, hunger: 7200 } : r,
     ),
   };
   expect(villageFatalIncident(hungry, () => 0).history.at(-1)?.text).toContain(

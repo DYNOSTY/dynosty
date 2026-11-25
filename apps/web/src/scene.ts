@@ -1,3 +1,4 @@
+import { VILLAGE_LAYOUT } from "@dynosty/game-core";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { createHomePlacementVisual } from "./home-placement-scene.js";
@@ -920,9 +921,20 @@ export function mountScene(
         village.postDecree(decree.title, !!villageState);
       if (!decree && priorDecree) village.clearDecree();
       village.setFireDamage(
-        !!state?.rebuilding,
+        !!state?.rebuilding && !state.campaign?.openingLosses,
         state?.campaign?.beat === "departure",
         state?.removedLandmarks,
+        state?.campaign?.beat === "departure" && state.campaign.openingLosses
+          ? VILLAGE_LAYOUT.filter(([id]) =>
+              state.campaign?.openingLosses?.includes(id),
+            ).map(([id, x, z]) => ({ id, x, z }))
+          : state?.nightFires?.flatMap((f) => {
+              const b =
+                state.homes.find((b) => b.id === f.id) ??
+                state.town.facilities.find((b) => b.id === f.id);
+              return b ? [{ id: b.id, ...b.position }] : [];
+            }),
+        state?.raidFailures === 3,
       );
       villageState = state;
       animationSpeed = state?.speed ?? 1;

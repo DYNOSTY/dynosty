@@ -3,6 +3,7 @@ import {
   BUILDING_RULES,
   CHAPTERS,
   campaignOf,
+  departureBuildings,
   canPay,
   capitalMinutesLeft,
   capitalReady,
@@ -479,7 +480,19 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line(
         "돌쇠",
-        "공자님! 병원 처마에 불이 붙었습니다. 불씨가 공방 지붕으로 넘어갑니다!",
+        c.openingLosses?.length
+          ? "공자님! " +
+              c.openingLosses
+                .map((id, i) => {
+                  const b = departureBuildings[id];
+                  return (
+                    (b?.name ?? "건물") +
+                    (b?.roof ? " 지붕" : "") +
+                    (i === 0 ? "에 불이 붙었습니다!" : " 쪽으로 번집니다!")
+                  );
+                })
+                .join(" ")
+          : "공자님! 병원 처마에 불이 붙었습니다. 불씨가 공방 지붕으로 넘어갑니다!",
       );
       choice("leave", "성문을 열고 남은 장부 확인");
       break;

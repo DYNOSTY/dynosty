@@ -329,6 +329,7 @@ export function createVillage(
   const face = (x: number, z: number) => Math.atan2(-x, -z); // +Z가 마당 쪽
   const permanent = new Map<string, TransformNode>();
   let missing = new Set<string>();
+  let townDestroyed = false;
   const lostQuarter = new Set<TransformNode>();
   let exodusVisible = false;
   let previewResidentsVisible = true;
@@ -344,7 +345,7 @@ export function createVillage(
     ).then((node) => {
       if (node) {
         permanent.set(id, node);
-        node.setEnabled(!missing.has(id));
+        node.setEnabled(!townDestroyed && !missing.has(id));
       }
     }),
   );
@@ -478,6 +479,7 @@ export function createVillage(
   pc.fillRect(0, 0, 64, 64);
   puff.update();
   puff.hasAlpha = true;
+  const incidentFires = new Map<string, ParticleSystem>();
   const fires = [
     [-30, 0],
     [30, -14],
@@ -944,20 +946,40 @@ export function createVillage(
       burned: boolean,
       burning: boolean,
       removed: readonly string[] = [],
+      active: readonly { id: string; x: number; z: number }[] = [],
+      destroyed = false,
     ) {
+      townDestroyed = destroyed;
       missing = new Set(removed);
       if (burned) {
         missing.add("BLD_WORKSHOP");
         missing.add("BLD_CLINIC");
       }
-      for (const [id, node] of permanent) node.setEnabled(!missing.has(id));
+      for (const [id, node] of permanent)
+        node.setEnabled(!destroyed && !missing.has(id));
+      for (const [id, fire] of incidentFires)
+        if (!active.some((b) => b.id === id)) {
+          fire.dispose(false);
+          incidentFires.delete(id);
+        }
+      for (const b of active) {
+        if (incidentFires.has(b.id)) continue;
+        const fire = fires[0]?.clone(
+          "건물 화재-" + b.id,
+          new Vector3(b.x, elevation(b.x, b.z) + 1.2, b.z),
+        );
+        if (fire) {
+          incidentFires.set(b.id, fire);
+          fire.start();
+        }
+      }
       exodusVisible = burning;
       for (const w of walkers)
         if (w.haul) w.node.setEnabled(burning || previewResidentsVisible);
       for (const node of lostQuarter) node.setEnabled(burning);
       for (const fire of fires) {
-        if (burning && !fire.isStarted()) fire.start();
-        if (!burning && fire.isStarted()) fire.stop();
+        if (burning && !active.length && !fire.isStarted()) fire.start();
+        if ((!burning || active.length) && fire.isStarted()) fire.stop();
       }
     },
     setPreviewResidentsVisible(visible: boolean) {
@@ -996,6 +1018,7 @@ export function createVillage(
       ink.dispose();
       paper.dispose();
       plinthMat.dispose();
+      for (const fire of incidentFires.values()) fire.dispose(false);
       for (const fire of fires) fire.dispose(false);
       for (const ps of smokes) ps.dispose();
       for (const p of parties.values())

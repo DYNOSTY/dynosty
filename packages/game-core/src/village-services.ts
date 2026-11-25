@@ -227,8 +227,10 @@ export function mealPlan(
     if (amount > 0) foods[food] = amount;
     remaining -= amount;
   }
+  if (remaining > 0 || portion * 4 - used < portion)
+    return { amount: 0, foods: {}, relief: 0 };
   const amount = Object.values(foods).reduce((a, b) => a + b, 0);
-  return { amount, foods, relief: Math.floor((amount * 360) / rule.portion) };
+  return { amount, foods, relief: 7200 };
 }
 export const rationLimit = (species: string, policy: RationPolicy) =>
   (policy === "cap" ? 25000 : speciesRule(species).portion) * 4;

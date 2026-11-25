@@ -526,7 +526,10 @@ export function TimberDemo({
           />
           <section aria-label="공동 식당" className="village-service">
             <h3>공동 식당</h3>
-            <p>식당 06:00–22:00 · 작업·건설 09:00–18:00</p>
+            <p>
+              식당 주간 06:00–18:00 · 야간 18:00–06:00 (2명 이상 배치) ·
+              작업·건설 09:00–18:00
+            </p>
             <p>
               1배: 게임 1시간 = 실제 1분 · 09~18시 9분 · 건물별 공사 시간 + 자재
               운반
@@ -585,7 +588,7 @@ export function TimberDemo({
                               (f) => f.kind === "restaurant",
                             ) ?? { kind: "restaurant", level: 1 },
                           )
-                        : 2) + 1,
+                        : 4) + 1,
                   },
                   (_, n) => n,
                 ).map((n) => (

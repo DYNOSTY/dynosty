@@ -2,6 +2,7 @@ import {
   BOKHOL_FORESTS,
   BOKHOL_MAP,
   BOKHOL_MINERALS,
+  bokholElevation,
   reservedVillageLand,
 } from "./bokhol.js";
 import { loggingSiteRules, loggingSites, productionSites } from "./logging.js";
@@ -58,6 +59,16 @@ export function rotatedPoint(
       x * Math.sin(p.headingRadians) +
       z * Math.cos(p.headingRadians),
   };
+}
+export function steepFoundation(
+  s: TimberState,
+  samples: readonly GroundPoint[],
+) {
+  const forests = Object.fromEntries(
+    productionSites(s).map((l) => [l.siteId, l.remaining]),
+  );
+  const levels = samples.map((q) => bokholElevation(q.x, q.z, forests));
+  return Math.max(...levels) - Math.min(...levels) > 1;
 }
 type Rectangle = HomePlacement & { halfWidth: number; halfDepth: number };
 export function rectanglesOverlap(a: Rectangle, b: Rectangle): boolean {
@@ -159,7 +170,7 @@ export function homePlacementIssue(
     return "건물 위치와 방향을 확인해 주세요.";
   const protectedLand = reservedVillageLand(
     p.position,
-    !!s.rebuilding,
+    !!s.rebuilding && !s.campaign?.openingLosses,
     s.removedLandmarks,
   );
   if (protectedLand) return protectedLand;
@@ -176,6 +187,8 @@ export function homePlacementIssue(
       ),
     ),
   ];
+  if (steepFoundation(s, samples))
+    return "경사가 가파릅니다. 완만한 터를 골라 주세요.";
   if (
     samples.some(
       (q) =>
