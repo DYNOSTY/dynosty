@@ -3,6 +3,7 @@ import {
   AMOUNT_SCALE,
   createVillageGame,
   requireValue,
+  VILLAGE_RULES,
 } from "../../packages/game-core/dist/index.js";
 import { advanceVillageDay, readVillage } from "./read-village.js";
 import { clickExample, clickNode, EXAMPLE_IDS } from "./scene-picking.js";
@@ -30,6 +31,29 @@ async function tools(page: Page) {
 const shown = (amount: number) =>
   Math.floor(amount / AMOUNT_SCALE).toLocaleString("ko-KR");
 
+async function spendVillageWood(page: Page, before: number) {
+  const worker = page.workers().find((w) => w.url().includes("timber.worker"));
+  if (!worker) throw Error("마을 작업 워커를 찾을 수 없습니다.");
+  await worker.evaluate(() =>
+    self.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "command",
+          id: crypto.randomUUID(),
+          command: {
+            type: "build-home",
+            position: { x: 12, z: 12 },
+            headingRadians: 0,
+          },
+        },
+      }),
+    ),
+  );
+  await expect(stock(page, "RES_WOOD")).toHaveText(
+    shown(before - VILLAGE_RULES.constructionWood * AMOUNT_SCALE),
+  );
+}
+
 test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저장·새로고침 복원", async ({
   page,
 }) => {
@@ -50,44 +74,91 @@ test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저�
   const dayTwo = (await page.evaluate(readVillage)).world.resources;
   for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"] as const)
     await expect(stock(page, id)).toHaveText(shown(dayTwo[id]));
+  const villagePanel = page.getByRole("region", {
+    name: "목재 조달",
+    exact: true,
+  });
+  await expect(villagePanel).toBeHidden();
   await saveMenu(page);
-  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
-  await expect(page.getByTestId("play-save-status")).toHaveText(
-    "게임을 저장했습니다.",
+  await expect(
+    page.getByRole("button", { name: "저장", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "진행 저장", exact: true }).click();
+  await expect(page.getByTestId("timber-save-status")).toHaveText(
+    "마을 진행을 저장했습니다.",
   );
   const first = await page.evaluate(() =>
-    localStorage.getItem("dynosty.play.saves"),
+    localStorage.getItem("dynosty.timber.saves.v17"),
   );
-  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
-  await expect(page.getByTestId("play-save-status")).toHaveText(
-    "게임을 저장했습니다.",
+  await page.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "저장", exact: true }),
+  ).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("j");
+  await expect(
+    page.getByRole("button", { name: "진행 저장", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "저장", exact: true }),
+  ).toHaveAttribute("aria-expanded", "false");
+  await expect(villagePanel).toBeHidden();
+  await advanceVillageDay(page);
+  await expect(page.getByText("3일차", { exact: true })).toBeVisible();
+  // 기본 마을의 식량 표시값은 같을 수 있어 목재를 써서 다른 재고를 만든다.
+  await spendVillageWood(page, dayTwo.RES_WOOD);
+  await saveMenu(page);
+  await page
+    .getByRole("button", { name: "진행 불러오기", exact: true })
+    .click();
+  await expect(page.getByTestId("timber-save-status")).toHaveText(
+    "마을 진행을 불러왔습니다. 일시정지 상태입니다.",
   );
-  // 두 번째 저장은 최근 기록을 직전(previous) 기록으로 옮긴다.
+  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH", "RES_WOOD"] as const)
+    await expect(stock(page, id)).toHaveText(shown(dayTwo[id]));
+  // 캠페인에서 Esc는 일시정지 메뉴를 연다. 저장 창은 「저장 닫기」로 닫는다.
+  await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
+  await expect(villagePanel).toBeHidden();
+  await advanceVillageDay(page);
+  await expect(page.getByText("3일차", { exact: true })).toBeVisible();
+  await spendVillageWood(page, dayTwo.RES_WOOD);
+  const dayThree = (await page.evaluate(readVillage)).world.resources;
+  await page.keyboard.press("j");
+  await page.getByRole("button", { name: "진행 저장", exact: true }).click();
+  await expect(page.getByTestId("timber-save-status")).toHaveText(
+    "마을 진행을 저장했습니다.",
+  );
   const slots = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("dynosty.play.saves") ?? "null"),
+    JSON.parse(localStorage.getItem("dynosty.timber.saves.v17") ?? "null"),
   );
   expect(slots.previous).toEqual(JSON.parse(first ?? "null").current);
   await page
-    .getByRole("button", { name: "이전 게임 불러오기", exact: true })
+    .getByRole("button", { name: "이전 진행 불러오기", exact: true })
     .click();
-  await expect(page.getByTestId("play-save-status")).toHaveText(
-    "게임을 불러왔습니다. 일시정지 상태입니다.",
+  await expect(page.getByTestId("timber-save-status")).toHaveText(
+    "마을 진행을 불러왔습니다. 일시정지 상태입니다.",
   );
+  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH", "RES_WOOD"] as const)
+    await expect(stock(page, id)).toHaveText(shown(dayTwo[id]));
+  await expect
+    .poll(() => page.evaluate(readVillage).then((s) => s.world.day))
+    .toBe(2);
   await page.reload();
   await expect(page.getByTestId("play-scene-status")).toHaveText(
     "3D 준비 완료",
   );
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
-  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH"] as const)
+  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH", "RES_WOOD"] as const)
     await expect(stock(page, id)).toHaveText(shown(dayTwo[id]));
   await saveMenu(page);
   await page
-    .getByRole("button", { name: "게임 불러오기", exact: true })
+    .getByRole("button", { name: "진행 불러오기", exact: true })
     .click();
-  await expect(page.getByTestId("play-save-status")).toHaveText(
-    "게임을 불러왔습니다. 일시정지 상태입니다.",
-  );
-  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  await expect(page.getByText("3일차", { exact: true })).toBeVisible();
+  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH", "RES_WOOD"] as const)
+    await expect(stock(page, id)).toHaveText(shown(dayThree[id]));
   expect(
     await page.evaluate(() => localStorage.getItem("dynosty.example.saves")),
   ).toBe("keep example");
@@ -137,27 +208,33 @@ test("실제 Worker 시간이 흐르고 일시정지·탭 비활성 뒤 수동 �
   ).toBeVisible();
 });
 
-test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존한다", async ({
+test("마을 저장 실패·손상은 현재 마을과 기존 원문을 보존한다", async ({
   page,
 }) => {
   await ready(page);
   await saveMenu(page);
-  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
-  await expect(page.getByTestId("play-save-status")).toHaveText(
-    "게임을 저장했습니다.",
+  await page.getByRole("button", { name: "진행 저장", exact: true }).click();
+  await expect(page.getByTestId("timber-save-status")).toHaveText(
+    "마을 진행을 저장했습니다.",
   );
   const before = await page.evaluate(() =>
-    localStorage.getItem("dynosty.play.saves"),
+    localStorage.getItem("dynosty.timber.saves.v17"),
   );
+  const savedWood = (await page.evaluate(readVillage)).world.resources.RES_WOOD;
+  // 캠페인에서 Esc는 일시정지 메뉴를 연다. 저장 창은 「저장 닫기」로 닫는다.
   await page.getByRole("button", { name: "저장 닫기", exact: true }).click();
   await advanceVillageDay(page);
+  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(readVillage).then((s) => s.world.day))
+    .toBe(2);
+  await spendVillageWood(page, savedWood);
+  const dayTwo = (await page.evaluate(readVillage)).world.resources;
   await saveMenu(page);
-  // 제출본 마을 재고(1,000)는 하루 진행만으로 줄지 않는다. 저장 실패 전후 같은 값을 유지해야 한다.
-  await expect(stock(page)).toHaveText("1,000");
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
     Storage.prototype.setItem = function (k, v) {
-      if (k === "dynosty.play.saves")
+      if (k === "dynosty.timber.saves.v17")
         throw new DOMException("quota", "QuotaExceededError");
       return original.call(this, k, v);
     };
@@ -167,29 +244,33 @@ test("게임 저장 실패·손상은 현재 게임과 기존 원문을 보존�
       },
     });
   });
-  await page.getByRole("button", { name: "게임 저장", exact: true }).click();
+  await page.getByRole("button", { name: "진행 저장", exact: true }).click();
   await expect(
-    page.getByRole("region", { name: "생존 게임 저장" }).getByRole("alert"),
-  ).toContainText("기존 기록은 유지");
+    page.getByRole("alert").filter({ hasText: "기존 기록은 유지" }),
+  ).toBeVisible();
   expect(
-    await page.evaluate(() => localStorage.getItem("dynosty.play.saves")),
+    await page.evaluate(() => localStorage.getItem("dynosty.timber.saves.v17")),
   ).toBe(before);
-  await expect(stock(page)).toHaveText("1,000");
+  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH", "RES_WOOD"] as const)
+    await expect(stock(page, id)).toHaveText(shown(dayTwo[id]));
   await page.evaluate(() =>
     (window as unknown as { restoreWrite: () => void }).restoreWrite(),
   );
   await page.evaluate(() =>
-    localStorage.setItem("dynosty.play.saves", "{broken"),
+    localStorage.setItem("dynosty.timber.saves.v17", "{broken"),
   );
   await page
-    .getByRole("button", { name: "게임 불러오기", exact: true })
+    .getByRole("button", { name: "진행 불러오기", exact: true })
     .click();
   await expect(
-    page.getByRole("region", { name: "생존 게임 저장" }).getByRole("alert"),
-  ).toContainText("손상");
-  await expect(stock(page)).toHaveText("1,000");
+    page.getByRole("alert").filter({ hasText: "마을 저장 기록이 손상" }),
+  ).toBeVisible();
+  await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH", "RES_WOOD"] as const)
+    await expect(stock(page, id)).toHaveText(shown(dayTwo[id]));
   expect(
-    await page.evaluate(() => localStorage.getItem("dynosty.play.saves")),
+    await page.evaluate(() => localStorage.getItem("dynosty.timber.saves.v17")),
   ).toBe("{broken");
 });
 
