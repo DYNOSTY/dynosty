@@ -17,11 +17,12 @@
     "format": "biome check --write .",
     "test": "pnpm --filter @dynosty/game-core build && vitest run",
     "test:e2e": "pnpm --filter @dynosty/game-core build && playwright test",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm run models:check-crowd && pnpm build",
     "db:up": "docker compose --env-file .env.local -f infra/compose.dev.yml up -d --wait",
     "db:down": "docker compose --env-file .env.local -f infra/compose.dev.yml down",
     "db:check": "node --env-file=.env.local scripts/check-db.mjs",
-    "models:optimize": "node scripts/optimize-models.mjs"
+    "models:optimize": "node scripts/optimize-models.mjs",
+    "models:check-crowd": "node art/residents/generate-crowd.mjs --check && node --test art/residents/crowd-models.test.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
