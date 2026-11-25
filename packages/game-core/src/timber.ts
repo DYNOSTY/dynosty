@@ -2234,7 +2234,7 @@ export function parseTimberState(value: unknown): TimberState {
       fail("식당 건설 시각이 일치하지 않습니다.");
     if (build.startedAt !== null) {
       num(build.startedAt);
-      num(build.finishAt, 14430);
+      num(build.finishAt, 144000000 + VILLAGE_RULES.constructionMinutes);
       if (
         build.startedAt > (value.elapsed as number) ||
         ![8, VILLAGE_RULES.constructionMinutes].includes(
