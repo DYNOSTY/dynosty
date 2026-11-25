@@ -3,6 +3,7 @@ import {
   AMOUNT_SCALE,
   createVillageGame,
   requireValue,
+  type TimberCommand,
   VILLAGE_RULES,
 } from "../../packages/game-core/dist/index.js";
 import { advanceVillageDay, readVillage } from "./read-village.js";
@@ -31,24 +32,26 @@ async function tools(page: Page) {
 const shown = (amount: number) =>
   Math.floor(amount / AMOUNT_SCALE).toLocaleString("ko-KR");
 
-async function spendVillageWood(page: Page, before: number) {
+async function villageCommand(page: Page, command: TimberCommand) {
   const worker = page.workers().find((w) => w.url().includes("timber.worker"));
   if (!worker) throw Error("마을 작업 워커를 찾을 수 없습니다.");
-  await worker.evaluate(() =>
-    self.dispatchEvent(
-      new MessageEvent("message", {
-        data: {
-          type: "command",
-          id: crypto.randomUUID(),
-          command: {
-            type: "build-home",
-            position: { x: 12, z: 12 },
-            headingRadians: 0,
-          },
-        },
-      }),
-    ),
+  await worker.evaluate(
+    (cmd) =>
+      self.dispatchEvent(
+        new MessageEvent("message", {
+          data: { type: "command", id: crypto.randomUUID(), command: cmd },
+        }),
+      ),
+    command,
   );
+}
+
+async function spendVillageWood(page: Page, before: number) {
+  await villageCommand(page, {
+    type: "build-home",
+    position: { x: 12, z: 12 },
+    headingRadians: 0,
+  });
   await expect(stock(page, "RES_WOOD")).toHaveText(
     shown(before - VILLAGE_RULES.constructionWood * AMOUNT_SCALE),
   );
@@ -65,8 +68,18 @@ test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저�
   const start = createVillageGame().world.resources;
   for (const id of ["RES_PLANT", "RES_MEAT", "RES_FISH", "RES_COAL"] as const)
     await expect(stock(page, id)).toHaveText(shown(start[id]));
+  await villageCommand(page, { type: "build-restaurant" });
   await advanceVillageDay(page);
   await expect(page.getByText("2일차", { exact: true })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(readVillage).then((s) => s.restaurantBuilt))
+    .toBe(true);
+  await villageCommand(page, { type: "set-restaurant-workers", count: 2 });
+  await expect
+    .poll(() =>
+      page.evaluate(readVillage).then((s) => s.restaurantWorkerTarget),
+    )
+    .toBe(2);
   // 하루 뒤 식성별 재고는 실제 Worker가 자동 저장한 마을 장부와 같다.
   await expect
     .poll(() => page.evaluate(readVillage).then((s) => s.world.day))
@@ -105,7 +118,12 @@ test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저�
   await expect(villagePanel).toBeHidden();
   await advanceVillageDay(page);
   await expect(page.getByText("3일차", { exact: true })).toBeVisible();
-  // 기본 마을의 식량 표시값은 같을 수 있어 목재를 써서 다른 재고를 만든다.
+  // 식당이 운영된 날에는 실제 식량이 줄고, 직전 저장을 불러오면 되돌아와야 한다.
+  await expect
+    .poll(async () =>
+      Number(((await stock(page).textContent()) || "NaN").replaceAll(",", "")),
+    )
+    .toBeLessThan(Math.floor(dayTwo.RES_PLANT / AMOUNT_SCALE));
   await spendVillageWood(page, dayTwo.RES_WOOD);
   await saveMenu(page);
   await page
