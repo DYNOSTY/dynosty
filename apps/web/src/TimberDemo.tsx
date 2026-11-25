@@ -134,8 +134,18 @@ export function TimberDemo({
     if (
       focusSection.label === "교역소 방문" ||
       focusSection.label === "다음 임무"
-    )
-      section?.querySelector("button")?.focus({ preventScroll: true });
+    ) {
+      // 캠페인에서는 입촌 요청이 조달 패널 대신 마을 소식 카드(VillageBulletin)에 뜬다.
+      // 사용자가 표식을 눌러 열었을 때만 여기로 오므로, 카드가 저절로 뜰 때는 초점을 뺏지 않는다.
+      const target =
+        section ??
+        (focusSection.label === "다음 임무"
+          ? document.querySelector<HTMLElement>(
+              '.village-bulletin[aria-label="주민 도착"]',
+            )
+          : null);
+      target?.querySelector("button")?.focus({ preventScroll: true });
+    }
   }, [active, ready, focusSection]);
   const selectedFacility = state?.town.facilities.find(
     (f) => f.sourceId === selectedSiteId,
