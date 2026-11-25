@@ -217,7 +217,8 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText(
     String(120 - VILLAGE_RULES.constructionWood),
   );
-  await expect(page.getByTestId("building-queue")).toContainText("자재 운반");
+  // 공사는 자재 수령 → 자재 운반 → 공사 중 순서다(TownPanel). 일시정지 중이라 첫 단계에 머문다.
+  await expect(page.getByTestId("building-queue")).toContainText("자재 수령");
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
   // 불러온 진행은 일시정지 상태로 시작한다.
   await button(page, "시간 재개").click();
