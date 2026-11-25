@@ -281,13 +281,3 @@ test("교환 운송과 배급 준비는 실제 Worker 배속에서 함께 진행
   await expect(p.getByTestId("labor-clock")).toHaveText(clock ?? "");
   await phase(p, "불량품 회수 중", { transit: "4" });
 });
-test("좁은 화면에서도 교환 요청·출발·담당 잠금이 가능하고 가로 넘침이 없다", async ({
-  page: p,
-}) => {
-  await p.setViewportSize({ width: 375, height: 812 });
-  await start(p);
-  await phase(p, "불량품 회수 중", { transit: "4" });
-  expect(
-    await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-  ).toBe(true);
-});

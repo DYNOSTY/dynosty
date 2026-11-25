@@ -4,7 +4,6 @@ import {
   advancePlayMinutes,
   createExampleSave,
   createInitialState,
-  createPlaySave,
   createPlayScene,
   createPlayState,
   createSceneExample,
@@ -13,7 +12,6 @@ import {
   type GameWorkerMessage,
   type PlayState,
   parseExampleSave,
-  parsePlaySave,
   setPlayPaused,
   supplyFood,
   tickPlay,
@@ -77,21 +75,6 @@ self.onmessage = (event: MessageEvent<GameCommand>) => {
         publishPlay();
         break;
       }
-      case "request-play-save":
-        if (!play) throw new Error("저장할 게임 없음");
-        send({
-          type: "play-save-ready",
-          requestId: event.data.requestId,
-          save: createPlaySave(play),
-        });
-        break;
-      case "load-play":
-        play = setPlayPaused(parsePlaySave(event.data.data).state, true);
-        manualScene = false;
-        lastTick = performance.now();
-        publishPlay();
-        send({ type: "play-loaded", requestId: event.data.requestId });
-        break;
       case "advance-day":
         state = advanceDay(state);
         send({ type: "state", state });
@@ -126,18 +109,6 @@ self.onmessage = (event: MessageEvent<GameCommand>) => {
       }
     }
   } catch {
-    if (
-      event.data.type === "request-play-save" ||
-      event.data.type === "load-play"
-    ) {
-      send({
-        type: "play-save-error",
-        requestId: event.data.requestId,
-        message:
-          "게임 저장을 처리하지 못했습니다. 현재 게임과 기존 기록은 유지됩니다.",
-      });
-      return;
-    }
     if (event.data.type === "play-command") {
       send({
         type: "play-error",
