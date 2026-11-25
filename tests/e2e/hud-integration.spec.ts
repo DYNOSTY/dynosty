@@ -5,7 +5,7 @@ import {
   payTown,
   requireValue,
 } from "../../packages/game-core/dist/index.js";
-import { advanceVillageDay } from "./read-village.js";
+import { advanceVillageDay, advanceVillageMinutes } from "./read-village.js";
 import { clickExample } from "./scene-picking.js";
 import { openCommandConsole, openLaborPanel } from "./workspace.js";
 
@@ -137,9 +137,12 @@ test("지도에 연구가 적용된 정찰 왕복 시간과 귀환을 표시한�
   await expect(
     page.getByRole("button", { name: "갈대나루 정찰 중 · 12시간 남음" }),
   ).toBeVisible();
-  await advanceVillageDay(page);
+  await advanceVillageMinutes(page, 12 * 60);
+  // 오전 9시에 출발한 정찰대가 도착하면 저녁 청원이 먼저 열린다.
+  const petition = page.getByRole("dialog", { name: "배식 줄에서 온 청" });
+  await petition.getByRole("button", { name: "장면 접기" }).click();
   await page.getByRole("button", { name: "남겨 두고 정찰을 마친다" }).click();
-  await advanceVillageDay(page);
+  await advanceVillageMinutes(page, 12 * 60);
   await expect(
     page.getByRole("region", { name: "의뢰", exact: true }),
   ).toContainText("갈대나루 발견");

@@ -634,7 +634,9 @@ test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 �
   const delta = (await counts()).map((n, i) => n - before[i]);
   expect(delta).toEqual([120, 3000, 1500, 1500, 1800]);
   const advance = dialog.getByRole("button", { name: /^다음 대사/ });
-  for (let i = 0; i < 6; i++) {
+  while (
+    !(await dialog.getByText("남문에서 온 짐꾼", { exact: true }).isVisible())
+  ) {
     const label = (await advance.textContent()) ?? "";
     await advance.click();
     await expect(advance).not.toHaveText(label);
@@ -1014,20 +1016,28 @@ test("출문 대화 중 실제 3D 장면에서 불길이 그려진다", async ({
     "3D 준비 완료",
     { timeout: 60_000 },
   );
+  const losses = requireValue(
+    save.state.campaign?.openingLosses,
+    "출문 피해 건물",
+  );
+  expect(losses.length).toBeGreaterThan(0);
   await expect
     .poll(() =>
-      page.evaluate(() => {
+      page.evaluate((ids) => {
         const { __scene } = window as unknown as {
           __scene: {
             particleSystems: { name: string; getActiveCount(): number }[];
           };
         };
-        return __scene.particleSystems
-          .filter((system) => system.name.startsWith("처마 불길-"))
-          .reduce((count, system) => count + system.getActiveCount(), 0);
-      }),
+        return ids.every((id) =>
+          __scene.particleSystems.some(
+            (system) =>
+              system.name === "건물 화재-" + id && system.getActiveCount() > 0,
+          ),
+        );
+      }, losses),
     )
-    .toBeGreaterThan(0);
+    .toBe(true);
 });
 
 test("3D 관아 선택과 해제가 순라 패널에 반영된다", async ({ page }) => {

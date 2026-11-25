@@ -80,6 +80,7 @@ export interface ScenePage {
   laterIllustration?: { from: number; image: string; alt: string };
   lineImages?: Record<number, { image: string; alt: string }>;
   lineIllustration?: { at: number; image: string; alt: string };
+  summitFamily?: { from: number; through: number };
   lines: Line[];
   choices: Choice[];
   auto: boolean;
@@ -953,7 +954,7 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       complete("5단계로 넘어갈까요? · 성문 앞으로");
       break;
-    case "summit":
+    case "summit": {
       page.clip = "five";
       page.music = filmMusic["five"];
       page.title = "두 그릇을 놓고";
@@ -966,6 +967,7 @@ export function campaignPage(s: TimberState): ScenePage {
         "나르미",
         "사람이 늘어 물독부터 봐야겠어요. 취수장과 온상 재배소에 일손을 보내고, 공동 식당에도 배식할 분을 남겨 주세요.",
       );
+      const familyFrom = page.lines.length;
       line(
         "양녕",
         "포야, 혜야. 이제 내려와라. 내 아들들이다. 네 녀석도 봐 두어라. 셋 다 세 번째 행렬에 태웠는데, 이 문까지 온 건 둘뿐이다.",
@@ -983,6 +985,7 @@ export function campaignPage(s: TimberState): ScenePage {
         "양녕",
         "이 백성들은 나의 것이다. 그 같은 일이 또 벌어진다면 내 아들에게 이들을 맡기겠다. 그날은 나도 아버지처럼 홀로 남겠다.",
       );
+      page.summitFamily = { from: familyFrom, through: page.lines.length - 1 };
       if (c.evacuees)
         line(
           "남문에서 온 짐꾼",
@@ -1021,6 +1024,7 @@ export function campaignPage(s: TimberState): ScenePage {
       choice("coexist", "충녕 · 먹는 것과 필요한 양에 맞춰 배급한다");
       choice("control", "양녕 · 식단마다 하루 배급의 상한을 정한다");
       break;
+    }
     case "forecast":
       page.auto = false;
       page.title =

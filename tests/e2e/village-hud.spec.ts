@@ -58,6 +58,8 @@ test("HUD 건설·연구 메뉴와 저장·개발 도구가 같은 마을 진행
   await button("개발 도구 닫기").click();
   await page.screenshot({ path: info.outputPath("village-hud.png") });
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "일시정지" })).toBeVisible();
+  await button("계속하기").click();
   await expect(button("조달")).toBeEnabled();
   expect(errors).toEqual([]);
 });

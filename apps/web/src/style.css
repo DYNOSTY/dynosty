@@ -2272,8 +2272,11 @@ body {
     font-size: 13px;
   }
 
+  .play-shell {
+    --console-height: 190px;
+  }
   .g-console {
-    height: 190px;
+    height: var(--console-height);
     grid-template-columns: 132px 1fr 132px;
     gap: 23px;
     padding: 36px 19px 20px 18px;
@@ -2344,9 +2347,10 @@ body {
 
   /* 의뢰: 판 없이 투명 바탕 + 줄 (글자는 먹색, 눈밭·숲 위에서도 읽히게 옅은 한지 테두리 빛) */
   .g-quests {
+    --quests-top: 76px;
     position: absolute;
     z-index: 2;
-    top: 76px;
+    top: var(--quests-top);
     right: 18px;
     width: 300px;
     margin: 0;
@@ -2357,6 +2361,19 @@ body {
     text-shadow:
       0 0 3px rgb(239 230 210 / 95%),
       0 0 8px rgb(239 230 210 / 80%);
+  }
+  /* 곳간 소식으로 의뢰가 길어져도 마지막 조달 버튼까지 스크롤할 수 있게 한다. */
+  .g-quests:has(.timber-entry-link) {
+    max-height: calc(
+      100% -
+      var(--quests-top) -
+      var(--quests-bottom, 0px) -
+      8px
+    );
+    overflow-y: auto;
+  }
+  .g-quests:has(~ .g-console:not(.console-folded)) {
+    --quests-bottom: var(--console-height);
   }
   .g-quests h2 {
     margin: 0 0 4px;

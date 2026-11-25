@@ -336,7 +336,8 @@ test("다른 숲 권역의 자유 배치 시설과 기존 시설의 자원을 �
     {
       type: "plan-building",
       kind: "logging",
-      position: { x: 41, z: 28 },
+      // 중앙 숲 동쪽의 평탄한 격자점. x=41은 가파른 x=42로 보정된다.
+      position: { x: 40, z: 28 },
       headingRadians: Math.PI,
     },
     "central",
@@ -346,12 +347,10 @@ test("다른 숲 권역의 자유 배치 시설과 기존 시설의 자원을 �
   await loadFixture(page, createTimberSave(s));
   await dev(page);
   await page.getByLabel("작업장 권역", { exact: true }).selectOption("central");
-  await page.getByLabel("작업 인원", { exact: true }).selectOption("2");
-  for (let i = 0; i < 30; i++) {
-    const before = await page.getByTestId("timber-clock").textContent();
-    await button(page, "5분 진행").click();
-    await expect(page.getByTestId("timber-clock")).not.toHaveText(before ?? "");
-  }
+  const workers = page.getByLabel("작업 인원", { exact: true });
+  await workers.selectOption("2");
+  await expect(workers).toHaveValue("2");
+  await advanceVillageMinutes(page, 150);
   await expect(page.getByTestId("logging-panel")).toContainText(
     /누적 입고 [1-9]/,
   );
@@ -433,8 +432,9 @@ test("검사 명령 없이 허기 요구가 생기고 식당을 건설하면 각
   if (!point)
     throw new Error("식당을 배치할 평탄한 빈 부지를 찾지 못했습니다.");
   await page.mouse.click(point.x, point.y);
+  // 새 식당은 주야 교대를 위해 운영 인원 4명으로 시작한다.
   await expect(page.getByLabel("식당 운영 인원", { exact: true })).toHaveValue(
-    "2",
+    "4",
     { timeout: 30_000 },
   );
   await expect(page.getByTestId("restaurant-status")).toHaveText("영업 중", {

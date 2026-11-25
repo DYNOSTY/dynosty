@@ -480,19 +480,13 @@ export function createVillage(
   puff.update();
   puff.hasAlpha = true;
   const incidentFires = new Map<string, ParticleSystem>();
-  const fires = [
-    [-30, 0],
-    [30, -14],
-    [-8, -20],
-    [16, 0],
-    [-10, -8],
-  ].map(([x = 0, z = 0], i) => {
-    const fire = new ParticleSystem("처마 불길-" + i, 90, scene);
+  function createFire(name: string, emitter: Vector3) {
+    const fire = new ParticleSystem(name, 90, scene);
     fire.particleTexture = puff;
     fire.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     fire.minScaleY = 1.2;
     fire.maxScaleY = 1.9;
-    fire.emitter = new Vector3(x, elevation(x, z) + 1.8, z);
+    fire.emitter = emitter;
     fire.minEmitBox = new Vector3(-1, 0, -0.5);
     fire.maxEmitBox = new Vector3(1, 0, 0.5);
     fire.direction1 = new Vector3(-0.4, 1.8, -0.2);
@@ -507,7 +501,16 @@ export function createVillage(
     fire.addColorGradient(0.72, new Color4(0.24, 0.17, 0.14, 0.64));
     fire.addColorGradient(1, new Color4(0.18, 0.17, 0.16, 0));
     return fire;
-  });
+  }
+  const fires = [
+    [-30, 0],
+    [30, -14],
+    [-8, -20],
+    [16, 0],
+    [-10, -8],
+  ].map(([x = 0, z = 0], i) =>
+    createFire("처마 불길-" + i, new Vector3(x, elevation(x, z) + 1.8, z)),
+  );
   const CHIMNEY: Record<string, number> = {
     BLD_OFFICE: 2.5,
     BLD_WORKSHOP: 3,
@@ -964,14 +967,13 @@ export function createVillage(
         }
       for (const b of active) {
         if (incidentFires.has(b.id)) continue;
-        const fire = fires[0]?.clone(
+        // DynamicTexture.clone()은 그려 둔 픽셀을 복사하지 않으므로 원본을 공유한다.
+        const fire = createFire(
           "건물 화재-" + b.id,
           new Vector3(b.x, elevation(b.x, b.z) + 1.2, b.z),
         );
-        if (fire) {
-          incidentFires.set(b.id, fire);
-          fire.start();
-        }
+        incidentFires.set(b.id, fire);
+        fire.start();
       }
       exodusVisible = burning;
       for (const w of walkers)

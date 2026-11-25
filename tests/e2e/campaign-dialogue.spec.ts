@@ -40,6 +40,11 @@ test("5단계 컷씬과 성안 변종 없는 반란을 이어 본다", async ({ 
   // A resumed summit starts at the meeting. The stage introduction plays on entry.
   await expect(dialog).toContainText("마지막 수레에 어린 것들이 타고 있어요");
   await dialog.getByRole("button", { name: /^다음 대사/ }).click();
+  await expect(dialog).toContainText("사람이 늘어 물독부터 봐야겠어요");
+  await expect(
+    dialog.getByRole("region", { name: "두 왕자의 인사" }),
+  ).toHaveCount(0);
+  await dialog.getByRole("button", { name: /^다음 대사/ }).click();
   const family = dialog.getByRole("img", { name: /포와 혜/ });
   await expect
     .poll(() => family.evaluate((el) => (el as HTMLImageElement).naturalWidth))
