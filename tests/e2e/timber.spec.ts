@@ -5,6 +5,7 @@ import {
   commandTimber,
   createTimberSave,
   createTimberState,
+  homePlacementIssue,
   loggingSite,
   productionSiteDefinition,
   RESIDENT_REQUEST_TEXT,
@@ -114,6 +115,47 @@ async function homeCursor(
   await page.mouse.move(point.x, point.y);
   return point;
 }
+// 기존 둥지와 겹치지만 둥지 모델 위는 아닌 바닥 지점을 고른다. 배치 중 둥지 모델을 누르면
+// 배치를 취소하고 그 둥지를 선택하는 것이 의도된 동작이다(scene.ts observeSceneClicks).
+async function overlapCursor(
+  page: Page,
+  s: ReturnType<typeof createTimberState>,
+  home: { x: number; z: number },
+) {
+  const offsets = [-3, -2.4, 2.4, 3].flatMap((dx) =>
+    [-3, -2.4, 0, 2.4, 3].map((dz) => [dx, dz] as const),
+  );
+  for (const [dx, dz] of [...offsets, [0, 3] as const, [0, -3] as const]) {
+    const position = { x: home.x + dx, z: home.z + dz };
+    if (
+      !homePlacementIssue(s, { position, headingRadians: Math.PI })?.includes(
+        "겹",
+      )
+    )
+      continue;
+    const point = await homeCursor(page, position.x, position.z);
+    const onBuilding = await page.locator("canvas").evaluate((el, p) => {
+      type N = { id: string; parent: N | null };
+      const scene = (
+        window as unknown as {
+          __scene: { pick(x: number, y: number): { pickedMesh: N | null } };
+        }
+      ).__scene;
+      const r = el.getBoundingClientRect();
+      let n = scene.pick(p.x - r.left, p.y - r.top)?.pickedMesh ?? null;
+      while (n) {
+        if (/^(example-building-|dwelling-|town:|village:)/.test(n.id))
+          return true;
+        n = n.parent;
+      }
+      return false;
+    }, point);
+    if (!onBuilding) return point;
+  }
+  throw new Error(
+    "둥지와 겹치면서 모델에 가리지 않는 바닥 지점을 찾지 못했습니다.",
+  );
+}
 async function contract(page: Page, offer = "B") {
   await button(page, `제안 ${offer} 선택`).click();
   await button(page, "선택한 제안 계약").click();
@@ -151,9 +193,9 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   await loadFixture(page, createTimberSave(s));
   await dev(page);
   await button(page, nestButton).click();
-  // 중앙 광장(0, -1)은 이제 별도 사유로 막힌다. 첫 둥지(-6, -2) 자리에 그대로 겹치게 둔다.
-  // 배치 미리보기 중에는 포인터가 미리보기로 가므로 둥지 중심(game-core 기준 '다른 건물과 겹치는 자리')을 쓴다.
-  const invalid = await homeCursor(page, -6, -2);
+  // 중앙 광장(0, -1)은 별도 사유로 막힌다. 첫 둥지 옆 바닥에서 겹침을 확인한다.
+  const first = s.homes[0]?.position ?? { x: -6, z: -2 };
+  const invalid = await overlapCursor(page, s, first);
   await expect(page.getByTestId("home-placement-status")).toContainText("겹");
   await page.mouse.click(invalid.x, invalid.y);
   await expect(page.getByTestId("housing-status")).toContainText("둥지 6곳");
