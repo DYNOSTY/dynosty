@@ -18,6 +18,11 @@ import {
   warehouseDoor,
   workplaceOpen,
 } from "@dynosty/game-core";
+import { buildStage } from "./build-stage.js";
+import {
+  createBuildStageVisual,
+  HOME_BUILD_SCALE,
+} from "./build-stage-visual.js";
 import { createLoggingVisual } from "./logging-scene.js";
 import { terrainElevation } from "./terrain.js";
 
@@ -112,6 +117,7 @@ export function createTimberVisual(scene: Scene) {
   mealTable.material = dry;
   parts.push(mealTable);
   const buildSite = new TransformNode("village-construction", scene);
+  const fallbackParts: typeof parts = [];
   const foundation = CreateBox(
     "village-construction-foundation",
     { width: 2.4, height: 0.1, depth: 2 },
@@ -120,7 +126,7 @@ export function createTimberVisual(scene: Scene) {
   foundation.parent = buildSite;
   foundation.position.y = 0.05;
   foundation.material = brown;
-  parts.push(foundation);
+  fallbackParts.push(foundation);
   for (const x of [-1, 1])
     for (const z of [-0.8, 0.8]) {
       const post = CreateBox(
@@ -131,8 +137,18 @@ export function createTimberVisual(scene: Scene) {
       post.parent = buildSite;
       post.position.set(x, 0.6, z);
       post.material = brown;
-      parts.push(post);
+      fallbackParts.push(post);
     }
+  for (const mesh of fallbackParts) mesh.isPickable = false;
+  const stageVisual = createBuildStageVisual(
+    scene,
+    buildSite,
+    "village-construction",
+    HOME_BUILD_SCALE,
+    (show) => {
+      for (const mesh of fallbackParts) mesh.setEnabled(show);
+    },
+  );
   const tool = CreateBox(
     "timber-build-tool",
     { width: 0.08, height: 0.5, depth: 0.08 },
@@ -257,6 +273,14 @@ export function createTimberVisual(scene: Scene) {
       for (const m of parts) m.setEnabled(active);
       buildSite.setEnabled(s !== null && s.construction !== null);
       buildSite.rotation.y = s?.construction?.headingRadians ?? 0;
+      if (s?.construction) {
+        const { startedAt, finishAt } = s.construction;
+        const progress =
+          startedAt === null || finishAt === null || finishAt <= startedAt
+            ? 0
+            : (s.elapsed - startedAt) / (finishAt - startedAt);
+        stageVisual.update(buildStage(progress));
+      }
       for (let i = 0; i < 3; i++) {
         const w = s?.construction?.crew?.[i],
           r = w?.id ? scene.getMeshById(w.id) : null;
@@ -445,6 +469,7 @@ export function createTimberVisual(scene: Scene) {
       for (const { cart } of convoyCarts) cart.dispose();
       loggingVisual.dispose();
       handles.dispose();
+      stageVisual.dispose();
       buildSite.dispose();
       for (const m of parts) m.dispose();
       for (const m of [brown, wet, dry, hole]) m.dispose();

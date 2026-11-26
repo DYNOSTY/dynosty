@@ -9,9 +9,15 @@ import {
   BOKHOL_WATERS,
   facilityDoor,
   isMechanical,
+  orderWork,
   type TimberState,
   townShiftOpen,
 } from "@dynosty/game-core";
+import { buildStage } from "./build-stage.js";
+import {
+  createBuildStageVisual,
+  TOWN_BUILD_SCALE,
+} from "./build-stage-visual.js";
 import { facilityModel } from "./facility-model.js";
 import { buildModel, type ModelVisual } from "./model-assets.js";
 import { terrainElevation } from "./terrain.js";
@@ -60,7 +66,12 @@ export function createTownVisual(scene: Scene) {
   });
   const objects = new Map<
     string,
-    { root: Mesh; visual: ModelVisual | null; level: number }
+    {
+      root: Mesh;
+      visual: ModelVisual | null;
+      level: number;
+      stageVisual: ReturnType<typeof createBuildStageVisual> | null;
+    }
   >();
   const hammers = new Map<Mesh, { actor: AbstractMesh; pitch: number }>();
   let paused = true;
@@ -150,6 +161,7 @@ export function createTownVisual(scene: Scene) {
       for (const [id, o] of objects)
         if (!items.some((f) => f.id === id)) {
           o.visual?.dispose();
+          o.stageVisual?.dispose();
           o.root.dispose();
           objects.delete(id);
         }
@@ -157,14 +169,22 @@ export function createTownVisual(scene: Scene) {
         let o = objects.get(f.id);
         const pending = !!s?.town.orders.some((q) => q.id === f.id);
         if (!o) {
-          const root = CreateBox(`town:${f.id}`, { size: 1 }, scene);
+          const root = CreateBox(
+            `town:${f.id}`,
+            { width: 4, height: 0.1, depth: 4 },
+            scene,
+          );
           root.metadata = { townTarget: root.id };
           root.material = mat;
           root.isVisible = false;
-          o = { root, visual: null, level: 0 };
+          o = { root, visual: null, level: 0, stageVisual: null };
           objects.set(f.id, o);
         }
         const level = "level" in f ? f.level : 1;
+        if (!pending && o.stageVisual) {
+          o.stageVisual.dispose();
+          o.stageVisual = null;
+        }
         if (!pending && (!o.visual || o.level !== level)) {
           o.visual?.dispose();
           o.visual = buildModel(
@@ -175,13 +195,30 @@ export function createTownVisual(scene: Scene) {
           );
           o.level = level;
         }
-        if (pending && !o.visual) {
-          o.root.isVisible = true;
-          o.root.scaling.set(4, 0.1, 4);
+        if (pending) {
+          o.visual?.dispose();
+          o.visual = null;
+          if (!o.stageVisual) {
+            const root = o.root;
+            o.stageVisual = createBuildStageVisual(
+              scene,
+              root,
+              `town:${f.id}`,
+              TOWN_BUILD_SCALE,
+              (show) => {
+                root.isVisible = show;
+              },
+              -0.05,
+            );
+          }
+          if ("workDone" in f)
+            o.stageVisual.update(
+              buildStage(f.stage === "build" ? f.workDone / orderWork(f) : 0),
+            );
         } else {
           o.root.isVisible = false;
-          o.root.scaling.setAll(1);
         }
+        o.root.scaling.setAll(1);
         o.root.position.set(
           f.position.x,
           terrainElevation(s)(f.position.x, f.position.z) +
@@ -198,6 +235,7 @@ export function createTownVisual(scene: Scene) {
       for (const mesh of props.values()) mesh.dispose();
       for (const o of objects.values()) {
         o.visual?.dispose();
+        o.stageVisual?.dispose();
         o.root.dispose();
       }
       for (const p of ponds) {
