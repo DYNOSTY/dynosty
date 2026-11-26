@@ -59,6 +59,7 @@ import {
   loggingSiteRules,
   loggingSites,
   loggingValid,
+  loggingWorkId,
   loggingWorkplace,
   productionSites,
   setLoggingSite,
@@ -5042,6 +5043,41 @@ export function residentIndoors(s: TimberState, r: VillageResident): boolean {
     Math.hypot(r.position.x - goal.x, r.position.z - goal.z) < 0.01
   );
 }
+function residentJige(s: TimberState, r: VillageResident) {
+  const site = r.workplaceId?.startsWith("logging")
+    ? productionSites(s).find((l) => loggingWorkId(l.siteId) === r.workplaceId)
+    : undefined;
+  const facility = r.workplaceId?.startsWith("facility:")
+    ? s.town.facilities.find((f) => `facility:${f.id}` === r.workplaceId)
+    : undefined;
+  const kind =
+    site && productionSiteDefinition(site.siteId).kind === "forest"
+      ? ("wood" as const)
+      : facility?.kind === "farm"
+        ? ("plant" as const)
+        : facility?.kind === "fishery"
+          ? ("fish" as const)
+          : undefined;
+  if (!kind) return undefined;
+  const workplace = site
+    ? loggingWorkplace(s, r.id)
+    : facility
+      ? facilityDoor(facility)
+      : null;
+  if (!workplace) return undefined;
+  return {
+    kind,
+    loaded:
+      !workplaceOpen(s.world.minute) &&
+      (r.routine === "home" || r.routine === "restaurant") &&
+      Math.hypot(r.position.x - workplace.x, r.position.z - workplace.z) >=
+        0.01,
+  };
+}
+function jigeField(s: TimberState, r: VillageResident) {
+  const jige = residentJige(s, r);
+  return jige ? { jige } : {};
+}
 export function timberScene(s: TimberState): SceneSnapshot {
   return {
     schemaVersion: 1,
@@ -5076,6 +5112,7 @@ export function timberScene(s: TimberState): SceneSnapshot {
           !residentIndoors(s, r),
         indoors: residentIndoors(s, r) && r.health !== "dead",
         needsHelp: r.request !== null && r.request !== "waiting-seat",
+        ...jigeField(s, r),
         motion:
           productionSites(s).some(
             (l) =>
