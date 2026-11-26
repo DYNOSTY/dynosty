@@ -27,6 +27,7 @@ import {
   upgradeResearch,
   upgradeTarget,
 } from "./development.js";
+import { FUEL_YARD_RECT, fuelYardShown } from "./fuel-yard.js";
 import {
   clearBuildingFootprint,
   type HomePlacement,
@@ -414,6 +415,8 @@ export function buildingIssue(
   );
   if (protectedLand) return protectedLand;
   const rect = { ...p, halfWidth: 2.25, halfDepth: 2.25 };
+  if (fuelYardShown(s) && rectanglesOverlap(rect, FUEL_YARD_RECT))
+    return "연료 더미와 겹쳐요.";
   const samples = [-1, 0, 1].flatMap((x) =>
     [-1, 0, 1].map((z) => rotatedPoint(p, x * 2.25, z * 2.25)),
   );

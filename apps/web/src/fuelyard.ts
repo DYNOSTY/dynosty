@@ -5,13 +5,10 @@ import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
+import { FUEL_YARD_COAL, FUEL_YARD_WOOD } from "@dynosty/game-core";
 import { loadSceneAsset } from "./scene-assets.js";
 import { elevation, rng } from "./world.js";
 
-/** 장작 더미 · 석탄 더미 자리. 박찬님 원본은 온돌 앞 큰길 양옆(±3.9, -4.6)이었지만
- * 지금 마을에서는 둥지·주민 줄과 겹쳐 창고(BLD_WAREHOUSE, -16, 2) 서쪽 빈 땅으로 옮김 */
-export const WOOD_AT = { x: -22, z: 8 };
-export const COAL_AT = { x: -22, z: 10 };
 const LOG_ROWS = 6;
 const LOGS_PER_ROW = 6;
 /** 목재 몇 개당 장작 한 토막 */
@@ -69,9 +66,11 @@ export function createFuelYard(scene: Scene, worldRoot?: TransformNode) {
       for (let row = 0; row < LOG_ROWS; row++) {
         const n = LOGS_PER_ROW - (row % 2);
         for (let i = 0; i < n; i++) {
-          const x = WOOD_AT.x + (i - (n - 1) / 2) * 0.23 + (r() - 0.5) * 0.02;
-          const z = WOOD_AT.z + (r() - 0.5) * 0.08;
-          const y = elevation(WOOD_AT.x, WOOD_AT.z) + 0.11 + row * 0.2;
+          const x =
+            FUEL_YARD_WOOD.x + (i - (n - 1) / 2) * 0.23 + (r() - 0.5) * 0.02;
+          const z = FUEL_YARD_WOOD.z + (r() - 0.5) * 0.08;
+          const y =
+            elevation(FUEL_YARD_WOOD.x, FUEL_YARD_WOOD.z) + 0.11 + row * 0.2;
           const roll = Quaternion.RotationYawPitchRoll(
             (r() - 0.5) * 0.06,
             0,
@@ -93,7 +92,7 @@ export function createFuelYard(scene: Scene, worldRoot?: TransformNode) {
     const chunks = await Promise.all(
       [0, 1, 2].map((k) => part(`FUEL_COAL_${k}`)),
     );
-    const base = elevation(COAL_AT.x, COAL_AT.z);
+    const base = elevation(FUEL_YARD_COAL.x, FUEL_YARD_COAL.z);
     for (let k = 0; k < COAL_CHUNKS; k++) {
       const t = k / COAL_CHUNKS;
       const radius = 0.7 * (1 - t) ** 0.85;
@@ -105,9 +104,9 @@ export function createFuelYard(scene: Scene, worldRoot?: TransformNode) {
           new Vector3(1, 1, 1).scale(0.9 + r() * 0.5),
           Quaternion.RotationYawPitchRoll(r() * 6.28, r() * 6.28, r() * 6.28),
           new Vector3(
-            COAL_AT.x + Math.cos(a) * radius,
+            FUEL_YARD_COAL.x + Math.cos(a) * radius,
             base + 0.05 + t * 0.95,
-            COAL_AT.z + Math.sin(a) * radius,
+            FUEL_YARD_COAL.z + Math.sin(a) * radius,
           ),
         ),
         false,
