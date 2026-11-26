@@ -44,11 +44,12 @@ const RESIDENT_HEIGHT: Record<string, [number, number]> = {
   R12_Protoceratops: [0.6, 2.28],
   GORI: [0.94, 2.15],
 };
+// 관아(0, -16) 바로 앞 빈터. 둥지(-4,-10)·(4,-10)와 줄 선 주민 사이를 피한다(Windows GPU 위에서 본 시점으로 확인).
 const GORI_ROUTE = [
-  [4, -10],
-  [7, -11.2],
-  [6, -12.6],
-  [4.6, -11.6],
+  [-1.5, -12],
+  [1.5, -12],
+  [1.5, -13],
+  [-1.5, -13],
 ] as const;
 const RESIDENTS = [
   "R01_Pachycephalosaurus",
