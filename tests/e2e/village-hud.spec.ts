@@ -199,15 +199,19 @@ test("배치 중 완공된 식당을 눌러도 배치가 유지되고, 취소한
   const rect = requireValue(await canvas.boundingBox(), "화면 위치");
   const restaurant = { x: rect.width / 2, y: rect.height / 2 - 10 };
   const info = page.getByRole("region", { name: "선택 정보" });
-  const placing = page.getByTestId("home-placement-status");
-  // 배치 중 클릭은 그 자리에 짓기를 시도한다. 식당 위는 겹치므로 배치가 유지된다.
+  // 하단 건물 목록으로 시작한 배치는 상태를 목록 안 <output>에 보여 준다.
+  const placing = page
+    .getByRole("region", { name: "건물 목록" })
+    .locator("output");
+  // 배치 중 클릭은 그 자리에 짓기를 시도한다. 식당 위는 지을 수 없으므로 배치가 유지된다.
   await canvas.click({ position: restaurant });
-  await expect(placing).toBeVisible();
-  await expect(placing).toContainText("겹");
+  await expect(placing).toContainText("온돌 둥지 ·");
+  await expect(placing).toContainText("방향");
+  await expect(placing).not.toContainText("배치 가능");
   await expect(info.filter({ hasText: "공동 식당" })).toHaveCount(0);
   // 배치를 취소한 뒤 같은 자리를 누르면 식당 정보가 열린다.
   await page.keyboard.press("Escape");
-  await expect(placing).toHaveCount(0);
+  await expect(placing).toContainText("건물 배치를 취소했습니다.");
   await canvas.click({ position: restaurant });
   await expect(info).toContainText("공동 식당");
   await expect(info).toContainText("완공 시설 · 1단계");
