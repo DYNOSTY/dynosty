@@ -42,7 +42,8 @@ const RESIDENT_HEIGHT: Record<string, [number, number]> = {
   R09_Oviraptor: [0.78, 3.49],
   R04_Ankylosaurus: [0.75, 2.45],
   R12_Protoceratops: [0.6, 2.28],
-  GORI: [0.94, 2.15],
+  // 박찬님 기준: 같은 몸꼴(R09) 주민의 1.2배. 지금 마을의 벨로키랍토르 옆에서 0.9배로 보여 1.33배 키움(Windows GPU 사진 대조).
+  GORI: [1.25, 2.15],
 };
 // 관아(0, -16) 바로 앞 빈터. 둥지(-4,-10)·(4,-10)와 줄 선 주민 사이를 피한다(Windows GPU 위에서 본 시점으로 확인).
 const GORI_ROUTE = [

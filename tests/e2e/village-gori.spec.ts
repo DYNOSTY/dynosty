@@ -34,7 +34,7 @@ test("복홀에서 고리를 선택하면 정보와 초상이 보인다", async 
       }),
     )
     .toBe(true);
-  // 고리는 키 약 0.94m라 마을 전체 시점에서는 몇 픽셀뿐이다. 플레이어처럼 가까이 당겨 본다.
+  // 고리는 키 약 1.25m라 마을 전체 시점에서는 몇 픽셀뿐이다. 플레이어처럼 가까이 당겨 본다.
   await page.evaluate(() => {
     const scene = (
       window as unknown as {
