@@ -167,9 +167,21 @@ test("자동 시간 tick도 진행량을 갱신하고 일시정지하면 같은 
     )
     .toBeGreaterThan(0);
   await b(p, "일손 일시정지").click();
-  const raw = await p
-    .getByRole("progressbar", { name: "검수대 전량 검사", exact: true })
-    .getAttribute("value");
+  // 일시정지 명령이 Worker에 닿기 전 마지막 tick이 올 수 있다. 값이 멈춘 뒤 기준을 잡는다.
+  const bar = p.getByRole("progressbar", {
+    name: "검수대 전량 검사",
+    exact: true,
+  });
+  let raw = await bar.getAttribute("value");
+  await expect
+    .poll(async () => {
+      await p.waitForTimeout(700);
+      const next = await bar.getAttribute("value");
+      const settled = next === raw;
+      raw = next;
+      return settled;
+    })
+    .toBe(true);
   await p.waitForTimeout(1300);
   await expect(
     p.getByRole("progressbar", { name: "검수대 전량 검사", exact: true }),
