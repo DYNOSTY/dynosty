@@ -6,7 +6,7 @@ import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
@@ -25,6 +25,16 @@ import { elevation, rng, type Season } from "./world.js";
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
 export const BUILDING_SCALE = 0.75; // 둥지 지붕 1.85m = 목재 체험 보수 표시 높이
 export const RESIDENT_SCALE = 0.75;
+
+/** 이동 거리 중 실제로 지난 비율만큼 발자국을 표시한다. */
+export function scoutTrailCount(
+  steps: number,
+  elapsed: number,
+  travel: number,
+) {
+  if (travel <= 0) return elapsed >= 0 ? steps : 0;
+  return Math.floor(steps * Math.max(0, Math.min(1, elapsed / travel)));
+}
 const OUTLINE = new Color3(0.3, 0.9, 1); // 현장과 대표 모델의 공통 선택색
 
 export { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
@@ -674,16 +684,96 @@ export function createVillage(
     }>;
     from: Vector3;
     to: Vector3;
+    trail: Mesh;
+    steps: number;
+    shown: number;
+    flag?: Mesh;
   };
   const parties = new Map<string, Party>();
+  const stepMat = new StandardMaterial("scout-step", scene);
+  stepMat.diffuseColor = new Color3(0.5, 0.57, 0.7);
+  stepMat.specularColor = Color3.Black();
+  const poleMat = new StandardMaterial("scout-flag-pole", scene);
+  poleMat.diffuseColor = new Color3(0.3, 0.22, 0.15);
+  poleMat.specularColor = Color3.Black();
+  const flagMat = new StandardMaterial("scout-flag", scene);
+  flagMat.diffuseColor = new Color3(0.72, 0.16, 0.12);
+  flagMat.emissiveColor = new Color3(0.3, 0.06, 0.05);
+  flagMat.specularColor = Color3.Black();
+  function layTrail(id: string, from: Vector3, to: Vector3) {
+    const mesh = CreateBox(
+      `scout-trail-${id}`,
+      { width: 0.2, height: 0.03, depth: 0.34 },
+      scene,
+    );
+    mesh.material = stepMat;
+    mesh.isPickable = false;
+    mesh.isVisible = false;
+    mesh.parent = worldRoot ?? null;
+    const dx = to.x - from.x,
+      dz = to.z - from.z,
+      len = Math.hypot(dx, dz) || 1;
+    const steps = Math.max(1, Math.floor(len / 0.7));
+    const buf = new Float32Array(steps * 16);
+    const q = Quaternion.RotationYawPitchRoll(Math.atan2(dx, dz), 0, 0);
+    for (let i = 0; i < steps; i++) {
+      const t = (i + 0.5) / steps;
+      const side = (i % 2 ? 0.22 : -0.22) + (i % 4 < 2 ? 0.9 : -0.9);
+      const x = from.x + dx * t - (dz / len) * side,
+        z = from.z + dz * t + (dx / len) * side;
+      Matrix.Compose(
+        Vector3.One(),
+        q,
+        new Vector3(x, elevation(x, z) + 0.03, z),
+      ).copyToArray(buf, i * 16);
+    }
+    mesh.thinInstanceSetBuffer("matrix", buf, 16, true);
+    mesh.thinInstanceCount = 0;
+    return { trail: mesh, steps };
+  }
+  function raiseFlag(on: TransformNode) {
+    // 박찬님 원본 값 그대로(주민 모델 단위). 주민 노드가 배율로 커지므로 깃발도 정찰병 키에 비례한다.
+    const pole = CreateBox(
+      "scout-flag-pole",
+      {
+        width: 0.07,
+        height: 2.6,
+        depth: 0.07,
+      },
+      scene,
+    );
+    pole.material = poleMat;
+    pole.isPickable = false;
+    pole.parent = on;
+    pole.position.set(0.3, 1.3, -0.1);
+    const cloth = CreateBox(
+      "scout-flag",
+      {
+        width: 0.95,
+        height: 0.55,
+        depth: 0.03,
+      },
+      scene,
+    );
+    cloth.bakeTransformIntoVertices(Matrix.Translation(0.5, 0, 0));
+    cloth.material = flagMat;
+    cloth.isPickable = false;
+    cloth.parent = pole;
+    cloth.position.y = 0.95;
+    return cloth;
+  }
+  function dropParty(p: Party) {
+    for (const mb of p.members) {
+      mb.dispose();
+      mb.node.dispose();
+    }
+    p.trail.dispose();
+  }
   async function setMissions(list: Mission[]) {
     const ids = new Set(list.map((m) => m.id));
     for (const [id, p] of parties)
       if (!ids.has(id)) {
-        for (const mb of p.members) {
-          mb.dispose();
-          mb.node.dispose();
-        }
+        dropParty(p);
         parties.delete(id);
       }
     for (const m of list) {
@@ -693,11 +783,17 @@ export function createVillage(
         continue;
       }
       const dir = new Vector3(m.x, 0, m.z).normalize();
+      // 박찬님 원본은 마을 중심 9.5m에서 출발했지만 지금 마을은 둥지(6~13m)·시설(15~27m)이 그 길을 막아
+      // 정찰대와 깃발이 지붕을 뚫고 지나갔다 → 시설 고리(최대 25.5m) 밖 26m에서 출발한다.
+      const from = dir.scale(26);
+      const to = new Vector3(m.x, 0, m.z).subtract(dir.scale(4));
       const party: Party = {
         m,
         members: [],
-        from: dir.scale(9.5),
-        to: new Vector3(m.x, 0, m.z).subtract(dir.scale(4)),
+        from,
+        to,
+        ...layTrail(m.id, from, to),
+        shown: -1,
       };
       parties.set(m.id, party);
       for (const [k, file] of [
@@ -722,6 +818,7 @@ export function createVillage(
           dispose: v.dispose,
           side: k ? -0.9 : 0.9,
         });
+        if (k === 0) party.flag = raiseFlag(node);
       }
     }
   }
@@ -732,6 +829,13 @@ export function createVillage(
         e = gameMin - p.m.start;
       const dist = Vector3.Distance(p.from, p.to);
       const travel = Math.min(total / 2, dist * 6.25); // 1초=게임 10분, 걸음 1.6m/s
+      const count = scoutTrailCount(p.steps, e, travel);
+      if (count !== p.shown) {
+        p.shown = count;
+        p.trail.thinInstanceCount = count;
+        p.trail.isVisible = count > 0;
+      }
+      if (p.flag) p.flag.rotation.y = 0.35 * Math.sin(performance.now() / 260);
       let t = -1,
         out = true;
       if (e >= 0 && e < travel) t = e / travel;
@@ -1096,11 +1200,7 @@ export function createVillage(
     partyPoints,
     resetScouting() {
       scoutGeneration++;
-      for (const party of parties.values())
-        for (const member of party.members) {
-          member.dispose();
-          member.node.dispose();
-        }
+      for (const party of parties.values()) dropParty(party);
       parties.clear();
       for (const visual of landmarkVisuals.values()) {
         visual.dispose();
@@ -1120,12 +1220,11 @@ export function createVillage(
       for (const fire of incidentFires.values()) fire.dispose(false);
       for (const fire of fires) fire.dispose(false);
       for (const ps of smokes) ps.dispose();
-      for (const p of parties.values())
-        for (const mb of p.members) {
-          mb.dispose();
-          mb.node.dispose();
-        }
+      for (const p of parties.values()) dropParty(p);
       parties.clear();
+      stepMat.dispose();
+      poleMat.dispose();
+      flagMat.dispose();
       for (const visual of landmarkVisuals.values()) {
         visual.dispose();
         visual.node.dispose();
