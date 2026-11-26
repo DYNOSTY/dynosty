@@ -14,22 +14,26 @@ import {
   productionSiteDefinition,
   type TimberState,
 } from "@dynosty/game-core";
+import { createForestTrees } from "./forest-trees.js";
 import { depositCarved } from "./resource-sites.js";
 import { terrainElevation } from "./terrain.js";
 
 export function createLoggingVisual(scene: Scene) {
+  const trees = createForestTrees(scene);
   const visuals = BOKHOL_PRODUCTION_SITES.map((f) => ({
     id: f.id,
     visual: createLoggingSiteVisual(scene, f.id),
   }));
   return {
     update(s: TimberState | null) {
+      trees.update(s);
       for (const { visual } of visuals) visual.update(s);
     },
     animate(delta: number) {
       for (const { visual } of visuals) visual.animate(delta);
     },
     dispose() {
+      trees.dispose();
       for (const { visual } of visuals) visual.dispose();
     },
   };
@@ -48,7 +52,6 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
   };
   const wood = material("wood", new Color3(0.43, 0.27, 0.12));
   const tile = material("tile", new Color3(0.23, 0.29, 0.3));
-  const leaves = material("leaves", new Color3(0.12, 0.32, 0.18));
   const logs = material(
     "logs",
     isForest
@@ -117,45 +120,6 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
     [2.6, 0.8, 1.4],
     [rules.workshop.x, 0.5, rules.workshop.z + 3],
     logs,
-  );
-  // Every tree in a forest is the same trunk and crown, drawn as instances of one
-  // hidden pair instead of two separate meshes (and draw calls) per tree.
-  const trunkSource = isForest
-    ? box("logging-trunk-source", [0.35, 1.4, 0.35], [0, 0.7, 0], wood)
-    : null;
-  const crownSource = isForest
-    ? CreateCylinder(
-        unique("logging-crown-source"),
-        { height: 3, diameterBottom: 2, diameterTop: 0, tessellation: 6 },
-        scene,
-      )
-    : null;
-  if (crownSource) crownSource.material = leaves;
-  for (const source of [trunkSource, crownSource])
-    if (source) {
-      source.isVisible = false;
-      source.isPickable = false;
-    }
-  const forest = Array.from(
-    { length: isForest ? LOGGING_RULES.treesPerForest : 0 },
-    (_, i) => {
-      const tree = new TransformNode(unique(`logging-tree-${i}`), scene);
-      tree.position.set(
-        patch.x - 7 + (i % 8) * 2 + Math.sin(i * 13 + patch.x) * 0.8,
-        0,
-        patch.z - 9 + Math.floor(i / 8) * 6 + Math.cos(i * 7 + patch.z) * 1.1,
-      );
-      if (!trunkSource || !crownSource) return tree;
-      const trunk = trunkSource.createInstance(unique("logging-trunk"));
-      trunk.parent = tree;
-      trunk.position.set(0, 0.7, 0);
-      const crown = crownSource.createInstance(unique("logging-crown"));
-      tree.scaling.setAll(0.8 + (1 + Math.sin(i * 4.9 + patch.z)) * 0.24);
-      tree.rotation.y = i * 1.61;
-      crown.parent = tree;
-      crown.position.y = 2.5;
-      return tree;
-    },
   );
   const deposit = new TransformNode(unique("mineral-deposit"), scene);
   deposit.position.set(patch.x, 0, patch.z);
@@ -242,12 +206,6 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
       buffer.position.y = 0.5 + height(buffer.position.x, buffer.position.z);
       workshop.setEnabled(!!site?.built);
       storage.setEnabled(!!site?.storageBuilt);
-      forest.forEach((t, i) => {
-        t.setEnabled(
-          !!site && i * (LOGGING_RULES.forest / forest.length) < site.remaining,
-        );
-        t.position.y = height(t.position.x, t.position.z);
-      });
       buffer.setEnabled(!!site && site.buffer > 0);
       buffer.scaling.y = Math.max(0.1, (site?.buffer ?? 0) / 20);
       delivered.setEnabled(!!site && site.delivered > 0);
@@ -313,12 +271,9 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
       cartBase.isPickable = false;
     },
     dispose() {
-      for (const node of [workshop, storage, cart, deposit, ...forest])
-        node.dispose();
-      trunkSource?.dispose();
-      crownSource?.dispose();
+      for (const node of [workshop, storage, cart, deposit]) node.dispose();
       buffer.dispose();
-      for (const m of [wood, tile, leaves, logs]) m?.dispose();
+      for (const m of [wood, tile, logs]) m?.dispose();
     },
   };
 }
