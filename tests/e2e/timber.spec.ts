@@ -14,7 +14,12 @@ import {
   VILLAGE_RULES,
 } from "../../packages/game-core/dist/index.js";
 import { advanceVillageMinutes } from "./read-village.js";
-import { hoverNode, nodePoint, worldPoint } from "./scene-picking.js";
+import {
+  clickNode,
+  hoverNode,
+  nodePoint,
+  worldPoint,
+} from "./scene-picking.js";
 
 const button = (page: Page, name: string) =>
   page.getByRole("button", { name, exact: true });
@@ -117,8 +122,8 @@ async function homeCursor(
   await page.mouse.move(point.x, point.y);
   return point;
 }
-// 기존 둥지와 겹치지만 둥지 모델 위는 아닌 바닥 지점을 고른다. 배치 중 둥지 모델을 누르면
-// 배치를 취소하고 그 둥지를 선택하는 것이 의도된 동작이다(scene.ts observeSceneClicks).
+// 기존 둥지와 겹치지만 둥지 모델 위는 아닌 바닥 지점을 고른다.
+// 배치 중에는 둥지 모델을 눌러도 배치를 유지하고 겹침을 표시한다.
 async function overlapCursor(
   page: Page,
   s: ReturnType<typeof createTimberState>,
@@ -200,6 +205,11 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
   const invalid = await overlapCursor(page, s, first);
   await expect(page.getByTestId("home-placement-status")).toContainText("겹");
   await page.mouse.click(invalid.x, invalid.y);
+  await expect(page.getByTestId("housing-status")).toContainText("둥지 6곳");
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("120");
+  await clickNode(page, "example-building-1");
+  await expect(page.getByTestId("home-placement-status")).toBeVisible();
+  await expect(page.getByTestId("home-placement-status")).toContainText("겹");
   await expect(page.getByTestId("housing-status")).toContainText("둥지 6곳");
   await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("120");
   const point = await homeCursor(page, 12, 12);
