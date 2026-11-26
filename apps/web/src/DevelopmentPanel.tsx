@@ -98,7 +98,7 @@ export function DevelopmentPanel({
     const image =
       entry.category === "building" && entry.level > 0
         ? `/art/facilities/${entry.target}-${entry.level}.webp`
-        : `/ui/cmd/${branch === "movement" ? "map" : "research"}.png`;
+        : `/ui/cmd/${branch === "movement" ? "map" : "research"}.webp`;
     const detail = [
       entry.effect,
       price,
@@ -317,7 +317,7 @@ export function DevelopmentPanel({
         <figure>
           <img
             className="research-illustration"
-            src="/story/flight-research-v1.png"
+            src="/story/flight-research-v1.webp"
             width={1672}
             height={941}
             alt="완성된 날틀에 기뻐하는 충녕과 그 모습을 바라보는 고리"
@@ -330,7 +330,7 @@ export function DevelopmentPanel({
         <figure>
           <img
             className="research-illustration"
-            src="/story/electrical-coercion-v1.png"
+            src="/story/electrical-coercion-v1.webp"
             width={1672}
             height={941}
             alt="전기자극기로 강제 노동하는 주민들을 내려다보는 양녕과 고리"

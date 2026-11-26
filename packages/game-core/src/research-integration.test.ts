@@ -135,7 +135,7 @@ it("병원 단계별5/15/25병상과 경상12/8/4시간, 경중2/4배를 실제 
   ]);
 });
 it("채집 연구는 건물 단계와 곱하지 않고2배까지만 적용하며 기존 연구를 반복할 수 없다", () => {
-  let s = build(lab(), "fishery", 46, 32);
+  let s = build(lab(), "fishery", 28, 48);
   s = finishResearch(s, "GATHER_RES_FISH_1");
   expect(collectionRate(s, secondFacility(s))).toBe(1.5);
   s = finishResearch(s, "GATHER_RES_FISH_2");
@@ -168,11 +168,13 @@ it("저장 공간500/1000/2000은 연구·건물의 높은 값으로 적용하�
   };
   expect(parseTimberState(legacy).world.resources.RES_FISH).toBe(30000000);
 });
-it("창고가 없어도 시작 적재 용량을 쓰고 창고 하나로 기존 용량이 줄지 않는다", () => {
+it("창고 없이 야적으로 시작하고 창고를 지어야 보호 용량이 생긴다", () => {
   const village = createVillageGame();
-  expect(storageCapacity(village)).toBe(1500);
-  expect(storageCapacity(start())).toBe(500);
-  expect(yardStock(village, "RES_WOOD")).toBe(0);
+  expect(storageCapacity(village)).toBe(0);
+  expect(storageCapacity(start())).toBe(0);
+  expect(yardStock(village, "RES_WOOD")).toBe(
+    village.world.resources.RES_WOOD / 10000,
+  );
   const crowded = {
     ...village,
     world: {
@@ -181,11 +183,11 @@ it("창고가 없어도 시작 적재 용량을 쓰고 창고 하나로 기존 �
     },
   };
   // 넘친 물량은 기획자 규칙대로 야적장에 둔다.
-  expect(yardStock(crowded, "RES_WOOD")).toBe(500);
+  expect(yardStock(crowded, "RES_WOOD")).toBe(2000);
   const warehouse = build(start(), "storage", 0, 16);
   expect(storageCapacity(warehouse)).toBe(500);
   const campaign = requireValue(village.campaign, "캠페인 기록");
-  expect(storageCapacity({ ...warehouse, campaign })).toBe(1500);
+  expect(storageCapacity({ ...warehouse, campaign })).toBe(500);
 });
 it("저장 용량을 넘긴 수레 화물도 야적장 재고에 한 번만 더한다", () => {
   const w = createPlayState();
@@ -194,7 +196,7 @@ it("저장 용량을 넘긴 수레 화물도 야적장 재고에 한 번만 더�
     minute: 540,
     resources: { ...w.resources, RES_WOOD: 3000000, RES_PLANT: 5000000 },
   });
-  s = build(s, "farm", 46, 32);
+  s = build(s, "farm", 12, 12);
   s = cmd(s, { type: "facility-staff", id: "build-1", count: 2 });
   s = advanceTimber(s, 180);
   const f = s.town.facilities[0];
@@ -260,7 +262,7 @@ it("메카2는 충녕 시해 분기에서 부활시키고 사망자의 뼈를 �
   ).toThrow();
 });
 it("전기자극기는 독재 루트에서 지정 시설만 기본200%로 바꾸고 중복4배를 만들지 않는다", () => {
-  let s = build(lab(), "fishery", 46, 32);
+  let s = build(lab(), "fishery", 28, 48);
   expect(() =>
     cmd(s, { type: "electrical-work", id: "build-2", enabled: true }),
   ).toThrow();
@@ -329,7 +331,7 @@ it("구v16 저장의 개량·회복비율을 승계하고 병상이 줄면 회�
 });
 
 it("메카는 야간에도 배치된 시설에서 일하고 배급·수면·둥지를 요구하지 않는다", () => {
-  let s = build(lab(), "fishery", 46, 32);
+  let s = build(lab(), "fishery", 28, 48);
   s = cmd(s, { type: "story-event", event: "rebellion-started" });
   s = cmd(s, { type: "story-event", event: "chungnyeong-assassinated" });
   s = finishResearch(s, "R17");

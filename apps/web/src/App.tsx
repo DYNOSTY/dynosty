@@ -56,9 +56,8 @@ import {
 } from "./local-save.js";
 import { MediaPanel } from "./MediaPanel.js";
 import { MerchantDialog, merchantCards } from "./MerchantOffers.js";
+import type { MarkerRect } from "./marker-layout.js";
 import { PlayPanel } from "./PlayPanel.js";
-import { PlaySavePanel } from "./PlaySavePanel.js";
-import { loadPlay, playSaveError, savePlay } from "./play-save.js";
 import { QualityFlow } from "./QualityFlow.js";
 import { RegionMap } from "./RegionMap.js";
 import { residentName } from "./resident-names.js";
@@ -73,6 +72,7 @@ import type {
   SceneController,
   ScreenPoint,
 } from "./scene.js";
+import { placeScoutPin } from "./scout-pin-layout.js";
 import { SCOUT_CREW, SCOUT_GOAL, SCOUT_SITES } from "./scout-sites.js";
 import { type SiteNotice, siteCompletions } from "./site-progress.js";
 import {
@@ -117,13 +117,10 @@ export function App() {
   const [timberOpen, setTimberOpen] = useState(false);
   const [timberState, setTimberState] = useState<TimberState | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
+  const saveOpenedVillage = useRef(false);
   const [playState, setPlayState] = useState<PlayState | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
   const [exampleClock, setExampleClock] = useState(false);
-  const [playSaveBusy, setPlaySaveBusy] = useState(false);
-  const [playSaveStatus, setPlaySaveStatus] = useState("");
-  const [playSaveFailure, setPlaySaveFailure] = useState<string | null>(null);
-  const pendingPlaySaveRef = useRef<number | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [villageSection, setVillageSection] = useState<{
@@ -225,32 +222,14 @@ export function App() {
         setPlayError(null);
       } else if (event.data.type === "play-error")
         setPlayError(event.data.message);
-      else if (
-        event.data.type === "play-save-ready" ||
-        event.data.type === "play-loaded" ||
-        event.data.type === "play-save-error"
-      ) {
-        const message = event.data;
-        if (pendingPlaySaveRef.current !== message.requestId) return;
-        try {
-          if (message.type === "play-save-ready") {
-            savePlay(window.localStorage, message.save);
-            setPlaySaveStatus("게임을 저장했습니다.");
-          } else if (message.type === "play-loaded") {
-            setPlaySaveStatus("게임을 불러왔습니다. 일시정지 상태입니다.");
-
-            sceneRef.current?.resetScouting();
-          } else setPlaySaveFailure(message.message);
-        } catch (error) {
-          setPlaySaveFailure(playSaveError(error));
-        } finally {
-          pendingPlaySaveRef.current = null;
-          setPlaySaveBusy(false);
-        }
-      } else if (event.data.type === "state") setState(event.data.state);
+      else if (event.data.type === "state") setState(event.data.state);
       else if (event.data.type === "scene") setSnapshot(event.data.snapshot);
       else if (event.data.type === "error") setWorkerError(event.data.message);
-      else {
+      else if (
+        event.data.type === "save-ready" ||
+        event.data.type === "load-complete" ||
+        event.data.type === "save-error"
+      ) {
         const message = event.data;
         if (pendingSaveRef.current !== message.requestId) return;
         try {
@@ -273,8 +252,6 @@ export function App() {
       }
     };
     worker.onerror = () => {
-      pendingPlaySaveRef.current = null;
-      setPlaySaveBusy(false);
       setPlayError(
         "게임 기준이나 계산 모듈을 확인하지 못해 새 게임을 시작할 수 없습니다.",
       );
@@ -287,7 +264,6 @@ export function App() {
       worker.terminate();
       workerRef.current = null;
       pendingSaveRef.current = null;
-      pendingPlaySaveRef.current = null;
     };
   }, []);
 
@@ -328,6 +304,7 @@ export function App() {
             ) {
               setConsoleOpen(true);
               setTimberOpen(false);
+              setSaveOpen(false);
               setVillageSection(null);
             }
           },
@@ -538,7 +515,6 @@ export function App() {
     return () => document.removeEventListener("visibilitychange", pause);
   }, []);
   function commandPlay(command: PlayCommand) {
-    if (playSaveBusy) return;
     if (command.type === "new-game") {
       sceneRef.current?.resetScouting();
     }
@@ -549,31 +525,7 @@ export function App() {
       command,
     } satisfies GameCommand);
   }
-  function accessPlaySave(operation: "save" | "load", previous = false) {
-    if (!workerRef.current || pendingPlaySaveRef.current !== null) return;
-    setPlaySaveFailure(null);
-    setPlaySaveStatus("");
-    try {
-      const requestId = ++nextRequestRef.current;
-      const command: GameCommand =
-        operation === "save"
-          ? { type: "request-play-save", requestId }
-          : {
-              type: "load-play",
-              requestId,
-              data: loadPlay(
-                window.localStorage,
-                previous ? "previous" : "current",
-              ),
-            };
-      pendingPlaySaveRef.current = requestId;
-      setPlaySaveBusy(true);
-      if (operation === "load") setExampleClock(false);
-      workerRef.current.postMessage(command);
-    } catch (error) {
-      setPlaySaveFailure(playSaveError(error));
-    }
-  }
+
   const shownDay = timberOpen
     ? laborOpen
       ? Math.floor((laborState?.elapsed ?? 0) / 1440) + 1
@@ -743,6 +695,7 @@ export function App() {
         const quests = document
           .querySelector(".g-quests")
           ?.getBoundingClientRect();
+        const placed: MarkerRect[] = [];
         for (const [id, pt] of Object.entries(pos)) {
           const el = pinRefs.current[id];
           if (!el) continue;
@@ -780,6 +733,34 @@ export function App() {
             y < quests.bottom + 16
           )
             y = quests.bottom + 24;
+          // 일반 표식은 아래쪽, 가장자리 표식은 가운데가 기준점이다.
+          const height = el.offsetHeight;
+          const anchor = inside ? height : height / 2;
+          const rect = placeScoutPin(
+            {
+              left: x - el.offsetWidth / 2,
+              top: y - anchor,
+              width: el.offsetWidth,
+              height,
+            },
+            y0,
+            y1,
+            placed,
+          );
+          if (rect) {
+            x = rect.left + rect.width / 2;
+            y = rect.top + anchor;
+            placed.push(rect);
+          } else {
+            // 공간이 부족해도 기준 영역 밖으로 벗어나지 않게 한다.
+            y = Math.max(y0 + anchor, Math.min(y1 - height + anchor, y));
+            placed.push({
+              left: x - el.offsetWidth / 2,
+              top: y - anchor,
+              width: el.offsetWidth,
+              height,
+            });
+          }
           el.style.left = `${x}px`;
           el.style.top = `${y}px`;
           el.classList.toggle("is-edge", !inside);
@@ -793,6 +774,7 @@ export function App() {
   function closePopups() {
     setRegionOpen(false);
     setSaveOpen(false);
+    saveOpenedVillage.current = false;
     setToolsOpen(false);
     setScoutOpen(null);
     setTimberOpen(false);
@@ -880,22 +862,33 @@ export function App() {
     }
     setVillageSection({ label: section });
   }
+  function closeSave() {
+    setSaveOpen(false);
+    if (saveOpenedVillage.current) setTimberOpen(false);
+    saveOpenedVillage.current = false;
+  }
   function toggleAuxiliary(panel: "save" | "tools") {
     if (prologue) return;
-    if (panel === "save" && !timberOpen) {
-      openOnly(() => setSaveOpen(!saveOpen));
+    if (panel === "save") {
+      if (!timberReady) return;
+      if (saveOpen) {
+        closeSave();
+      } else if (!timberOpen) {
+        openOnly(() => {
+          saveOpenedVillage.current = true;
+          setTimberOpen(true);
+          setSaveOpen(true);
+        });
+      } else {
+        saveOpenedVillage.current = false;
+        setSaveOpen(true);
+      }
       return;
     }
-    if (!timberOpen) {
-      openOnly(() => setToolsOpen(!toolsOpen));
-      return;
-    }
-    if (panel === "save") setSaveOpen(!saveOpen);
+    if (!timberOpen) openOnly(() => setToolsOpen(!toolsOpen));
     else setToolsOpen(!toolsOpen);
   }
   // 명령 단축키: E 조달, J 저장, Esc 닫기 (입력 칸·대화상자 안에서는 무시)
-  const timberOpenRef = useRef(timberOpen);
-  timberOpenRef.current = timberOpen;
   const toggleAuxiliaryRef = useRef(toggleAuxiliary);
   toggleAuxiliaryRef.current = toggleAuxiliary;
   const openVillageRef = useRef(openVillageSection);
@@ -904,8 +897,6 @@ export function App() {
   openTimberRef.current = () => openVillageSection("교역소 방문");
   const closeRef = useRef(closePopups);
   closeRef.current = closePopups;
-  const saveOpenRef = useRef(saveOpen);
-  saveOpenRef.current = saveOpen;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
@@ -959,15 +950,7 @@ export function App() {
       if (key === "u") openVillageRef.current("거주지");
       if (key === "p") openVillageRef.current("배급 정책");
       if (key === "t") openVillageRef.current("연구와 교역망");
-      if (key === "j") {
-        if (timberOpenRef.current) {
-          toggleAuxiliaryRef.current("save");
-          return;
-        }
-        const wasOpen = saveOpenRef.current;
-        closeRef.current();
-        setSaveOpen(!wasOpen);
-      }
+      if (key === "j") toggleAuxiliaryRef.current("save");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1004,8 +987,8 @@ export function App() {
       alt=""
       src={
         speakingMerchant
-          ? "/art/merchants/" + speakingMerchant[0] + ".png"
-          : `/art/advisers/${daylight ? "nareumi" : "dali"}/neutral.png`
+          ? "/art/merchants/" + speakingMerchant[0] + ".webp"
+          : `/art/advisers/${daylight ? "nareumi" : "dali"}/neutral.webp`
       }
     />
   );
@@ -1134,7 +1117,7 @@ export function App() {
             <>
               {/* 정찰 목표 */}
               <div className="g-quest">
-                <img src="/ui/cmd/map.png" alt="" />
+                <img src="/ui/cmd/map.webp" alt="" />
                 <div className="g-quest__body">
                   <span>1단계 목표 · 정찰</span>
                   <span className="g-pips" aria-hidden="true">
@@ -1187,7 +1170,7 @@ export function App() {
                   className="g-quest g-quest--btn is-found"
                   onClick={() => openOnly(() => setScoutOpen(site.id))}
                 >
-                  <img src="/ui/cmd/economy.png" alt="" />
+                  <img src="/ui/cmd/economy.webp" alt="" />
                   <span className="g-quest__body">
                     <span>{site.name} 발견</span>
                     <small>
@@ -1270,7 +1253,6 @@ export function App() {
               : null
           }
           error={playError}
-          busy={playSaveBusy}
           onCommand={(command) => {
             if (command.type === "new-game") {
               sceneRef.current?.resetScouting();
@@ -1624,6 +1606,11 @@ export function App() {
             world={playState}
             showDevTools={toolsOpen}
             saveOpen={saveOpen}
+            savePanelId={savePanelId}
+            onCloseSave={() => {
+              closeSave();
+              saveMenuRef.current?.focus();
+            }}
             onState={onVillageState}
             onLaborState={receiveLabor}
             onLaborModeChange={setLaborOpen}
@@ -1637,6 +1624,7 @@ export function App() {
             }
             onExit={() => {
               setTimberOpen(false);
+              setSaveOpen(false);
             }}
           />
           <WorkspacePanel
@@ -1726,24 +1714,6 @@ export function App() {
                 </p>
               </section>
             ) : null}
-          </WorkspacePanel>
-          <WorkspacePanel
-            id={savePanelId}
-            title="저장"
-            open={saveOpen && !timberOpen}
-            onClose={() => {
-              setSaveOpen(false);
-              saveMenuRef.current?.focus();
-            }}
-          >
-            <PlaySavePanel
-              busy={playSaveBusy}
-              ready={playState !== null}
-              status={playSaveStatus}
-              error={playSaveFailure}
-              onSave={() => accessPlaySave("save")}
-              onLoad={(previous) => accessPlaySave("load", previous)}
-            />
           </WorkspacePanel>
           <WorkspacePanel
             id={toolsPanelId}
@@ -2221,7 +2191,8 @@ export function App() {
             label="저장"
             hotkey="J"
             pressed={saveOpen}
-            controls={savePanelId}
+            disabled={prologue || !timberReady}
+            {...(saveOpen && { controls: savePanelId })}
             onClick={() => toggleAuxiliary("save")}
           />
           <SettingsMenu className="g-cmd">

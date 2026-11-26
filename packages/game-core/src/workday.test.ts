@@ -100,6 +100,12 @@ it("식당과 작업장에 도착하면 숨고 퇴근 뒤 다시 나와 귀가�
     expect(e?.visible).toBe(false);
     expect(e?.kind === "resident" && e.indoors).toBe(true);
   }
+  s = {
+    ...s,
+    residents: s.residents.map((r) =>
+      r.workplaceId === null ? { ...r, hunger: 720 } : r,
+    ),
+  };
   let ate = false;
   for (let i = 0; i < 120; i++) {
     s = advanceTimber(s, 1);
@@ -115,7 +121,9 @@ it("식당과 작업장에 도착하면 숨고 퇴근 뒤 다시 나와 귀가�
   s = advanceTimber(s, 1);
   expect(
     s.residents.some(
-      (r) => r.workplaceId === "restaurant" && r.routine === "home",
+      (r) =>
+        r.workplaceId === "restaurant" &&
+        (r.routine === "home" || r.insideHome),
     ),
   ).toBe(true);
 });

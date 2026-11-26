@@ -1474,7 +1474,7 @@ h1 {
     box-shadow: none;
     border-radius: 0;
     border: 36px solid transparent;
-    border-image: url(/ui/kit/board_frame.png) 175 fill / 44px / 8px stretch;
+    border-image: url(/ui/kit/board_frame.webp) 175 fill / 44px / 8px stretch;
   }
   .play-status::before {
     content: "의뢰";
@@ -1508,7 +1508,7 @@ h1 {
     border-radius: 0;
     box-shadow: none;
     border: 36px solid transparent;
-    border-image: url(/ui/kit/board_frame.png) 175 fill / 44px / 8px stretch;
+    border-image: url(/ui/kit/board_frame.webp) 175 fill / 44px / 8px stretch;
     padding: 0;
   }
   .workspace-panel-heading {
@@ -1731,7 +1731,7 @@ h1 {
     padding: 0;
     box-sizing: border-box;
     border: 8px solid var(--jjok-deep);
-    border-image: url(/ui/kit/btn.png) 56 fill / 12px / 2px stretch;
+    border-image: url(/ui/kit/btn.webp) 56 fill / 12px / 2px stretch;
     background: var(--jjok);
     color: var(--hanji);
     border-radius: 0;
@@ -1757,7 +1757,7 @@ h1 {
     filter: brightness(1.15);
   }
   .g-cmd:active:not(:disabled) {
-    border-image-source: url(/ui/kit/btn_pressed.png);
+    border-image-source: url(/ui/kit/btn_pressed.webp);
   }
   .g-cmd[aria-expanded="true"] {
     outline: 2px solid var(--hanji);
@@ -2081,10 +2081,10 @@ h1 {
     background: var(--jjok);
     color: var(--hanji);
     border: 6px solid var(--jjok-deep);
-    border-image: url(/ui/kit/btn.png) 56 fill / 10px / 2px stretch;
+    border-image: url(/ui/kit/btn.webp) 56 fill / 10px / 2px stretch;
   }
   .play-menu.g-console__cmd .g-cmd:active:not(:disabled) {
-    border-image-source: url(/ui/kit/btn_pressed.png);
+    border-image-source: url(/ui/kit/btn_pressed.webp);
   }
   .g-mood figcaption {
     display: none;
@@ -2272,8 +2272,11 @@ body {
     font-size: 13px;
   }
 
+  .play-shell {
+    --console-height: 190px;
+  }
   .g-console {
-    height: 190px;
+    height: var(--console-height);
     grid-template-columns: 132px 1fr 132px;
     gap: 23px;
     padding: 36px 19px 20px 18px;
@@ -2344,9 +2347,10 @@ body {
 
   /* 의뢰: 판 없이 투명 바탕 + 줄 (글자는 먹색, 눈밭·숲 위에서도 읽히게 옅은 한지 테두리 빛) */
   .g-quests {
+    --quests-top: 76px;
     position: absolute;
     z-index: 2;
-    top: 76px;
+    top: var(--quests-top);
     right: 18px;
     width: 300px;
     margin: 0;
@@ -2357,6 +2361,19 @@ body {
     text-shadow:
       0 0 3px rgb(239 230 210 / 95%),
       0 0 8px rgb(239 230 210 / 80%);
+  }
+  /* 곳간 소식으로 의뢰가 길어져도 마지막 조달 버튼까지 스크롤할 수 있게 한다. */
+  .g-quests:has(.timber-entry-link) {
+    max-height: calc(
+      100% -
+      var(--quests-top) -
+      var(--quests-bottom, 0px) -
+      8px
+    );
+    overflow-y: auto;
+  }
+  .g-quests:has(~ .g-console:not(.console-folded)) {
+    --quests-bottom: var(--console-height);
   }
   .g-quests h2 {
     margin: 0 0 4px;
@@ -2645,7 +2662,7 @@ body {
     display: block;
     width: 32px;
     height: 32px;
-    background: url(/ui/cmd/economy.png) center / contain no-repeat;
+    background: url(/ui/cmd/economy.webp) center / contain no-repeat;
     filter: drop-shadow(0 1px 2px rgb(0 0 0 / 60%));
   }
 }
@@ -2789,10 +2806,10 @@ body {
   background: center / contain no-repeat;
 }
 [data-testid="timber-iron"]::before {
-  background-image: url(/ui/resources-3d/RES_METAL.png);
+  background-image: url(/ui/resources-3d/RES_METAL.webp);
 }
 [data-testid="timber-workers"]::before {
-  background-image: url(/ui/cmd/residents.png);
+  background-image: url(/ui/cmd/residents.webp);
 }
 @media (min-width: 761px) {
   /* 위 막대 */
@@ -2909,10 +2926,10 @@ body {
   transition: filter 0.12s;
 }
 .g-knob--close {
-  background-image: url(/ui/kit/knob_close.png);
+  background-image: url(/ui/kit/knob_close.webp);
 }
 .g-knob--back {
-  background-image: url(/ui/kit/knob_back.png);
+  background-image: url(/ui/kit/knob_back.webp);
 }
 .g-knob:hover {
   filter: brightness(1.18);
@@ -3032,7 +3049,7 @@ body {
     padding: 4px 8px 16px;
     border: 36px solid transparent;
     border-radius: 0;
-    border-image: url(/ui/kit/board_frame.png) 175 fill / 44px / 8px stretch;
+    border-image: url(/ui/kit/board_frame.webp) 175 fill / 44px / 8px stretch;
     background: none;
     color: var(--meok);
     overflow: hidden;
@@ -3047,57 +3064,6 @@ body {
   }
 }
 
-/* 저장 1단계: 큰 저장 + 기록 2칸 */
-.g-save {
-  display: grid;
-  gap: 12px;
-}
-.g-save__main {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  min-height: 64px;
-  font: 700 18px / 1 var(--font-title);
-}
-.g-save__main img {
-  width: 36px;
-  height: 36px;
-  object-fit: contain;
-}
-.g-save__slots {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.g-slot {
-  display: grid;
-  gap: 4px;
-  justify-items: start;
-  padding: 12px 16px;
-  text-align: left;
-  border: 1px solid var(--hanji-line);
-  border-radius: 6px;
-  background: var(--hanji-deep);
-  color: var(--meok);
-  box-shadow: none;
-}
-.g-slot b {
-  font: 700 16px / 1.2 var(--font-title);
-}
-.g-slot small {
-  font-size: 13px;
-  color: var(--meok-sub);
-}
-.g-slot:hover:not(:disabled) {
-  box-shadow: inset 0 0 0 2px var(--jjok);
-}
-.g-save__status:empty {
-  display: none;
-}
-.g-save .hint {
-  margin: 0;
-}
 .g-next {
   display: flex;
   justify-content: space-between;

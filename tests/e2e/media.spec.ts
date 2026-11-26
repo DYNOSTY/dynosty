@@ -93,12 +93,13 @@ test("BGM·음성을 함께 재생하고 복원된 음량·음소거와 정지�
     mimeType: "audio/wav",
     buffer: wave(10),
   });
+  // 제출본은 타이틀 BGM이 공용 AudioContext 하나를 먼저 만들 수 있다.
   expect(
     await page.evaluate(
       () =>
         (window as unknown as { mediaProbe: Probe }).mediaProbe.contexts.length,
     ),
-  ).toBe(0);
+  ).toBeLessThanOrEqual(1);
   await page.getByRole("button", { name: "BGM 재생", exact: true }).click();
   await expect(page.getByTestId("bgm-status")).toHaveText("재생 중");
   await page.getByRole("button", { name: "음성 재생", exact: true }).click();
@@ -200,19 +201,24 @@ test("음성 자연 종료와 BGM 파일 교체·참조 해제를 처리한다",
     mimeType: "text/plain",
     buffer: Buffer.from("not audio"),
   });
-  await expect(page.getByRole("alert")).toContainText("음원 파일");
+  await expect(
+    page
+      .getByRole("region", { name: "BGM과 음성 재생", exact: true })
+      .getByRole("alert"),
+  ).toContainText("음원 파일");
   await expect(page.getByText("short.wav", { exact: true })).toBeVisible();
   await page.reload();
   await openWorkspace(page);
   await expect(
     page.getByRole("button", { name: "BGM 재생", exact: true }),
   ).toBeDisabled();
+  // 제출본은 타이틀 BGM이 공용 AudioContext 하나를 먼저 만들 수 있다.
   expect(
     await page.evaluate(
       () =>
         (window as unknown as { mediaProbe: Probe }).mediaProbe.contexts.length,
     ),
-  ).toBe(0);
+  ).toBeLessThanOrEqual(1);
 });
 
 test("손상된 음원과 재생 거부를 안내하고 새 파일로 다시 재생할 수 있다", async ({
@@ -229,7 +235,11 @@ test("손상된 음원과 재생 거부를 안내하고 새 파일로 다시 재
   });
   await play.click();
   await expect(page.getByTestId("voice-status")).toHaveText("재생 실패");
-  await expect(page.getByRole("alert")).toContainText("재생하지 못했습니다");
+  await expect(
+    page
+      .getByRole("region", { name: "BGM과 음성 재생", exact: true })
+      .getByRole("alert"),
+  ).toContainText("재생하지 못했습니다");
   await voice.setInputFiles({
     name: "valid.wav",
     mimeType: "audio/wav",
@@ -252,5 +262,9 @@ test("손상된 음원과 재생 거부를 안내하고 새 파일로 다시 재
   await expect(page.getByTestId("voice-status")).toHaveText("재생 실패");
   await play.click();
   await expect(page.getByTestId("voice-status")).toHaveText("재생 중");
-  await expect(page.getByRole("alert")).not.toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "BGM과 음성 재생", exact: true })
+      .getByRole("alert"),
+  ).not.toBeVisible();
 });

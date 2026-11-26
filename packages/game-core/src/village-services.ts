@@ -5,6 +5,7 @@ import {
   constructionPlot,
   inBokholForest,
 } from "./bokhol.js";
+import { findById } from "./lookup.js";
 import {
   AMOUNT_SCALE,
   type Citizen,
@@ -195,7 +196,7 @@ export function homeUsage(
   return residents
     .filter((r) => r.homeId === homeId)
     .reduce((sum, r) => {
-      const c = citizens.find((c) => c.id === r.id);
+      const c = findById(citizens, r.id);
       return sum + (c?.alive ? speciesRule(c.species).space : 0);
     }, 0);
 }
@@ -226,8 +227,10 @@ export function mealPlan(
     if (amount > 0) foods[food] = amount;
     remaining -= amount;
   }
+  if (remaining > 0 || portion * 4 - used < portion)
+    return { amount: 0, foods: {}, relief: 0 };
   const amount = Object.values(foods).reduce((a, b) => a + b, 0);
-  return { amount, foods, relief: Math.floor((amount * 360) / rule.portion) };
+  return { amount, foods, relief: 7200 };
 }
 export const rationLimit = (species: string, policy: RationPolicy) =>
   (policy === "cap" ? 25000 : speciesRule(species).portion) * 4;

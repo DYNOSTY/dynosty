@@ -30,7 +30,7 @@ export function TopFrame() {
         <img
           // biome-ignore lint/suspicious/noArrayIndexKey: 고정된 9조각 그림
           key={i}
-          src={`/ui/kit/topbar_${i}.png`}
+          src={`/ui/kit/topbar_${i}.webp`}
           alt=""
           className={TOP_GROW.has(i) ? "grow" : TOP_INSET.has(i) ? "inset" : ""}
         />
@@ -45,7 +45,7 @@ export function ConsoleFrame() {
       {[0, 1, 2, 3, 4].map((i) => (
         <img
           key={i}
-          src={`/ui/kit/console_${i}.png`}
+          src={`/ui/kit/console_${i}.webp`}
           alt=""
           className={i % 2 ? "grow" : ""}
         />
@@ -102,7 +102,7 @@ export function CmdFace({
 }): ReactNode {
   return (
     <>
-      <img src={`/ui/cmd/${icon}.png`} alt="" />
+      <img src={`/ui/cmd/${icon}.webp`} alt="" />
       <span>{label}</span>
       <span className="g-hotkey" aria-hidden="true">
         {hotkey}
@@ -166,22 +166,22 @@ export function MoodScale({
         </span>
         <div className="rig">
           <img
-            src="/ui/kit/scale_post.png"
+            src="/ui/kit/scale_post.webp"
             alt=""
             style={{ left: X - 240, top: Y - 205 }}
           />
           <img
-            src="/ui/kit/scale_panL.png"
+            src="/ui/kit/scale_panL.webp"
             alt=""
             style={{ left: X + lx - 210, top: Y + ly - 30 }}
           />
           <img
-            src="/ui/kit/scale_panR.png"
+            src="/ui/kit/scale_panR.webp"
             alt=""
             style={{ left: X + rx - 205, top: Y + ry - 30 }}
           />
           <img
-            src="/ui/kit/scale_beam.png"
+            src="/ui/kit/scale_beam.webp"
             alt=""
             style={{
               left: X - 472,
@@ -221,7 +221,7 @@ export function Res({
 }) {
   return (
     <span className="g-res" title={label}>
-      <img src={`/ui/resources-3d/${id}.png`} alt={label ?? ""} />
+      <img src={`/ui/resources-3d/${id}.webp`} alt={label ?? ""} />
       <b>{n}</b>
     </span>
   );

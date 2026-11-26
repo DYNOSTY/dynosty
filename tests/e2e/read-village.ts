@@ -9,18 +9,22 @@ export function readVillage(key = "dynosty.village.resume"): TimberState {
 }
 
 // Long campaign scenarios move the simulation clock at the worker boundary.
-export async function advanceVillageDay(page: Page) {
+export const advanceVillageDay = (page: Page) =>
+  advanceVillageMinutes(page, 1440);
+export async function advanceVillageMinutes(page: Page, minutes: number) {
   const worker = page.workers().find((w) => w.url().includes("timber.worker"));
   if (!worker) throw Error("마을 시계를 찾을 수 없습니다.");
-  await worker.evaluate(() =>
-    self.dispatchEvent(
-      new MessageEvent("message", {
-        data: {
-          type: "command",
-          id: crypto.randomUUID(),
-          command: { type: "advance", minutes: 1440 },
-        },
-      }),
-    ),
+  await worker.evaluate(
+    (step) =>
+      self.dispatchEvent(
+        new MessageEvent("message", {
+          data: {
+            type: "command",
+            id: crypto.randomUUID(),
+            command: { type: "advance", minutes: step },
+          },
+        }),
+      ),
+    minutes,
   );
 }

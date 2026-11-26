@@ -27,6 +27,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -45,6 +46,7 @@ import {
   moraleAdvice,
   PATROL_NAMES,
   type ScenePage,
+  supplyAdvice,
 } from "./campaign-scenes.js";
 import { EndingMenu } from "./EndingMenu.js";
 import { completedChapters } from "./stage-replay.js";
@@ -93,7 +95,10 @@ function SceneDialog({
   const frameIndex = cursor - page.lines.length;
   const frame = page.frames?.[frameIndex];
   const flashback = page.key === "summit" && page.lines[cursor]?.[1] === "";
-  const familyScene = page.key === "summit" && cursor > 0 && cursor <= 5;
+  const familyScene =
+    page.summitFamily &&
+    cursor >= page.summitFamily.from &&
+    cursor <= page.summitFamily.through;
   const storyLength = page.lines.length + (page.frames?.length ?? 0);
   const total = storyLength + Number(!!page.resultQuote);
   const result = cursor === storyLength ? page.resultQuote : undefined;
@@ -406,7 +411,7 @@ function SceneDialog({
                 src={`/story/campaign/${familyScene ? "royal-family" : (later?.image ?? page.illustration)}.webp`}
               />
             )}
-          {page.key === "summit" && cursor === 1 && (
+          {cursor === page.summitFamily?.from && (
             <section className="prince-greetings" aria-label="두 왕자의 인사">
               <p>
                 <strong>포</strong> 복홀 어른들, 안녕하세요! 쥬신의 왕자 포예요!
@@ -429,7 +434,7 @@ function SceneDialog({
               ) : name === "나르미" || name === "달이" ? (
                 <img
                   alt=""
-                  src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.png`}
+                  src={`/art/advisers/${name === "나르미" ? "nareumi" : "dali"}/${["12", "10", "11", "13"].includes(page.music) ? "concern" : "neutral"}.webp`}
                 />
               ) : ["고리", "가솔을 이끄는 귀족", "노귀족"].includes(name) ? (
                 <span
@@ -580,10 +585,17 @@ export function CampaignPanel({
     c.beat === "opening" && !filmSeen("opening"),
   );
   const [preparingNewGame, setPreparingNewGame] = useState(false);
+  const [startingGame, setStartingGame] = useState(false);
+  useLayoutEffect(() => {
+    if (startingGame && c.beat === "departure") {
+      setStartingGame(false);
+      setPreparingNewGame(false);
+    }
+  }, [startingGame, c.beat]);
   const [pauseMenu, setPauseMenu] = useState(false);
   const wasRunning = useRef(false);
   const introDialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (intro) introDialog.current?.showModal();
   }, [intro]);
   function finishIntro() {
@@ -844,6 +856,8 @@ export function CampaignPanel({
         advisory={null}
         close={() => setPreparingNewGame(false)}
         act={(action, difficulty) => {
+          if (startingGame) return;
+          setStartingGame(true);
           resetView?.();
           setPetition(false);
           setSouth(false);
@@ -859,7 +873,6 @@ export function CampaignPanel({
           setDismissed(null);
           setOpened(null);
           setMainMenu(false);
-          setPreparingNewGame(false);
           wasRunning.current = false;
         }}
       />,
@@ -904,6 +917,13 @@ export function CampaignPanel({
   }
   return (
     <div className="campaign-quest">
+      <aside className="supply-advice" aria-label="나르미의 곳간 소식">
+        {supplyAdvice(s).map((words) => (
+          <p className="campaign-advisory" role="status" key={words}>
+            <strong>나르미</strong> {words}
+          </p>
+        ))}
+      </aside>
       {!["opening", "departure", "after", "finished", "ending"].includes(
         c.beat,
       ) && (
@@ -957,6 +977,12 @@ export function CampaignPanel({
                     왕 “내 겨울 몫까지 풀어라. 양녕아, 남쪽 길에 솥을 걸거든
                     뒤처진 이들도 먹이고 가거라.”
                   </p>
+                  {(c.cargo?.RES_COAL ?? 0) < CONVOY_GOALS.RES_COAL && (
+                    <p>
+                      인수한 석탄은 도성 난방에도 쓰입니다. 물자를 받을 때마다
+                      호송할 석탄부터 수레에 실어 두세요.
+                    </p>
+                  )}
                   {(c.storeBatches ?? 0) < 4 && (
                     <button
                       type="button"

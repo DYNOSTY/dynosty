@@ -19,13 +19,14 @@ import {
   type ModelVisual,
 } from "./model-assets.js";
 import { residentModel } from "./resident-model.js";
-import type { GlbVisual } from "./village.js";
+import { type GlbVisual, residentGlb } from "./village.js";
 
 type GlbFactory = (
   kind: SceneEntity["kind"],
   parent: Mesh,
   offsetY: number,
   level?: number,
+  species?: string,
 ) => Promise<GlbVisual>;
 
 import {
@@ -55,8 +56,16 @@ export function createSceneEntities(
       visual: GlbVisual | ModelVisual | null;
       modelAttempted: boolean;
       assetKey: string;
+      generation: number;
       path: GroundPoint[];
       needMarker: Mesh | null;
+      ground?: {
+        x: number;
+        z: number;
+        base: number;
+        height: (x: number, z: number) => number;
+        y: number;
+      };
     }
   >();
   let elevation = (x: number, z: number) => {
@@ -150,10 +159,16 @@ export function createSceneEntities(
       for (const [id, object] of objects) {
         if (
           object.assetKey !== "default" &&
-          !object.assetKey.startsWith("home:")
+          !object.assetKey.startsWith("home:") &&
+          !(
+            object.entity.kind === "resident" &&
+            object.entity.species &&
+            residentGlb(object.entity.species, "summer")
+          )
         )
           continue;
         const key = object.assetKey;
+        const generation = ++object.generation;
         const { kind } = object;
         const size = kind === "resident" ? 1 : 1.5;
         object.modelAttempted = true;
@@ -162,9 +177,14 @@ export function createSceneEntities(
           object.mesh,
           -size / 2,
           object.entity.kind === "building" ? object.entity.level : undefined,
+          object.entity.kind === "resident" ? object.entity.species : undefined,
         )
           .then((visual) => {
-            if (objects.get(id) !== object || object.assetKey !== key)
+            if (
+              objects.get(id) !== object ||
+              object.assetKey !== key ||
+              object.generation !== generation
+            )
               return visual.dispose();
             object.visual?.dispose();
             object.visual = visual;
@@ -179,7 +199,8 @@ export function createSceneEntities(
             );
           })
           .catch(() => {
-            if (objects.get(id) === object) onModelError();
+            if (objects.get(id) === object && object.generation === generation)
+              onModelError();
           });
       }
     },
@@ -189,6 +210,7 @@ export function createSceneEntities(
         object.visual?.dispose();
         object.visual = null;
         object.modelAttempted = false;
+        object.generation++;
         object.mesh.isVisible = true;
       }
     },
@@ -241,10 +263,26 @@ export function createSceneEntities(
               object.mesh.rotation.y = Math.atan2(dx, dz);
             }
           }
-          object.mesh.position.y =
-            e.position.y +
-            0.5 +
-            elevation(object.mesh.position.x, object.mesh.position.z);
+          // The terrain sample walks every foundation; skip it while the resident stands still.
+          let ground = object.ground;
+          const { x, z } = object.mesh.position;
+          if (
+            !ground ||
+            ground.x !== x ||
+            ground.z !== z ||
+            ground.base !== e.position.y ||
+            ground.height !== elevation
+          ) {
+            ground = {
+              x,
+              z,
+              base: e.position.y,
+              height: elevation,
+              y: e.position.y + 0.5 + elevation(x, z),
+            };
+            object.ground = ground;
+          }
+          object.mesh.position.y = ground.y;
           object.visual?.setMotion(moved ? "walking" : "idle");
           if (e.indoors && object.path.length === 0)
             object.mesh.setEnabled(false);
@@ -287,6 +325,7 @@ export function createSceneEntities(
             visual: null,
             modelAttempted: false,
             assetKey: "default",
+            generation: 0,
             path: [],
             needMarker: null,
           };
@@ -306,6 +345,8 @@ export function createSceneEntities(
           object.visual = null;
           object.modelAttempted = false;
           object.assetKey = assetKey;
+          object.generation++;
+          object.mesh.isVisible = true;
         }
         object.entity = entity;
         if (
@@ -366,23 +407,56 @@ export function createSceneEntities(
               : entity.kind === "building" && entity.level
                 ? facilityModel("home", entity.level)
                 : models[entity.kind];
+        // Keep the same-species procedural model visible while its GLB loads or fails.
         if (
           glb &&
-          (assetKey === "default" || assetKey.startsWith("home:")) &&
+          asset &&
+          entity.kind === "resident" &&
+          entity.species &&
+          residentGlb(entity.species, "summer") &&
+          !object.modelAttempted &&
+          !object.visual
+        ) {
+          try {
+            object.visual = buildModel(
+              scene,
+              object.mesh,
+              object.material,
+              asset,
+            );
+            object.mesh.isVisible = false;
+            object.visual.setOutline(selectedId === entity.id);
+          } catch {
+            onModelError();
+          }
+        }
+        if (
+          glb &&
+          (assetKey === "default" ||
+            assetKey.startsWith("home:") ||
+            (entity.kind === "resident" &&
+              !!entity.species &&
+              !!residentGlb(entity.species, "summer"))) &&
           !object.modelAttempted
         ) {
           object.modelAttempted = true;
           const target = object,
             id = entity.id,
-            size0 = size;
+            size0 = size,
+            generation = ++object.generation;
           glb(
             entity.kind,
             object.mesh,
             -size0 / 2,
             entity.kind === "building" ? entity.level : undefined,
+            entity.kind === "resident" ? entity.species : undefined,
           )
             .then((visual) => {
-              if (objects.get(id) !== target || target.assetKey !== assetKey)
+              if (
+                objects.get(id) !== target ||
+                target.assetKey !== assetKey ||
+                target.generation !== generation
+              )
                 return visual.dispose();
               target.visual?.dispose();
               target.visual = visual;
@@ -398,7 +472,11 @@ export function createSceneEntities(
               visual.setOutline(selectedId === id);
             })
             .catch(() => {
-              if (objects.get(id) === target) onModelError();
+              if (
+                objects.get(id) === target &&
+                target.generation === generation
+              )
+                onModelError();
             });
         } else if (asset && !object.modelAttempted) {
           object.modelAttempted = true;

@@ -6,6 +6,7 @@ import {
   createCapital,
   createTimberSave,
   createVillageGame,
+  departureBuildings,
   parseTimberSave,
   recordResearchStory,
   type TimberState,
@@ -17,8 +18,29 @@ import {
   firstVillageTask,
   gatheringRumor,
   moraleAdvice,
+  supplyAdvice,
   villageAdvice,
 } from "./campaign-scenes.js";
+
+it("식량과 물을 따로 알리고 비축이 회복되면 안내를 거둔다", () => {
+  const s = createVillageGame();
+  const resources = { ...s.world.resources, RES_PLANT: 0, RES_WATER: 0 };
+  const low = { ...s, world: { ...s.world, resources } };
+  expect(supplyAdvice(low)).toEqual([
+    expect.stringContaining("온상 재배소"),
+    expect.stringContaining("취수장"),
+  ]);
+  expect(
+    supplyAdvice({
+      ...low,
+      world: {
+        ...low.world,
+        resources: { ...resources, RES_MEAT: 0, RES_FISH: 0 },
+      },
+    }),
+  ).toHaveLength(3);
+  expect(supplyAdvice(s)).toEqual([]);
+});
 
 const loadDevSave = (state: TimberState) =>
   parseTimberSave(
@@ -490,11 +512,12 @@ it.each([true, false])(
     );
     expect(campaignOf(departure).beat).toBe("departure");
     const page = campaignPage({ ...departure, restaurantBuilt });
-    expect(page.lines.filter(([speaker]) => speaker === "돌쇠")).toEqual([
-      [
-        "돌쇠",
-        "공자님! 병원 처마에 불이 붙었습니다. 불씨가 공방 지붕으로 넘어갑니다!",
-      ],
-    ]);
+    const losses = campaignOf(departure).openingLosses;
+    expect(losses?.length).toBeGreaterThan(0);
+    const line = page.lines.find(([speaker]) => speaker === "돌쇠")?.[1];
+    for (const id of losses ?? []) {
+      const building = departureBuildings[id];
+      expect(line).toContain(building?.name + (building?.roof ? " 지붕" : ""));
+    }
   },
 );

@@ -404,9 +404,9 @@ it("대기 GLB가 늦게 와도 새 종별 모델을 덮어쓰지 않고 단계 
     const base = createSceneExample();
     entities.update(base);
     entities.setGlb(
-      (kind, _parent, _offset, level) =>
+      (kind, _parent, _offset, level, species) =>
         new Promise((resolve) =>
-          pending.set(level ? kind + level : kind, resolve),
+          pending.set(level ? kind + level : kind + (species ?? ""), resolve),
         ),
     );
     const custom = {
@@ -418,11 +418,11 @@ it("대기 GLB가 늦게 와도 새 종별 모델을 덮어쓰지 않고 단계 
       ),
     };
     entities.update(custom);
-    expect(scene.getMeshById("example-resident-1:back-sail-0")).not.toBeNull();
+    expect(scene.getMeshById("model:resident-SPINO:figure")).not.toBeNull();
     pending.get("resident")?.(visual);
     await Promise.resolve();
     expect(visual.dispose).toHaveBeenCalledOnce();
-    expect(scene.getMeshById("example-resident-1:back-sail-0")).not.toBeNull();
+    expect(scene.getMeshById("model:resident-SPINO:figure")).not.toBeNull();
     const original = { ...visual, dispose: vi.fn() };
     pending.get("building1")?.(original);
     await Promise.resolve();
@@ -434,6 +434,105 @@ it("대기 GLB가 늦게 와도 새 종별 모델을 덮어쓰지 않고 단계 
     });
     expect(original.dispose).toHaveBeenCalledOnce();
     expect(pending.has("building3")).toBe(true);
+  } finally {
+    entities.dispose();
+    scene.dispose();
+    engine.dispose();
+  }
+});
+
+it("종별 주민 GLB를 요청하고 실패 시 같은 종의 절차 모델을 유지한다", async () => {
+  const engine = new NullEngine(),
+    scene = new Scene(engine),
+    entities = createSceneEntities(scene);
+  const factory = vi.fn(
+    async (
+      kind: string,
+      _parent: Mesh,
+      _offset: number,
+      _level?: number,
+      species?: string,
+    ) => {
+      if (kind === "resident") throw Error(species);
+      return {
+        setOutline: vi.fn(),
+        setMotion: vi.fn(),
+        animate: vi.fn(),
+        dispose: vi.fn(),
+      };
+    },
+  );
+  try {
+    entities.setGlb(factory);
+    const base = createSceneExample();
+    entities.update({
+      ...base,
+      entities: base.entities.map((e) =>
+        e.kind === "resident" ? { ...e, species: "SPINO" } : e,
+      ),
+    });
+    await Promise.resolve();
+    expect(factory).toHaveBeenCalledWith(
+      "resident",
+      expect.anything(),
+      -0.5,
+      undefined,
+      "SPINO",
+    );
+    expect(scene.getMeshById("model:resident-SPINO:figure")).not.toBeNull();
+  } finally {
+    entities.dispose();
+    scene.dispose();
+    engine.dispose();
+  }
+});
+
+it("종이 다시 바뀌거나 ID가 재사용돼도 오래된 GLB를 붙이지 않는다", async () => {
+  const engine = new NullEngine(),
+    scene = new Scene(engine),
+    entities = createSceneEntities(scene);
+  const pending: Array<(visual: import("./village.js").GlbVisual) => void> = [];
+  const makeVisual = () => ({
+    setOutline: vi.fn(),
+    setMotion: vi.fn(),
+    animate: vi.fn(),
+    dispose: vi.fn(),
+  });
+  const base = createSceneExample();
+  const update = (species: string) =>
+    entities.update({
+      ...base,
+      entities: base.entities.map((e) =>
+        e.kind === "resident" ? { ...e, species } : e,
+      ),
+    });
+  try {
+    entities.setGlb((kind) =>
+      kind === "building"
+        ? Promise.resolve(makeVisual())
+        : new Promise((resolve) => pending.push(resolve)),
+    );
+    update("R02");
+    update("R03");
+    update("R02");
+    const old = makeVisual(),
+      current = makeVisual();
+    pending[0]!(old);
+    await Promise.resolve();
+    expect(old.dispose).toHaveBeenCalledOnce();
+    pending[2]!(current);
+    await Promise.resolve();
+    entities.selectMesh(scene.getMeshById("example-resident-1"));
+    expect(current.setOutline).toHaveBeenLastCalledWith(true);
+    entities.update({
+      ...base,
+      entities: base.entities.filter((e) => e.kind !== "resident"),
+    });
+    update("R02");
+    const stale = makeVisual();
+    pending[1]!(stale);
+    await Promise.resolve();
+    expect(stale.dispose).toHaveBeenCalledOnce();
   } finally {
     entities.dispose();
     scene.dispose();

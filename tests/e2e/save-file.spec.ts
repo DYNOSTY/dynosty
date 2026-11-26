@@ -150,7 +150,14 @@ for (const bad of invalid) {
       mimeType: "application/json",
       buffer: Buffer.from(bad.raw),
     });
-    await expect(page.getByRole("alert")).toContainText(bad.message);
+    await expect(
+      page
+        .getByRole("region", {
+          name: "저장 파일 내보내기와 가져오기",
+          exact: true,
+        })
+        .getByRole("alert"),
+    ).toContainText(bad.message);
     await expect(
       page.getByRole("button", { name: "파일 가져오기", exact: true }),
     ).toBeDisabled();
@@ -186,7 +193,14 @@ test("가져오기 쓰기 실패는 원문과 현재 상태를 유지하며 재�
     exact: true,
   });
   await button.click();
-  await expect(page.getByRole("alert")).toContainText("여유 공간");
+  await expect(
+    page
+      .getByRole("region", {
+        name: "저장 파일 내보내기와 가져오기",
+        exact: true,
+      })
+      .getByRole("alert"),
+  ).toContainText("여유 공간");
   expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe(
     before,
   );
@@ -216,7 +230,14 @@ test("파일 읽기 실패는 기존 기록을 보존한다", async ({ page }) =
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(fileValue)),
   });
-  await expect(page.getByRole("alert")).toContainText("읽지 못했습니다");
+  await expect(
+    page
+      .getByRole("region", {
+        name: "저장 파일 내보내기와 가져오기",
+        exact: true,
+      })
+      .getByRole("alert"),
+  ).toContainText("읽지 못했습니다");
   expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe(
     before,
   );
@@ -232,7 +253,14 @@ test("기존 로컬 저장이 손상되었으면 유효한 가져오기 파일�
   await page
     .getByRole("button", { name: "파일 가져오기", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toContainText("손상");
+  await expect(
+    page
+      .getByRole("region", {
+        name: "저장 파일 내보내기와 가져오기",
+        exact: true,
+      })
+      .getByRole("alert"),
+  ).toContainText("손상");
   expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe(
     "{keep broken",
   );

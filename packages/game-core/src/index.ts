@@ -147,6 +147,7 @@ export * from "./resident-routine.js";
 export * from "./scout-sites.js";
 export * from "./storage.js";
 export * from "./story-research.js";
+export { terrainElevation } from "./terrain.js";
 export * from "./timber.js";
 export * from "./town.js";
 export * from "./village-services.js";

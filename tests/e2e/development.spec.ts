@@ -51,11 +51,18 @@ async function load(page: Page, s: TimberState) {
     "불러왔습니다",
   );
   await button(page, "저장").click();
+  await tools(page);
+}
+// 제출본은 운영 장부를 메뉴별로 나눠 보여 준다. 개발 도구를 열면 전체 장부와 시간 조작이 보인다.
+async function tools(page: Page) {
+  const toggle = button(page, "개발 도구");
+  if ((await toggle.getAttribute("aria-expanded")) !== "true")
+    await toggle.click();
 }
 test("시설 개량 버튼으로2단계 생산 배율과 저장 복원을 확인한다", async ({
   page,
 }) => {
-  let unlocked = payTown(built("fishery", 46, 32), {
+  let unlocked = payTown(built("fishery", 28, 48), {
     RES_WOOD: 24,
     RES_METAL: 6,
   });
@@ -73,6 +80,14 @@ test("시설 개량 버튼으로2단계 생산 배율과 저장 복원을 확인
   await page.getByText("완공 시설 1곳", { exact: true }).click();
   await page.getByRole("button", { name: /2단계 개량/ }).click();
   await page.getByLabel("진행 속도", { exact: true }).selectOption("3");
+  // 개량 명령 뒤 시간이 멈춰 있으면 재개한다. 생산 배율 확인에는 시간이 흘러야 한다.
+  // 게임이 공사 명령 뒤 스스로 재개하기도 해서(App.tsx resumeAfterConstruction), 「시간 재개」가
+  // 보였다가 누르기 전에 사라질 수 있다. 일시정지 버튼이 보일 때까지 다시 시도한다.
+  await expect(async () => {
+    const resume = button(page, "시간 재개");
+    if (await resume.isVisible()) await resume.click({ timeout: 2000 });
+    await expect(button(page, "일시정지")).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 20000 });
   await expect(
     page.getByText("어획막 · 2단계 · build-1", { exact: true }),
   ).toBeVisible({ timeout: 25000 });
@@ -87,7 +102,8 @@ test("시설 개량 버튼으로2단계 생산 배율과 저장 복원을 확인
   await expect(
     page.getByText("어획막 · 2단계 · build-1", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("69");
+  // 목재 120 - 어획막 45 - 연구비 24 - 2단계 개량 9
+  await expect(page.getByTestId("resource-RES_WOOD")).toHaveText("42");
   await button(page, "현장 보기").click();
   await page
     .getByText("어획막 · 2단계 · build-1", { exact: true })
@@ -117,7 +133,7 @@ test("야근 선택은 추가 식량을 차감하지 않고 부상 기록을 남
     page.getByRole("checkbox", { name: "build-1 야근", exact: true }),
   ).toBeChecked();
   await expect(page.getByTestId("resource-RES_MEAT")).toHaveText(food ?? "");
-  await button(page, "개발 도구").click();
+  await tools(page);
   for (let i = 0; i < 13; i++) {
     const before = await page.getByTestId("timber-clock").textContent();
     await button(page, "5분 진행").click();

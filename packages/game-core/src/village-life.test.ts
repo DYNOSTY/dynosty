@@ -61,9 +61,7 @@ it("식당이 닫혀 있거나 먹이가 없으면 먹지 않고 요구를 전�
       { ...base, restaurantBuilt: true, world: { ...base.world, minute } },
       3,
     );
-    expect(s.residents.some((r) => r.request === "restaurant-closed")).toBe(
-      true,
-    );
+    expect(s.residents.some((r) => r.request === "no-staff")).toBe(true);
     expect(s.world.resources).toEqual(base.world.resources);
   }
   const s = advanceTimber(
@@ -99,13 +97,13 @@ it("식당은 개인별로 이용하며 근무 중인 주민은 작업장을 이
       residents: base.residents.map((r) => ({
         ...r,
         workplaceId: "mill",
-        hunger: 400,
+        hunger: 720,
       })),
     },
     20,
   );
   expect(
-    s.residents.every((r) => r.routine === "working" && r.hunger === 420),
+    s.residents.every((r) => r.routine === "working" && r.hunger === 740),
   ).toBe(true);
   expect(s.world.resources.RES_PLANT).toBe(base.world.resources.RES_PLANT);
   const after = advanceTimber(
@@ -114,10 +112,10 @@ it("식당은 개인별로 이용하며 근무 중인 주민은 작업장을 이
         ...s,
         world: { ...s.world, minute: 19 * 60 },
         residents: s.residents.map((r, i) =>
-          i === 0 ? { ...r, workplaceId: null } : r,
+          i < 2 ? { ...r, workplaceId: null } : r,
         ),
       },
-      { type: "set-restaurant-workers", count: 1 },
+      { type: "set-restaurant-workers", count: 2 },
       "evening-staff",
     ),
     30,

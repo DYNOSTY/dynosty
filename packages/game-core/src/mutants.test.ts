@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { campaignOf } from "./campaign.js";
-import { advanceMutants, mutantRepairCost } from "./mutants.js";
+import { advanceMutants, mutantRepairCost, mutantWound } from "./mutants.js";
 import { AMOUNT_SCALE } from "./play.js";
 import { requireValue } from "./require-value.js";
 import {
@@ -15,23 +15,27 @@ import {
 function bitten(draw: number) {
   const initial = createVillageGame(false, true);
   const night = { ...initial, world: { ...initial.world, minute: 1260 } };
-  return gateRaid(
+  const id = requireValue(night.residents[0], "부상 주민").id;
+  const wounded = commandTimber(
     night,
-    vi
-      .fn()
-      .mockReturnValueOnce(0)
-      .mockReturnValueOnce(0)
-      .mockReturnValueOnce(0)
-      .mockReturnValueOnce(0.5)
-      .mockReturnValueOnce(draw)
-      .mockReturnValue(0.99),
+    {
+      type: "citizen-event",
+      event: {
+        id: "mutant-bite",
+        type: "illness",
+        severity: "major",
+        citizenIds: [id],
+      },
+    },
+    "record-bite",
   );
+  return mutantWound(wounded, id, () => draw);
 }
 describe("변종 야습", () => {
   it("부상 판정 후 20% 경계에서만 변종이 되고, 사망자는 변하지 않는다", () => {
     expect(bitten(0.2).mutants).toBeUndefined();
     const s = bitten(0.19999);
-    expect(s.raid?.injured).toBe(1);
+    expect(s.residents.filter((r) => r.health === "sick")).toHaveLength(1);
     expect(s.mutants).toHaveLength(1);
     const fatal = gateRaid(
       {
@@ -43,7 +47,7 @@ describe("변종 야습", () => {
       },
       () => 0,
     );
-    expect(fatal.raid?.dead).toBe(2);
+    expect(fatal.raid?.dead).toBe(10);
     expect(fatal.mutants).toBeUndefined();
   });
   it("도성에서는 포졸 배치를 기다리지 않고 변종을 진압한다", () => {

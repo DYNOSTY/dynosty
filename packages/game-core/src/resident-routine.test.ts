@@ -43,26 +43,32 @@ it("업무 뒤 집 또는 따뜻한 대기 장소로 돌아간다", () => {
   ).toEqual(places.warmth);
 });
 it("허기가 생긴 개인만 식당에 가고 먹고 난 뒤 귀가한다", () => {
-  let hungry = { ...resident(), hunger: 400 };
+  let hungry = { ...resident(), hunger: 7128 };
   const full = advanceResidentRoutine(resident(), 1, 1, 2, places, true);
   for (let i = 1; i <= 10; i++)
     hungry = advanceResidentRoutine(hungry, i, 1, 2, places, true);
-  expect(hungry.hunger).toBe(40);
+  expect(hungry.hunger).toBe(0);
   expect(hungry.position).toEqual(hungry.home);
   expect(full.routine).toBe("idle");
 });
 it("식당이 없거나 닫혀 있으면 지휘관에게 요구하고 가짜 식당으로 가지 않는다", () => {
-  const r = { ...resident(), hunger: 400 };
+  const r = { ...resident(), hunger: 720 };
   expect(
     advanceResidentRoutine(r, 1, 1, 2, { ...places, restaurant: null }, true),
-  ).toMatchObject({ request: "no-restaurant", hunger: 400, position: r.home });
+  ).toMatchObject({ request: "no-restaurant", hunger: 720, position: r.home });
   expect(
-    advanceResidentRoutine(r, 1, 1, 2, { ...places, minute: 23 * 60 }, true)
-      .request,
-  ).toBe("restaurant-closed");
+    advanceResidentRoutine(
+      r,
+      1,
+      1,
+      2,
+      { ...places, minute: 23 * 60, restaurantStaffed: false },
+      true,
+    ).request,
+  ).toBe("no-staff");
 });
 it("근무 중이거나 지시 업무 중에는 식사를 위해 이탈하지 않는다", () => {
-  const r = { ...resident(), hunger: 400, workplaceId: "mill" };
+  const r = { ...resident(), hunger: 720, workplaceId: "mill" };
   expect(
     advanceResidentRoutine(r, 1, 1, 2, { ...places, minute: 9 * 60 }, true),
   ).toMatchObject({ position: r.position, routine: "working" });
@@ -78,12 +84,12 @@ it("근무 중이거나 지시 업무 중에는 식사를 위해 이탈하지 �
 it("식당은 작업장보다 먼저 열고 늦게 닫는다", () => {
   expect(restaurantOpen(7 * 60) && !workplaceOpen(7 * 60)).toBe(true);
   expect(restaurantOpen(19 * 60) && !workplaceOpen(19 * 60)).toBe(true);
-  expect(restaurantOpen(22 * 60)).toBe(false);
+  expect(restaurantOpen(22 * 60)).toBe(true);
 });
 it("먹이가 없거나 자리가 없으면 먹었다고 처리하지 않는다", () => {
-  const r = { ...resident(), hunger: 400, position: { x: -3, z: 0 } };
+  const r = { ...resident(), hunger: 720, position: { x: -3, z: 0 } };
   expect(advanceResidentRoutine(r, 1, 1, 2, places, false)).toMatchObject({
-    hunger: 400,
+    hunger: 720,
     request: "no-food",
     routine: "restaurant",
   });
@@ -96,7 +102,7 @@ it("먹이가 없거나 자리가 없으면 먹었다고 처리하지 않는다"
       { ...places, seatAvailable: false },
       true,
     ),
-  ).toMatchObject({ hunger: 400, request: "waiting-seat" });
+  ).toMatchObject({ hunger: 720, request: "waiting-seat" });
 });
 it("신규와 기존 모두 같은 건강 상태를 따르고 사망자는 업무에 들어가지 않는다", () => {
   expect(
@@ -125,7 +131,7 @@ it("배고픈 주민은 출근·예약 작업을 먼저 수행하고 퇴근 뒤 
   const job = { x: 4, z: 0 };
   const r = {
     ...resident(),
-    hunger: 500,
+    hunger: 720,
     routine: "restaurant" as const,
     request: "waiting-seat" as const,
   };

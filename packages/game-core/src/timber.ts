@@ -8,6 +8,7 @@ import {
   productionSiteDefinition,
   reservedVillageLand,
   sawmillHasForest,
+  VILLAGE_LAYOUT,
 } from "./bokhol.js";
 import {
   actCampaign,
@@ -16,6 +17,7 @@ import {
   type CampaignCommand,
   campaignOf,
   campaignValid,
+  departureBuildings,
   minutesUntilCoup,
   newCampaign,
   policyWait,
@@ -62,6 +64,7 @@ import {
   setLoggingSite,
   staffLogging,
 } from "./logging.js";
+import { findById, indexById } from "./lookup.js";
 import {
   advanceMutants,
   containMutant,
@@ -72,6 +75,7 @@ import {
 } from "./mutants.js";
 import {
   AMOUNT_SCALE,
+  advanceParsedClock,
   advancePlayClock,
   applyCitizenEvent,
   type Citizen,
@@ -85,11 +89,13 @@ import {
   isDifficulty,
   type PlayState,
   parsePlayState,
+  type ResourceId,
 } from "./play.js";
 import { requireValue } from "./require-value.js";
 import {
   type GroundObstacle,
   type GroundPoint,
+  moveOnGround,
   residentPath,
 } from "./resident-path.js";
 import {
@@ -112,7 +118,12 @@ import {
   scoutRun,
   scoutTripMinutes,
 } from "./scout-sites.js";
-import { storageCapacity, warehouseDoor } from "./storage.js";
+import {
+  advanceYardTransfer,
+  storageCapacity,
+  warehouseDoor,
+  yardStock,
+} from "./storage.js";
 import {
   createResearchStory,
   mechanizeCitizen,
@@ -124,6 +135,7 @@ import {
   BUILDING_RULES,
   type BuildingKind,
   createTown,
+  demolishableLandmark,
   demolishBuilding,
   deposit,
   directStaff,
@@ -132,6 +144,7 @@ import {
   facilityDoor,
   facilityResource,
   facilityStaffLimit,
+  landmarkKinds,
   mineralWorksites,
   orderResting,
   originalBuildingCost,
@@ -257,6 +270,12 @@ export interface TimberState {
   readonly bokhol?: TimberState;
   readonly firedHeat?: number;
   readonly warmerHomes?: readonly string[];
+  readonly coveredStock?: Partial<Record<ResourceId, number>> | undefined;
+  readonly yardTransfer?:
+    | { worker: string; resource: ResourceId; loaded: boolean }
+    | undefined;
+  readonly raidFailures?: number;
+  readonly nightFires?: readonly { id: string; work: number }[];
   readonly raid?: {
     minute: number;
     picture: number;
@@ -509,7 +528,7 @@ function createVillageResident(
     workplaceId: null,
     task: null,
     nextWork: null,
-    hunger: c.mechanicalFrom ? 0 : (seed + index * 97) % 420,
+    hunger: c.mechanicalFrom ? 0 : (seed + index * 97) % 840,
     diningSeat: null,
     health: c.alive ? (c.health ?? "healthy") : "dead",
     request: null,
@@ -533,13 +552,8 @@ export function createVillageGame(
   const resources = { ...world.resources };
   for (const id of Object.keys(resources) as (keyof typeof resources)[])
     resources[id] =
-      (id === "RES_WATER"
-        ? beforeDeparture
-          ? 200
-          : 20
-        : beforeDeparture
-          ? 10000
-          : 1000) * AMOUNT_SCALE;
+      (id === "RES_WATER" ? 200 : beforeDeparture ? 10000 : 1000) *
+      AMOUNT_SCALE;
   const citizens = beforeDeparture
     ? [
         ...world.citizens,
@@ -679,7 +693,7 @@ export function createCapital(s: TimberState): TimberState {
     elapsed: s.elapsed,
     rebuilding: true,
     restaurantBuilt: true,
-    restaurantWorkerTarget: 2,
+    restaurantWorkerTarget: 4,
     rationPolicy: "cap",
     bokhol: s,
     processed: s.processed,
@@ -732,6 +746,7 @@ export function createTimberState(
     version: 19,
     town: createTown(),
     world: { ...world, paused: true },
+    coveredStock: {},
     initialWood: parsed.resources.RES_WOOD,
     initialIron: parsed.resources.RES_METAL,
     woodSpent: 0,
@@ -819,7 +834,7 @@ const restaurants = (s: TimberState) =>
   s.town.facilities.filter((f) => f.kind === "restaurant");
 const diningCapacity = (level: number) => [10, 20, 40][level - 1] ?? 10;
 function employeeRestaurant(s: TimberState, id: string) {
-  const workplace = s.residents.find((r) => r.id === id)?.workplaceId;
+  const workplace = findById(s.residents, id)?.workplaceId;
   if (
     !workplace ||
     (workplace !== "restaurant" && !workplace.startsWith("facility:"))
@@ -851,6 +866,30 @@ function employeePosition(s: TimberState, id: string): GroundPoint {
     z: TIMBER_RULES.restaurant.z + 4.4,
   };
 }
+const kitchenRosters = new WeakMap<TimberState, Set<string>>();
+function diningShift(s: TimberState, r: VillageResident) {
+  let onDuty = kitchenRosters.get(s);
+  if (!onDuty) {
+    onDuty = new Set();
+    const counts = new Map<string, number>();
+    const kitchens = restaurants(s);
+    const day = s.world.minute >= 360 && s.world.minute < 1080;
+    for (const employee of s.residents) {
+      if (employee.health !== "healthy") continue;
+      const post = employee.workplaceId;
+      const kitchen =
+        post === "restaurant"
+          ? (kitchens[0]?.id ?? "restaurant")
+          : kitchens.find((k) => post === "facility:" + k.id)?.id;
+      if (!kitchen) continue;
+      const index = counts.get(kitchen) ?? 0;
+      counts.set(kitchen, index + 1);
+      if ((index % 2 === 0) === day) onDuty.add(employee.id);
+    }
+    kitchenRosters.set(s, onDuty);
+  }
+  return onDuty.has(r.id);
+}
 export function restaurantStaff(s: TimberState, facilityId?: string) {
   const assigned = s.residents.filter(
     (r) =>
@@ -861,6 +900,7 @@ export function restaurantStaff(s: TimberState, facilityId?: string) {
   );
   const present = assigned.filter(
     (r) =>
+      diningShift(s, r) &&
       Math.hypot(
         r.position.x - employeePosition(s, r.id).x,
         r.position.z - employeePosition(s, r.id).z,
@@ -886,7 +926,7 @@ function staffRestaurant(s: TimberState): TimberState {
   );
   let next = { ...s, residents };
   const first = restaurants(s)[0];
-  const limit = first ? facilityStaffLimit(first) : 2;
+  const limit = first ? facilityStaffLimit(first) : 4;
   for (let count = 0; count < limit; count++) {
     if (
       residents.filter((r) => r.workplaceId === "restaurant").length >=
@@ -918,9 +958,7 @@ function residentMeal(
   r: VillageResident,
   resources = s.world.resources,
 ) {
-  const c =
-    s.world.citizens.find((c) => c.id === r.id) ??
-    fail("주민 등록이 없습니다.");
+  const c = findById(s.world.citizens, r.id) ?? fail("주민 등록이 없습니다.");
   return mealPlan(
     c,
     s.rationPolicy,
@@ -943,9 +981,14 @@ function diningSeats(s: TimberState): Map<string, number> {
       r.health !== "dead" &&
       r.routine === "eating" &&
       r.diningSeat !== null &&
-      !isDiningEmployee(s, r) &&
+      !(isDiningEmployee(s, r) && diningShift(s, r)) &&
       !r.nextWork &&
-      !(r.workplaceId && residentShiftOpen(s, r.id)) &&
+      !(
+        r.workplaceId &&
+        (isDiningEmployee(s, r)
+          ? diningShift(s, r)
+          : residentShiftOpen(s, r.id))
+      ) &&
       !admitted.has(r.id)
     )
       seats.set(r.id, r.diningSeat);
@@ -953,6 +996,8 @@ function diningSeats(s: TimberState): Map<string, number> {
   const candidates = s.residents.filter(
     (r) =>
       r.health !== "dead" &&
+      (r.hunger >= RESIDENT_ROUTINE_RULES.hungryAt || r.routine === "eating") &&
+      !r.nextWork &&
       !admitted.has(r.id) &&
       !s.workerIds.includes(r.id) &&
       (!r.task ||
@@ -960,12 +1005,16 @@ function diningSeats(s: TimberState): Map<string, number> {
           (orderResting(s, r.id) ||
             s.construction?.crew?.some((w) => w.id === r.id) ||
             s.construction?.workerId === r.id))) &&
-      !isDiningEmployee(s, r) &&
+      !(isDiningEmployee(s, r) && diningShift(s, r)) &&
       (residentMeal(s, r).amount > 0 || r.routine === "eating") &&
-      !r.nextWork &&
-      !(r.workplaceId && residentShiftOpen(s, r.id)) &&
-      (r.hunger >= RESIDENT_ROUTINE_RULES.hungryAt || r.routine === "eating"),
+      !(
+        r.workplaceId &&
+        (isDiningEmployee(s, r)
+          ? diningShift(s, r)
+          : residentShiftOpen(s, r.id))
+      ),
   );
+  if (!candidates.length) return seats;
   const facilities = restaurants(s);
   const available = facilities.length
     ? facilities.flatMap((f, index) =>
@@ -977,41 +1026,71 @@ function diningSeats(s: TimberState): Map<string, number> {
           : [],
       )
     : Array.from({ length: 10 }, (_, i) => i);
+  const freeSeats = new Set(available);
+  const capacity = restaurantSeats(s);
+  for (const seat of seats.values()) freeSeats.delete(seat);
   for (const r of candidates)
-    if (
-      r.diningSeat !== null &&
-      available.includes(r.diningSeat) &&
-      ![...seats.values()].includes(r.diningSeat)
-    )
+    if (r.diningSeat !== null && freeSeats.delete(r.diningSeat))
       seats.set(r.id, r.diningSeat);
   for (const r of candidates.sort(
     (a, b) => b.hunger - a.hunger || a.id.localeCompare(b.id),
   )) {
-    if (seats.size >= restaurantSeats(s)) break;
+    if (!freeSeats.size || seats.size >= capacity) break;
     if (seats.has(r.id)) continue;
-    const free = available
-      .filter((i) => ![...seats.values()].includes(i))
-      .sort((a, b) => {
-        const x =
-          facilities[Math.floor(a / 40)]?.position ?? TIMBER_RULES.restaurant;
-        const y =
-          facilities[Math.floor(b / 40)]?.position ?? TIMBER_RULES.restaurant;
-        return (
-          Math.hypot(r.position.x - x.x, r.position.z - x.z) -
-          Math.hypot(r.position.x - y.x, r.position.z - y.z)
-        );
-      })[0];
-    if (free !== undefined) seats.set(r.id, free);
+    let nearest: number | undefined;
+    let distance = Infinity;
+    for (const seat of freeSeats) {
+      const p =
+        facilities[Math.floor(seat / 40)]?.position ?? TIMBER_RULES.restaurant;
+      const d = Math.hypot(r.position.x - p.x, r.position.z - p.z);
+      if (d < distance) {
+        nearest = seat;
+        distance = d;
+      }
+    }
+    if (nearest !== undefined) {
+      seats.set(r.id, nearest);
+      freeSeats.delete(nearest);
+    }
   }
   return seats;
 }
-function routinePlaces(s: TimberState, id: string, seats = diningSeats(s)) {
-  const index = s.residents.findIndex((r) => r.id === id);
+// Values every resident reads from the same minute's state; computed once per minute.
+function routineShared(s: TimberState) {
+  const staff = new Map<
+    string | undefined,
+    ReturnType<typeof restaurantStaff>
+  >();
+  return {
+    obstacles: villageObstacles(s),
+    restaurants: restaurants(s),
+    staff(facilityId: string | undefined) {
+      let value = staff.get(facilityId);
+      if (!value) {
+        value = restaurantStaff(s, facilityId);
+        staff.set(facilityId, value);
+      }
+      return value;
+    },
+  };
+}
+function routinePlaces(
+  s: TimberState,
+  id: string,
+  seats = diningSeats(s),
+  shared = routineShared(s),
+  index = indexById(s.residents, id),
+) {
+  const resident = s.residents[index] ?? fail();
   const seat = seats.get(id) ?? -1;
-  const employee = isDiningEmployee(s, s.residents[index] ?? fail());
-  const facilities = restaurants(s);
+  const employee = isDiningEmployee(s, resident);
+  const facilities = shared.restaurants;
   const diningPlace =
-    employeeRestaurant(s, id) ??
+    (employee && resident.workplaceId === "restaurant"
+      ? facilities[0]
+      : employee
+        ? facilities.find((f) => resident.workplaceId === `facility:${f.id}`)
+        : undefined) ??
     (seat >= 0
       ? facilities[Math.floor(seat / 40)]
       : [...facilities].sort(
@@ -1028,8 +1107,9 @@ function routinePlaces(s: TimberState, id: string, seats = diningSeats(s)) {
   const diningOrigin = diningPlace
     ? facilityDoor(diningPlace)
     : TIMBER_RULES.restaurant;
-  const h = s.homes.find((h) => h.id === s.residents[index]?.homeId);
-  const staff = restaurantStaff(s, diningPlace?.id);
+  const homeId = s.residents[index]?.homeId;
+  const h = homeId == null ? undefined : findById(s.homes, homeId);
+  const staff = shared.staff(diningPlace?.id);
   return {
     warmth: h
       ? rotatedPoint(
@@ -1045,7 +1125,7 @@ function routinePlaces(s: TimberState, id: string, seats = diningSeats(s)) {
             ...diningOrigin,
           }
         : { x: -10 - (index % 3) * 2, z: 5 + (Math.floor(index / 3) % 4) * 2 },
-    seatAvailable: employee || seat >= 0,
+    seatAvailable: seat >= 0,
     restaurantEmployee: employee,
     restaurantStaffed: staff.serving > 0,
     eatingMinutes: Math.max(5, Math.ceil(30 / Math.max(1, staff.present))),
@@ -1071,15 +1151,19 @@ function routinePlaces(s: TimberState, id: string, seats = diningSeats(s)) {
         : 0) <
       rationLimit(s.world.citizens[index]?.species ?? "R02", s.rationPolicy),
     minute: s.world.minute,
-    workOpen: residentShiftOpen(s, id),
-    obstacles: villageObstacles(s),
+    workOpen: employee
+      ? diningShift(s, s.residents[index]!)
+      : residentShiftOpen(s, id),
+    obstacles: shared.obstacles,
   };
 }
 function resumeResidents(input: TimberState, minutes: number): TimberState {
   const s = staffTown(staffLogging(staffRestaurant(input), eligible));
   const resources = { ...s.world.resources };
   const seats = diningSeats(s);
-  const residents = s.residents.map((r) => {
+  const shared = routineShared(s);
+  const poorMeals: string[] = [];
+  const residents = s.residents.map((r, index) => {
     const current = {
       ...r,
       diningSeat: seats.get(r.id) ?? null,
@@ -1089,8 +1173,12 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
         ? 0
         : r.health === "dead"
           ? r.hunger
-          : Math.min(2880, r.hunger + minutes),
+          : Math.min(RESIDENT_ROUTINE_RULES.starvationAt, r.hunger + minutes),
     };
+    if (s.nightFires?.length && s.world.minute !== 360 && canFightFire(s, r))
+      return current;
+    if (s.yardTransfer?.worker === r.id && workplaceOpen(s.world.minute))
+      return current;
     if (r.task?.startsWith("scout:")) {
       const site = SCOUT_SITES.find((q) => r.task === "scout:" + q.id);
       const trip = site && scoutRun(s, site);
@@ -1108,6 +1196,13 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
         atHospital(s, current) &&
         current.hunger >= RESIDENT_ROUTINE_RULES.hungryAt &&
         meal.amount > 0;
+      if (
+        served &&
+        meal.amount <
+          speciesRule(s.world.citizens.find((c) => c.id === r.id)!.species)
+            .portion
+      )
+        poorMeals.push(r.id);
       if (served)
         for (const [food, amount] of Object.entries(meal.foods))
           resources[food as FoodId] -= amount;
@@ -1156,7 +1251,7 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
       minutes,
       TIMBER_RULES.walkSpeed,
       {
-        ...routinePlaces(s, r.id, seats),
+        ...routinePlaces(s, r.id, seats, shared, index),
         ...(isMechanical(s, r.id) ? { minute: 720 } : {}),
         hungerRelief: meal.relief,
       },
@@ -1166,6 +1261,13 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
       for (const [food, amount] of Object.entries(meal.foods))
         resources[food as FoodId] -= amount;
     const served = next.routine === "eating" && r.routine !== "eating";
+    if (
+      served &&
+      meal.amount <
+        speciesRule(s.world.citizens.find((c) => c.id === r.id)!.species)
+          .portion
+    )
+      poorMeals.push(r.id);
     return {
       ...next,
       ...(builderRest
@@ -1191,6 +1293,47 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
     };
   });
   let next: TimberState = { ...s, residents, world: { ...s.world, resources } };
+  const starving = residents
+    .filter(
+      (r) =>
+        r.health !== "dead" && r.hunger >= RESIDENT_ROUTINE_RULES.starvationAt,
+    )
+    .map((r) => r.id);
+  if (starving.length)
+    next = note(
+      applyAutomaticCitizenEvent(next, {
+        type: "death",
+        id: "hunger-" + s.elapsed,
+        citizenIds: starving,
+      }),
+      "식량을 받지 못한 주민 " +
+        starving.length +
+        "명이 굶주림으로 숨졌습니다.",
+    );
+  if (poorMeals.length) {
+    let seed = next.town.development.seed;
+    const sick = poorMeals.filter((id) => {
+      seed = nextVillageSeed(seed);
+      return (
+        seed / 4294967296 < 0.01 &&
+        next.residents.some((r) => r.id === id && r.health === "healthy")
+      );
+    });
+    next = {
+      ...next,
+      town: { ...next.town, development: { ...next.town.development, seed } },
+    };
+    if (sick.length)
+      next = note(
+        applyAutomaticCitizenEvent(next, {
+          type: "illness",
+          severity: "minor",
+          id: "ration-" + s.elapsed,
+          citizenIds: sick,
+        }),
+        "간소 배급을 받은 주민이 탈이 났습니다.",
+      );
+  }
   const build = next.construction;
   if (build && !build.crew && !workplaceOpen(s.world.minute))
     next = {
@@ -2210,7 +2353,7 @@ export function parseTimberState(value: unknown): TimberState {
       fail("식당 건설 시각이 일치하지 않습니다.");
     if (build.startedAt !== null) {
       num(build.startedAt);
-      num(build.finishAt, 14430);
+      num(build.finishAt, 144000000 + VILLAGE_RULES.constructionMinutes);
       if (
         build.startedAt > (value.elapsed as number) ||
         ![8, VILLAGE_RULES.constructionMinutes].includes(
@@ -2410,7 +2553,7 @@ export function parseTimberState(value: unknown): TimberState {
               40)) ||
       !Number.isSafeInteger(r.hunger) ||
       (r.hunger as number) < 0 ||
-      (r.hunger as number) > 2880 ||
+      (r.hunger as number) > RESIDENT_ROUTINE_RULES.starvationAt ||
       !["healthy", "sick", "dead"].includes(r.health as string) ||
       ![
         null,
@@ -2447,19 +2590,61 @@ export function parseTimberState(value: unknown): TimberState {
       (r.task !== null && typeof r.task !== "string")
     )
       fail("주민 명부가 올바르지 않습니다.");
+    // Citizen ids are unique here: parsePlayState(value.world) already checked them.
+    const citizen = findById(
+      (value.world as unknown as PlayState).citizens,
+      r.id as string,
+    );
     if (
-      !(value.world as unknown as PlayState).citizens.some(
-        (c) =>
-          c.id === r.id &&
-          (c.alive ? (c.health ?? "healthy") : "dead") === r.health,
-      )
+      !citizen ||
+      (citizen.alive ? (citizen.health ?? "healthy") : "dead") !== r.health
     )
       fail("존재하지 않는 주민입니다.");
     if ((r.routine === "eating") !== (r.eatingUntil !== null))
       fail("식사 상태가 올바르지 않습니다.");
     ids.add(r.id);
   }
-  const s = JSON.parse(JSON.stringify(value)) as TimberState;
+  let s = JSON.parse(JSON.stringify(value)) as TimberState;
+  if (
+    s.coveredStock !== undefined &&
+    (!isRecord(s.coveredStock) ||
+      Object.entries(s.coveredStock).some(
+        ([key, n]) =>
+          !Object.hasOwn(s.world.resources, key) ||
+          !Number.isFinite(n) ||
+          n < 0,
+      ))
+  )
+    fail("창고 재고 기록 오류");
+  if (
+    s.yardTransfer &&
+    (!isRecord(s.yardTransfer) ||
+      !s.residents.some((r) => r.id === s.yardTransfer?.worker) ||
+      !Object.hasOwn(s.world.resources, s.yardTransfer.resource) ||
+      typeof s.yardTransfer.loaded !== "boolean")
+  )
+    fail("야적 운반 기록 오류");
+  const capacity = storageCapacity(s);
+  s = {
+    ...s,
+    coveredStock: Object.fromEntries(
+      (Object.keys(s.world.resources) as ResourceId[])
+        .filter(
+          (k) =>
+            (s.coveredStock?.[k] ?? (s.coveredStock ? 0 : capacity)) > 0 &&
+            s.world.resources[k] > 0 &&
+            capacity > 0,
+        )
+        .map((k) => [
+          k,
+          Math.min(
+            s.coveredStock?.[k] ?? (s.coveredStock ? 0 : capacity),
+            s.world.resources[k] / AMOUNT_SCALE,
+            capacity,
+          ),
+        ]),
+    ),
+  };
   if (
     s.mutants !== undefined &&
     (!Array.isArray(s.mutants) ||
@@ -2499,11 +2684,27 @@ export function parseTimberState(value: unknown): TimberState {
       !s.warmerHomes.every((id) => typeof id === "string"))
   )
     throw Error("온돌 기록을 확인해 주세요.");
+  if (s.raidFailures !== undefined) num(s.raidFailures, 3);
+  if (
+    s.nightFires !== undefined &&
+    (!Array.isArray(s.nightFires) ||
+      s.nightFires.length > 6 ||
+      new Set(s.nightFires.map((f) => f?.id)).size !== s.nightFires.length ||
+      s.nightFires.some(
+        (f) =>
+          !f ||
+          typeof f.id !== "string" ||
+          !Number.isFinite(f.work) ||
+          f.work <= 0 ||
+          f.work > 480,
+      ))
+  )
+    fail("화재 기록 오류");
   if (s.raid !== undefined) {
     if (!isRecord(s.raid)) fail();
     num(s.raid.minute, s.elapsed);
     num(s.raid.picture, 5);
-    num(s.raid.dead, 2);
+    num(s.raid.dead, s.residents.length);
     num(s.raid.injured, 2);
   }
   if (
@@ -2571,8 +2772,8 @@ export function parseTimberState(value: unknown): TimberState {
       if (r.homeSlot !== null) fail("거주지 없는 주민의 잠자리 기록입니다.");
       continue;
     }
-    const h = s.homes.find((h) => h.id === r.homeId),
-      c = s.world.citizens.find((c) => c.id === r.id);
+    const h = findById(s.homes, r.homeId),
+      c = findById(s.world.citizens, r.id);
     if (
       !h ||
       !c?.alive ||
@@ -2590,8 +2791,8 @@ export function parseTimberState(value: unknown): TimberState {
     }
   }
   for (const r of s.residents) {
-    const h = s.homes.find((h) => h.id === r.homeId),
-      c = s.world.citizens.find((c) => c.id === r.id) ?? fail();
+    const h = r.homeId === null ? undefined : findById(s.homes, r.homeId),
+      c = findById(s.world.citizens, r.id) ?? fail();
     if (
       h
         ? !r.home ||
@@ -2639,7 +2840,7 @@ export function parseTimberState(value: unknown): TimberState {
         ? facilityStaffLimit(
             restaurants(s)[0] ?? { kind: "restaurant", level: 1 },
           )
-        : 2) ||
+        : 4) ||
     staff.length > s.restaurantWorkerTarget ||
     (!s.restaurantBuilt && staff.length)
   )
@@ -2972,6 +3173,19 @@ function onExpedition(s: TimberState, r: VillageResident) {
     s.town.trips.some((t) => t.ids.includes(r.id))
   );
 }
+export function fireBuildings(s: TimberState) {
+  const landmarks = VILLAGE_LAYOUT.flatMap(([id, x, z]) => {
+    const kind = landmarkKinds[id];
+    return kind && demolishableLandmark(s, `village:${id}:${x}:${z}`)
+      ? [{ id, kind, position: { x, z } }]
+      : [];
+  });
+  return [
+    ...s.homes.map((h) => ({ ...h, kind: "home" as const })),
+    ...s.town.facilities,
+    ...landmarks,
+  ];
+}
 export function gateRaid(s: TimberState, random = Math.random): TimberState {
   if (
     !s.campaign ||
@@ -2979,44 +3193,109 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
     (s.world.minute >= 360 && s.world.minute < 1080) ||
     s.campaign.ending ||
     (s.campaign.beat !== "capital" &&
-      random() >= incidentChance(0.15, s.campaign.difficulty))
+      random() >=
+        (s.campaign.difficulty === "hard"
+          ? 0.225
+          : incidentChance(0.15, s.campaign.difficulty)))
   )
     return s;
   const defenders = s.residents.filter(
     (r) => r.workplaceId === "gate" && r.health === "healthy",
   ).length;
-  const exposed = s.residents.filter(
-    (r) =>
-      r.health === "healthy" && !isMechanical(s, r.id) && !onExpedition(s, r),
+  const risk =
+    s.campaign.beat === "capital"
+      ? 1
+      : s.campaign.difficulty === "hard"
+        ? 0.225
+        : incidentChance(0.15, s.campaign.difficulty);
+  const required = risk <= 0.3 ? 4 : risk <= 0.6 ? 8 : 16;
+  const failures =
+    defenders >= required
+      ? (s.raidFailures ?? 0)
+      : Math.min(3, (s.raidFailures ?? 0) + 1);
+  const loss =
+    defenders >= required
+      ? 0
+      : failures === 1
+        ? 10
+        : failures === 2
+          ? 20
+          : s.residents.length;
+  const candidates = s.residents.filter(
+    (r) => r.health !== "dead" && (failures === 3 || !onExpedition(s, r)),
   );
-  let dead = 0,
-    injured = 0;
-  for (let i = 0; i < 2 && exposed.length; i++) {
-    if (random() >= 0.7 / (1 + defenders / 4)) continue;
-    const [victim] = exposed.splice(Math.floor(random() * exposed.length), 1);
-    if (!victim) continue;
-    const killed = random() < 0.2;
-    const id = "gate-raid-" + s.elapsed + "-" + i;
-    s = applyAutomaticCitizenEvent(
-      s,
-      killed
-        ? { type: "death", id, citizenIds: [victim.id] }
-        : {
-            type: "illness",
-            severity: "major",
-            id,
-            citizenIds: [victim.id],
-          },
-    );
-    if (killed) dead++;
-    else {
-      injured++;
-      s = mutantWound(s, victim.id, random);
-    }
+  const victims: string[] = [];
+  while (victims.length < loss && candidates.length) {
+    const [r] = candidates.splice(Math.floor(random() * candidates.length), 1);
+    if (r) victims.push(r.id);
   }
+  if (victims.length)
+    s = applyAutomaticCitizenEvent(s, {
+      type: "death",
+      id: "raid-" + s.elapsed,
+      citizenIds: victims,
+    });
+  const buildings = fireBuildings(s).filter(
+    (b) => s.mutantDamage?.[b.id] !== 100,
+  );
+  const damage = { ...s.mutantDamage };
+  if (failures === 3 && loss) {
+    for (const b of buildings) damage[b.id] = 100;
+    s = {
+      ...s,
+      paused: true,
+      campaign: { ...campaignOf(s), beat: "ending", ending: "collapse" },
+      mutantDamage: damage,
+      nightFires: [],
+    };
+    s = {
+      ...s,
+      residents: assignHomes(s.residents, s.world.citizens, usableHomes(s)),
+    };
+  } else if (loss) {
+    const near = buildings.filter(
+      (b) => Math.hypot(b.position.x, b.position.z - 24) <= 38,
+    );
+    const count = (failures === 1 ? 3 : 5) + Math.floor(random() * 2);
+    const fires: { id: string; work: number }[] = [];
+    let point = { x: 0, z: 24 };
+    while (fires.length < count && near.length) {
+      const neighbors = near.filter(
+        (b) =>
+          Math.hypot(b.position.x - point.x, b.position.z - point.z) <=
+          (fires.length ? 22 : 38),
+      );
+      const target = neighbors[Math.floor(random() * neighbors.length)];
+      if (!target) break;
+      near.splice(near.indexOf(target), 1);
+      point = target.position;
+      const kind = target.kind;
+      const roof =
+        departureBuildings[target.id]?.roof ??
+        [
+          "home",
+          "restaurant",
+          "storage",
+          "workshop",
+          "hospital",
+          "trade",
+        ].includes(kind);
+      s = note(
+        s,
+        "돌쇠: " +
+          (departureBuildings[target.id]?.name ?? BUILDING_RULES[kind].name) +
+          (roof ? " 지붕" : "") +
+          (fires.length ? " 쪽으로 불이 번졌습니다!" : " 쪽에 불이 났습니다!"),
+      );
+      fires.push({ id: target.id, work: 480 });
+    }
+    s = { ...s, nightFires: fires };
+  }
+  const dead = victims.length;
   return note(
     {
       ...s,
+      raidFailures: failures,
       sighting: {
         source: "gate",
         species: pickOne(["R02", "R03", "SPINO"], random),
@@ -3025,11 +3304,113 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
         minute: s.elapsed,
         picture: Math.floor(random() * 6),
         dead,
-        injured,
+        injured: 0,
       },
     },
-    `붉은 눈의 변종 공룡이 성문에서 물러났습니다. 사망 ${dead}명, 부상 ${injured}명.`,
+    loss
+      ? failures === 3
+        ? "마을이 전소했습니다."
+        : "성문이 뚫렸습니다. 사망 " + dead + "명."
+      : "성문 수비대가 습격을 막았습니다.",
   );
+}
+function canFightFire(s: TimberState, r: VillageResident) {
+  const offDutyBuilder =
+    !workplaceOpen(s.world.minute) &&
+    (orderResting(s, r.id) ||
+      s.construction?.workerId === r.id ||
+      s.construction?.crew?.some((w) => w.id === r.id));
+  return (
+    r.health === "healthy" &&
+    (!r.nextWork || offDutyBuilder) &&
+    !onExpedition(s, r) &&
+    !s.workerIds.includes(r.id) &&
+    (!r.task || offDutyBuilder) &&
+    !s.town.patients.some((p) => p.resident === r.id) &&
+    r.workplaceId !== "gate" &&
+    r.workplaceId !== "office" &&
+    !(
+      r.workplaceId &&
+      (isDiningEmployee(s, r) ? diningShift(s, r) : residentShiftOpen(s, r.id))
+    )
+  );
+}
+function fightNightFires(s: TimberState, minutes: number): TimberState {
+  if (!s.nightFires?.length) return s;
+  const targets = fireBuildings(s);
+  const active = s.nightFires.flatMap((f) => {
+    const b = targets.find((b) => b.id === f.id);
+    return b
+      ? [
+          {
+            ...f,
+            position: b.position,
+            name: departureBuildings[b.id]?.name ?? BUILDING_RULES[b.kind].name,
+          },
+        ]
+      : [];
+  });
+  const damage = { ...s.mutantDamage };
+  const dawn = s.world.minute === 360;
+  const obstacles = villageObstacles(s);
+  const residents = s.residents.map((r) => {
+    if (dawn || !canFightFire(s, r)) return r;
+    const fire = active
+      .filter((f) => f.work > 0)
+      .sort(
+        (a, b) =>
+          Math.hypot(a.position.x - r.position.x, a.position.z - r.position.z) -
+          Math.hypot(b.position.x - r.position.x, b.position.z - r.position.z),
+      )[0];
+    if (!fire) return r;
+    const goal = { x: fire.position.x, z: fire.position.z + 3.5 };
+    const position = moveOnGround(
+      r.position,
+      goal,
+      minutes,
+      TIMBER_RULES.walkSpeed,
+      obstacles,
+    );
+    if (Math.hypot(position.x - goal.x, position.z - goal.z) < 0.1)
+      fire.work -= minutes;
+    return {
+      ...r,
+      position,
+      insideHome: false,
+      diningSeat: null,
+      eatingUntil: null,
+      routine: "idle" as const,
+    };
+  });
+  for (const f of active)
+    if (dawn || f.work <= 0) {
+      damage[f.id] = dawn && f.work > 0 ? 100 : Math.max(25, damage[f.id] ?? 0);
+      s = note(s, f.name + (damage[f.id] === 100 ? " 전소" : " 진화 · 파손"));
+    }
+  s = {
+    ...s,
+    mutantDamage: damage,
+    residents,
+    removedLandmarks: [
+      ...new Set([
+        ...(s.removedLandmarks ?? []),
+        ...active
+          .filter(
+            (f) => damage[f.id] === 100 && Object.hasOwn(landmarkKinds, f.id),
+          )
+          .map((f) => f.id),
+      ]),
+    ],
+    nightFires: dawn
+      ? []
+      : active.filter((f) => f.work > 0).map(({ id, work }) => ({ id, work })),
+  };
+  return dawn
+    ? {
+        ...s,
+        residents: assignHomes(s.residents, s.world.citizens, usableHomes(s)),
+      }
+    : s;
 }
 export function villageFatalIncident(
   s: TimberState,
@@ -3091,7 +3472,10 @@ export function villageFatalIncident(
       )
         cause = "병원에서 치료를 받던 중 상태가 악화되어 숨졌습니다.";
     } else if (r.task?.startsWith("expedition:")) continue;
-    else if (r.hunger >= 2880 && r.routine !== "eating")
+    else if (
+      r.hunger >= RESIDENT_ROUTINE_RULES.starvationAt &&
+      r.routine !== "eating"
+    )
       cause = "굶주림으로 숨졌습니다.";
     else if (
       r.routine === "working" &&
@@ -3172,12 +3556,11 @@ export function villageFatalIncident(
   return wounded ? mutantWound(seen, casualty.id, random) : seen;
 }
 function ageYardFood(s: TimberState, previousMinute: number): TimberState {
-  const covered = storageCapacity(s) * AMOUNT_SCALE;
   let next = s;
   for (const food of FOOD_IDS) {
     const since = next.yardFoodSince?.[food];
     const available = next.world.resources[food];
-    if (available - covered < AMOUNT_SCALE) {
+    if (yardStock(next, food) < 1) {
       if (since === undefined) continue;
       const ages = { ...next.yardFoodSince };
       delete ages[food];
@@ -3221,13 +3604,22 @@ export function advanceTimber(
   input: TimberState,
   minutes: number,
 ): TimberState {
-  let s = parseTimberState(input);
+  return advanceParsedTimber(parseTimberState(input), minutes);
+}
+// `parsed` must come straight from parseTimberState; callers that already
+// validated the input skip a second full check of a large state.
+function advanceParsedTimber(
+  parsed: TimberState,
+  minutes: number,
+): TimberState {
+  let s = parsed;
   num(minutes, 1440);
   if (s.campaign?.ending) return s;
   s = replaceCrew(s);
   const target = Math.min(144000000, s.elapsed + minutes);
   let count = 0;
   while (s.elapsed < target) {
+    if (SCOUT_SITES.some((site) => encounterReady(s, site.id))) break;
     const beforeUpdate = s.campaign?.beat;
     if (++count > 1500) fail("작업 정산 경계가 너무 많습니다.");
     if (s.phase === "waiting-labor") s = startDrying(s);
@@ -3242,7 +3634,11 @@ export function advanceTimber(
     s = {
       ...s,
       elapsed: nextTime,
-      world: advancePlayClock(s.world, elapsed),
+      // Normalize the incoming world once (including older save shapes).
+      world:
+        count === 1
+          ? advancePlayClock(s.world, elapsed)
+          : advanceParsedClock(s.world, elapsed),
     };
     for (const [site, e] of Object.entries(s.scoutFinds ?? {})) {
       if (
@@ -3340,7 +3736,7 @@ export function advanceTimber(
     }
     if (
       !s.merchantRepair &&
-      s.world.day !== input.world.day &&
+      s.world.day !== parsed.world.day &&
       s.world.minute === 0 &&
       s.town.facilities.some(
         (f) =>
@@ -3385,7 +3781,10 @@ export function advanceTimber(
         );
       else s = { ...s, merchantRepair: { ...repair, work } };
     }
-    s = resumeResidents(s, elapsed);
+    s = advanceYardTransfer(
+      fightNightFires(resumeResidents(s, elapsed), elapsed),
+      elapsed,
+    );
     const campaign = s.campaign;
     if (
       !campaign?.ending &&
@@ -3619,6 +4018,7 @@ function applyTimberCommand(
       break;
     case "facility-staff":
       n = setFacilityStaff(s, command.id, command.count);
+      if (restaurants(s)[0]?.id === command.id) n = staffRestaurant(n);
       break;
     case "dispatch-food":
       n = dispatchFood(s, command.id, command.food, command.rank);
@@ -3864,7 +4264,7 @@ function applyTimberCommand(
           ? facilityStaffLimit(
               restaurants(s)[0] ?? { kind: "restaurant", level: 1 },
             )
-          : 2,
+          : 4,
       );
       if (!s.restaurantBuilt) fail("식당을 먼저 건설해 주세요.");
       n = staffRestaurant({ ...s, restaurantWorkerTarget: command.count });
@@ -4282,8 +4682,7 @@ function applyTimberCommand(
         fail("교역소에 거래를 맡을 직원이 필요합니다.");
       const offer = visitorOffer(s, command.option);
       const paid = payTown(s, { [offer.payment]: offer.cost });
-      const bad =
-        Math.random() < incidentChance(0.3, s.campaign?.difficulty) ? 2 : 0;
+      const bad = Math.random() < 0.3 ? 2 : 0;
       n = note(
         {
           ...deposit(paid, offer.goods, offer.quantity - bad),
@@ -4550,7 +4949,7 @@ export function tickTimber(input: TimberState, elapsedMs: number): TimberState {
   if (s.paused) return s;
   const numerator = Math.min(1000, elapsedMs) * s.speed + s.remainder;
   return {
-    ...advanceTimber(s, Math.floor(numerator / 1000)),
+    ...advanceParsedTimber(s, Math.floor(numerator / 1000)),
     remainder: numerator % 1000,
   };
 }

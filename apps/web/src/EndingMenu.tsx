@@ -4,7 +4,7 @@ import {
   isDifficulty,
   type TimberState,
 } from "@dynosty/game-core";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAudio } from "./AudioProvider.js";
 import {
   CampaignFilm,
@@ -104,8 +104,10 @@ export function EndingMenu({
   const [notice, setNotice] = useState("");
   const unlocked = completedChapters(limit);
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     modal.current?.showModal();
+  }, []);
+  useEffect(() => {
     try {
       localStorage.setItem("dynosty.completedChapter", String(unlocked));
     } catch {

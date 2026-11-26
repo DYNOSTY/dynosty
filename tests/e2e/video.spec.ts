@@ -67,12 +67,13 @@ test("영상 수동 재생·정지·자연 종료에 저장된 음량·음소거
   await page.reload();
   await openWorkspace(page);
   await page.getByLabel("영상 파일", { exact: true }).setInputFiles(videoPath);
+  // 제출본은 타이틀 BGM이 공용 AudioContext 하나를 먼저 만들 수 있다.
   expect(
     await page.evaluate(
       () =>
         (window as unknown as { videoProbe: Probe }).videoProbe.contexts.length,
     ),
-  ).toBe(0);
+  ).toBeLessThanOrEqual(1);
   const video = page.getByLabel("선택한 영상", { exact: true });
   await expect(video).toHaveJSProperty("paused", true);
   await page.getByRole("button", { name: "영상 재생", exact: true }).click();
@@ -112,10 +113,13 @@ test("영상 수동 재생·정지·자연 종료에 저장된 음량·음소거
   await expect(page.getByTestId("video-status")).toHaveText("재생 완료", {
     timeout: 12_000,
   });
+  // 제출본 타이틀 BGM도 같은 출력에 연결된다. 영상 요소는 재생을 반복해도 한 번만 연결한다.
   expect(
     await page.evaluate(
       () =>
-        (window as unknown as { videoProbe: Probe }).videoProbe.elements.length,
+        (window as unknown as { videoProbe: Probe }).videoProbe.elements.filter(
+          (e) => e instanceof HTMLVideoElement,
+        ).length,
     ),
   ).toBe(1);
   expect(
@@ -173,12 +177,13 @@ test("영상 정지·파일 교체가 BGM을 멈추지 않고 이전 파일 참�
   await expect(
     page.getByRole("button", { name: "영상 재생", exact: true }),
   ).toBeDisabled();
+  // 제출본은 타이틀 BGM이 공용 AudioContext 하나를 먼저 만들 수 있다.
   expect(
     await page.evaluate(
       () =>
         (window as unknown as { videoProbe: Probe }).videoProbe.contexts.length,
     ),
-  ).toBe(0);
+  ).toBeLessThanOrEqual(1);
 });
 
 test("잘못된 영상과 재생 거부를 안내하고 올바른 파일로 복구한다", async ({
@@ -194,7 +199,11 @@ test("잘못된 영상과 재생 거부를 안내하고 올바른 파일로 복�
     mimeType: "text/plain",
     buffer: Buffer.from("text"),
   });
-  await expect(page.getByRole("alert")).toContainText("영상 파일");
+  await expect(
+    page
+      .getByRole("region", { name: "영상 재생", exact: true })
+      .getByRole("alert"),
+  ).toContainText("영상 파일");
   await expect(
     page.getByText("test-video.webm", { exact: true }),
   ).toBeVisible();
@@ -205,7 +214,11 @@ test("잘못된 영상과 재생 거부를 안내하고 올바른 파일로 복�
   });
   await play.click();
   await expect(page.getByTestId("video-status")).toHaveText("재생 실패");
-  await expect(page.getByRole("alert")).toContainText("재생하지 못했습니다");
+  await expect(
+    page
+      .getByRole("region", { name: "영상 재생", exact: true })
+      .getByRole("alert"),
+  ).toContainText("재생하지 못했습니다");
   await input.setInputFiles(videoPath);
   await page.evaluate(() => {
     const original = HTMLMediaElement.prototype.play;
@@ -224,5 +237,9 @@ test("잘못된 영상과 재생 거부를 안내하고 올바른 파일로 복�
   await expect(page.getByTestId("video-status")).toHaveText("재생 실패");
   await play.click();
   await expect(page.getByTestId("video-status")).toHaveText("재생 중");
-  await expect(page.getByRole("alert")).not.toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "영상 재생", exact: true })
+      .getByRole("alert"),
+  ).not.toBeVisible();
 });

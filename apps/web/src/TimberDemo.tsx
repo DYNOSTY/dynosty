@@ -47,6 +47,7 @@ import type { SiteId } from "./site-targets.js";
 import { saveStageStart } from "./stage-replay.js";
 import { buildingCost, TownPanel } from "./TownPanel.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
+import { readWorkerSnapshot } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
 
 const time = (m: number) => `${Math.floor(m / 60)}시간 ${m % 60}분`;
@@ -79,6 +80,8 @@ type Props = {
   selectedWorkplace?: string | null;
   showDevTools?: boolean;
   saveOpen?: boolean;
+  savePanelId?: string;
+  onCloseSave?: () => void;
   onState: (state: TimberState, lines?: string[], reset?: boolean) => void;
   world: PlayState | null;
   onExit: (world: PlayState) => void;
@@ -108,6 +111,8 @@ export function TimberDemo({
   onCancelHomePlacement,
   showDevTools = false,
   saveOpen = false,
+  savePanelId,
+  onCloseSave,
   world,
 }: Props) {
   const [laborMode, setLaborMode] = useState(false);
@@ -134,8 +139,18 @@ export function TimberDemo({
     if (
       focusSection.label === "교역소 방문" ||
       focusSection.label === "다음 임무"
-    )
-      section?.querySelector("button")?.focus({ preventScroll: true });
+    ) {
+      // 캠페인에서는 입촌 요청이 조달 패널 대신 마을 소식 카드(VillageBulletin)에 뜬다.
+      // 사용자가 표식을 눌러 열었을 때만 여기로 오므로, 카드가 저절로 뜰 때는 초점을 뺏지 않는다.
+      const target =
+        section ??
+        (focusSection.label === "다음 임무"
+          ? document.querySelector<HTMLElement>(
+              '.village-bulletin[aria-label="주민 도착"]',
+            )
+          : null);
+      target?.querySelector("button")?.focus({ preventScroll: true });
+    }
   }, [active, ready, focusSection]);
   const selectedFacility = state?.town.facilities.find(
     (f) => f.sourceId === selectedSiteId,
@@ -204,36 +219,30 @@ export function TimberDemo({
     w.onmessage = (e: MessageEvent<TimberResponse>) => {
       const m = e.data;
       if (m.type === "state") {
-        const stage = m.state.chapter ?? 1;
-        const campaign = m.state.campaign;
+        const state = readWorkerSnapshot(m.resumeJson);
+        const stage = state.chapter ?? 1;
+        const campaign = state.campaign;
         if (
           campaign &&
           stage !== previousChapter &&
-          campaign.since === m.state.elapsed &&
+          campaign.since === state.elapsed &&
           campaign.beat ===
             ["opening", "roads", "capital", "arrival", "summit"][stage - 1] &&
           (stage !== 2 || (!campaign.caravan && !campaign.treaties.length)) &&
           (stage !== 3 || !campaign.relief)
         ) {
-          void saveStageStart(m.state).catch(() =>
+          void saveStageStart(state).catch(() =>
             setError("단계 시작 기록을 저장하지 못했습니다."),
           );
         }
         previousChapter = stage;
         try {
-          localStorage.setItem(
-            "dynosty.village.resume",
-            JSON.stringify({
-              format: "dynosty-timber",
-              saveVersion: 1,
-              state: m.state,
-            }),
-          );
+          localStorage.setItem("dynosty.village.resume", m.resumeJson);
         } catch {
           setError("자동 저장 공간을 확인해 주세요.");
         }
-        setState(m.state);
-        onState(m.state, m.completions, m.resetNotices);
+        setState(state);
+        onState(state, m.completions, m.resetNotices);
       } else if (m.type === "exited") {
         exitCallback.current(m.world);
       } else if (m.type === "error") {
@@ -368,8 +377,8 @@ export function TimberDemo({
   }, [state?.construction, error, active, placingHome, onCancelHomePlacement]);
   useEffect(() => () => onCancelHomePlacement(), [onCancelHomePlacement]);
   useEffect(() => {
-    if (!active) setLaborMode(false);
-  }, [active]);
+    if (!active || saveOpen) setLaborMode(false);
+  }, [active, saveOpen]);
   const merchant =
     state?.merchantItem === undefined
       ? undefined
@@ -393,7 +402,7 @@ export function TimberDemo({
     <section
       hidden={!active || laborMode}
       className="timber-demo"
-      data-service={showDevTools ? undefined : service}
+      data-service={showDevTools || saveOpen ? undefined : service}
       aria-label="목재 조달"
     >
       <button
@@ -427,6 +436,53 @@ export function TimberDemo({
         <p>마을을 불러오는 중입니다.</p>
       ) : (
         <>
+          {saveOpen ? (
+            <div className="timber-controls" id={savePanelId}>
+              <button type="button" onClick={onCloseSave}>
+                저장 닫기
+              </button>
+              <button type="button" onClick={() => setSlotPicker(true)}>
+                슬롯에 저장하기
+              </button>
+              {slotPicker && (
+                <EndingMenu
+                  state={state}
+                  initialView="save"
+                  limit={(state.chapter ?? 1) - 1}
+                  resume={() => setSlotPicker(false)}
+                  restart={() => {
+                    setSlotPicker(false);
+                    command({ type: "restart" });
+                  }}
+                />
+              )}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => access(false)}
+              >
+                진행 저장
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => access(true)}
+              >
+                진행 불러오기
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => access(true, true)}
+              >
+                이전 진행 불러오기
+              </button>
+              <p aria-live="polite" data-testid="timber-save-status">
+                {busy ? "저장 처리 중" : saveStatus}
+              </p>
+              {error ? <p role="alert">{error}</p> : null}
+            </div>
+          ) : null}
           <p>
             공급안을 비교해 계약하세요. 주민 배정·운송·하역·검수·복귀·공동 재고
             정산은 자동으로 이어집니다.
@@ -526,7 +582,10 @@ export function TimberDemo({
           />
           <section aria-label="공동 식당" className="village-service">
             <h3>공동 식당</h3>
-            <p>식당 06:00–22:00 · 작업·건설 09:00–18:00</p>
+            <p>
+              식당 주간 06:00–18:00 · 야간 18:00–06:00 (2명 이상 배치) ·
+              작업·건설 09:00–18:00
+            </p>
             <p>
               1배: 게임 1시간 = 실제 1분 · 09~18시 9분 · 건물별 공사 시간 + 자재
               운반
@@ -558,7 +617,7 @@ export function TimberDemo({
                 }
                 onClick={() => placeBuilding("restaurant")}
               >
-                공동 식당 배치 · 목재30 · 철재2
+                공동 식당 배치 · {buildingCost("restaurant")}
               </button>
             ) : null}
             <label>
@@ -585,7 +644,7 @@ export function TimberDemo({
                               (f) => f.kind === "restaurant",
                             ) ?? { kind: "restaurant", level: 1 },
                           )
-                        : 2) + 1,
+                        : 4) + 1,
                   },
                   (_, n) => n,
                 ).map((n) => (
@@ -700,8 +759,8 @@ export function TimberDemo({
                 height="64"
                 src={
                   foodShortage
-                    ? "/art/advisers/nareumi/concern.png"
-                    : "/art/advisers/nareumi/neutral.png"
+                    ? "/art/advisers/nareumi/concern.webp"
+                    : "/art/advisers/nareumi/neutral.webp"
                 }
                 alt={foodShortage ? "걱정스러운 나르미" : "평상시의 나르미"}
               />{" "}
@@ -725,7 +784,7 @@ export function TimberDemo({
                 ❗ 교역소 · {merchant[1]} 상인 {merchant[2]} 방문
               </h3>
               <img
-                src={"/art/merchants/" + merchant[0] + ".png"}
+                src={"/art/merchants/" + merchant[0] + ".webp"}
                 alt={merchant[1] + " 상인 " + merchant[2] + "의 초상"}
                 width="112"
                 height="112"
@@ -823,7 +882,7 @@ export function TimberDemo({
                 <summary>종별 주민 설계 보기</summary>
                 <img
                   className="facility-reference"
-                  src="/art/residents/species-turnaround-v1.png"
+                  src="/art/residents/species-turnaround-v1.webp"
                   alt="세 뿔과 목깃의 트리케라톱스, 두 다리와 깃의 벨로키랍토르, 긴 주둥이와 등돛의 스피노사우루스"
                   loading="lazy"
                   width="1536"
@@ -1273,7 +1332,7 @@ export function TimberDemo({
                 <img
                   width="64"
                   height="64"
-                  src="/art/advisers/dali/concern.png"
+                  src="/art/advisers/dali/concern.webp"
                   alt="아픈 주민을 걱정하는 달이"
                 />{" "}
                 달이 ·{" "}
@@ -1306,7 +1365,7 @@ export function TimberDemo({
                 <img
                   width="64"
                   height="64"
-                  src="/art/advisers/dali/neutral.png"
+                  src="/art/advisers/dali/neutral.webp"
                   alt="평상시의 달이"
                 />{" "}
                 달이 · 현재 인구{" "}
@@ -1345,49 +1404,6 @@ export function TimberDemo({
               ) : null}
             </details>
           )}
-          {saveOpen ? (
-            <div className="timber-controls">
-              <button type="button" onClick={() => setSlotPicker(true)}>
-                슬롯에 저장하기
-              </button>
-              {slotPicker && (
-                <EndingMenu
-                  state={state}
-                  initialView="save"
-                  limit={(state.chapter ?? 1) - 1}
-                  resume={() => setSlotPicker(false)}
-                  restart={() => {
-                    setSlotPicker(false);
-                    command({ type: "restart" });
-                  }}
-                />
-              )}
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => access(false)}
-              >
-                진행 저장
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => access(true)}
-              >
-                진행 불러오기
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => access(true, true)}
-              >
-                이전 진행 불러오기
-              </button>
-            </div>
-          ) : null}
-          <p aria-live="polite" data-testid="timber-save-status">
-            {busy ? "저장 처리 중" : saveStatus}
-          </p>
           {showDevTools ? (
             <section aria-label="조달 개발 검사">
               <h3>조달 개발 검사</h3>
@@ -1497,7 +1513,7 @@ export function TimberDemo({
           </details>
         </>
       )}
-      {error ? <p role="alert">{error}</p> : null}
+      {error && (!saveOpen || !state) ? <p role="alert">{error}</p> : null}
     </section>
   );
   return (

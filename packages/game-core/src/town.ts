@@ -6,6 +6,7 @@ import {
   type ProductionSiteId,
   reservedVillageLand,
   VILLAGE_LAYOUT,
+  VILLAGE_POND,
 } from "./bokhol.js";
 import {
   advanceDevelopment,
@@ -33,6 +34,7 @@ import {
   homeObstacle,
   rectanglesOverlap,
   rotatedPoint,
+  steepFoundation,
 } from "./home-placement.js";
 import { advanceHospital, hospitalValid, type Patient } from "./hospital.js";
 import {
@@ -40,6 +42,7 @@ import {
   productionSites,
   setLoggingSite,
 } from "./logging.js";
+import { findById } from "./lookup.js";
 import { usableHomes } from "./mutants.js";
 import {
   AMOUNT_SCALE,
@@ -55,7 +58,7 @@ import {
 } from "./resident-path.js";
 import { workplaceOpen } from "./resident-routine.js";
 import { isRecord } from "./save.js";
-import { warehouseDoor } from "./storage.js";
+import { storageCapacity, warehouseDoor } from "./storage.js";
 import { capitalRoad, type TimberState } from "./timber.js";
 import {
   assignHomes,
@@ -76,6 +79,7 @@ export type BuildingKind =
   | "coal"
   | "iron"
   | "quarry"
+  | "waterworks"
   | "fishery"
   | "farm"
   | "ranch"
@@ -114,7 +118,7 @@ const previousBuildingRules: Record<
     name: "공동 식당",
     cost: { RES_WOOD: 150, RES_METAL: 10 },
     work: 240,
-    staff: 2,
+    staff: 4,
     site: "빈 육지 · 여러 곳 건설 가능 · 좌석10/20/40",
   },
   logging: {
@@ -151,6 +155,13 @@ const previousBuildingRules: Record<
     work: 240,
     staff: 4,
     site: "돌이 많은 암반 주변",
+  },
+  waterworks: {
+    name: "취수장",
+    cost: { RES_WOOD: 90, RES_METAL: 10 },
+    work: 180,
+    staff: 3,
+    site: "수원지 옆 육지에서 물을 길어 저장소로 운반",
   },
   fishery: {
     name: "어획막",
@@ -250,6 +261,7 @@ export const individualWorkplaces = [
   "logging",
   "workshop",
   "hospital",
+  "waterworks",
   "fishery",
   "farm",
   "quarry",
@@ -261,7 +273,7 @@ export function canDirectStaff(kind: BuildingKind) {
 }
 export const facilityStaffLimit = (f: Pick<Facility, "kind" | "level">) =>
   f.kind === "restaurant"
-    ? ([2, 4, 6][f.level - 1] ?? 2)
+    ? ([4, 4, 6][f.level - 1] ?? 4)
     : f.kind === "fishery"
       ? ([5, 10, 20][f.level - 1] ?? 5)
       : canDirectStaff(f.kind)
@@ -397,7 +409,7 @@ export function buildingIssue(
     return "정찰 거점과 교역소는 맵에 각각 한 곳만 건설할 수 있어요.";
   const protectedLand = reservedVillageLand(
     p.position,
-    !!s.rebuilding,
+    !!s.rebuilding && !s.campaign?.openingLosses,
     s.removedLandmarks,
   );
   if (protectedLand) return protectedLand;
@@ -405,6 +417,8 @@ export function buildingIssue(
   const samples = [-1, 0, 1].flatMap((x) =>
     [-1, 0, 1].map((z) => rotatedPoint(p, x * 2.25, z * 2.25)),
   );
+  if (steepFoundation(s, samples))
+    return "경사가 가파릅니다. 완만한 터를 골라 주세요.";
   if (samples.some((q) => Math.abs(q.x) > 250 || Math.abs(q.z) > 250))
     return "지도 밖에는 지을 수 없어요.";
   if (samples.some((q) => waterAt(q, 0.5)))
@@ -476,6 +490,13 @@ export function buildingIssue(
     if (source && mineralWorksites(s, source) >= 2)
       return "이 광맥에는 건설 중인 곳을 포함해 채굴 시설을 두 곳까지 지을 수 있어요.";
   }
+  if (
+    kind === "waterworks" &&
+    !waterAt(p.position, 8) &&
+    Math.hypot(p.position.x - VILLAGE_POND.x, p.position.z - VILLAGE_POND.z) >
+      VILLAGE_POND.r + 8
+  )
+    return "취수장은 수원지 옆 육지에 지어 주세요.";
   if (kind === "fishery" && !waterAt(p.position, 7))
     return "물고기가 모이는 물가에만 어획막을 지을 수 있어요.";
   if (
@@ -607,24 +628,23 @@ export function freeTownResidents(
   count: number,
 ): string[] {
   if (count <= 0) return [];
+  const obstacles = townObstacles(s);
+  const length = (id: string, path: GroundPoint[]) => {
+    let q = findById(s.residents, id)?.position ?? p,
+      n = 0;
+    for (const p of path) {
+      n += Math.hypot(q.x - p.x, q.z - p.z);
+      q = p;
+    }
+    return n;
+  };
   return idleTownResidents(s)
-    .map((r) => ({
-      id: r.id,
-      path: residentPath(r.position, p, townObstacles(s)),
-    }))
-    .filter((r) => r.path.length)
-    .sort((a, b) => {
-      const length = (id: string, path: GroundPoint[]) => {
-        let q = s.residents.find((r) => r.id === id)?.position ?? p,
-          n = 0;
-        for (const p of path) {
-          n += Math.hypot(q.x - p.x, q.z - p.z);
-          q = p;
-        }
-        return n;
-      };
-      return length(a.id, a.path) - length(b.id, b.path);
+    .map((r) => {
+      const path = residentPath(r.position, p, obstacles);
+      return { id: r.id, path, length: length(r.id, path) };
     })
+    .filter((r) => r.path.length)
+    .sort((a, b) => a.length - b.length)
     .slice(0, count)
     .map((r) => r.id);
 }
@@ -859,12 +879,13 @@ export const facilityResource = (f: Facility): ResourceId | null =>
       coal: "RES_COAL",
       iron: "RES_IRON_ORE",
       quarry: "RES_STONE",
+      waterworks: "RES_WATER",
       fishery: "RES_FISH",
       farm: "RES_PLANT",
       ranch: "RES_MEAT",
     }) as Partial<Record<BuildingKind, ResourceId>>
   )[f.kind] ?? null;
-const landmarkKinds: Record<string, BuildingKind> = {
+export const landmarkKinds: Record<string, BuildingKind> = {
   BLD_WAREHOUSE: "storage",
   BLD_WORKSHOP: "workshop",
   BLD_FORAGE: "farm",
@@ -880,7 +901,11 @@ export function demolishableLandmark(s: TimberState, target: string) {
       target === `village:${id}:${x}:${z}` &&
       Object.hasOwn(landmarkKinds, id) &&
       !s.removedLandmarks?.includes(id) &&
-      !(s.rebuilding && ["BLD_CLINIC", "BLD_WORKSHOP"].includes(id)),
+      !(
+        s.rebuilding &&
+        !s.campaign?.openingLosses &&
+        ["BLD_CLINIC", "BLD_WORKSHOP"].includes(id)
+      ),
   )?.[0];
 }
 export function salvageMaterials(s: TimberState, id: string): Cost {
@@ -1141,6 +1166,20 @@ export function deposit(s: TimberState, r: ResourceId, n: number): TimberState {
     },
   };
 }
+function deliver(s: TimberState, resource: ResourceId, amount: number) {
+  if (amount === 0) return s;
+  const next = deposit(s, resource, amount);
+  return {
+    ...next,
+    coveredStock: {
+      ...s.coveredStock,
+      [resource]: Math.min(
+        storageCapacity(s),
+        (s.coveredStock?.[resource] ?? 0) + amount,
+      ),
+    },
+  };
+}
 function advanceTownProduction(
   input: TimberState,
   minutes: number,
@@ -1201,7 +1240,10 @@ function advanceTownProduction(
       if (f.sourceId) {
         let l = productionSites(s).find((site) => site.siteId === f.sourceId);
         if (!l?.remaining) {
-          // Quarries and mines move on like sawmills, within the per-deposit cap.
+          if (f.kind !== "logging") {
+            f.progress = 0;
+            break;
+          }
           l = connectedDeposits(s, f.kind, f.position).find(
             (site) =>
               site.remaining > 0 &&
@@ -1233,14 +1275,15 @@ function advanceTownProduction(
     }
     f.progress = Math.min(f.progress, unitWork);
     const destination = warehouseDoor(s, f.position) ?? { x: 4.5, z: 0.6 };
-    if (f.kind === "fishery") {
+    const immediate = ["fishery", "iron", "coal", "quarry"].includes(f.kind);
+    if (immediate) {
       const amount = f.buffer;
-      s = deposit(s, resource, amount);
+      s = deliver(s, resource, amount);
       f.buffer -= amount;
       f.delivered += amount;
     }
     if (
-      f.kind !== "fishery" &&
+      !immediate &&
       !f.haul &&
       f.buffer >= 5 &&
       workplaceOpen(s.world.minute)
@@ -1307,7 +1350,7 @@ function advanceTownProduction(
           if (h.stage === "pickup") h.stage = "store";
           else if (h.stage === "store") {
             const unloaded = h.cargo;
-            s = deposit(s, resource, unloaded);
+            s = deliver(s, resource, unloaded);
             f.delivered += unloaded;
             h = {
               ...h,

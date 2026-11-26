@@ -56,8 +56,11 @@ DB를 끄면 DB 준비 상태 확인은 실패하는 것이 정상입니다. 로
 | `pnpm build`                         | Core·API·Web 배포용 산출물 생성      |
 | `pnpm --filter @dynosty/api start`   | 빌드한 API 실행                      |
 | `pnpm --filter @dynosty/web preview` | 빌드한 웹을 로컬에서 확인            |
+| `pnpm models:optimize`               | 새로 넣은 주민·건물 GLB 압축         |
 
 `preview`는 운영용 웹 서버가 아닙니다. 실제 배포 방법은 별도로 구성합니다.
+주민(`models/residents`)·건물(`models/buildings`) GLB를 추가하거나 바꾸면 `pnpm models:optimize`를 실행합니다. 압축하지 않은 파일이 있으면 `pnpm test`가 실패합니다.
+`apps/web/public`의 UI·삽화 이미지는 PNG 대신 WebP로 둡니다. 화면이 바뀌지 않도록 무손실(lossless, exact)로 변환합니다.
 VS Code에서는 선택적으로 Biome 확장을 설치하면 저장소의 포맷·검사 설정을 사용할 수 있습니다.
 
 ## 브라우저까지 검사
@@ -75,7 +78,8 @@ Linux에서 브라우저 시스템 의존성이 부족하면 관리자 권한을
 
 - PR 필수 검사 `check`는 `pnpm check`와 `pnpm test:e2e --grep '@smoke'`를 실행합니다. 실제 DB 응답, 3D 게임 시작, 정찰 진행과 발견의 저장·새로고침 복원, 새 게임 초기화를 확인합니다.
 - 전체 브라우저 회귀는 별도 워크플로에서 실행합니다. `main` 대상 PR에서 자동 실행되며, 기본 브랜치에 워크플로가 들어간 뒤 야간·수동 실행도 가능합니다. `main` 승격 전에는 해당 후보의 전체 회귀 결과를 확인합니다.
-- 화면·기획 변경의 사람 검토는 실제 PC·모바일에서 첫 행동의 명확성, 카메라·터치 조작감, 대사와 연출을 봅니다. 계산·저장 호환 같은 반복 확인은 자동 검사에 맡깁니다.
+- 전체 회귀는 GitHub 서버 16대에 검사를 나눠 동시에 돌리고(`--shard`), 마지막 작업이 결과를 하나의 보고서(`playwright-report` 산출물)와 실행 요약으로 합칩니다. 수동 실행은 `gh workflow run e2e-regression.yml --ref <브랜치> -f grep=<검사 이름 일부> -f shards=4`처럼 일부 검사와 서버 수를 고를 수 있습니다.
+- 화면·기획 변경의 사람 검토는 실제 Windows PC(exe 실행본)에서 첫 행동의 명확성, 카메라·마우스 조작감, 대사와 연출을 봅니다. 계산·저장 호환 같은 반복 확인은 자동 검사에 맡깁니다.
 
 ## 환경 설정
 

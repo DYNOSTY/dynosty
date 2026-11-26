@@ -7,7 +7,7 @@ import {
   payTown,
   requireValue,
 } from "../../packages/game-core/dist/index.js";
-import { openLaborPanel } from "./workspace.js";
+import { openLaborPanel, openWorkspace } from "./workspace.js";
 
 test("HUD 건설·연구 메뉴와 저장·개발 도구가 같은 마을 진행을 유지한다", async ({
   page,
@@ -22,30 +22,27 @@ test("HUD 건설·연구 메뉴와 저장·개발 도구가 같은 마을 진행
   const button = (name: string) =>
     page.getByRole("button", { name, exact: true });
   const canvas = await page.locator("canvas").elementHandle();
+  // 제출본 HUD: 건설은 건물 목록, 연구는 연구 도감을 연다. 마을은 일시정지로 이어진다.
   await button("건설").click();
-  await expect(
-    page.getByRole("region", { name: "건설과 식량 수급", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "건물 목록" })).toBeVisible();
+  const clock = await page.getByTestId("play-clock").textContent();
+  await button("연구").click();
+  await expect(page.getByRole("region", { name: "연구 도감" })).toBeVisible();
+  await button("개발 도구").click();
   await expect(page.getByTestId("village-population")).toContainText(
     "주민 60명",
   );
-  await button("일시정지").click();
   await expect(button("시간 재개")).toBeVisible();
-  const clock = await page.getByTestId("timber-clock").textContent();
-  await button("연구").click();
-  await expect(page.getByLabel("연구 기술", { exact: true })).toBeInViewport();
   await button("저장").click();
   await button("진행 저장").click();
   await expect(page.getByTestId("timber-save-status")).toContainText(
     "저장했습니다",
   );
   await button("저장").click();
-  await button("연구").click();
-  await expect(page.getByLabel("연구 기술", { exact: true })).toBeInViewport();
-  await button("개발 도구").click();
-  await expect(page.getByTestId("village-population")).toBeVisible();
   await button("개발 도구 닫기").click();
-  await expect(page.getByTestId("timber-clock")).toHaveText(clock ?? "");
+  await button("연구").click();
+  await expect(page.getByRole("region", { name: "연구 도감" })).toBeVisible();
+  await expect(page.getByTestId("play-clock")).toHaveText(clock ?? "");
   expect(
     await canvas?.evaluate(
       (element) => element === document.querySelector("canvas"),
@@ -55,11 +52,14 @@ test("HUD 건설·연구 메뉴와 저장·개발 도구가 같은 마을 진행
   await expect(page.getByTestId("labor-clock")).toBeVisible();
   await button("목재 조달 보기").click();
   await button("복홀 전체 보기").click();
-  await button("개발 도구").click();
+  // 일손 화면은 이미 개발 도구를 연 채라서 토글하지 않고 열린 상태를 보장한다.
+  await openWorkspace(page);
   await expect(page.getByTestId("camera-distance")).toHaveText("640.00");
   await button("개발 도구 닫기").click();
   await page.screenshot({ path: info.outputPath("village-hud.png") });
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "일시정지" })).toBeVisible();
+  await button("계속하기").click();
   await expect(button("조달")).toBeEnabled();
   expect(errors).toEqual([]);
 });

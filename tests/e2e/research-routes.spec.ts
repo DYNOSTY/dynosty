@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
+  AMOUNT_SCALE,
   advanceTimber,
   commandTimber,
   createPlayState,
@@ -18,7 +19,19 @@ function fixture(
   completed: string[],
   pending?: string,
 ) {
-  let s = createTimberState({ ...createPlayState(), minute: 540 });
+  const world = createPlayState();
+  const resources = { ...world.resources };
+  const funded = [...completed, ...(pending ? [pending] : [])].map((id) => {
+    const research = RESEARCH_CATALOG.find((entry) => entry.id === id);
+    if (!research) throw Error("연구 없음");
+    return research;
+  });
+  for (const research of funded) {
+    for (const [key, units] of Object.entries(research.cost)) {
+      resources[key as keyof typeof resources] += units * AMOUNT_SCALE;
+    }
+  }
+  let s = createTimberState({ ...world, resources, minute: 540 });
   s = commandTimber(
     s,
     {
@@ -36,11 +49,7 @@ function fixture(
     "staff",
   );
   s = advanceTimber(s, 30);
-  for (const id of [...completed, ...(pending ? [pending] : [])]) {
-    const r = RESEARCH_CATALOG.find((r) => r.id === id);
-    if (!r) throw Error("연구 없음");
-    s = payTown(s, r.cost);
-  }
+  for (const research of funded) s = payTown(s, research.cost);
   const r = RESEARCH_CATALOG.find((r) => r.id === pending);
   return {
     ...s,
@@ -95,11 +104,22 @@ async function load(p: Page, s: TimberState) {
     "불러왔습니다",
   );
   await p.locator("canvas").press("j");
+  // 제출본은 운영 장부를 메뉴별로 나눠 보여 준다. 개발 도구를 열면 전체 장부와 시간 조작이 보인다.
+  const tools = button(p, "개발 도구");
+  if ((await tools.getAttribute("aria-expanded")) !== "true")
+    await tools.click();
 }
 test("초기 연구 화면은 후반 사건과 기술을 공개하지 않는다", async ({
   page,
 }) => {
   await load(page, createTimberState(createPlayState()));
+  // 개발 도구는 후반 분기 검사 정보를 함께 보여 준다. 끄고 플레이어의 연구 메뉴만 확인한다.
+  await button(page, "개발 도구").click();
+  await expect(button(page, "개발 도구")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await button(page, "연구").click();
   const panel = page.getByRole("region", { name: "연구와 교역망" });
   await expect(panel.getByLabel("연구 기술")).toBeAttached();
   await expect(panel).not.toContainText(/반란|시해|날틀|전기자극기|메카/);
@@ -148,7 +168,7 @@ test("독재 노선에서 시설을 지정해야 강제 작업과 새 삽화가 
     {
       type: "plan-building",
       kind: "fishery",
-      position: { x: 46, z: 32 },
+      position: { x: 28, z: 48 },
       headingRadians: Math.PI,
     },
     "fish",

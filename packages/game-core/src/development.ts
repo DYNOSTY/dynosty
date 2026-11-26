@@ -1,3 +1,4 @@
+import { findById } from "./lookup.js";
 import {
   applyCitizenEvent,
   incidentChance,
@@ -93,7 +94,7 @@ export const productionRate = (s: TimberState, f: Facility) =>
     ),
   );
 export const isMechanical = (s: TimberState, id: string) =>
-  !!s.world.citizens.find((c) => c.id === id)?.mechanicalFrom;
+  !!findById(s.world.citizens, id)?.mechanicalFrom;
 export const upgradeResearch = (kind: string, level: number) =>
   catalog.find(
     (r) => r.category === "building" && r.target === kind && r.level === level,
@@ -168,7 +169,7 @@ export function townShiftOpen(s: TimberState, target: string): boolean {
   );
 }
 export function residentShiftOpen(s: TimberState, id: string): boolean {
-  const r = s.residents.find((r) => r.id === id);
+  const r = findById(s.residents, id);
   if (
     r?.workplaceId?.startsWith("facility:") &&
     s.mutantDamage?.[r.workplaceId.slice(9)] === 100

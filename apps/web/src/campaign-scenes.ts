@@ -7,11 +7,13 @@ import {
   capitalMinutesLeft,
   capitalReady,
   capitalRoad,
+  departureBuildings,
   emergencyRation,
   foodWarnings,
   GAME_RULES,
   lostPatrol,
   minutesUntilCoup,
+  rationLimit,
   recoveryCrew,
   returnedScouts,
   SCOUT_SITES,
@@ -78,6 +80,7 @@ export interface ScenePage {
   laterIllustration?: { from: number; image: string; alt: string };
   lineImages?: Record<number, { image: string; alt: string }>;
   lineIllustration?: { at: number; image: string; alt: string };
+  summitFamily?: { from: number; through: number };
   lines: Line[];
   choices: Choice[];
   auto: boolean;
@@ -192,6 +195,45 @@ export function firstVillageTask(s: TimberState) {
     };
   return null;
 }
+export function supplyAdvice(s: TimberState): string[] {
+  const beat = campaignOf(s).beat;
+  if (["opening", "departure", "capital", "ending", "finished"].includes(beat))
+    return [];
+  const stock = s.world.resources;
+  let plant = 0;
+  let protein = 0;
+  for (const resident of s.world.citizens) {
+    if (!resident.alive || resident.mechanicalFrom) continue;
+    const twoMeals = rationLimit(resident.species, s.rationPolicy) / 2;
+    if (resident.diet === "RES_PLANT") plant += twoMeals;
+    else protein += twoMeals;
+  }
+  function assign(kind: "farm" | "fishery" | "waterworks") {
+    const name = BUILDING_RULES[kind].name;
+    if (s.town.facilities.some((f) => f.kind === kind))
+      return `${name}의 일손 배치를 열어 일할 분을 보내 주세요.`;
+    if (s.town.orders.some((o) => o.kind === kind))
+      return `${name} 공사가 끝나면 거기서 일할 분을 배치해 주세요.`;
+    return `건설에서 ‘${name}’ 터를 잡고 일손을 배치해 주세요.`;
+  }
+  const advice: string[] = [];
+  if (stock.RES_PLANT < plant)
+    advice.push(
+      "풀 먹는 이들에게 두 끼 돌릴 풀잎이 모자라요. " + assign("farm"),
+    );
+  if (stock.RES_MEAT + stock.RES_FISH < protein)
+    advice.push(
+      "고기와 생선을 합쳐도 두 끼를 못 채우겠어요. " + assign("fishery"),
+    );
+  if (stock.RES_WATER <= 10 * AMOUNT_SCALE)
+    advice.push(
+      (stock.RES_WATER === 0
+        ? "물독이 비었어요. "
+        : "남은 물이 열 몫 이하예요. ") + assign("waterworks"),
+    );
+  return advice;
+}
+
 export function villageAdvice(
   s: TimberState,
   daylight: boolean,
@@ -439,7 +481,19 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       line(
         "돌쇠",
-        "공자님! 병원 처마에 불이 붙었습니다. 불씨가 공방 지붕으로 넘어갑니다!",
+        c.openingLosses?.length
+          ? "공자님! " +
+              c.openingLosses
+                .map((id, i) => {
+                  const b = departureBuildings[id];
+                  return (
+                    (b?.name ?? "건물") +
+                    (b?.roof ? " 지붕" : "") +
+                    (i === 0 ? "에 불이 붙었습니다!" : " 쪽으로 번집니다!")
+                  );
+                })
+                .join(" ")
+          : "공자님! 병원 처마에 불이 붙었습니다. 불씨가 공방 지붕으로 넘어갑니다!",
       );
       choice("leave", "성문을 열고 남은 장부 확인");
       break;
@@ -900,7 +954,7 @@ export function campaignPage(s: TimberState): ScenePage {
       );
       complete("5단계로 넘어갈까요? · 성문 앞으로");
       break;
-    case "summit":
+    case "summit": {
       page.clip = "five";
       page.music = filmMusic["five"];
       page.title = "두 그릇을 놓고";
@@ -909,6 +963,11 @@ export function campaignPage(s: TimberState): ScenePage {
         "나르미",
         "고리야, 성문 좀 더 열어 주세요. 마지막 수레에 어린 것들이 타고 있어요.",
       );
+      line(
+        "나르미",
+        "사람이 늘어 물독부터 봐야겠어요. 취수장과 온상 재배소에 일손을 보내고, 공동 식당에도 배식할 분을 남겨 주세요.",
+      );
+      const familyFrom = page.lines.length;
       line(
         "양녕",
         "포야, 혜야. 이제 내려와라. 내 아들들이다. 네 녀석도 봐 두어라. 셋 다 세 번째 행렬에 태웠는데, 이 문까지 온 건 둘뿐이다.",
@@ -926,6 +985,7 @@ export function campaignPage(s: TimberState): ScenePage {
         "양녕",
         "이 백성들은 나의 것이다. 그 같은 일이 또 벌어진다면 내 아들에게 이들을 맡기겠다. 그날은 나도 아버지처럼 홀로 남겠다.",
       );
+      page.summitFamily = { from: familyFrom, through: page.lines.length - 1 };
       if (c.evacuees)
         line(
           "남문에서 온 짐꾼",
@@ -964,6 +1024,7 @@ export function campaignPage(s: TimberState): ScenePage {
       choice("coexist", "충녕 · 먹는 것과 필요한 양에 맞춰 배급한다");
       choice("control", "양녕 · 식단마다 하루 배급의 상한을 정한다");
       break;
+    }
     case "forecast":
       page.auto = false;
       page.title =

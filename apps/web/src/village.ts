@@ -14,11 +14,12 @@ import { CreateSphere } from "@babylonjs/core/Meshes/Builders/sphereBuilder";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import type { Node } from "@babylonjs/core/node";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import type { Scene } from "@babylonjs/core/scene";
 import { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
+import { createResidentVisual } from "./resident-visual.js";
 import { loadSceneAsset as load } from "./scene-assets.js";
+import { hasWinterModel, seasonalModelUrl } from "./seasonal-model.js";
 import { elevation, rng, type Season } from "./world.js";
 
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
@@ -79,6 +80,9 @@ const villageNames: Record<string, string> = {
   R10_Iguanodon: "이구아노돈",
   R12_Protoceratops: "프로토케라톱스",
 };
+
+export { residentGlb } from "./resident-visual.js";
+
 export interface GlbVisual {
   setOutline(value: boolean): void;
   setLit?(lit: boolean): void;
@@ -106,14 +110,20 @@ function instantiate(
   shadow: Shadow,
   radius: number,
   depth?: number,
+  // Instances of unskinned parts share draw calls with every other copy of the model.
+  instanced = false,
 ) {
+  const before = new Set(parent.getChildMeshes(false));
   const inst = container.instantiateModelsToScene(
     (n) => `${parent.name}:${n}`,
     false,
+    { doNotInstantiate: !instanced },
   );
   for (const root of inst.rootNodes) root.parent = parent;
   parent.scaling.setAll(scale);
-  const meshes = parent.getChildMeshes(false) as AbstractMesh[];
+  const meshes = parent
+    .getChildMeshes(false)
+    .filter((m) => !before.has(m)) as AbstractMesh[];
   for (const m of meshes) {
     m.isPickable = true;
     // 화면에서 몇 픽셀도 안 되는 조각(발톱·눈 등)은 멀리서 그리지 않음 — 그리기 호출 약 1/4 감소
@@ -221,15 +231,15 @@ export function createVillage(
     depth = 3.8,
     role?: "walk" | Omit<Hauler, "state" | "timer">,
   ) => {
-    let winter = season === "winter";
+    let winter = season === "winter" && hasWinterModel(model);
     const folder = role ? "residents" : "buildings";
     const asset = await load(
       scene,
-      `/models/${folder}/${model}${winter ? "_v2" : ""}.glb`,
+      seasonalModelUrl(folder, model, winter),
     ).catch((error: unknown) => {
       if (!winter || disposed) throw error;
       winter = false;
-      return load(scene, `/models/${folder}/${model}.glb`);
+      return load(scene, seasonalModelUrl(folder, model, false));
     });
     if (disposed) return;
     // Keep scene/selection identities independent of the asset variant.
@@ -322,6 +332,7 @@ export function createVillage(
   const face = (x: number, z: number) => Math.atan2(-x, -z); // +Z가 마당 쪽
   const permanent = new Map<string, TransformNode>();
   let missing = new Set<string>();
+  let townDestroyed = false;
   const lostQuarter = new Set<TransformNode>();
   let exodusVisible = false;
   let previewResidentsVisible = true;
@@ -337,7 +348,7 @@ export function createVillage(
     ).then((node) => {
       if (node) {
         permanent.set(id, node);
-        node.setEnabled(!missing.has(id));
+        node.setEnabled(!townDestroyed && !missing.has(id));
       }
     }),
   );
@@ -471,19 +482,14 @@ export function createVillage(
   pc.fillRect(0, 0, 64, 64);
   puff.update();
   puff.hasAlpha = true;
-  const fires = [
-    [-30, 0],
-    [30, -14],
-    [-8, -20],
-    [16, 0],
-    [-10, -8],
-  ].map(([x = 0, z = 0], i) => {
-    const fire = new ParticleSystem("처마 불길-" + i, 90, scene);
+  const incidentFires = new Map<string, ParticleSystem>();
+  function createFire(name: string, emitter: Vector3) {
+    const fire = new ParticleSystem(name, 90, scene);
     fire.particleTexture = puff;
     fire.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     fire.minScaleY = 1.2;
     fire.maxScaleY = 1.9;
-    fire.emitter = new Vector3(x, elevation(x, z) + 1.8, z);
+    fire.emitter = emitter;
     fire.minEmitBox = new Vector3(-1, 0, -0.5);
     fire.maxEmitBox = new Vector3(1, 0, 0.5);
     fire.direction1 = new Vector3(-0.4, 1.8, -0.2);
@@ -498,7 +504,16 @@ export function createVillage(
     fire.addColorGradient(0.72, new Color4(0.24, 0.17, 0.14, 0.64));
     fire.addColorGradient(1, new Color4(0.18, 0.17, 0.16, 0));
     return fire;
-  });
+  }
+  const fires = [
+    [-30, 0],
+    [30, -14],
+    [-8, -20],
+    [16, 0],
+    [-10, -8],
+  ].map(([x = 0, z = 0], i) =>
+    createFire("처마 불길-" + i, new Vector3(x, elevation(x, z) + 1.8, z)),
+  );
   const CHIMNEY: Record<string, number> = {
     BLD_OFFICE: 2.5,
     BLD_WORKSHOP: 3,
@@ -824,30 +839,49 @@ export function createVillage(
   // 게임 대상(둥지·대표 주민)용 GLB 표시
   async function entityVisual(
     kind: "building" | "resident",
-    parent: Node,
+    parent: TransformNode,
     offsetY: number,
     level = 1,
+    species?: string,
   ): Promise<GlbVisual> {
+    // The decree messenger is a scripted actor. Only selectable game residents
+    // use the crowd/detail switch; buildings and the messenger keep their rigs.
+    if (kind === "resident" && parent !== herald)
+      return createResidentVisual(
+        scene,
+        parent,
+        offsetY,
+        species ?? "R02",
+        season,
+        shadow,
+      );
     const asset = await load(
       scene,
-      kind === "building"
-        ? "/models/buildings/BLD_NEST.glb"
-        : "/models/residents/R02_Triceratops.glb",
+      kind === "resident"
+        ? "/models/residents/R02_Triceratops.glb"
+        : "/models/buildings/BLD_NEST.glb",
     );
     if (disposed || parent.isDisposed()) throw new Error("종료한 대상입니다.");
     const node = new TransformNode(`${parent.name}:glb`, scene);
     node.parent = parent;
     node.position.y = offsetY;
-    const v = instantiate(
-      asset,
-      node,
-      kind === "building"
-        ? BUILDING_SCALE * (1 + (level - 1) * 0.06)
-        : RESIDENT_SCALE,
-      shadow,
-      kind === "building" ? 4.2 : 1.3,
-      kind === "building" ? 4 : 2,
-    );
+    // Many nests share one model: draw them as instances. The representative nest keeps
+    // its own copy for the winter door glow, which lights only its own meshes.
+    const instanced = kind === "building" && parent.id !== "example-building-1";
+    const make = (copy: boolean) =>
+      instantiate(
+        asset,
+        node,
+        kind === "building"
+          ? BUILDING_SCALE * (1 + (level - 1) * 0.06)
+          : RESIDENT_SCALE,
+        shadow,
+        kind === "building" ? 4.2 : 1.3,
+        kind === "building" ? 4 : 2,
+        !copy && instanced,
+      );
+    let v = make(false);
+    let outlined = false;
     const lamp =
       kind === "building" && light
         ? CreateBox(
@@ -892,6 +926,13 @@ export function createVillage(
         lamp?.setEnabled(value);
       },
       setOutline(value) {
+        // An outline applies to all instances of a mesh, so a selected nest
+        // switches to its own copy while it is selected.
+        if (instanced && value !== outlined) {
+          v.dispose();
+          v = make(value);
+        }
+        outlined = value;
         for (const m of v.meshes) {
           m.outlineColor = OUTLINE;
           m.outlineWidth = 0.025;
@@ -923,20 +964,39 @@ export function createVillage(
       burned: boolean,
       burning: boolean,
       removed: readonly string[] = [],
+      active: readonly { id: string; x: number; z: number }[] = [],
+      destroyed = false,
     ) {
+      townDestroyed = destroyed;
       missing = new Set(removed);
       if (burned) {
         missing.add("BLD_WORKSHOP");
         missing.add("BLD_CLINIC");
       }
-      for (const [id, node] of permanent) node.setEnabled(!missing.has(id));
+      for (const [id, node] of permanent)
+        node.setEnabled(!destroyed && !missing.has(id));
+      for (const [id, fire] of incidentFires)
+        if (!active.some((b) => b.id === id)) {
+          fire.dispose(false);
+          incidentFires.delete(id);
+        }
+      for (const b of active) {
+        if (incidentFires.has(b.id)) continue;
+        // DynamicTexture.clone()은 그려 둔 픽셀을 복사하지 않으므로 원본을 공유한다.
+        const fire = createFire(
+          "건물 화재-" + b.id,
+          new Vector3(b.x, elevation(b.x, b.z) + 1.2, b.z),
+        );
+        incidentFires.set(b.id, fire);
+        fire.start();
+      }
       exodusVisible = burning;
       for (const w of walkers)
         if (w.haul) w.node.setEnabled(burning || previewResidentsVisible);
       for (const node of lostQuarter) node.setEnabled(burning);
       for (const fire of fires) {
-        if (burning && !fire.isStarted()) fire.start();
-        if (!burning && fire.isStarted()) fire.stop();
+        if (burning && !active.length && !fire.isStarted()) fire.start();
+        if ((!burning || active.length) && fire.isStarted()) fire.stop();
       }
     },
     setPreviewResidentsVisible(visible: boolean) {
@@ -975,6 +1035,7 @@ export function createVillage(
       ink.dispose();
       paper.dispose();
       plinthMat.dispose();
+      for (const fire of incidentFires.values()) fire.dispose(false);
       for (const fire of fires) fire.dispose(false);
       for (const ps of smokes) ps.dispose();
       for (const p of parties.values())

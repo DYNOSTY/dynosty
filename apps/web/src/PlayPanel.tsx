@@ -11,7 +11,6 @@ import { useState } from "react";
 type Props = {
   state: PlayState | null;
   error: string | null;
-  busy: boolean;
   onCommand: (command: PlayCommand) => void;
   compact?: boolean;
   settlement?: string;
@@ -21,7 +20,6 @@ type Props = {
 export function PlayPanel({
   state,
   error,
-  busy,
   onCommand,
   compact = false,
   settlement = "복홀",
@@ -61,7 +59,6 @@ export function PlayPanel({
         <div className="play-controls" hidden={compact}>
           <button
             type="button"
-            disabled={busy}
             onClick={() => onCommand({ type: "pause", paused: !state.paused })}
           >
             {state.paused ? "게임 시작" : "일시정지"}
@@ -69,7 +66,6 @@ export function PlayPanel({
           <button
             type="button"
             className="quiet-button"
-            disabled={busy}
             onClick={() => setConfirm(true)}
           >
             새 게임
@@ -81,7 +77,6 @@ export function PlayPanel({
           <p>현재 진행을 새 게임으로 바꿀까요? 기존 저장 기록은 유지됩니다.</p>
           <button
             type="button"
-            disabled={busy}
             onClick={() => {
               onCommand({ type: "new-game" });
               setConfirm(false);
@@ -111,7 +106,7 @@ export function PlayPanel({
             >
               <img
                 className="resource-icon"
-                src={`/ui/resources-3d/${id === "RES_IRON_ORE" ? "RES_METAL" : id === "RES_STONE" ? "RES_COAL" : id}.png`}
+                src={`/ui/resources-3d/${id === "RES_IRON_ORE" ? "RES_METAL" : id === "RES_STONE" ? "RES_COAL" : id}.webp`}
                 alt=""
                 width={32}
                 height={32}
