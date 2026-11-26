@@ -440,6 +440,10 @@ export function mountScene(
   let animationSpeed = 1;
   const stopPicking = observeSceneClicks(canvas, (x, y) => {
     if (!selectionEnabled) return;
+    if (homePreview.active) {
+      homePreview.commit(x, y);
+      return;
+    }
     const picked = pickedNode(scene.pick(x, y));
     let hit = picked;
     while (hit) {
@@ -450,7 +454,6 @@ export function mountScene(
       )?.id;
       const target = townId ?? villageId ?? homeId;
       if (target) {
-        if (homePreview.active) homePreview.cancel();
         select(target);
         const facility = villageState?.town.facilities.find(
           (f) => "town:" + f.id === townId,
@@ -478,12 +481,7 @@ export function mountScene(
       });
     onFacilitySelect(null);
     if (foundation) {
-      if (homePreview.active) homePreview.cancel();
       select("town:" + foundation.id);
-      return;
-    }
-    if (homePreview.active) {
-      homePreview.commit(x, y);
       return;
     }
     const site = sites.idForMesh(picked);
