@@ -901,6 +901,9 @@ export function mountScene(
         camera.upperRadiusLimit = state ? 720 : 140;
       }
       const active = state !== null;
+      village.setGoriVisible(
+        !(state?.bokhol && state.campaign?.beat === "capital"),
+      );
       camera.upperRadiusLimit = active ? 720 : 140;
       if (active !== demoActive) {
         demoActive = active;

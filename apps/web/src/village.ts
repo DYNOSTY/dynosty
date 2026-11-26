@@ -42,7 +42,16 @@ const RESIDENT_HEIGHT: Record<string, [number, number]> = {
   R09_Oviraptor: [0.78, 3.49],
   R04_Ankylosaurus: [0.75, 2.45],
   R12_Protoceratops: [0.6, 2.28],
+  // 박찬님 기준: 같은 몸꼴(R09) 주민의 1.2배. 지금 마을의 벨로키랍토르 옆에서 0.9배로 보여 1.33배 키움(Windows GPU 사진 대조).
+  GORI: [1.25, 2.15],
 };
+// 관아(0, -16) 바로 앞 빈터. 둥지(-4,-10)·(4,-10)와 줄 선 주민 사이를 피한다(Windows GPU 위에서 본 시점으로 확인).
+const GORI_ROUTE = [
+  [-1.5, -12],
+  [1.5, -12],
+  [1.5, -13],
+  [-1.5, -13],
+] as const;
 const RESIDENTS = [
   "R01_Pachycephalosaurus",
   "R02_Triceratops",
@@ -216,6 +225,15 @@ export function createVillage(
     haul?: Hauler;
   };
   const walkers: Walker[] = [];
+  let gori:
+    | {
+        node: TransformNode;
+        play: (clip: string) => void;
+        leg: number;
+        wait: number;
+      }
+    | undefined;
+  let goriVisible = true;
   const plinthMat = new StandardMaterial("plinth-snow", scene);
   plinthMat.diffuseColor = new Color3(0.74, 0.74, 0.8);
   plinthMat.specularColor = Color3.Black();
@@ -468,6 +486,41 @@ export function createVillage(
       ),
     );
   });
+  jobs.push(
+    load(scene, "/models/gori/GORI.glb").then((asset) => {
+      if (disposed) return;
+      const node = new TransformNode("gori", scene);
+      node.parent = worldRoot;
+      node.position.set(
+        GORI_ROUTE[0][0],
+        elevation(...GORI_ROUTE[0]),
+        GORI_ROUTE[0][1],
+      );
+      node.setEnabled(goriVisible);
+      nodes.push(node);
+      const [height, modelHeight] = RESIDENT_HEIGHT.GORI as [number, number];
+      const visual = instantiate(
+        asset,
+        node,
+        height / modelHeight,
+        shadow,
+        1.3,
+        2,
+      );
+      for (const mesh of visual.meshes)
+        mesh.metadata = { ...mesh.metadata, villageTarget: "village:gori" };
+      targets.set("village:gori", {
+        name: "고리",
+        detail:
+          "복홀의 지휘관. 부친의 장부를 이어받아 조달과 배급으로 마을을 지킵니다.",
+        portrait: "/ui/gori/face1.webp",
+        meshes: visual.meshes,
+      });
+      disposers.push(visual.dispose);
+      gori = { node, play: visual.play, leg: 1, wait: 0 };
+      visual.play("Idle");
+    }),
+  );
   const ready = Promise.allSettled(jobs).then(
     (rs) => rs.filter((x) => x.status === "rejected").length,
   );
@@ -708,6 +761,7 @@ export function createVillage(
   function setRunning(value: boolean) {
     if (value === running) return;
     running = value;
+    if (!value) gori?.play("Idle");
     for (const ps of smokes) value ? ps.start() : ps.stop();
     for (const w of walkers) {
       w.target = null;
@@ -776,6 +830,30 @@ export function createVillage(
         .catch(() => {});
   }
   function animate(dt: number) {
+    if (gori && running && goriVisible) {
+      if (gori.wait > 0) {
+        gori.wait -= dt;
+        gori.play("Work");
+      } else {
+        const [x, z] = GORI_ROUTE[gori.leg] as readonly [number, number];
+        const p = gori.node.position;
+        const dx = x - p.x,
+          dz = z - p.z,
+          distance = Math.hypot(dx, dz);
+        const step = Math.min(distance, 1.1 * dt);
+        if (distance > 0) {
+          p.x += (dx / distance) * step;
+          p.z += (dz / distance) * step;
+          gori.node.rotation.y = Math.atan2(dx, dz);
+        }
+        p.y = elevation(p.x, p.z);
+        if (distance <= step) {
+          if (gori.leg === 1 || gori.leg === 3) gori.wait = 3.5;
+          gori.leg = (gori.leg + 1) % GORI_ROUTE.length;
+        }
+        gori.play("Walk");
+      }
+    }
     if (delivery >= 0) {
       delivery = Math.min(1, delivery + dt / 3);
       const z = -10 + 13.6 * delivery;
@@ -953,6 +1031,10 @@ export function createVillage(
 
   return {
     ready,
+    setGoriVisible(visible: boolean) {
+      goriVisible = visible;
+      gori?.node.setEnabled(visible);
+    },
     entityVisual,
     postDecree,
     clearDecree() {
