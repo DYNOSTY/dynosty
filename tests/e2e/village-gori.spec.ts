@@ -34,6 +34,25 @@ test("복홀에서 고리를 선택하면 정보와 초상이 보인다", async 
       }),
     )
     .toBe(true);
+  // 고리는 키 약 0.94m라 마을 전체 시점에서는 몇 픽셀뿐이다. 플레이어처럼 가까이 당겨 본다.
+  await page.evaluate(() => {
+    const scene = (
+      window as unknown as {
+        __scene: {
+          getTransformNodeById(id: string): {
+            getAbsolutePosition(): unknown;
+          } | null;
+          activeCamera: { setTarget(p: unknown): void; radius: number };
+        };
+      }
+    ).__scene;
+    const node = scene.getTransformNodeById("gori");
+    if (!node) throw Error("고리 노드가 없습니다.");
+    scene.activeCamera.setTarget(node.getAbsolutePosition());
+    scene.activeCamera.radius = 12;
+  });
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: test.info().outputPath("gori-near.png") });
   await clickNode(page, "gori");
   const info = page.getByRole("region", { name: "선택 정보", exact: true });
   await expect(
