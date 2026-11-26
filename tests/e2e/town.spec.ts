@@ -110,14 +110,16 @@ test("시설 완성 모습으로 회전 배치하고 자재를 확보한 두 공
   await dialog.getByRole("button", { name: "뒤로" }).click();
   await dialog.getByRole("button", { name: "불러오기" }).click();
   // 슬롯을 불러오면 페이지가 다시 열리므로 새 문서가 뜬 뒤 기록을 읽는다.
-  const reloaded = page.waitForEvent("load");
+  // CI 소프트웨어 렌더에서는 이미지·모델까지 기다리는 load가 30초를 넘길 때가 있어 문서 준비만 기다린다.
+  const reloaded = page.waitForEvent("domcontentloaded", { timeout: 90_000 });
   await dialog.getByRole("button", { name: /슬롯 1 ·/ }).click();
   await reloaded;
   await expect
-    .poll(async () => (await read()).town.orders)
+    .poll(async () => (await read()).town.orders, { timeout: 90_000 })
     .toEqual(pausedOrders);
   await expect(page.getByTestId("play-scene-status")).toHaveText(
     "3D 준비 완료",
+    { timeout: 90_000 },
   );
   await advanceVillageDay(page);
   await expect
