@@ -2,7 +2,6 @@ import type {
   GameCommand,
   GameState,
   GameWorkerMessage,
-  PlayCommand,
   PlayState,
   SceneSnapshot,
 } from "@dynosty/game-core";
@@ -514,18 +513,6 @@ export function App() {
     document.addEventListener("visibilitychange", pause);
     return () => document.removeEventListener("visibilitychange", pause);
   }, []);
-  function commandPlay(command: PlayCommand) {
-    if (command.type === "new-game") {
-      sceneRef.current?.resetScouting();
-    }
-    setExampleClock(false);
-    setPlayError(null);
-    workerRef.current?.postMessage({
-      type: "play-command",
-      command,
-    } satisfies GameCommand);
-  }
-
   const shownDay = timberOpen
     ? laborOpen
       ? Math.floor((laborState?.elapsed ?? 0) / 1440) + 1
@@ -1725,23 +1712,6 @@ export function App() {
             }}
           >
             <section aria-label="개발 환경 연결 상태" className="panel">
-              <div className="media-actions">
-                <button
-                  type="button"
-                  onClick={() => commandPlay({ type: "test-food", days: 0 })}
-                >
-                  식량 고갈 검사
-                </button>
-                <button
-                  type="button"
-                  onClick={() => commandPlay({ type: "test-food", days: 1 })}
-                >
-                  1일분 식량 복구
-                </button>
-              </div>
-              <p className="hint">
-                식량 검사 버튼은 개발용 재고 변경이며 생산·교역 규칙이 아닙니다.
-              </p>
               <p>
                 카메라 거리(m):{" "}
                 <span data-testid="camera-distance">

@@ -28,8 +28,7 @@ export interface GameState {
 export type PlayCommand =
   | { readonly type: "pause"; readonly paused: boolean }
   | { readonly type: "advance-day" }
-  | { readonly type: "new-game" }
-  | { readonly type: "test-food"; readonly days: number };
+  | { readonly type: "new-game" };
 export type GameCommand =
   | { readonly type: "play-command"; readonly command: PlayCommand }
   | { readonly type: "request-play-save"; readonly requestId: number }
