@@ -13,6 +13,7 @@ import {
   validateSceneSnapshot,
 } from "@dynosty/game-core";
 import { facilityModel } from "./facility-model.js";
+import { wearJige } from "./jige.js";
 import {
   buildModel,
   type ModelAssets,
@@ -59,6 +60,7 @@ export function createSceneEntities(
       generation: number;
       path: GroundPoint[];
       needMarker: Mesh | null;
+      jige: ReturnType<typeof wearJige> | null;
       ground?: {
         x: number;
         z: number;
@@ -122,6 +124,7 @@ export function createSceneEntities(
     if (!object) return;
     if (id === selectedId) select(null);
     object.visual?.dispose();
+    object.jige?.dispose();
     object.mesh.dispose();
     object.material.dispose();
     objects.delete(id);
@@ -328,6 +331,7 @@ export function createSceneEntities(
             generation: 0,
             path: [],
             needMarker: null,
+            jige: null,
           };
           objects.set(entity.id, object);
         }
@@ -349,6 +353,13 @@ export function createSceneEntities(
           object.mesh.isVisible = true;
         }
         object.entity = entity;
+        const jige = entity.kind === "resident" ? entity.jige : undefined;
+        if (object.jige?.kind !== jige?.kind) {
+          object.jige?.dispose();
+          object.jige = jige ? wearJige(scene, jige.kind, object.mesh) : null;
+        }
+        object.jige?.setLoaded(jige?.loaded === true);
+        object.jige?.rig.setEnabled(entity.visible);
         if (
           entity.kind === "resident" &&
           entity.needsHelp &&
