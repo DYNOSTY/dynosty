@@ -23,7 +23,7 @@ export const ISLAND_RADIUS = 70;
 export const MAP_SPAN = (ISLAND_RADIUS + 1) * 2;
 export { VILLAGE_POND as POND } from "@dynosty/game-core";
 
-const LAKE = { x: 40, z: -26, r: 10 };
+export const LAKE = { x: 40, z: -26, r: 10 };
 
 const smooth = (a: number, b: number, v: number) => {
   const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
@@ -31,6 +31,18 @@ const smooth = (a: number, b: number, v: number) => {
 };
 const mix = (a: readonly number[], b: readonly number[], t: number) =>
   a.map((v, k) => v + ((b[k] ?? v) - v) * t);
+/** 원본의 낮밤 안개색 계산. */
+export const fogColorAtDaylight = (
+  color: readonly number[],
+  daylight: number,
+) =>
+  daylight >= 0.35
+    ? [...color]
+    : mix(
+        color.map((v, k) => v * ([0.3, 0.34, 0.5][k] ?? 1)),
+        color,
+        smooth(0, 0.35, daylight),
+      );
 // 마을(반경 23)은 평평, 바깥은 언덕, 가장자리는 높은 능선. 호수 자리는 낮게
 export const elevation = (x: number, z: number) => {
   const d = Math.hypot(x, z),
@@ -868,6 +880,7 @@ export function buildWorld(
     sky.diffuse = c3(mix(P.skyNight, P.skyDay, daylight));
     const warm = smooth(0, 0.18, daylight) * (1 - smooth(0.18, 0.5, daylight));
     sun.diffuse = c3(mix(P.sun, [1, 0.72, 0.55], warm));
+    scene.fogColor = c3(fogColorAtDaylight(P.fog, daylight));
     glow.intensity = 0.55 + 0.6 * (1 - daylight); // 밤일수록 불빛이 번짐
     // 배경 밝기는 20단계로만 바꿈 (매 프레임 바꾸면 화면 전체를 다시 그려 느려짐)
     const level = (0.72 + (0.28 * Math.round(daylight * 20)) / 20).toFixed(3);
