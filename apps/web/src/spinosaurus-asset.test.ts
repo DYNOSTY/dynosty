@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 function glb(name: string) {
@@ -65,10 +66,12 @@ it("스피노 표면의 삼각형 방향은 바깥 법선과 일치한다", asyn
     .registerExtensions(ALL_EXTENSIONS)
     .registerDependencies({ "meshopt.decoder": MeshoptDecoder })
     .read(
-      new URL(
-        "../public/models/residents/SPINO_Spinosaurus.glb",
-        import.meta.url,
-      ).pathname,
+      fileURLToPath(
+        new URL(
+          "../public/models/residents/SPINO_Spinosaurus.glb",
+          import.meta.url,
+        ),
+      ),
     );
   const primitive = doc
     .getRoot()
@@ -113,8 +116,9 @@ it.each(["SPINO_Spinosaurus", "SPINO_Spinosaurus_v2"])(
       .registerExtensions(ALL_EXTENSIONS)
       .registerDependencies({ "meshopt.decoder": MeshoptDecoder })
       .read(
-        new URL(`../public/models/residents/${name}.glb`, import.meta.url)
-          .pathname,
+        fileURLToPath(
+          new URL(`../public/models/residents/${name}.glb`, import.meta.url),
+        ),
       );
     const swing = (clip: string) => {
       const animation = doc

@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { AssetContainer } from "@babylonjs/core/assetContainer";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -96,7 +97,7 @@ describe("게임 주민 GLB", () => {
       const model = residentGlb(species, season);
       if (!model) throw Error(`Missing ${species}`);
       const document = await new NodeIO().read(
-        new URL(`../public${model.crowdUrl}`, import.meta.url).pathname,
+        fileURLToPath(new URL(`../public${model.crowdUrl}`, import.meta.url)),
       );
       const crowdScene =
         document.getRoot().getDefaultScene() ??
