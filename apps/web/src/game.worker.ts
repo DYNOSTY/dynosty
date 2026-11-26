@@ -13,7 +13,6 @@ import {
   type PlayState,
   parseExampleSave,
   setPlayPaused,
-  supplyFood,
   tickPlay,
 } from "@dynosty/game-core";
 
@@ -68,8 +67,6 @@ self.onmessage = (event: MessageEvent<GameCommand>) => {
           play = setPlayPaused(play, command.paused);
         else if (command.type === "advance-day")
           play = advancePlayMinutes(play, 1440);
-        else if (command.type === "test-food")
-          play = supplyFood(play, command.days);
         manualScene = false;
         lastTick = performance.now();
         publishPlay();
