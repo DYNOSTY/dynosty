@@ -12,7 +12,7 @@ import { dedup, meshopt, prune } from "@gltf-transform/functions";
 import { MeshoptDecoder, MeshoptEncoder } from "meshoptimizer";
 
 const root = path.resolve(import.meta.dirname, "../apps/web/public/models");
-const folders = ["residents", "buildings", "gori", "trees"];
+const folders = ["residents", "buildings", "gori", "props", "trees"];
 
 await MeshoptEncoder.ready;
 await MeshoptDecoder.ready;
