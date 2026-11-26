@@ -1102,6 +1102,102 @@ def spring():
         reed(f"reed{i}", x, y, gh(x, y), rnd.uniform(0.5, 0.95), 5800 + i, n=5, spread=0.1)
 
 
+def build_stage(stage):
+    rnd = random.Random(90 + stage)
+    gh = make_gh(3.3, 2.8, 0.0, base=0.1)
+    WX, DY, EAVE, RIDGE = 1.7, 1.2, 1.75, 2.5
+    # 사람이 오가며 다져 흙이 드러난 자리
+    ground(3.3, 2.8, 0.0, gh, lambda x, y: sstep(1.0, 0.45, max(abs(x) / (WX + 1.3), abs(y) / (DY + 1.4))), "ground_plain", n=12, segs=40)
+    corners = ((-WX, -DY), (WX, -DY), (WX, DY), (-WX, DY))
+    # 기초돌: 1단계는 뒤와 왼쪽만, 그 뒤로는 빙 둘러
+    k = 0
+    for (x0, y0), (x1, y1) in zip(corners, corners[1:] + corners[:1]):
+        n = 5 if abs(x1 - x0) > 1 else 4
+        for i in range(n):
+            x, y = x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n
+            if stage == 1 and (y < 0.5 and x > -WX + 0.2) and rnd.random() < 0.8:
+                k += 1
+                continue
+            if y0 == y1 == -DY and 0.25 < i / n < 0.75:
+                k += 1
+                continue  # 앞 가운데는 드나드는 자리
+            stone(f"found{k}", (x, y, gh(x, y) + 0.08), (0.42, 0.38, 0.3), 900 + k, rz=rnd.uniform(-0.3, 0.3))
+            k += 1
+    if stage == 1:
+        # 자리를 잡는 말뚝과 줄
+        for i, (x, y) in enumerate(corners):
+            log(f"stake{i}", (x, y, 0.0), (x + rnd.uniform(-0.04, 0.04), y, 0.95), 0.05, 0.04, seed=i)
+        for i, ((x0, y0), (x1, y1)) in enumerate(zip(corners, corners[1:] + corners[:1])):
+            log(f"line{i}", (x0, y0, 0.82), (x1, y1, 0.82), 0.016, 0.016, mat="rope", segs=4, seed=10 + i, wob=0.01)
+    else:
+        # 기둥 여섯, 도리, 들보, 가새
+        for i, (x, y) in enumerate(((-WX, -DY), (0, -DY), (WX, -DY), (-WX, DY), (0, DY), (WX, DY))):
+            log(f"post{i}", (x, y, 0.1), (x + rnd.uniform(-0.03, 0.03), y, EAVE), 0.1, 0.085, seed=20 + i)
+        for i, y in enumerate((-DY, DY)):
+            log(f"plate{i}", (-WX - 0.25, y, EAVE + 0.06), (WX + 0.25, y, EAVE + 0.06), 0.085, 0.08, seed=30 + i)
+        for i, x in enumerate((-WX, 0.0, WX)):
+            log(f"tie{i}", (x, -DY - 0.2, EAVE + 0.16), (x, DY + 0.2, EAVE + 0.16), 0.08, 0.075, seed=33 + i)
+        for i, (x, y, dx) in enumerate(((-WX, -DY, 0.55), (WX, -DY, -0.55), (-WX, DY, 0.55), (WX, DY, -0.55))):
+            log(f"brace{i}", (x, y, EAVE - 0.7), (x + dx, y, EAVE), 0.05, 0.045, seed=36 + i)
+        # 사다리: 앞 도리에 기대 세움
+        for sx in (-0.2, 0.2):
+            log(f"ladder{sx}", (0.9 + sx, -DY - 0.95, gh(0.9, -DY - 0.95)), (0.9 + sx, -DY - 0.1, EAVE + 0.25), 0.035, 0.03, seed=40)
+        for i in range(5):
+            f = 0.14 + i * 0.17
+            y, z = -DY - 0.95 + 0.85 * f, gh(0.9, -DY - 0.95) + (EAVE + 0.25) * f
+            log(f"rung{i}", (0.68, y, z), (1.12, y, z), 0.025, 0.025, seed=45 + i, wob=0)
+    if stage == 3:
+        ridge = lambda x: RIDGE - 0.06 * math.sin((x + WX) / (2 * WX) * math.pi)
+        log("ridge", (-WX - 0.3, 0, ridge(-WX)), (WX + 0.3, 0, ridge(WX)), 0.08, 0.075, seed=50)
+        for i, x in enumerate((-WX, 0.0, WX)):
+            log(f"king{i}", (x, 0, EAVE + 0.2), (x, 0, ridge(x) - 0.05), 0.065, 0.06, seed=52 + i)
+        for s in (-1, 1):
+            for i in range(8):
+                x = -WX - 0.15 + (2 * WX + 0.3) * i / 7
+                log(f"raft{s}{i}", (x, 0, ridge(x) + 0.05), (x, s * (DY + 0.45), EAVE - 0.22), 0.045, 0.04, seed=60 + i + (s > 0) * 10)
+            # 이엉: 뒤 비탈은 다 얹었고, 앞 비탈은 왼쪽 반만 (얹다 만 자리의 서까래가 보임)
+            NC, NXC = 4, 30
+            for kk in range(NC):
+                v0, top, bot, lip = max(0.0, kk / NC - 0.05), [], [], []
+                umax = 1.0 if s > 0 else 0.5 - 0.08 * kk
+                for i in range(NXC + 1):
+                    u = i / NXC * umax
+                    x = -WX - 0.3 + (2 * WX + 0.6) * u
+                    vb = min(1.06, (kk + 1) / NC + 0.06 * rnd.random())
+                    P = lambda v: Vector((x, s * v * (DY + 0.5), ridge(x) + 0.1 - v * (ridge(x) - EAVE + 0.3)))
+                    n = Vector((0, s * 0.55, 0.83))
+                    top.append((P(v0) + n * 0.04, (x, v0 * 1.7), (0.0, 0)))
+                    bot.append((P(vb) + n * 0.14, (x, vb * 1.7), (1.0, 0)))
+                    lip.append((P(vb - 0.015) + n * 0.03, (x, vb * 1.7 + 0.1), (0.15, 0)))
+                sheet(f"thatch{s}{kk}", [top, bot, lip], "thatch", Vector((0, s * 0.55, 0.83)))
+        # 비계 장대와 발판, 올릴 짚단
+        for i, x in enumerate((-0.2, 1.5)):
+            log(f"scaf{i}", (x, -DY - 0.75, gh(x, -DY - 0.75)), (x, -DY - 0.7, EAVE + 0.5), 0.045, 0.04, seed=80 + i)
+        log("scafbar", (-0.35, -DY - 0.72, 1.15), (1.65, -DY - 0.72, 1.15), 0.04, 0.04, seed=83, wob=0)
+        for i, (x, y) in enumerate(((-2.2, -1.5), (-1.75, -1.85), (-2.35, -2.0))):
+            lathe(f"sheaf{i}", (x, y, gh(x, y)), [(0.2, 0.0), (0.24, 0.3), (0.12, 0.42), (0.2, 0.7), (0.26, 0.74)], "blade", segs=9, lean=(rnd.uniform(-0.1, 0.1), 0))
+            log(f"sheaftie{i}", (x, y, gh(x, y) + 0.38), (x, y, gh(x, y) + 0.46), 0.135, 0.135, mat="rope", segs=8, seed=85 + i, wob=0)
+    # 쌓아 둔 통나무 (지을수록 줄어듦)와 돌무더기, 모탕 위의 통나무
+    rows = {1: (4, 3, 2), 2: (3, 2), 3: (2,)}[stage]
+    for j, n in enumerate(rows):
+        for i in range(n):
+            # 통나무 마구리가 앞(카메라)을 보게 쌓음 — 옆으로 뉘었더니 줄무늬 판자로 보였음
+            x = 2.25 + (i - (n - 1) / 2) * 0.3
+            z = gh(2.25, -1.9) + 0.15 + j * 0.26
+            log(f"pile{j}{i}", (x, -2.55, z), (x + rnd.uniform(-0.05, 0.05), -1.15, z), 0.14, 0.13, mat="bark" if (i + j) % 2 else "wood", segs=8, seed=100 + j * 5 + i, wob=0.01)
+    for i in range(7 if stage == 1 else 3):
+        x, y = -2.4 + rnd.uniform(-0.35, 0.35), 1.6 + rnd.uniform(-0.3, 0.3)
+        stone(f"heap{i}", (x, y, gh(x, y) + 0.1 + 0.2 * (i % 3 == 0)), (0.4, 0.36, 0.3), 950 + i, rz=rnd.uniform(0, 3))
+    if stage >= 2:
+        for sx in (-0.3, 0.3):  # 모탕(통나무 받침) 둘에 다듬던 통나무
+            log(f"horse{sx}", (-2.3 + sx, -1.9, gh(-2.3, -1.9) + 0.12), (-2.3 + sx, -1.2, gh(-2.3, -1.2) + 0.12), 0.1, 0.1, seed=110, wob=0)
+        log("worked", (-2.75, -1.55, gh(-2.3, -1.55) + 0.3), (-1.85, -1.55, gh(-2.3, -1.55) + 0.3), 0.11, 0.1, mat="heartwood", segs=8, seed=112, wob=0)
+        for i in range(8):  # 대팻밥
+            x, y = -2.3 + rnd.uniform(-0.6, 0.6), -1.55 + rnd.uniform(-0.5, 0.5)
+            a = rnd.uniform(0, TAU)
+            log(f"chip{i}", (x, y, gh(x, y) + 0.03), (x + math.cos(a) * 0.18, y + math.sin(a) * 0.18, gh(x, y) + 0.05), 0.03, 0.008, mat="heartwood", segs=4, seed=120 + i, wob=0)
+
+
 def bake(name, out_dir, tex):
     """부품을 한 물체로 합치고, 재질과 틈새 그늘을 그림 한 장으로 구워 GLB + JPG로 내보냄"""
     sc = bpy.context.scene
@@ -1187,6 +1283,7 @@ def bake(name, out_dir, tex):
 
 # 이름: (세우는 함수, 구울 그림 한 변)
 SITES = {"STORE": (store, 2048), "COAL": (coal, 1536), "IRON": (iron, 1536), "FISH": (pond, 1536), "PINE": (pine, 1536), "SPRING": (spring, 1536)}
+SITES.update({"BUILD1": (lambda: build_stage(1), 1024), "BUILD2": (lambda: build_stage(2), 1024), "BUILD3": (lambda: build_stage(3), 1024)})
 ONLY = globals().get("ONLY")
 for key, (fn, tex) in SITES.items():
     if ONLY and key not in ONLY:

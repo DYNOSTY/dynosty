@@ -4,6 +4,7 @@
 // Already compressed files are skipped, so run it again after adding or replacing models:
 //   pnpm models:optimize
 // Resource-site models stay as authored: their raw POSITION bounds feed the site layout.
+// Construction stages do not feed that layout, so they can be compressed.
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { NodeIO } from "@gltf-transform/core";
@@ -12,7 +13,7 @@ import { dedup, meshopt, prune } from "@gltf-transform/functions";
 import { MeshoptDecoder, MeshoptEncoder } from "meshoptimizer";
 
 const root = path.resolve(import.meta.dirname, "../apps/web/public/models");
-const folders = ["residents", "buildings", "gori", "props"];
+const folders = ["residents", "buildings", "gori", "props", "sites"];
 
 await MeshoptEncoder.ready;
 await MeshoptDecoder.ready;
@@ -29,6 +30,7 @@ for (const folder of folders) {
   const dir = path.join(root, folder);
   for (const name of (await readdir(dir)).sort()) {
     if (!name.endsWith(".glb")) continue;
+    if (folder === "sites" && !/^SITE3_BUILD[123]\.glb$/.test(name)) continue;
     const file = path.join(dir, name);
     const doc = await io.read(file);
     if (
