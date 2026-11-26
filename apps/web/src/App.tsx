@@ -56,6 +56,7 @@ import {
 } from "./local-save.js";
 import { MediaPanel } from "./MediaPanel.js";
 import { MerchantDialog, merchantCards } from "./MerchantOffers.js";
+import type { MarkerRect } from "./marker-layout.js";
 import { PlayPanel } from "./PlayPanel.js";
 import { QualityFlow } from "./QualityFlow.js";
 import { RegionMap } from "./RegionMap.js";
@@ -71,6 +72,7 @@ import type {
   SceneController,
   ScreenPoint,
 } from "./scene.js";
+import { placeScoutPin } from "./scout-pin-layout.js";
 import { SCOUT_CREW, SCOUT_GOAL, SCOUT_SITES } from "./scout-sites.js";
 import { type SiteNotice, siteCompletions } from "./site-progress.js";
 import {
@@ -693,6 +695,7 @@ export function App() {
         const quests = document
           .querySelector(".g-quests")
           ?.getBoundingClientRect();
+        const placed: MarkerRect[] = [];
         for (const [id, pt] of Object.entries(pos)) {
           const el = pinRefs.current[id];
           if (!el) continue;
@@ -730,6 +733,34 @@ export function App() {
             y < quests.bottom + 16
           )
             y = quests.bottom + 24;
+          // 일반 표식은 아래쪽, 가장자리 표식은 가운데가 기준점이다.
+          const height = el.offsetHeight;
+          const anchor = inside ? height : height / 2;
+          const rect = placeScoutPin(
+            {
+              left: x - el.offsetWidth / 2,
+              top: y - anchor,
+              width: el.offsetWidth,
+              height,
+            },
+            y0,
+            y1,
+            placed,
+          );
+          if (rect) {
+            x = rect.left + rect.width / 2;
+            y = rect.top + anchor;
+            placed.push(rect);
+          } else {
+            // 공간이 부족해도 기준 영역 밖으로 벗어나지 않게 한다.
+            y = Math.max(y0 + anchor, Math.min(y1 - height + anchor, y));
+            placed.push({
+              left: x - el.offsetWidth / 2,
+              top: y - anchor,
+              width: el.offsetWidth,
+              height,
+            });
+          }
           el.style.left = `${x}px`;
           el.style.top = `${y}px`;
           el.classList.toggle("is-edge", !inside);
