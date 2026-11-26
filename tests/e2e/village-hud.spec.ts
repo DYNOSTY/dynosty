@@ -157,7 +157,7 @@ test("건설 카드를 골라도 WASD 이동을 유지하고 새 부지를 누�
   throw Error("빈 부지에서 온돌 둥지 공사를 시작하지 못했습니다.");
 });
 
-test("배치 중 완공된 식당을 누르면 식당의 이름과 단계가 열린다", async ({
+test("배치 중 완공된 식당을 눌러도 배치가 유지되고, 취소한 뒤 누르면 식당 정보가 열린다", async ({
   page,
 }) => {
   const order = commandTimber(
@@ -197,10 +197,18 @@ test("배치 중 완공된 식당을 누르면 식당의 이름과 단계가 열
     .click();
   const canvas = page.locator(".scene-viewport canvas");
   const rect = requireValue(await canvas.boundingBox(), "화면 위치");
-  await canvas.click({
-    position: { x: rect.width / 2, y: rect.height / 2 - 10 },
-  });
+  const restaurant = { x: rect.width / 2, y: rect.height / 2 - 10 };
   const info = page.getByRole("region", { name: "선택 정보" });
+  const placing = page.getByTestId("home-placement-status");
+  // 배치 중 클릭은 그 자리에 짓기를 시도한다. 식당 위는 겹치므로 배치가 유지된다.
+  await canvas.click({ position: restaurant });
+  await expect(placing).toBeVisible();
+  await expect(placing).toContainText("겹");
+  await expect(info.filter({ hasText: "공동 식당" })).toHaveCount(0);
+  // 배치를 취소한 뒤 같은 자리를 누르면 식당 정보가 열린다.
+  await page.keyboard.press("Escape");
+  await expect(placing).toHaveCount(0);
+  await canvas.click({ position: restaurant });
   await expect(info).toContainText("공동 식당");
   await expect(info).toContainText("완공 시설 · 1단계");
 });
