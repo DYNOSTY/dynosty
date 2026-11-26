@@ -47,6 +47,7 @@ import {
   MoodScale,
   TopFrame,
 } from "./GameHud.js";
+import { goriFace } from "./gori-face.js";
 import {
   loadLocalExample,
   localSaveError,
@@ -298,6 +299,7 @@ export function App() {
               id &&
               (id.startsWith("town:") ||
                 id.startsWith("village:BLD_") ||
+                id === "village:gori" ||
                 id === "example-building-1" ||
                 id.startsWith("dwelling-"))
             ) {
@@ -2015,9 +2017,17 @@ export function App() {
             >
               {villageInfo.portrait && (
                 <img
-                  key={villageInfo.portrait}
+                  key={
+                    selectedId === "village:gori"
+                      ? goriFace(timberState)
+                      : villageInfo.portrait
+                  }
                   className="village-selection-portrait"
-                  src={villageInfo.portrait}
+                  src={
+                    selectedId === "village:gori"
+                      ? goriFace(timberState)
+                      : villageInfo.portrait
+                  }
                   alt=""
                   width={64}
                   height={44}
@@ -2028,6 +2038,12 @@ export function App() {
               )}
               <h2>{villageInfo.name}</h2>
               <p>{villageInfo.detail}</p>
+              {selectedId === "village:gori" && (
+                <>
+                  <p>조달과 배급을 이끈다 · 복홀의 지휘관</p>
+                  <p>지휘권은 매일의 성과로만 지킨다</p>
+                </>
+              )}
               {villageInfo.buildingPosition && (
                 <>
                   <button
