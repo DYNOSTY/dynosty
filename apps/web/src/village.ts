@@ -1041,8 +1041,17 @@ export function createVillage(
       scene,
       kind === "resident"
         ? "/models/residents/R02_Triceratops.glb"
-        : "/models/buildings/BLD_NEST.glb",
-    );
+        : seasonalModelUrl("buildings", "BLD_NEST", season === "winter"),
+    ).catch((error: unknown) => {
+      if (
+        kind !== "building" ||
+        season !== "winter" ||
+        disposed ||
+        parent.isDisposed()
+      )
+        throw error;
+      return load(scene, seasonalModelUrl("buildings", "BLD_NEST", false));
+    });
     if (disposed || parent.isDisposed()) throw new Error("종료한 대상입니다.");
     const node = new TransformNode(`${parent.name}:glb`, scene);
     node.parent = parent;

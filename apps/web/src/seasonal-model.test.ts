@@ -17,7 +17,7 @@ it("겨울에도 실제로 있는 모델 파일만 요청한다", () => {
       }
   }
   expect(seasonalModelUrl("buildings", "BLD_NEST", true)).toBe(
-    "/models/buildings/BLD_NEST.glb",
+    "/models/buildings/BLD_NEST_v2.glb",
   );
   expect(seasonalModelUrl("buildings", "BLD_OFFICE", true)).toBe(
     "/models/buildings/BLD_OFFICE_v2.glb",
