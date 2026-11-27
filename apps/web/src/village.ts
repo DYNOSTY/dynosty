@@ -191,6 +191,7 @@ export function createVillage(
   light: Light,
   worldRoot: TransformNode,
   season: Season,
+  residentShadowSource?: Mesh,
 ) {
   const targets = new Map<
     string,
@@ -1036,6 +1037,8 @@ export function createVillage(
         species ?? "R02",
         season,
         shadow,
+        load,
+        residentShadowSource,
       );
     const asset = await load(
       scene,

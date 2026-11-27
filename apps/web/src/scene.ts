@@ -193,6 +193,7 @@ export function mountScene(
   canvas.dataset.season = season;
   const {
     shadow,
+    blobSrc,
     setTime,
     glow,
     warmMat,
@@ -214,6 +215,7 @@ export function mountScene(
     { glow, warmMat },
     previewVillage,
     season,
+    blobSrc,
   );
   const fuelYard = createFuelYard(scene, worldRoot);
   fuelYard.setVisible(false);
