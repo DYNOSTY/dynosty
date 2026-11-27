@@ -1,5 +1,6 @@
 import type {
   PlayState,
+  SceneSnapshot,
   TimberCommand,
   TimberSave,
   TimberState,
@@ -14,6 +15,7 @@ export type TimberResponse =
   | { type: "exited"; world: PlayState }
   | {
       type: "state";
+      scene: SceneSnapshot;
       resumeJson: string;
       completions?: string[];
       resetNotices?: boolean;

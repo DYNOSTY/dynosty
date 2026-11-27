@@ -49,6 +49,7 @@ import { buildingCost, TownPanel } from "./TownPanel.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 import { readWorkerSnapshot } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
+import { rememberScene } from "./timber-scene-cache.js";
 
 const time = (m: number) => `${Math.floor(m / 60)}시간 ${m % 60}분`;
 const phaseNames = {
@@ -220,6 +221,7 @@ export function TimberDemo({
       const m = e.data;
       if (m.type === "state") {
         const state = readWorkerSnapshot(m.resumeJson);
+        rememberScene(state, m.scene);
         const stage = state.chapter ?? 1;
         const campaign = state.campaign;
         if (
