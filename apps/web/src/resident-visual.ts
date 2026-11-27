@@ -162,7 +162,10 @@ export async function createResidentVisual(
       if (detail) return;
       const eye = scene.activeCamera?.globalPosition;
       const d2 = eye
-        ? Vector3.DistanceSquared(parent.absolutePosition, eye)
+        ? Vector3.DistanceSquared(
+            parent.parent ? parent.absolutePosition : parent.position,
+            eye,
+          )
         : 0;
       // At overview distance retain path/heading, not subpixel bob and sway.
       if (d2 >= 85 * 85) {

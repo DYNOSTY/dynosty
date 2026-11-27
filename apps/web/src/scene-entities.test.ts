@@ -4,7 +4,100 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { Scene } from "@babylonjs/core/scene";
 import { createSceneExample } from "@dynosty/game-core";
 import { describe, expect, it, vi } from "vitest";
+import { residentPath } from "./resident-path.js";
 import { createSceneEntities } from "./scene-entities.js";
+
+vi.mock("./resident-path.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./resident-path.js")>();
+  return { ...actual, residentPath: vi.fn(actual.residentPath) };
+});
+
+describe("주민 경로 재계산", () => {
+  it("목표가 바뀐 주민만 계산하고 같은 장애물은 재계산하지 않는다", () => {
+    const engine = new NullEngine(),
+      scene = new Scene(engine),
+      entities = createSceneEntities(scene);
+    const base = createSceneExample();
+    const resident = base.entities.find((e) => e.kind === "resident");
+    if (!resident) throw new Error("주민 없음");
+    const snapshot = {
+      ...base,
+      entities: [
+        ...base.entities,
+        { ...resident, id: "resident-two", position: { x: -5, y: 0, z: 5 } },
+      ],
+    };
+    try {
+      entities.update(snapshot);
+      vi.mocked(residentPath).mockClear();
+      entities.update({
+        ...snapshot,
+        entities: snapshot.entities.map((e) =>
+          e.id === "resident-two"
+            ? { ...e, position: { x: -6, y: 0, z: 5 } }
+            : e,
+        ),
+      });
+      expect(residentPath).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(residentPath).mock.calls[0]?.[1]).toMatchObject({
+        x: -6,
+        z: 5,
+      });
+      vi.mocked(residentPath).mockClear();
+      entities.setObstacles([]);
+      expect(residentPath).not.toHaveBeenCalled();
+      entities.setObstacles([{ x: 20, z: 20 }]);
+      vi.mocked(residentPath).mockClear();
+      entities.setObstacles([{ x: 20, z: 20 }]);
+      expect(residentPath).not.toHaveBeenCalled();
+    } finally {
+      entities.dispose();
+      scene.dispose();
+      engine.dispose();
+    }
+  });
+
+  it("장애물 변경 시 다시 계산하고 새 건물을 우회해 도착한다", () => {
+    const engine = new NullEngine(),
+      scene = new Scene(engine),
+      entities = createSceneEntities(scene);
+    const base = createSceneExample();
+    const snapshot = {
+      ...base,
+      entities: base.entities
+        .filter((e) => e.kind === "resident")
+        .map((e) => ({ ...e, position: { x: -5, y: 0, z: 0 } })),
+    };
+    try {
+      entities.update(snapshot);
+      entities.update({
+        ...snapshot,
+        entities: snapshot.entities.map((e) => ({
+          ...e,
+          position: { x: 5, y: 0, z: 0 },
+        })),
+      });
+      vi.mocked(residentPath).mockClear();
+      entities.setObstacles([{ x: 0, z: 0 }]);
+      expect(residentPath).toHaveBeenCalledTimes(1);
+      const resident = scene.getMeshById("example-resident-1");
+      if (!resident) throw new Error("주민 없음");
+      for (let frame = 0; frame < 600; frame++) {
+        entities.animate(1 / 60);
+        expect(
+          Math.abs(resident.position.x) <= 1.75 &&
+            Math.abs(resident.position.z) <= 1.75,
+        ).toBe(false);
+      }
+      expect(resident.position.x).toBeCloseTo(5);
+      expect(resident.position.z).toBeCloseTo(0);
+    } finally {
+      entities.dispose();
+      scene.dispose();
+      engine.dispose();
+    }
+  });
+});
 
 it("구릉을 따라 이동할 때 주민의 발과 건물 기초가 지면 높이를 따른다", () => {
   const engine = new NullEngine(),

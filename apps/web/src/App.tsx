@@ -19,7 +19,6 @@ import {
   scoutTripMinutes,
   TIMBER_RULES,
   type TimberState,
-  timberScene,
   villageDefenseActive,
 } from "@dynosty/game-core";
 import {
@@ -84,6 +83,7 @@ import {
 import { SCENE_SIGNS } from "./site-zones.js";
 import { TimberDemo } from "./TimberDemo.js";
 import { buildingCost, Demolition } from "./TownPanel.js";
+import { sceneOf } from "./timber-scene-cache.js";
 import { VideoPanel } from "./VideoPanel.js";
 import { CREW_BADGES, cartBadge } from "./visual-badges.js";
 import { WorkspacePanel } from "./WorkspacePanel.js";
@@ -365,7 +365,7 @@ export function App() {
     )
       return;
     sceneRef.current.updateLabor(null);
-    const village = timberScene(timberState);
+    const village = sceneOf(timberState);
     const display: SceneSnapshot = {
       ...village,
       entities: [
