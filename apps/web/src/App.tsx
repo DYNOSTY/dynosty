@@ -323,13 +323,18 @@ export function App() {
         const controller = sceneRef.current;
         await controller.ready;
         if (cancelled) return;
-        void controller
-          .minimap()
-          .then((map) => {
-            if (!cancelled) setMinimap(map);
-          })
-          .catch(() => {});
         setSceneStatus("준비 완료");
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (cancelled) return;
+            void controller
+              .minimap()
+              .then((map) => {
+                if (!cancelled) setMinimap(map);
+              })
+              .catch(() => {});
+          }, 0);
+        });
       })
       .catch(() => {
         if (!cancelled)
