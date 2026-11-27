@@ -10,6 +10,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { Scene } from "@babylonjs/core/scene";
 import { createSceneExample } from "@dynosty/game-core";
 import { describe, expect, it } from "vitest";
+import { facilityModel } from "./facility-model.js";
 import {
   buildModel,
   loadModelAssets,
@@ -114,6 +115,79 @@ describe("자체 제작 대표 모델", () => {
       engine.dispose();
     }
   });
+});
+
+it("시설의 고정 색상은 한 메시로 합치고 선택과 정리를 유지한다", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  const material = new StandardMaterial("fallback", scene);
+  const root = CreateBox("town:facility", { size: 1 }, scene);
+  root.metadata = { townTarget: root.id };
+  try {
+    const asset = facilityModel("workshop", 1);
+    const visual = buildModel(scene, root, material, asset);
+    expect(asset.parts.length).toBeGreaterThan(1);
+    expect(visual.meshes).toHaveLength(1);
+    const merged = visual.meshes[0];
+    expect(merged?.subMeshes).toHaveLength(1);
+    expect(merged?.parent).toBe(root);
+    const hit = pickedNode({ pickedMesh: merged } as unknown as PickingInfo);
+    expect(hit?.parent?.metadata.townTarget).toBe("town:facility");
+    visual.setOutline(true);
+    expect(merged?.renderOutline).toBe(true);
+    visual.refreshStatic();
+    visual.dispose();
+    root.dispose();
+    material.dispose();
+    expect(scene.meshes).toHaveLength(0);
+    expect(scene.materials).toHaveLength(0);
+  } finally {
+    scene.dispose();
+    engine.dispose();
+  }
+});
+
+it("색상 없는 건물 부위는 강조 재질을 유지하고 병합 메시도 건물 선택에 연결된다", () => {
+  const engine = new NullEngine();
+  const scene = new Scene(engine);
+  const selected: Array<string | null> = [];
+  const entities = createSceneEntities(scene, (id) => selected.push(id));
+  try {
+    const asset = parseModel(building, "building");
+    const first = asset.parts[0];
+    if (!first) throw new Error("건물 부위가 없습니다.");
+    const { color: _color, ...uncolored } = first;
+    asset.parts[0] = uncolored;
+    entities.setModels({ building: asset });
+    const example = createSceneExample();
+    entities.update(example);
+    const merged = scene.getMeshById("example-building-1:model");
+    const fallback = scene.getMeshById("example-building-1:fallback");
+    const root = scene.getMeshById("example-building-1");
+    expect(fallback?.material).toBe(root?.material);
+    entities.selectMesh(
+      pickedNode({ pickedMesh: merged } as unknown as PickingInfo),
+    );
+    expect(selected.at(-1)).toBe("example-building-1");
+    expect(merged?.renderOutline).toBe(true);
+    expect(fallback?.renderOutline).toBe(true);
+    entities.update({
+      ...example,
+      entities: example.entities.map((e) =>
+        e.kind === "building" ? { ...e, highlighted: true } : e,
+      ),
+    });
+    expect(
+      (fallback?.material as StandardMaterial | undefined)?.diffuseColor.r,
+    ).toBe(1);
+    entities.update({ schemaVersion: 1, entities: [] });
+    expect(scene.meshes).toHaveLength(0);
+    expect(scene.materials).toHaveLength(0);
+  } finally {
+    entities.dispose();
+    scene.dispose();
+    engine.dispose();
+  }
 });
 
 it("주민 모델은 같은 부위를 공유 메시에 몰아 그리고 선택한 주민만 윤곽선을 켠다", () => {

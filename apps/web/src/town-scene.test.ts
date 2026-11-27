@@ -73,8 +73,13 @@ it("수역·어군과 결빙 구멍을 전환하고 대기 부지에서 완성 �
     visual.update(s);
     expect(scene.getMeshById("town:build-1")?.isVisible).toBe(false);
     expect(scene.getMeshById("town:build-1")?.rotation.y).toBe(Math.PI / 2);
-    expect(scene.getMeshById("town:build-1:sprout-0")).not.toBeNull();
-    const first = scene.getMeshById("town:build-1:sprout-0");
+    // Coloured parts of a finished facility are merged into one mesh.
+    const first = requireValue(
+      scene.getMeshById("town:build-1:model"),
+      "완성 시설 모델",
+    );
+    const firstVertices = first.getTotalVertices();
+    expect(firstVertices).toBeGreaterThan(0);
     visual.update({
       ...s,
       town: {
@@ -82,8 +87,11 @@ it("수역·어군과 결빙 구멍을 전환하고 대기 부지에서 완성 �
         facilities: s.town.facilities.map((f) => ({ ...f, level: 3 })),
       },
     });
-    expect(first?.isDisposed()).toBe(true);
-    expect(scene.getMeshById("town:build-1:high-bay-ridge")).not.toBeNull();
+    expect(first.isDisposed()).toBe(true);
+    // Level 3 adds the high bay, so the rebuilt model has more geometry.
+    expect(
+      scene.getMeshById("town:build-1:model")?.getTotalVertices(),
+    ).toBeGreaterThan(firstVertices);
     visual.update(null);
     expect(scene.getMeshById("town:build-1")).toBeNull();
   } finally {
