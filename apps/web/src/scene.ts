@@ -28,6 +28,7 @@ import {
   BOKHOL_MAP,
   BUILDING_RULES,
   type BuildingKind,
+  fuelYardShown,
   type GroundPoint,
   type HomePlacement,
   homeObstacle,
@@ -908,9 +909,7 @@ export function mountScene(
         camera.upperRadiusLimit = state ? 720 : 140;
       }
       const active = state !== null;
-      fuelYard.setVisible(
-        !!state && !(state.bokhol && state.campaign?.beat === "capital"),
-      );
+      fuelYard.setVisible(!!state && fuelYardShown(state));
       if (state)
         fuelYard.setStock(
           state.world.resources.RES_COAL / AMOUNT_SCALE,

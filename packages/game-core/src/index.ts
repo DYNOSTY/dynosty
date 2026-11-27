@@ -93,6 +93,7 @@ export * from "./bokhol.js";
 export * from "./campaign.js";
 export * from "./development.js";
 export * from "./exchange.js";
+export * from "./fuel-yard.js";
 export * from "./home-construction.js";
 export * from "./home-placement.js";
 export * from "./hospital.js";
