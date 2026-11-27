@@ -6,7 +6,7 @@ import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import { CreateCylinder } from "@babylonjs/core/Meshes/Builders/cylinderBuilder";
@@ -25,6 +25,16 @@ import { elevation, rng, type Season } from "./world.js";
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
 export const BUILDING_SCALE = 0.75; // 둥지 지붕 1.85m = 목재 체험 보수 표시 높이
 export const RESIDENT_SCALE = 0.75;
+
+/** 이동 거리 중 실제로 지난 비율만큼 발자국을 표시한다. */
+export function scoutTrailCount(
+  steps: number,
+  elapsed: number,
+  travel: number,
+) {
+  if (travel <= 0) return elapsed >= 0 ? steps : 0;
+  return Math.floor(steps * Math.max(0, Math.min(1, elapsed / travel)));
+}
 const OUTLINE = new Color3(0.3, 0.9, 1); // 현장과 대표 모델의 공통 선택색
 
 export { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
@@ -42,7 +52,16 @@ const RESIDENT_HEIGHT: Record<string, [number, number]> = {
   R09_Oviraptor: [0.78, 3.49],
   R04_Ankylosaurus: [0.75, 2.45],
   R12_Protoceratops: [0.6, 2.28],
+  // 박찬님 기준: 같은 몸꼴(R09) 주민의 1.2배. 지금 마을의 벨로키랍토르 옆에서 0.9배로 보여 1.33배 키움(Windows GPU 사진 대조).
+  GORI: [1.25, 2.15],
 };
+// 관아(0, -16) 바로 앞 빈터. 둥지(-4,-10)·(4,-10)와 줄 선 주민 사이를 피한다(Windows GPU 위에서 본 시점으로 확인).
+const GORI_ROUTE = [
+  [-1.5, -12],
+  [1.5, -12],
+  [1.5, -13],
+  [-1.5, -13],
+] as const;
 const RESIDENTS = [
   "R01_Pachycephalosaurus",
   "R02_Triceratops",
@@ -216,6 +235,15 @@ export function createVillage(
     haul?: Hauler;
   };
   const walkers: Walker[] = [];
+  let gori:
+    | {
+        node: TransformNode;
+        play: (clip: string) => void;
+        leg: number;
+        wait: number;
+      }
+    | undefined;
+  let goriVisible = true;
   const plinthMat = new StandardMaterial("plinth-snow", scene);
   plinthMat.diffuseColor = new Color3(0.74, 0.74, 0.8);
   plinthMat.specularColor = Color3.Black();
@@ -468,6 +496,41 @@ export function createVillage(
       ),
     );
   });
+  jobs.push(
+    load(scene, "/models/gori/GORI.glb").then((asset) => {
+      if (disposed) return;
+      const node = new TransformNode("gori", scene);
+      node.parent = worldRoot;
+      node.position.set(
+        GORI_ROUTE[0][0],
+        elevation(...GORI_ROUTE[0]),
+        GORI_ROUTE[0][1],
+      );
+      node.setEnabled(goriVisible);
+      nodes.push(node);
+      const [height, modelHeight] = RESIDENT_HEIGHT.GORI as [number, number];
+      const visual = instantiate(
+        asset,
+        node,
+        height / modelHeight,
+        shadow,
+        1.3,
+        2,
+      );
+      for (const mesh of visual.meshes)
+        mesh.metadata = { ...mesh.metadata, villageTarget: "village:gori" };
+      targets.set("village:gori", {
+        name: "고리",
+        detail:
+          "복홀의 지휘관. 부친의 장부를 이어받아 조달과 배급으로 마을을 지킵니다.",
+        portrait: "/ui/gori/face1.webp",
+        meshes: visual.meshes,
+      });
+      disposers.push(visual.dispose);
+      gori = { node, play: visual.play, leg: 1, wait: 0 };
+      visual.play("Idle");
+    }),
+  );
   const ready = Promise.allSettled(jobs).then(
     (rs) => rs.filter((x) => x.status === "rejected").length,
   );
@@ -621,16 +684,96 @@ export function createVillage(
     }>;
     from: Vector3;
     to: Vector3;
+    trail: Mesh;
+    steps: number;
+    shown: number;
+    flag?: Mesh;
   };
   const parties = new Map<string, Party>();
+  const stepMat = new StandardMaterial("scout-step", scene);
+  stepMat.diffuseColor = new Color3(0.5, 0.57, 0.7);
+  stepMat.specularColor = Color3.Black();
+  const poleMat = new StandardMaterial("scout-flag-pole", scene);
+  poleMat.diffuseColor = new Color3(0.3, 0.22, 0.15);
+  poleMat.specularColor = Color3.Black();
+  const flagMat = new StandardMaterial("scout-flag", scene);
+  flagMat.diffuseColor = new Color3(0.72, 0.16, 0.12);
+  flagMat.emissiveColor = new Color3(0.3, 0.06, 0.05);
+  flagMat.specularColor = Color3.Black();
+  function layTrail(id: string, from: Vector3, to: Vector3) {
+    const mesh = CreateBox(
+      `scout-trail-${id}`,
+      { width: 0.2, height: 0.03, depth: 0.34 },
+      scene,
+    );
+    mesh.material = stepMat;
+    mesh.isPickable = false;
+    mesh.isVisible = false;
+    mesh.parent = worldRoot ?? null;
+    const dx = to.x - from.x,
+      dz = to.z - from.z,
+      len = Math.hypot(dx, dz) || 1;
+    const steps = Math.max(1, Math.floor(len / 0.7));
+    const buf = new Float32Array(steps * 16);
+    const q = Quaternion.RotationYawPitchRoll(Math.atan2(dx, dz), 0, 0);
+    for (let i = 0; i < steps; i++) {
+      const t = (i + 0.5) / steps;
+      const side = (i % 2 ? 0.22 : -0.22) + (i % 4 < 2 ? 0.9 : -0.9);
+      const x = from.x + dx * t - (dz / len) * side,
+        z = from.z + dz * t + (dx / len) * side;
+      Matrix.Compose(
+        Vector3.One(),
+        q,
+        new Vector3(x, elevation(x, z) + 0.03, z),
+      ).copyToArray(buf, i * 16);
+    }
+    mesh.thinInstanceSetBuffer("matrix", buf, 16, true);
+    mesh.thinInstanceCount = 0;
+    return { trail: mesh, steps };
+  }
+  function raiseFlag(on: TransformNode) {
+    // 박찬님 원본 값 그대로(주민 모델 단위). 주민 노드가 배율로 커지므로 깃발도 정찰병 키에 비례한다.
+    const pole = CreateBox(
+      "scout-flag-pole",
+      {
+        width: 0.07,
+        height: 2.6,
+        depth: 0.07,
+      },
+      scene,
+    );
+    pole.material = poleMat;
+    pole.isPickable = false;
+    pole.parent = on;
+    pole.position.set(0.3, 1.3, -0.1);
+    const cloth = CreateBox(
+      "scout-flag",
+      {
+        width: 0.95,
+        height: 0.55,
+        depth: 0.03,
+      },
+      scene,
+    );
+    cloth.bakeTransformIntoVertices(Matrix.Translation(0.5, 0, 0));
+    cloth.material = flagMat;
+    cloth.isPickable = false;
+    cloth.parent = pole;
+    cloth.position.y = 0.95;
+    return cloth;
+  }
+  function dropParty(p: Party) {
+    for (const mb of p.members) {
+      mb.dispose();
+      mb.node.dispose();
+    }
+    p.trail.dispose();
+  }
   async function setMissions(list: Mission[]) {
     const ids = new Set(list.map((m) => m.id));
     for (const [id, p] of parties)
       if (!ids.has(id)) {
-        for (const mb of p.members) {
-          mb.dispose();
-          mb.node.dispose();
-        }
+        dropParty(p);
         parties.delete(id);
       }
     for (const m of list) {
@@ -640,11 +783,17 @@ export function createVillage(
         continue;
       }
       const dir = new Vector3(m.x, 0, m.z).normalize();
+      // 박찬님 원본은 마을 중심 9.5m에서 출발했지만 지금 마을은 둥지(6~13m)·시설(15~27m)이 그 길을 막아
+      // 정찰대와 깃발이 지붕을 뚫고 지나갔다 → 시설 고리(최대 25.5m) 밖 26m에서 출발한다.
+      const from = dir.scale(26);
+      const to = new Vector3(m.x, 0, m.z).subtract(dir.scale(4));
       const party: Party = {
         m,
         members: [],
-        from: dir.scale(9.5),
-        to: new Vector3(m.x, 0, m.z).subtract(dir.scale(4)),
+        from,
+        to,
+        ...layTrail(m.id, from, to),
+        shown: -1,
       };
       parties.set(m.id, party);
       for (const [k, file] of [
@@ -669,6 +818,7 @@ export function createVillage(
           dispose: v.dispose,
           side: k ? -0.9 : 0.9,
         });
+        if (k === 0) party.flag = raiseFlag(node);
       }
     }
   }
@@ -679,6 +829,13 @@ export function createVillage(
         e = gameMin - p.m.start;
       const dist = Vector3.Distance(p.from, p.to);
       const travel = Math.min(total / 2, dist * 6.25); // 1초=게임 10분, 걸음 1.6m/s
+      const count = scoutTrailCount(p.steps, e, travel);
+      if (count !== p.shown) {
+        p.shown = count;
+        p.trail.thinInstanceCount = count;
+        p.trail.isVisible = count > 0;
+      }
+      if (p.flag) p.flag.rotation.y = 0.35 * Math.sin(performance.now() / 260);
       let t = -1,
         out = true;
       if (e >= 0 && e < travel) t = e / travel;
@@ -708,6 +865,7 @@ export function createVillage(
   function setRunning(value: boolean) {
     if (value === running) return;
     running = value;
+    if (!value) gori?.play("Idle");
     for (const ps of smokes) value ? ps.start() : ps.stop();
     for (const w of walkers) {
       w.target = null;
@@ -776,6 +934,30 @@ export function createVillage(
         .catch(() => {});
   }
   function animate(dt: number) {
+    if (gori && running && goriVisible) {
+      if (gori.wait > 0) {
+        gori.wait -= dt;
+        gori.play("Work");
+      } else {
+        const [x, z] = GORI_ROUTE[gori.leg] as readonly [number, number];
+        const p = gori.node.position;
+        const dx = x - p.x,
+          dz = z - p.z,
+          distance = Math.hypot(dx, dz);
+        const step = Math.min(distance, 1.1 * dt);
+        if (distance > 0) {
+          p.x += (dx / distance) * step;
+          p.z += (dz / distance) * step;
+          gori.node.rotation.y = Math.atan2(dx, dz);
+        }
+        p.y = elevation(p.x, p.z);
+        if (distance <= step) {
+          if (gori.leg === 1 || gori.leg === 3) gori.wait = 3.5;
+          gori.leg = (gori.leg + 1) % GORI_ROUTE.length;
+        }
+        gori.play("Walk");
+      }
+    }
     if (delivery >= 0) {
       delivery = Math.min(1, delivery + dt / 3);
       const z = -10 + 13.6 * delivery;
@@ -859,8 +1041,17 @@ export function createVillage(
       scene,
       kind === "resident"
         ? "/models/residents/R02_Triceratops.glb"
-        : "/models/buildings/BLD_NEST.glb",
-    );
+        : seasonalModelUrl("buildings", "BLD_NEST", season === "winter"),
+    ).catch((error: unknown) => {
+      if (
+        kind !== "building" ||
+        season !== "winter" ||
+        disposed ||
+        parent.isDisposed()
+      )
+        throw error;
+      return load(scene, seasonalModelUrl("buildings", "BLD_NEST", false));
+    });
     if (disposed || parent.isDisposed()) throw new Error("종료한 대상입니다.");
     const node = new TransformNode(`${parent.name}:glb`, scene);
     node.parent = parent;
@@ -953,6 +1144,10 @@ export function createVillage(
 
   return {
     ready,
+    setGoriVisible(visible: boolean) {
+      goriVisible = visible;
+      gori?.node.setEnabled(visible);
+    },
     entityVisual,
     postDecree,
     clearDecree() {
@@ -1014,11 +1209,7 @@ export function createVillage(
     partyPoints,
     resetScouting() {
       scoutGeneration++;
-      for (const party of parties.values())
-        for (const member of party.members) {
-          member.dispose();
-          member.node.dispose();
-        }
+      for (const party of parties.values()) dropParty(party);
       parties.clear();
       for (const visual of landmarkVisuals.values()) {
         visual.dispose();
@@ -1038,12 +1229,11 @@ export function createVillage(
       for (const fire of incidentFires.values()) fire.dispose(false);
       for (const fire of fires) fire.dispose(false);
       for (const ps of smokes) ps.dispose();
-      for (const p of parties.values())
-        for (const mb of p.members) {
-          mb.dispose();
-          mb.node.dispose();
-        }
+      for (const p of parties.values()) dropParty(p);
       parties.clear();
+      stepMat.dispose();
+      poleMat.dispose();
+      flagMat.dispose();
       for (const visual of landmarkVisuals.values()) {
         visual.dispose();
         visual.node.dispose();

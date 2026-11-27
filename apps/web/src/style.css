@@ -4461,6 +4461,14 @@ dialog.film-gallery:has(.campaign-film) .campaign-film {
 .village-bulletin > div {
   padding: 1rem;
 }
+.village-bulletin img.village-bulletin__portrait {
+  float: left;
+  width: 80px;
+  height: 80px;
+  max-height: none;
+  object-fit: contain;
+  margin: 0 1rem 0.5rem 0;
+}
 .site-panel dl > div {
   display: grid;
   grid-template-columns: 7rem minmax(0, 1fr);

@@ -1,6 +1,11 @@
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
-import { fireBuildings, VILLAGE_LAYOUT } from "@dynosty/game-core";
+import {
+  AMOUNT_SCALE,
+  fireBuildings,
+  VILLAGE_LAYOUT,
+} from "@dynosty/game-core";
+import { createFuelYard } from "./fuelyard.js";
 import { createHomePlacementVisual } from "./home-placement-scene.js";
 import { createLegacyTimberVisual } from "./legacy-timber-scene.js";
 import { terrainElevation } from "./terrain.js";
@@ -23,6 +28,7 @@ import {
   BOKHOL_MAP,
   BUILDING_RULES,
   type BuildingKind,
+  fuelYardShown,
   type GroundPoint,
   type HomePlacement,
   homeObstacle,
@@ -209,6 +215,8 @@ export function mountScene(
     previewVillage,
     season,
   );
+  const fuelYard = createFuelYard(scene, worldRoot);
+  fuelYard.setVisible(false);
   const fog = createFog(scene, SCOUT_SITES);
   const landmarks = createLandmarks(scene, SCOUT_SITES, glow, warmMat);
   // 깎은 자원 터 모델 (#47): 복홀 지도의 광맥·물고기 못에 앉힘. 마을 상태가 있을 때만 보임
@@ -419,7 +427,7 @@ export function mountScene(
         onAssetWarning("대표 모델을 불러오지 못해 연결 예제로 표시합니다.");
     });
   let assetsReady = false;
-  const ready = Promise.all([modelsReady, village.ready])
+  const ready = Promise.all([modelsReady, village.ready, fuelYard.ready])
     .then(([, failures]) => {
       if (!disposed) {
         entities.setGlb(village.entityVisual);
@@ -440,6 +448,10 @@ export function mountScene(
   let animationSpeed = 1;
   const stopPicking = observeSceneClicks(canvas, (x, y) => {
     if (!selectionEnabled) return;
+    if (homePreview.active) {
+      homePreview.commit(x, y);
+      return;
+    }
     const picked = pickedNode(scene.pick(x, y));
     let hit = picked;
     while (hit) {
@@ -450,7 +462,6 @@ export function mountScene(
       )?.id;
       const target = townId ?? villageId ?? homeId;
       if (target) {
-        if (homePreview.active) homePreview.cancel();
         select(target);
         const facility = villageState?.town.facilities.find(
           (f) => "town:" + f.id === townId,
@@ -478,12 +489,7 @@ export function mountScene(
       });
     onFacilitySelect(null);
     if (foundation) {
-      if (homePreview.active) homePreview.cancel();
       select("town:" + foundation.id);
-      return;
-    }
-    if (homePreview.active) {
-      homePreview.commit(x, y);
       return;
     }
     const site = sites.idForMesh(picked);
@@ -903,6 +909,15 @@ export function mountScene(
         camera.upperRadiusLimit = state ? 720 : 140;
       }
       const active = state !== null;
+      fuelYard.setVisible(!!state && fuelYardShown(state));
+      if (state)
+        fuelYard.setStock(
+          state.world.resources.RES_COAL / AMOUNT_SCALE,
+          state.world.resources.RES_WOOD / AMOUNT_SCALE,
+        );
+      village.setGoriVisible(
+        !(state?.bokhol && state.campaign?.beat === "capital"),
+      );
       camera.upperRadiusLimit = active ? 720 : 140;
       if (active !== demoActive) {
         demoActive = active;
@@ -1231,6 +1246,7 @@ export function mountScene(
       entities.dispose();
       village.dispose();
       resourceSites.dispose();
+      fuelYard.dispose();
       fog.dispose();
       scene.dispose();
       engine.dispose();

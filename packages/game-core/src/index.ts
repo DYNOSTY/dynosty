@@ -28,8 +28,7 @@ export interface GameState {
 export type PlayCommand =
   | { readonly type: "pause"; readonly paused: boolean }
   | { readonly type: "advance-day" }
-  | { readonly type: "new-game" }
-  | { readonly type: "test-food"; readonly days: number };
+  | { readonly type: "new-game" };
 export type GameCommand =
   | { readonly type: "play-command"; readonly command: PlayCommand }
   | { readonly type: "request-play-save"; readonly requestId: number }
@@ -94,6 +93,7 @@ export * from "./bokhol.js";
 export * from "./campaign.js";
 export * from "./development.js";
 export * from "./exchange.js";
+export * from "./fuel-yard.js";
 export * from "./home-construction.js";
 export * from "./home-placement.js";
 export * from "./hospital.js";

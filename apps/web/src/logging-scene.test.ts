@@ -121,22 +121,26 @@ it("광산 함지에는 입구와 광맥을 표시하고 미건설 작업장은 
     engine.dispose();
   }
 });
-it("무성한 숲의 나무는 구릉 높이에 놓이고 고갈하면 모두 사라진 평지로 남는다", () => {
+it("숲 나무와 그루터기는 지형 높이를 따르고 공유 메시를 사용한다", () => {
   const engine = new NullEngine(),
     scene = new Scene(engine),
     visual = createLoggingVisual(scene);
   try {
     const s = createTimberState();
     visual.update(s);
-    const trees = scene.transformNodes.filter(
-      (t) => t.name.startsWith("logging-tree-") && !t.name.includes(":"),
-    );
-    expect(trees).toHaveLength(32);
-    expect(trees.every((t) => t.isEnabled())).toBe(true);
-    expect(trees.some((t) => t.position.y > 0.5)).toBe(true);
+    const stump = scene.getMeshByName(
+      "forest-tree:TREE_STUMP",
+    ) as import("@babylonjs/core/Meshes/mesh").Mesh;
+    expect(stump.thinInstanceCount).toBe(0);
     const cleared = { ...s, logging: { ...s.logging, remaining: 0 } };
     visual.update(cleared);
-    expect(trees.every((t) => !t.isEnabled() && t.position.y === 0)).toBe(true);
+    expect(stump.thinInstanceCount).toBe(32);
+    expect(
+      stump.thinInstanceGetWorldMatrices().every((matrix) => {
+        const p = matrix.getTranslation();
+        return Math.abs(p.y - terrainElevation(cleared)(p.x, p.z)) < 0.0001;
+      }),
+    ).toBe(true);
     expect(terrainElevation(cleared)(-40, -8)).toBe(0);
   } finally {
     visual.dispose();

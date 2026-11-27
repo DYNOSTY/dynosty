@@ -1,7 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
   AMOUNT_SCALE,
+  createTimberSave,
   createVillageGame,
+  dailyFoodDemand,
   requireValue,
   type TimberCommand,
   VILLAGE_RULES,
@@ -56,6 +58,57 @@ async function spendVillageWood(page: Page, before: number) {
     shown(before - VILLAGE_RULES.constructionWood * AMOUNT_SCALE),
   );
 }
+
+test("마을 식량 재고에 따라 부족 경고를 표시하고 복원 후 없앤다", async ({
+  page,
+}) => {
+  const village = createVillageGame();
+  const demand = dailyFoodDemand(village.world);
+  const lowSave = createTimberSave({
+    ...village,
+    world: {
+      ...village.world,
+      resources: {
+        ...village.world.resources,
+        RES_PLANT: demand.RES_PLANT - AMOUNT_SCALE,
+        RES_MEAT: 0,
+        RES_FISH: demand.RES_FISH * 10 + AMOUNT_SCALE,
+      },
+    },
+  });
+  // 자동 저장이 새로고침 직전에 덮어쓸 수 있으므로, 매 로드 전에 단계에 맞는 저장을 넣는다.
+  await page.addInitScript(
+    ({ low, normal }) => {
+      const save =
+        sessionStorage.getItem("food-warning-phase") === "normal"
+          ? normal
+          : low;
+      localStorage.setItem("dynosty.village.resume", JSON.stringify(save));
+    },
+    { low: lowSave, normal: createTimberSave(createVillageGame()) },
+  );
+  await ready(page);
+  const warnings = page.getByTestId("food-warnings");
+  await expect(warnings.locator("p")).toHaveCount(2);
+  await expect(
+    warnings.getByText("부족 주의 · 풀", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    warnings.getByText("긴급 · 고기", { exact: false }),
+  ).toBeVisible();
+  await expect(warnings).not.toContainText("어류");
+
+  await page.evaluate(() =>
+    sessionStorage.setItem("food-warning-phase", "normal"),
+  );
+  await page.reload();
+  await expect(page.getByTestId("play-scene-status")).toHaveText(
+    "3D 준비 완료",
+    { timeout: 90_000 },
+  );
+  await expect(page.getByTestId("resource-RES_MEAT")).not.toHaveText(/^0/);
+  await expect(warnings).toHaveCount(0);
+});
 
 test("승인 초기 상태·식성별 소비와 실제 게임 최근/직전 저장·새로고침 복원", async ({
   page,
@@ -307,7 +360,7 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   await ready(page);
   expect(loaded.some((x) => x.endsWith("triceratops.json"))).toBe(true);
   expect(loaded.some((x) => x.endsWith("ondol-nest.json"))).toBe(true);
-  expect(loaded.some((x) => x.endsWith("BLD_NEST.glb"))).toBe(true);
+  expect(loaded.some((x) => x.endsWith("BLD_NEST_v2.glb"))).toBe(true);
   // 겨울 마을은 주민 모델의 겨울판(_v2)을 불러온다.
   expect(loaded.some((x) => /R02_Triceratops(_v2)?\.glb$/.test(x))).toBe(true);
   const canvas = page.locator("canvas");

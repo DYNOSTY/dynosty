@@ -2,8 +2,8 @@
 #   버려진 곳간 · 석탄 노두 · 철광 노두 · 얼음 낚시 못 · 쓰러진 적송 · 얼지 않는 샘
 #
 # 지나온 길 (다시 하지 말 것):
-#   site.py   : 수식 덩어리 + 꼭짓점 색 → 세 번을 깎아도 장난감 같음 ("개 별로")
-#   relief.py : 컨셉 그림을 판에 입힘 → "깎은 게 아니라 그린 거 붙인 거" (퇴짜)
+#   site.py (지움)   : 수식 덩어리 + 꼭짓점 색 → 세 번을 깎아도 장난감 같음 ("개 별로")
+#   relief.py (지움) : 컨셉 그림을 판에 입힘 → "깎은 게 아니라 그린 거 붙인 거" (퇴짜)
 # 지금 방식:
 #   1) 부품을 실제로 세움: 기둥·도리·서까래·이엉 켜·눈 이불·흙벽·받침돌·섬·독·바구니 (덩어리 하나가 아님)
 #   2) 색은 꼭짓점 색이 아니라 절차 재질(결·얼룩·위를 보는 면의 눈) → 그림 한 장으로 구움(bake) + 틈새 그늘(AO)을 곱함
@@ -959,66 +959,133 @@ def pond():
         reed(f"reed{i}", x, y, max(0.13, gh(x, y)), rnd.uniform(0.85, 1.5), 300 + i)
 
 
-# ── 쓰러진 적송 ── 부러져 누운 굵은 줄기 + 뿌리가 벌어진 삐죽한 그루터기 + 눈을 인 가지 무리 + 튄 속살 조각
+# 적송의 붉은 껍질: 눈을 얹지 않아야 나무로 읽힘 (눈 얹힌 껍질은 눈 덮인 둔덕으로 보였음)
+make_mat("bark_bare", [(0.3, (0.3, 0.13, 0.08)), (0.5, (0.54, 0.26, 0.15)), (0.7, (0.76, 0.45, 0.28))], (9, 3, 1), grain=True, weave=(10, "X", 0.5, (0.12, 0.06, 0.04)))
+make_mat("cut", [(0.3, (0.72, 0.54, 0.3)), (0.5, (0.88, 0.72, 0.45)), (0.7, (0.97, 0.87, 0.62))], (5, 5, 5), detail=2.0)  # 톱으로 켠 밝은 마구리
+make_mat("spring", [(0.3, (0.08, 0.34, 0.44)), (0.5, (0.15, 0.5, 0.6)), (0.7, (0.3, 0.68, 0.76))], (2, 2, 2), detail=2.0)  # 검푸른 물은 구멍으로 보였음 → 밝은 옥빛
+make_mat("foam", [(0.3, (0.72, 0.88, 0.94)), (0.7, (0.94, 0.98, 1.0))], (3, 3, 3))
+
+
+def cutface(name, p, d, r, mat="cut", segs=10):
+    """통나무 끝에 붙이는 밝은 마구리 (톱으로 켠 면). d = 면이 보는 쪽"""
+    p, d = Vector(p), Vector(d).normalized()
+    side = d.cross(Vector((0, 0, 1)) if abs(d.z) < 0.9 else Vector((1, 0, 0))).normalized()
+    up = d.cross(side)
+    bm, _, _ = BM()
+    c = bm.verts.new(p + d * 0.014)
+    ring = [bm.verts.new(p + d * 0.008 + (side * math.cos(TAU * i / segs) + up * math.sin(TAU * i / segs)) * r) for i in range(segs)]
+    for i in range(segs):
+        bm.faces.new([c, ring[i], ring[(i + 1) % segs]])
+    bm.normal_update()
+    if sum(f.normal.dot(d) for f in bm.faces) < 0:
+        bmesh.ops.reverse_faces(bm, faces=bm.faces)
+    return finish(name, bm, mat, smooth=False, recalc=False)
+
+
+# ── 쓰러진 적송 ── 벌목 터로 읽히게: 가지를 쳐 낸 붉은 줄기 + 켠 토막(밝은 마구리가 위를 봄) + 쌓아 둔 통나무 더미
+#   + 모탕에 박힌 도끼와 팬 장작 + 삐죽한 그루터기. 솔잎은 우듬지 끝에만 (잎 뭉치가 많으면 덤불로 보였음)
 def pine():
     rnd = random.Random(77)
     gh = make_gh(3.5, 2.8, -0.1)
-    T = [Vector(p) for p in ((1.6, -1.0, 0.44), (0.6, -0.5, 0.46), (-0.55, 0.05, 0.54), (-1.55, 0.6, 0.66), (-2.2, 0.98, 0.8))]
-    RAD = (0.38, 0.34, 0.28, 0.2, 0.11)
+    T = [Vector(p) for p in ((1.35, -0.75, 0.52), (0.3, -0.4, 0.5), (-0.85, 0.05, 0.53), (-1.85, 0.5, 0.62), (-2.65, 0.85, 0.74))]
+    RAD = (0.5, 0.46, 0.38, 0.27, 0.13)
     line = [(p.x, p.y) for p in T]
-    ground(3.5, 2.8, -0.1, gh, lambda x, y: 0.8 * sstep(1.1, 0.3, min(pdist(x, y, line), math.hypot(x - 2.4, y - 0.1) + 0.2)), "ground_bark")
+    SX, SY = 2.35, 0.3  # 그루터기
+    BX, BY = 1.0, -1.95  # 모탕
+    PX, PY = -1.95, -1.75  # 통나무 더미
+    WORK = ((BX, BY), (2.15, -1.3), (PX, PY))  # 일하는 자리 둘레는 톱밥과 껍질로 눈이 걷힘
+
+    def bare(x, y):
+        return 0.85 * sstep(1.2, 0.3, min(pdist(x, y, line), min(math.hypot(x - wx, y - wy) for wx, wy in WORK) - 0.3, math.hypot(x - SX, y - SY) + 0.1))
+
+    ground(3.5, 2.8, -0.1, gh, bare, "ground_bark")
+    # 누운 줄기: 밑동 쪽 절반은 가지를 쳐 내 붉은 껍질이 드러남, 우듬지 쪽은 눈을 인 껍질
     for i in range(4):
-        log(f"trunk{i}", T[i], T[i + 1], RAD[i], RAD[i + 1], mat="bark", segs=12, seed=i, wob=0.03)
-    # 부러진 밑동: 줄기 결을 따라 찢긴 속살
-    d0 = (T[0] - T[1]).normalized()
-    side = d0.cross(Vector((0, 0, 1))).normalized()
-    up = side.cross(d0)
-    for i in range(16):
-        a = TAU * i / 16 + rnd.uniform(-0.2, 0.2)
-        ring = (side * math.cos(a) + up * math.sin(a))
-        p = T[0] + ring * RAD[0] * rnd.uniform(0.25, 0.88) - d0 * 0.1
-        log(f"splint{i}", p, p + d0 * rnd.uniform(0.3, 0.9) + ring * rnd.uniform(0.0, 0.14), 0.085, 0.008, mat="heartwood", segs=4, seed=20 + i, wob=0)
+        log(f"trunk{i}", T[i], T[i + 1], RAD[i], RAD[i + 1], mat="bark_bare" if i < 2 else "bark", segs=12, seed=i, wob=0.03)
+    cutface("buttcut", T[0], T[0] - T[1], RAD[0] * 0.96, segs=12)
+    for i, (ti, f, dd) in enumerate(((0, 0.35, (0.2, -0.5, 0.8)), (0, 0.8, (-0.1, 0.6, 0.75)), (1, 0.3, (0.1, -0.7, 0.7)), (1, 0.7, (0.0, 0.5, 0.85)))):  # 쳐 낸 가지 밑동
+        a = T[ti].lerp(T[ti + 1], f)
+        dv = Vector(dd).normalized()
+        b = a + dv * (RAD[ti] + 0.2)
+        log(f"stub{i}", a, b, 0.1, 0.09, mat="bark_bare", segs=7, seed=50 + i, wob=0)
+        cutface(f"stubcut{i}", b, dv, 0.088, segs=7)
     # 그루터기: 뿌리가 벌어지고, 꺾인 자리가 삐죽삐죽
-    SX, SY = 2.4, 0.1
     sz = gh(SX, SY)
-    lathe("stump", (SX, SY, sz - 0.05), [(0.6, 0.0), (0.47, 0.14), (0.4, 0.5), (0.37, 0.92)], "bark", segs=12, lump=0.1)
+    lathe("stump", (SX, SY, sz - 0.05), [(0.78, 0.0), (0.58, 0.16), (0.48, 0.55), (0.44, 1.05)], "bark_bare", segs=12, lump=0.1)
     for i in range(5):
         a = TAU * i / 5 + 0.4
-        log(f"root{i}", (SX + math.cos(a) * 0.3, SY + math.sin(a) * 0.3, sz + 0.3), (SX + math.cos(a) * 0.95, SY + math.sin(a) * 0.95, sz - 0.04), 0.16, 0.05, mat="bark", segs=7, seed=30 + i, wob=0.02)
-    for i in range(13):
-        a = TAU * i / 13 + rnd.uniform(-0.2, 0.2)
-        r = 0.34 * rnd.uniform(0.2, 0.95)
-        p = Vector((SX + math.cos(a) * r, SY + math.sin(a) * r, sz + 0.8))
-        log(f"stumpsplint{i}", p, p + Vector((math.cos(a) * 0.06, math.sin(a) * 0.06, rnd.uniform(0.3, 0.8))), 0.09, 0.008, mat="heartwood", segs=4, seed=40 + i, wob=0)
-    for i in range(14):  # 부러지며 튄 속살 조각
-        x, y = rnd.uniform(1.3, 3.0), rnd.uniform(-1.6, 0.0)
+        log(f"root{i}", (SX + math.cos(a) * 0.36, SY + math.sin(a) * 0.36, sz + 0.34), (SX + math.cos(a) * 1.1, SY + math.sin(a) * 1.1, sz - 0.04), 0.19, 0.06, mat="bark_bare", segs=7, seed=30 + i, wob=0.02)
+    for i in range(15):
+        a = TAU * i / 15 + rnd.uniform(-0.2, 0.2)
+        r = 0.4 * rnd.uniform(0.2, 0.95)
+        p = Vector((SX + math.cos(a) * r, SY + math.sin(a) * r, sz + 0.92))
+        log(f"stumpsplint{i}", p, p + Vector((math.cos(a) * 0.07, math.sin(a) * 0.07, rnd.uniform(0.35, 1.0))), 0.11, 0.01, mat="heartwood", segs=4, seed=40 + i, wob=0)
+    # 켠 토막: 세워 둔 것 둘(마구리가 위를 봄)과 뉜 것 하나
+    for i, (x, y, r, h) in enumerate(((2.15, -1.3, 0.45, 0.5), (2.78, -0.72, 0.42, 0.42))):
+        z = gh(x, y)
+        log(f"round{i}", (x, y, z - 0.03), (x, y, z + h), r, r, mat="bark_bare", segs=12, seed=200 + i, wob=0)
+        cutface(f"roundcut{i}", (x, y, z + h), (0, 0, 1), r * 0.97, segs=12)
+    la, lb = Vector((1.62, -2.18, gh(1.8, -2.0) + 0.38)), Vector((2.08, -1.84, gh(1.8, -2.0) + 0.38))
+    log("roundlay", la, lb, 0.4, 0.4, mat="bark_bare", segs=12, seed=203, wob=0)
+    cutface("roundlaycut", la, la - lb, 0.39, segs=12)
+    cutface("roundlaycutb", lb, lb - la, 0.39, segs=12)
+    # 모탕에 박힌 도끼, 둘레에 팬 장작
+    bz = gh(BX, BY)
+    log("block", (BX, BY, bz - 0.03), (BX, BY, bz + 0.42), 0.36, 0.34, mat="bark_bare", segs=11, seed=210, wob=0)
+    cutface("blockcut", (BX, BY, bz + 0.42), (0, 0, 1), 0.33, segs=11)
+    log("axehandle", (BX + 0.04, BY, bz + 0.5), (BX - 0.42, BY - 0.12, bz + 1.22), 0.04, 0.035, seed=211, wob=0)
+    rock("axehead", (BX + 0.07, BY + 0.01, bz + 0.52), (0.14, 0.34, 0.26), 212, mat="rock_wet", rot=(0, 0.5, 0.25), box=0.85, n=12)
+    for i in range(11):
         a = rnd.uniform(0, TAU)
-        ln = rnd.uniform(0.15, 0.4)
-        log(f"chip{i}", (x, y, gh(x, y) + 0.03), (x + math.cos(a) * ln, y + math.sin(a) * ln, gh(x, y) + 0.05), 0.035, 0.008, mat="heartwood", segs=4, seed=100 + i, wob=0)
-    # 가지와 솔잎: 가지마다 납작한 잎 뭉치가 층층이, 눈은 얇게 (게임의 선 적송과 같은 결)
+        d = rnd.uniform(0.55, 1.0)
+        x, y = BX + math.cos(a) * d, BY + math.sin(a) * d * 0.75
+        rock(f"split{i}", (x, y, gh(x, y) + 0.07), (0.16, 0.46, 0.13), 220 + i, mat="cut", rot=(rnd.uniform(-0.2, 0.2), rnd.uniform(-0.15, 0.15), rnd.uniform(0, 3.14)), box=0.75, n=9)
+    # 쌓아 둔 통나무 더미: 마구리가 카메라 쪽(-Y)을 봄, 구르지 않게 말뚝을 박음
+    pd = Vector((0.18, 1.0, 0)).normalized()
+    pn = Vector((pd.y, -pd.x, 0))
+    pz = gh(PX, PY)
+    R = 0.2
     k = 0
-    for i, (ti, d, ln) in enumerate(((1, (-0.2, -1.0, 0.3), 1.2), (1, (0.5, 0.9, 0.5), 1.0), (2, (0.3, 1.0, 0.45), 1.5), (2, (-0.6, -0.9, 0.2), 1.3), (3, (-0.2, 1.0, 0.55), 1.4), (3, (-0.9, -0.6, 0.3), 1.25), (3, (-0.6, 0.4, 0.9), 1.1), (4, (-1.0, 0.3, 0.4), 1.0), (4, (-0.5, 1.0, 0.6), 1.15), (4, (-0.9, -0.5, 0.55), 0.9))):
-        a = T[ti]
+    for row, cnt in enumerate((3, 2, 1)):
+        for j in range(cnt):
+            c = Vector((PX, PY, pz + R * 0.95 + row * R * 1.72)) + pn * ((j - (cnt - 1) / 2) * R * 2.05) + pd * rnd.uniform(-0.08, 0.08)
+            ln = 1.2 + rnd.uniform(-0.1, 0.1)
+            a, b = c - pd * ln / 2, c + pd * ln / 2
+            log(f"pile{k}", a, b, R, R * 0.94, mat="bark_bare", segs=10, seed=300 + k, wob=0.01)
+            cutface(f"pilecut{k}", a, -pd, R * 0.96)
+            cutface(f"pilecutb{k}", b, pd, R * 0.9)
+            k += 1
+    for i, (sgn, e) in enumerate(((-1, -0.3), (-1, 0.3), (1, -0.3), (1, 0.3))):
+        p = Vector((PX, PY, 0)) + pn * sgn * (R * 3.35) + pd * e
+        log(f"pilestake{i}", (p.x, p.y, pz - 0.05), (p.x, p.y, pz + 0.85), 0.05, 0.04, seed=320 + i)
+    pillow("pilesnow", (PX + 0.02, PY + 0.12, pz + R * 0.95 + 2 * R * 1.72 + R * 0.72), 0.22, 0.48, 0.1, 330)
+    # 우듬지: 가지는 듬성듬성, 솔잎 뭉치는 끝에만
+    k = 0
+    for i, (ti, f, d, ln, leaves) in enumerate(((2, 0.3, (0.2, 0.9, 0.7), 1.2, ()), (2, 0.75, (-0.3, -0.9, 0.45), 1.15, (1.0,)), (3, 0.2, (0.1, 0.9, 0.8), 1.3, (1.0,)), (3, 0.6, (-0.6, -0.8, 0.4), 1.15, (0.65, 1.02)), (3, 0.95, (-0.5, 0.7, 0.9), 1.1, (0.7, 1.02)), (3, 1.0, (-1.0, 0.3, 0.3), 0.85, (0.6, 1.02)))):
+        a = T[ti].lerp(T[ti + 1], f)
         b = a + Vector(d).normalized() * ln
-        log(f"branch{i}", a, b, 0.085, 0.03, mat="bark", segs=6, seed=60 + i, wob=0.04)
+        log(f"branch{i}", a, b, 0.09, 0.03, mat="bark", segs=6, seed=60 + i, wob=0.04)
         fork = a.lerp(b, 0.55)
-        log(f"branch{i}f", fork, fork + Vector((rnd.uniform(-0.5, 0.5), rnd.uniform(-0.5, 0.5), 0.25)), 0.04, 0.015, mat="bark", segs=5, seed=160 + i, wob=0.03)
-        for f in (0.5, 0.78, 1.02):
-            c = a.lerp(b, f) + Vector((rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), 0.08))
-            s = rnd.uniform(0.75, 1.15)
+        log(f"branch{i}f", fork, fork + Vector((rnd.uniform(-0.5, 0.5), rnd.uniform(-0.5, 0.5), 0.3)), 0.04, 0.015, mat="bark", segs=5, seed=160 + i, wob=0.03)
+        for f2 in leaves:
+            c = a.lerp(b, f2) + Vector((rnd.uniform(-0.15, 0.15), rnd.uniform(-0.15, 0.15), 0.08))
+            s = rnd.uniform(0.8, 1.1)
             cap(rock(f"needle{k}", c, (s, s * 0.85, s * 0.34), 700 + k, mat="needle", rot=(rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), rnd.uniform(0, 3.14)), n=18, box=0.12), 0.09, 750 + k, grow=0.6)
             k += 1
-    for i in range(10):  # 줄기 위에 길게 얹힌 눈
-        f = 0.06 + 0.88 * i / 9
+    for i in range(4):  # 우듬지 쪽 줄기에만 길게 얹힌 눈
+        f = 0.56 + 0.4 * i / 3
         seg = min(3, int(f * 4))
         p = T[seg].lerp(T[seg + 1], f * 4 - seg)
         r = RAD[seg] + (RAD[seg + 1] - RAD[seg]) * (f * 4 - seg)
-        pillow(f"trunksnow{i}", (p.x, p.y, p.z + r * 0.72), 0.3, 0.2, 0.1, 800 + i)
-    log("bit0", (0.2, -1.9, gh(0.2, -1.9) + 0.07), (1.1, -2.2, gh(1.1, -2.2) + 0.09), 0.08, 0.05, mat="bark", segs=6, seed=90)
-    log("bit1", (-1.6, -1.2, gh(-1.6, -1.2) + 0.06), (-0.9, -1.5, gh(-0.9, -1.5) + 0.06), 0.06, 0.03, mat="bark", segs=6, seed=91)
-    twig("twig0", 2.3, 1.6, gh(2.3, 1.6), 0.8, 950)
+        pillow(f"trunksnow{i}", (p.x, p.y, p.z + r * 0.72), 0.3, 0.18, 0.09, 800 + i)
+    for i in range(12):  # 튄 속살 조각과 톱밥
+        x, y = rnd.choice(((rnd.uniform(1.4, 3.0), rnd.uniform(-0.6, 1.0)), (rnd.uniform(-0.6, 1.6), rnd.uniform(-1.6, -1.0))))
+        a = rnd.uniform(0, TAU)
+        ln = rnd.uniform(0.15, 0.35)
+        log(f"chip{i}", (x, y, gh(x, y) + 0.03), (x + math.cos(a) * ln, y + math.sin(a) * ln, gh(x, y) + 0.05), 0.035, 0.008, mat="heartwood", segs=4, seed=100 + i, wob=0)
+    twig("twig0", 2.9, 1.5, gh(2.9, 1.5), 0.8, 950)
     for i in range(9):
-        x, y = rnd.uniform(-2.6, 2.6), rnd.choice((rnd.uniform(-2.3, -1.6), rnd.uniform(1.4, 2.0)))
+        x, y = rnd.uniform(-2.6, 2.6), rnd.choice((rnd.uniform(-2.6, -2.3), rnd.uniform(1.4, 2.0)))
         tuft(f"tuft{i}", x, y, gh(x, y), rnd.uniform(0.4, 0.7), 900 + i)
 
 
@@ -1040,7 +1107,7 @@ def spring():
         return min(h, 0.04 + max(0.0, h - 0.04) * sstep(0.14, 0.45, pdist(x, y, PATH)))
 
     ground(3.4, 2.8, -0.1, gh, lambda x, y: 0.8 * max(sstep(1.4, 1.05, prr(x, y)), sstep(0.6, 0.28, pdist(x, y, PATH))), "ground_wet", n=16, segs=56)
-    disc("pool", (PX, PY, 0.1), lambda a: (PRX * 1.04 * wob(a), PRY * 1.04 * wob(a)), "water")
+    disc("pool", (PX, PY, 0.1), lambda a: (PRX * 1.04 * wob(a), PRY * 1.04 * wob(a)), "spring")
     # 가장자리 살얼음 띠 (안쪽 끝이 들쭉날쭉)
     rows = [[], []]
     for i in range(33):
@@ -1061,7 +1128,7 @@ def spring():
         W1.append((p - n * w + Vector((0, 0, z)), (0, 0), (0, 0)))
         W2.append((p + n * w + Vector((0, 0, z)), (0, 0), (0, 0)))
         L2.append((p + n * (w + 0.13) + Vector((0, 0, z + 0.012)), (0, 0), (0, 0)))
-    sheet("stream", [W1, W2], "water", Vector((0, 0, 1)), smooth=False)
+    sheet("stream", [W1, W2], "spring", Vector((0, 0, 1)), smooth=False)
     sheet("streamice0", [L1, W1], "ice", Vector((0, 0, 1)), smooth=False)
     sheet("streamice1", [W2, L2], "ice", Vector((0, 0, 1)), smooth=False)
     for i, f in enumerate((0.3, 0.55, 0.8)):  # 물길에 놓인 디딤돌
@@ -1076,8 +1143,25 @@ def spring():
             z += hh * 0.86
         cap(top, 0.24, 590 + i, grow=0.95)
     blanket("backsnow", -1.9, 1.9, 1.75, 2.6, lambda bx, by: gh(bx, by) + 0.25 * sstep(2.6, 1.9, by), 0.2, 7, nu=22, nv=6)
+    # 바위 틈에서 홈통을 타고 나와 웅덩이로 떨어지는 물줄기 + 떨어진 자리의 물둘레
+    #   홈통은 비스듬히 뉨 — 카메라 쪽으로 곧게 뻗으면 물줄기와 한 기둥으로 겹쳐 보였음
+    TA, TB = Vector((-0.85, 0.95, 1.12)), Vector((0.12, 0.34, 0.66))
+    log("trough", TA, TB, 0.13, 0.12, segs=8, seed=20, wob=0)
+    log("troughwater", TA.lerp(TB, 0.25) + Vector((0, 0, 0.09)), TB + Vector((0, 0, 0.08)), 0.055, 0.055, mat="foam", segs=6, seed=21, wob=0)
+    log("fall", TB + Vector((0.02, -0.02, 0.06)), (TB.x + 0.04, TB.y - 0.06, 0.1), 0.06, 0.1, mat="foam", segs=7, seed=22, wob=0.015)
+    for i, sx in enumerate((-1, 1)):  # 홈통 끝을 받친 엇건 작대기
+        log(f"troughleg{i}", (TB.x - 0.1 + sx * 0.32, TB.y + 0.12, 0.05), (TB.x - 0.1 - sx * 0.1, TB.y + 0.08, 0.72), 0.04, 0.035, seed=23 + i)
+    for i, r in enumerate((0.26, 0.48, 0.72)):
+        ring = [[], []]
+        for j in range(25):
+            a = TAU * j / 24
+            for row, rr in zip(ring, (r, r + 0.05)):
+                row.append((Vector((TB.x + 0.04 + math.cos(a) * rr, TB.y - 0.06 + math.sin(a) * rr * 0.72, 0.104 + 0.001 * i)), (0, 0), (0, 0)))
+        sheet(f"ripple{i}", ring, "foam", Vector((0, 0, 1)), smooth=False)
     for i in range(7):  # 바위 턱에서 물 위로 드리운 고드름
         x = -0.8 + i * 0.27 + rnd.uniform(-0.06, 0.06)
+        if abs(x) < 0.25:
+            continue  # 홈통 자리
         icicle(f"icicle{i}", (x, 0.82 + 0.06 * abs(x), 0.72 + rnd.uniform(-0.1, 0.1)), rnd.uniform(0.22, 0.45), 5500 + i)
     for i, (a, s) in enumerate(((0.2, 0.55), (0.8, 0.42), (2.35, 0.44), (2.95, 0.58), (3.6, 0.46), (5.9, 0.42))):  # 웅덩이를 두른 눈 얹힌 돌 (앞은 물길로 트임)
         x, y = PX + math.cos(a) * PRX * wob(a) * 1.3, PY + math.sin(a) * PRY * wob(a) * 1.36
@@ -1086,20 +1170,144 @@ def spring():
         a = rnd.uniform(0, TAU)
         s = rnd.uniform(0.16, 0.3)
         rock(f"wet{i}", (PX + math.cos(a) * PRX * wob(a) * 0.98, PY + math.sin(a) * PRY * wob(a) * 0.98, 0.1 + s * 0.2), (s * 1.4, s * 1.2, s * 0.8), 5600 + i, mat="rock_wet", rot=(0, 0, rnd.uniform(0, 3.14)), box=0.4, n=11)
-    # 물 긷던 흔적: 통, 긴 자루 바가지, 물가의 통나무 발판
-    bz = gh(-1.75, -1.3)
-    lathe("bucket", (-1.75, -1.3, bz), [(0.24, 0.0), (0.3, 0.5), (0.27, 0.52), (0.23, 0.42), (0.2, 0.1)], "wood", segs=10)
-    for z in (0.12, 0.4):
-        lathe(f"hoop{z}", (-1.75, -1.3, bz), [(0.255 + z * 0.1, z - 0.02), (0.275 + z * 0.1, z), (0.255 + z * 0.1, z + 0.02)], "rope", segs=10)
-    log("ladle", (-1.45, -1.4, bz + 0.05), (-0.7, -0.75, 1.2), 0.035, 0.03, seed=7)
-    for i in range(3):
-        log(f"plank{i}", (-1.5 + 0.02 * i, -0.75 + 0.16 * i, 0.2), (-0.55, -0.95 + 0.16 * i, 0.16), 0.075, 0.07, seed=8 + i, wob=0.01)
+    # 물 긷는 살림: 물이 찬 통 둘과 물지게 작대기, 물동이(옹기), 두레박틀, 물가의 통나무 발판
+    def bucket(name, x, y, z, s=1.0):
+        lathe(name, (x, y, z), [(0.24 * s, 0.0), (0.3 * s, 0.5 * s), (0.27 * s, 0.52 * s), (0.23 * s, 0.42 * s), (0.2 * s, 0.1 * s)], "wood", segs=10)
+        for hz in (0.12, 0.4):
+            lathe(f"{name}hoop{hz}", (x, y, z), [((0.255 + hz * 0.1) * s, (hz - 0.02) * s), ((0.275 + hz * 0.1) * s, hz * s), ((0.255 + hz * 0.1) * s, (hz + 0.02) * s)], "rope", segs=10)
+        disc(f"{name}water", (x, y, z + 0.47 * s), lambda a: (0.25 * s, 0.25 * s), "spring", rings=(1.0, 0.5), segs=10)
+
+    YA, YB = (-2.0, -1.5), (-1.42, -2.08)
+    for i, (x, y) in enumerate((YA, YB)):
+        bucket(f"bucket{i}", x, y, gh(x, y))
+    log("yoke", (YA[0] - 0.22, YA[1] + 0.22, 0.66), (YB[0] + 0.22, YB[1] - 0.22, 0.64), 0.04, 0.035, seed=7, wob=0.01)
+    JAR = [(0.2, 0.0), (0.36, 0.28), (0.4, 0.55), (0.31, 0.8), (0.23, 0.88), (0.27, 0.95)]
+    for i, (x, y, s) in enumerate(((-2.35, -0.3, 1.0), (-2.6, -0.92, 0.82), (-1.9, -0.72, 0.7))):
+        lathe(f"jar{i}", (x, y, gh(x, y) - 0.02), [(r * s, z * s) for r, z in JAR], "jar", segs=11)
+        pillow(f"jarsnow{i}", (x, y, gh(x, y) + 0.93 * s), 0.27 * s, 0.27 * s, 0.11 * s, 5900 + i)
+    # 두레박틀: 기둥에 걸친 긴 장대, 뒤끝엔 돌을 매달고 앞끝엔 두레박이 물 위에 드리움
+    post = Vector((2.05, -0.38, 0.0))
+    butt, tip = Vector((2.85, -0.85, 0.92)), Vector((0.8, 0.3, 2.7))
+    pivot = butt.lerp(tip, 0.39)
+    log("post", (post.x, post.y, gh(post.x, post.y) - 0.05), (post.x, post.y, pivot.z + 0.02), 0.1, 0.08, segs=8, seed=30, wob=0.02)
+    for i, sx in enumerate((-1, 1)):
+        log(f"postfork{i}", (post.x, post.y, pivot.z - 0.1), (post.x + sx * 0.14, post.y + sx * 0.14, pivot.z + 0.32), 0.05, 0.035, seed=31 + i, wob=0)
+    log("lever", butt, tip, 0.075, 0.045, segs=7, seed=33, wob=0.03)
+    log("pivotrope", pivot - Vector((0, 0, 0.09)), pivot + Vector((0, 0, 0.09)), 0.1, 0.1, mat="rope", segs=8, seed=34, wob=0)
+    rock("weight", (butt.x, butt.y, butt.z - 0.3), (0.46, 0.42, 0.4), 5950, rot=(0.2, 0.1, 0.6), box=0.5, n=12)
+    log("weightrope", (butt.x, butt.y, butt.z - 0.12), butt + Vector((0, 0, 0.05)), 0.085, 0.085, mat="rope", segs=8, seed=35, wob=0)
+    log("wellrope", tip, (tip.x, tip.y, 1.06), 0.022, 0.022, mat="rope", segs=5, seed=36, wob=0.01)
+    bucket("dipper", tip.x, tip.y, 0.5, s=0.8)
+    for i, sx in enumerate((-1, 1)):  # 두레박 손잡이 줄
+        log(f"dipperbail{i}", (tip.x + sx * 0.2, tip.y, 0.9), (tip.x, tip.y, 1.06), 0.018, 0.018, mat="rope", segs=4, seed=37, wob=0)
+    log("ladle", (-1.2, -0.5, 0.2), (-0.62, -0.25, 1.15), 0.035, 0.03, seed=7)
+    for i in range(4):
+        log(f"plank{i}", (-1.55 + 0.02 * i, -0.8 + 0.17 * i, 0.2), (-0.5, -1.0 + 0.17 * i, 0.16), 0.08, 0.075, seed=8 + i, wob=0.01)
     twig("twig0", 2.55, -0.9, gh(2.55, -0.9), 0.85, 5700)
     twig("twig1", -2.6, 0.2, gh(-2.6, 0.2), 0.75, 5710)
     for i in range(12):
         a = rnd.choice((rnd.uniform(2.6, 3.6), rnd.uniform(-0.4, 0.5)))
         x, y = math.cos(a) * 2.5, -0.1 + math.sin(a) * 1.75
         reed(f"reed{i}", x, y, gh(x, y), rnd.uniform(0.5, 0.95), 5800 + i, n=5, spread=0.1)
+
+
+# ── 공사 중인 부지 세 단계 ── 건물을 짓는 동안 부지에 서는 모습 (어느 건물이든 같이 씀)
+#   1 터 닦기: 말뚝과 줄, 기초돌 몇 개, 쌓아 둔 통나무와 돌 / 2 골조: 기둥·도리·들보·가새, 사다리, 모탕
+#   3 지붕 얹기: 용마루·서까래에 이엉을 반쯤, 비계 장대, 짚단
+def build_stage(stage):
+    rnd = random.Random(90 + stage)
+    gh = make_gh(3.3, 2.8, 0.0, base=0.1)
+    WX, DY, EAVE, RIDGE = 1.7, 1.2, 1.75, 2.5
+    # 사람이 오가며 다져 흙이 드러난 자리
+    ground(3.3, 2.8, 0.0, gh, lambda x, y: sstep(1.0, 0.45, max(abs(x) / (WX + 1.3), abs(y) / (DY + 1.4))), "ground_plain", n=12, segs=40)
+    corners = ((-WX, -DY), (WX, -DY), (WX, DY), (-WX, DY))
+    # 기초돌: 1단계는 뒤와 왼쪽만, 그 뒤로는 빙 둘러
+    k = 0
+    for (x0, y0), (x1, y1) in zip(corners, corners[1:] + corners[:1]):
+        n = 5 if abs(x1 - x0) > 1 else 4
+        for i in range(n):
+            x, y = x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n
+            if stage == 1 and (y < 0.5 and x > -WX + 0.2) and rnd.random() < 0.8:
+                k += 1
+                continue
+            if y0 == y1 == -DY and 0.25 < i / n < 0.75:
+                k += 1
+                continue  # 앞 가운데는 드나드는 자리
+            stone(f"found{k}", (x, y, gh(x, y) + 0.08), (0.42, 0.38, 0.3), 900 + k, rz=rnd.uniform(-0.3, 0.3))
+            k += 1
+    if stage == 1:
+        # 자리를 잡는 말뚝과 줄
+        for i, (x, y) in enumerate(corners):
+            log(f"stake{i}", (x, y, 0.0), (x + rnd.uniform(-0.04, 0.04), y, 0.95), 0.05, 0.04, seed=i)
+        for i, ((x0, y0), (x1, y1)) in enumerate(zip(corners, corners[1:] + corners[:1])):
+            log(f"line{i}", (x0, y0, 0.82), (x1, y1, 0.82), 0.016, 0.016, mat="rope", segs=4, seed=10 + i, wob=0.01)
+    else:
+        # 기둥 여섯, 도리, 들보, 가새
+        for i, (x, y) in enumerate(((-WX, -DY), (0, -DY), (WX, -DY), (-WX, DY), (0, DY), (WX, DY))):
+            log(f"post{i}", (x, y, 0.1), (x + rnd.uniform(-0.03, 0.03), y, EAVE), 0.1, 0.085, seed=20 + i)
+        for i, y in enumerate((-DY, DY)):
+            log(f"plate{i}", (-WX - 0.25, y, EAVE + 0.06), (WX + 0.25, y, EAVE + 0.06), 0.085, 0.08, seed=30 + i)
+        for i, x in enumerate((-WX, 0.0, WX)):
+            log(f"tie{i}", (x, -DY - 0.2, EAVE + 0.16), (x, DY + 0.2, EAVE + 0.16), 0.08, 0.075, seed=33 + i)
+        for i, (x, y, dx) in enumerate(((-WX, -DY, 0.55), (WX, -DY, -0.55), (-WX, DY, 0.55), (WX, DY, -0.55))):
+            log(f"brace{i}", (x, y, EAVE - 0.7), (x + dx, y, EAVE), 0.05, 0.045, seed=36 + i)
+        # 사다리: 앞 도리에 기대 세움
+        for sx in (-0.2, 0.2):
+            log(f"ladder{sx}", (0.9 + sx, -DY - 0.95, gh(0.9, -DY - 0.95)), (0.9 + sx, -DY - 0.1, EAVE + 0.25), 0.035, 0.03, seed=40)
+        for i in range(5):
+            f = 0.14 + i * 0.17
+            y, z = -DY - 0.95 + 0.85 * f, gh(0.9, -DY - 0.95) + (EAVE + 0.25) * f
+            log(f"rung{i}", (0.68, y, z), (1.12, y, z), 0.025, 0.025, seed=45 + i, wob=0)
+    if stage == 3:
+        ridge = lambda x: RIDGE - 0.06 * math.sin((x + WX) / (2 * WX) * math.pi)
+        log("ridge", (-WX - 0.3, 0, ridge(-WX)), (WX + 0.3, 0, ridge(WX)), 0.08, 0.075, seed=50)
+        for i, x in enumerate((-WX, 0.0, WX)):
+            log(f"king{i}", (x, 0, EAVE + 0.2), (x, 0, ridge(x) - 0.05), 0.065, 0.06, seed=52 + i)
+        for s in (-1, 1):
+            for i in range(8):
+                x = -WX - 0.15 + (2 * WX + 0.3) * i / 7
+                log(f"raft{s}{i}", (x, 0, ridge(x) + 0.05), (x, s * (DY + 0.45), EAVE - 0.22), 0.045, 0.04, seed=60 + i + (s > 0) * 10)
+            # 이엉: 뒤 비탈은 다 얹었고, 앞 비탈은 왼쪽 반만 (얹다 만 자리의 서까래가 보임)
+            NC, NXC = 4, 30
+            for kk in range(NC):
+                v0, top, bot, lip = max(0.0, kk / NC - 0.05), [], [], []
+                umax = 1.0 if s > 0 else 0.5 - 0.08 * kk
+                for i in range(NXC + 1):
+                    u = i / NXC * umax
+                    x = -WX - 0.3 + (2 * WX + 0.6) * u
+                    vb = min(1.06, (kk + 1) / NC + 0.06 * rnd.random())
+                    P = lambda v: Vector((x, s * v * (DY + 0.5), ridge(x) + 0.1 - v * (ridge(x) - EAVE + 0.3)))
+                    n = Vector((0, s * 0.55, 0.83))
+                    top.append((P(v0) + n * 0.04, (x, v0 * 1.7), (0.0, 0)))
+                    bot.append((P(vb) + n * 0.14, (x, vb * 1.7), (1.0, 0)))
+                    lip.append((P(vb - 0.015) + n * 0.03, (x, vb * 1.7 + 0.1), (0.15, 0)))
+                sheet(f"thatch{s}{kk}", [top, bot, lip], "thatch", Vector((0, s * 0.55, 0.83)))
+        # 비계 장대와 발판, 올릴 짚단
+        for i, x in enumerate((-0.2, 1.5)):
+            log(f"scaf{i}", (x, -DY - 0.75, gh(x, -DY - 0.75)), (x, -DY - 0.7, EAVE + 0.5), 0.045, 0.04, seed=80 + i)
+        log("scafbar", (-0.35, -DY - 0.72, 1.15), (1.65, -DY - 0.72, 1.15), 0.04, 0.04, seed=83, wob=0)
+        for i, (x, y) in enumerate(((-2.2, -1.5), (-1.75, -1.85), (-2.35, -2.0))):
+            lathe(f"sheaf{i}", (x, y, gh(x, y)), [(0.2, 0.0), (0.24, 0.3), (0.12, 0.42), (0.2, 0.7), (0.26, 0.74)], "blade", segs=9, lean=(rnd.uniform(-0.1, 0.1), 0))
+            log(f"sheaftie{i}", (x, y, gh(x, y) + 0.38), (x, y, gh(x, y) + 0.46), 0.135, 0.135, mat="rope", segs=8, seed=85 + i, wob=0)
+    # 쌓아 둔 통나무 (지을수록 줄어듦)와 돌무더기, 모탕 위의 통나무
+    rows = {1: (4, 3, 2), 2: (3, 2), 3: (2,)}[stage]
+    for j, n in enumerate(rows):
+        for i in range(n):
+            # 통나무 마구리가 앞(카메라)을 보게 쌓음 — 옆으로 뉘었더니 줄무늬 판자로 보였음
+            x = 2.25 + (i - (n - 1) / 2) * 0.3
+            z = gh(2.25, -1.9) + 0.15 + j * 0.26
+            log(f"pile{j}{i}", (x, -2.55, z), (x + rnd.uniform(-0.05, 0.05), -1.15, z), 0.14, 0.13, mat="bark" if (i + j) % 2 else "wood", segs=8, seed=100 + j * 5 + i, wob=0.01)
+    for i in range(7 if stage == 1 else 3):
+        x, y = -2.4 + rnd.uniform(-0.35, 0.35), 1.6 + rnd.uniform(-0.3, 0.3)
+        stone(f"heap{i}", (x, y, gh(x, y) + 0.1 + 0.2 * (i % 3 == 0)), (0.4, 0.36, 0.3), 950 + i, rz=rnd.uniform(0, 3))
+    if stage >= 2:
+        for sx in (-0.3, 0.3):  # 모탕(통나무 받침) 둘에 다듬던 통나무
+            log(f"horse{sx}", (-2.3 + sx, -1.9, gh(-2.3, -1.9) + 0.12), (-2.3 + sx, -1.2, gh(-2.3, -1.2) + 0.12), 0.1, 0.1, seed=110, wob=0)
+        log("worked", (-2.75, -1.55, gh(-2.3, -1.55) + 0.3), (-1.85, -1.55, gh(-2.3, -1.55) + 0.3), 0.11, 0.1, mat="heartwood", segs=8, seed=112, wob=0)
+        for i in range(8):  # 대팻밥
+            x, y = -2.3 + rnd.uniform(-0.6, 0.6), -1.55 + rnd.uniform(-0.5, 0.5)
+            a = rnd.uniform(0, TAU)
+            log(f"chip{i}", (x, y, gh(x, y) + 0.03), (x + math.cos(a) * 0.18, y + math.sin(a) * 0.18, gh(x, y) + 0.05), 0.03, 0.008, mat="heartwood", segs=4, seed=120 + i, wob=0)
 
 
 def bake(name, out_dir, tex):
@@ -1186,7 +1394,10 @@ def bake(name, out_dir, tex):
 
 
 # 이름: (세우는 함수, 구울 그림 한 변)
-SITES = {"STORE": (store, 2048), "COAL": (coal, 1536), "IRON": (iron, 1536), "FISH": (pond, 1536), "PINE": (pine, 1536), "SPRING": (spring, 1536)}
+SITES = {
+    "STORE": (store, 2048), "COAL": (coal, 1536), "IRON": (iron, 1536), "FISH": (pond, 1536), "PINE": (pine, 1536), "SPRING": (spring, 1536),
+    "BUILD1": (lambda: build_stage(1), 1024), "BUILD2": (lambda: build_stage(2), 1024), "BUILD3": (lambda: build_stage(3), 1024),
+}
 ONLY = globals().get("ONLY")
 for key, (fn, tex) in SITES.items():
     if ONLY and key not in ONLY:

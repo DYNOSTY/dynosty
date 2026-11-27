@@ -4,6 +4,7 @@ import {
   BOKHOL_MINERALS,
   reservedVillageLand,
 } from "./bokhol.js";
+import { FUEL_YARD_RECT, fuelYardShown } from "./fuel-yard.js";
 import { loggingSiteRules, loggingSites, productionSites } from "./logging.js";
 import { AMOUNT_SCALE } from "./play.js";
 import {
@@ -177,6 +178,8 @@ export function homePlacementIssue(
     halfWidth: HOME_PLACEMENT_RULES.halfWidth + 0.2,
     halfDepth: HOME_PLACEMENT_RULES.halfDepth + 0.2,
   };
+  if (fuelYardShown(s) && rectanglesOverlap(rect, FUEL_YARD_RECT))
+    return "연료 더미와 겹쳐요.";
   const samples = [
     { ...p.position },
     ...[-1, 0, 1].flatMap((x) =>

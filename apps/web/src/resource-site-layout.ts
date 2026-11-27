@@ -118,7 +118,7 @@ export const RESOURCE_SITES: readonly ResourceSite[] = [
     replacesDeposit: false,
     x: iron.x - 15,
     z: iron.z,
-    bounds: [-3.76, 3.83, -2.78, 3.2],
+    bounds: [-3.84, 3.83, -2.78, 3.2],
   },
 ];
 

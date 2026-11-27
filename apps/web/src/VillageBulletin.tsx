@@ -289,6 +289,13 @@ export function VillageBulletin({
               />
             )}
             <div>
+              {!finding && !bulletin && arrival && (
+                <img
+                  className="village-bulletin__portrait"
+                  src="/art/advisers/dali/concern.webp"
+                  alt="아픈 주민을 걱정하는 달이"
+                />
+              )}
               <small>
                 {finding && site
                   ? site.name + " 방면 · 정찰대의 전갈"

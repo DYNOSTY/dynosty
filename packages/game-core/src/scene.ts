@@ -16,6 +16,10 @@ export type SceneEntity =
   | (SceneEntityBase & {
       readonly kind: "resident";
       readonly motion: "idle" | "walking";
+      readonly jige?: {
+        readonly kind: "wood" | "plant" | "fish";
+        readonly loaded: boolean;
+      };
       readonly needsHelp?: boolean;
       readonly indoors?: boolean;
       readonly species?: string;

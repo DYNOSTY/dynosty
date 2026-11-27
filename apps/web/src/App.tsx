@@ -2,7 +2,6 @@ import type {
   GameCommand,
   GameState,
   GameWorkerMessage,
-  PlayCommand,
   PlayState,
   SceneSnapshot,
 } from "@dynosty/game-core";
@@ -48,6 +47,7 @@ import {
   MoodScale,
   TopFrame,
 } from "./GameHud.js";
+import { goriFace } from "./gori-face.js";
 import {
   loadLocalExample,
   localSaveError,
@@ -299,6 +299,7 @@ export function App() {
               id &&
               (id.startsWith("town:") ||
                 id.startsWith("village:BLD_") ||
+                id === "village:gori" ||
                 id === "example-building-1" ||
                 id.startsWith("dwelling-"))
             ) {
@@ -514,18 +515,6 @@ export function App() {
     document.addEventListener("visibilitychange", pause);
     return () => document.removeEventListener("visibilitychange", pause);
   }, []);
-  function commandPlay(command: PlayCommand) {
-    if (command.type === "new-game") {
-      sceneRef.current?.resetScouting();
-    }
-    setExampleClock(false);
-    setPlayError(null);
-    workerRef.current?.postMessage({
-      type: "play-command",
-      command,
-    } satisfies GameCommand);
-  }
-
   const shownDay = timberOpen
     ? laborOpen
       ? Math.floor((laborState?.elapsed ?? 0) / 1440) + 1
@@ -1725,23 +1714,6 @@ export function App() {
             }}
           >
             <section aria-label="개발 환경 연결 상태" className="panel">
-              <div className="media-actions">
-                <button
-                  type="button"
-                  onClick={() => commandPlay({ type: "test-food", days: 0 })}
-                >
-                  식량 고갈 검사
-                </button>
-                <button
-                  type="button"
-                  onClick={() => commandPlay({ type: "test-food", days: 1 })}
-                >
-                  1일분 식량 복구
-                </button>
-              </div>
-              <p className="hint">
-                식량 검사 버튼은 개발용 재고 변경이며 생산·교역 규칙이 아닙니다.
-              </p>
               <p>
                 카메라 거리(m):{" "}
                 <span data-testid="camera-distance">
@@ -2045,9 +2017,17 @@ export function App() {
             >
               {villageInfo.portrait && (
                 <img
-                  key={villageInfo.portrait}
+                  key={
+                    selectedId === "village:gori"
+                      ? goriFace(timberState)
+                      : villageInfo.portrait
+                  }
                   className="village-selection-portrait"
-                  src={villageInfo.portrait}
+                  src={
+                    selectedId === "village:gori"
+                      ? goriFace(timberState)
+                      : villageInfo.portrait
+                  }
                   alt=""
                   width={64}
                   height={44}
@@ -2058,6 +2038,12 @@ export function App() {
               )}
               <h2>{villageInfo.name}</h2>
               <p>{villageInfo.detail}</p>
+              {selectedId === "village:gori" && (
+                <>
+                  <p>조달과 배급을 이끈다 · 복홀의 지휘관</p>
+                  <p>지휘권은 매일의 성과로만 지킨다</p>
+                </>
+              )}
               {villageInfo.buildingPosition && (
                 <>
                   <button
