@@ -162,11 +162,13 @@ export function createSceneEntities(
     setElevation(height: (x: number, z: number) => number) {
       if (height === elevation) return;
       elevation = height;
-      for (const o of objects.values())
+      for (const o of objects.values()) {
         o.mesh.position.y =
           o.entity.position.y +
           (o.kind === "resident" ? 0.5 : 0.75) +
           elevation(o.mesh.position.x, o.mesh.position.z);
+        if (o.kind === "building") o.visual?.refreshStatic?.();
+      }
     },
     setObstacles(obstacles: readonly GroundObstacle[]) {
       const nextSignature = signature(obstacles);
@@ -569,6 +571,7 @@ export function createSceneEntities(
           );
         if (created || entity.kind !== "resident")
           object.mesh.rotation.y = entity.headingRadians;
+        if (entity.kind === "building") object.visual?.refreshStatic?.();
         object.mesh.setEnabled(
           entity.visible ||
             (entity.kind === "resident" &&
