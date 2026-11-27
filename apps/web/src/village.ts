@@ -157,11 +157,32 @@ function instantiate(
   const groups = inst.animationGroups;
   for (const g of groups) g.stop();
   let playing: AnimationGroup | undefined;
+  let hiddenPause = false;
+  const visibilityObserver = groups.length
+    ? parent.getScene().onBeforeAnimationsObservable.add(() => {
+        if (!playing) return;
+        const visible = meshes.some(
+          (mesh) =>
+            mesh.getTotalVertices() > 0 &&
+            mesh.isEnabled() &&
+            mesh.isVisible &&
+            mesh.visibility > 0,
+        );
+        if (!visible && playing.isPlaying) {
+          playing.pause();
+          hiddenPause = true;
+        } else if (visible && hiddenPause) {
+          playing.restart();
+          hiddenPause = false;
+        }
+      })
+    : null;
   const play = (clip: string, offset = 0) => {
     const g = groups.find((x) => x.name.endsWith(clip));
     if (!g || g === playing) return;
     playing?.stop();
     playing = g;
+    hiddenPause = false;
     g.start(true, 1);
     if (offset) g.goToFrame(g.from + (g.to - g.from) * offset);
   };
@@ -169,6 +190,10 @@ function instantiate(
     meshes,
     play,
     dispose() {
+      if (visibilityObserver)
+        parent
+          .getScene()
+          .onBeforeAnimationsObservable.remove(visibilityObserver);
       blob?.dispose();
       inst.dispose();
     },
