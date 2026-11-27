@@ -653,14 +653,17 @@ export function mountScene(
     infoAt = 0;
   let clockTarget = 9 * 60,
     clockShown = 9 * 60;
+  let modalCheckAt = -Infinity;
+  let modalOpen = false;
   engine.runRenderLoop(() => {
-    if (
-      !assetsReady ||
-      document.querySelector(
+    const now = performance.now();
+    if (now - modalCheckAt >= 250) {
+      modalCheckAt = now;
+      modalOpen = !!document.querySelector(
         ".film-screen:modal, .bokhol-title:modal, .mission-entry:modal",
-      )
-    )
-      return;
+      );
+    }
+    if (!assetsReady || modalOpen) return;
     const dt = Math.min(engine.getDeltaTime() / 1000, 0.1);
     // 낮밤은 게임 시각을 부드럽게 따라감 (자정 넘김 처리)
     let diff = clockTarget - clockShown;
@@ -753,7 +756,6 @@ export function mountScene(
       onTrack(out);
     }
     // 카메라 정보(미니맵 화살표·개발 도구)는 초당 10번만 넘김 → 이동 중 화면 전체 다시 그리기 방지
-    const now = performance.now();
     if (key !== cameraKey) {
       if (homePreview.active) homePreview.cameraMoved();
       cameraKey = key;
