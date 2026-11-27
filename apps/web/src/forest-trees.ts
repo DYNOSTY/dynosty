@@ -35,6 +35,25 @@ const kinds = [
   "TREE_SNAG_B",
 ];
 
+// 박찬님 원본은 프로스트펑크풍의 거의 검은 녹색을 의도했지만, 게임 조명에서는 검게 보여
+// 사용자 결정으로 원본보다 밝게 한다. 선형 공간에서 잎 녹색만 보정한다.
+const NEEDLE_LIFT = 6;
+
+export function liftNeedleColor(linear: { r: number; g: number; b: number }): {
+  r: number;
+  g: number;
+  b: number;
+} {
+  if (linear.g > linear.r && linear.g >= linear.b && linear.g < 0.3) {
+    return {
+      r: Math.min(linear.r * NEEDLE_LIFT, 1),
+      g: Math.min(linear.g * NEEDLE_LIFT, 1),
+      b: Math.min(linear.b * NEEDLE_LIFT, 1),
+    };
+  }
+  return linear;
+}
+
 // 법선이 없는 조각은 원본처럼 기존 대체 나무의 감김을 기준으로 맞춘다.
 function windingScore(pos: ArrayLike<number>, ix: ArrayLike<number>) {
   let cx = 0,
@@ -238,7 +257,8 @@ export function createForestTrees(scene: Scene) {
                     source[i + 2] ?? 1,
                   )
                 : c;
-              const g = linear.toGammaSpace();
+              const lifted = liftNeedleColor(linear);
+              const g = new Color3(lifted.r, lifted.g, lifted.b).toGammaSpace();
               colors.set([g.r, g.g, g.b, 1], i);
             }
             m.setVerticesData("color", colors);
