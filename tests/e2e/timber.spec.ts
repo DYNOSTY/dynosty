@@ -263,6 +263,8 @@ test("둥지 완성 모델을 커서로 옮겨 회전·취소하고 클릭 확�
 test("제재소·저장소의 인원 지정으로 자동 운반·입고하고 저장 후 이어진다", async ({
   page,
 }) => {
+  // Usually 80–90 s on hosted runners; slow runners exceeded the 120 s limit.
+  test.slow();
   let s = commandTimber(
     advanceTimber(createTimberState(), 120),
     {

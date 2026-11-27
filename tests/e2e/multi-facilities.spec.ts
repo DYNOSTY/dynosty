@@ -295,6 +295,8 @@ test("복홀 운영 화면의 밤과 낮 조명이 마을 시각을 따른다", 
 });
 
 test("희망과 절망 중 높은 쪽 저울 접시가 내려간다", async ({ page }) => {
+  // Usually 80–90 s on hosted runners; slow runners exceeded the 120 s limit.
+  test.slow();
   const base = start();
   for (const [optimism, pessimism] of [
     [80, 20],

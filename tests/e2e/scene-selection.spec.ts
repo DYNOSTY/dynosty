@@ -75,6 +75,8 @@ async function ready(page: Page) {
 test("건물·주민을 실제 클릭해 테두리와 정보를 전환하고 빈 바닥에서 해제한다", async ({
   page,
 }) => {
+  // Usually 80–90 s on hosted runners; slow runners exceeded the 120 s limit.
+  test.slow();
   const errors: string[] = [];
   let navigations = 0;
   page.on("framenavigated", (frame) => {
