@@ -59,6 +59,7 @@ export function createSceneEntities(
       assetKey: string;
       generation: number;
       path: GroundPoint[];
+      plannedTarget?: GroundPoint;
       needMarker: Mesh | null;
       jige: ReturnType<typeof wearJige> | null;
       ground?: {
@@ -77,6 +78,19 @@ export function createSceneEntities(
   };
   let processionTime = 0;
   let extraObstacles: readonly GroundObstacle[] = [];
+  let extraSignature = "[]";
+  let obstacleSignature: string | undefined;
+  let cachedObstacles: readonly GroundObstacle[] = [];
+  const signature = (obstacles: readonly GroundObstacle[]) =>
+    JSON.stringify(
+      obstacles.map((o) => [
+        o.x,
+        o.z,
+        o.headingRadians ?? 0,
+        o.halfWidth,
+        o.halfDepth,
+      ]),
+    );
   function replan() {
     const buildings = [...objects.values()]
       .filter((o) => o.kind === "building" && o.entity.visible)
@@ -84,11 +98,24 @@ export function createSceneEntities(
         ...o.entity.position,
         headingRadians: o.entity.headingRadians,
       }));
-    const obstacles = [...buildings, ...extraObstacles];
+    const next = [...buildings, ...extraObstacles];
+    const nextSignature = signature(next);
+    const changed = nextSignature !== obstacleSignature;
+    if (changed) {
+      obstacleSignature = nextSignature;
+      cachedObstacles = next;
+    }
+    const obstacles = cachedObstacles;
     for (const object of objects.values()) {
       if (object.kind !== "resident") continue;
       const start = object.mesh.position,
         end = object.entity.position;
+      if (
+        !changed &&
+        object.plannedTarget?.x === end.x &&
+        object.plannedTarget.z === end.z
+      )
+        continue;
       object.path = residentPath(start, end, obstacles);
       // A new footprint can cover the interpolated position between ticks.
       if (
@@ -97,6 +124,7 @@ export function createSceneEntities(
         residentPath(end, end, obstacles).length
       )
         object.path = [end];
+      object.plannedTarget = { x: end.x, z: end.z };
     }
   }
 
@@ -140,8 +168,11 @@ export function createSceneEntities(
           elevation(o.mesh.position.x, o.mesh.position.z);
     },
     setObstacles(obstacles: readonly GroundObstacle[]) {
+      const nextSignature = signature(obstacles);
+      const changed = extraSignature !== nextSignature;
+      extraSignature = nextSignature;
       extraObstacles = obstacles;
-      replan();
+      if (changed) replan();
     },
     select,
     selectMesh(mesh: AbstractMesh | null) {
@@ -241,6 +272,8 @@ export function createSceneEntities(
             );
             object.visual?.setMotion(moving ? "walking" : "idle");
             object.visual?.animate(delta);
+            // The procession moves the mesh off its planned path; plan again from here.
+            delete object.plannedTarget;
             continue;
           }
           let budget = Math.max(0, delta) * 2;
