@@ -259,7 +259,7 @@ export function buildWorld(
 ) {
   const P = PALETTE[season];
   scene.clearColor = new Color4(0, 0, 0, 0);
-  scene.fogMode = Scene.FOGMODE_EXP2;
+  scene.fogMode = Scene.FOGMODE_LINEAR;
   scene.fogDensity = P.fogDensity;
   scene.fogColor = c3(P.fog);
   const ip = scene.imageProcessingConfiguration;
