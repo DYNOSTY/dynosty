@@ -293,6 +293,33 @@ export function buildWorld(
     blurKernelSize: 24,
     mainTextureRatio: 0.25,
   });
+  // Keep the render target's explicit list in step with the layer's inclusion
+  // list, including meshes disposed during upgrades and scene teardown.
+  const glowing: Mesh[] = [];
+  glow.mainTexture.renderList = glowing;
+  glow.mainTexture.forceLayerMaskCheck = true;
+  // The effect layer recreates its render target when the canvas is resized.
+  const syncGlowTarget = scene.onBeforeRenderObservable.add(() => {
+    if (glow.mainTexture.renderList === glowing) return;
+    glow.mainTexture.renderList = glowing;
+    glow.mainTexture.forceLayerMaskCheck = true;
+  });
+  glow.onDisposeObservable.addOnce(() => {
+    scene.onBeforeRenderObservable.remove(syncGlowTarget);
+  });
+  const addGlow = glow.addIncludedOnlyMesh.bind(glow);
+  const removeGlow = glow.removeIncludedOnlyMesh.bind(glow);
+  glow.addIncludedOnlyMesh = (mesh) => {
+    addGlow(mesh);
+    if (glowing.includes(mesh)) return;
+    glowing.push(mesh);
+    mesh.onDisposeObservable.addOnce(() => glow.removeIncludedOnlyMesh(mesh));
+  };
+  glow.removeIncludedOnlyMesh = (mesh) => {
+    removeGlow(mesh);
+    const index = glowing.indexOf(mesh);
+    if (index !== -1) glowing.splice(index, 1);
+  };
   glow.intensity = 0.9;
   const warmMat = new StandardMaterial("warm-light", scene);
   warmMat.disableLighting = true;
