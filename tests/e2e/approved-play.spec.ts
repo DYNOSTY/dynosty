@@ -360,7 +360,7 @@ test("대표 모델 파일·대기/걷기 전환과 카메라 한계·기본 시
   await ready(page);
   expect(loaded.some((x) => x.endsWith("triceratops.json"))).toBe(true);
   expect(loaded.some((x) => x.endsWith("ondol-nest.json"))).toBe(true);
-  expect(loaded.some((x) => x.endsWith("BLD_NEST.glb"))).toBe(true);
+  expect(loaded.some((x) => x.endsWith("BLD_NEST_v2.glb"))).toBe(true);
   // 겨울 마을은 주민 모델의 겨울판(_v2)을 불러온다.
   expect(loaded.some((x) => /R02_Triceratops(_v2)?\.glb$/.test(x))).toBe(true);
   const canvas = page.locator("canvas");

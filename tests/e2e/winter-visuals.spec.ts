@@ -27,13 +27,14 @@ for (const season of ["winter", "summer"] as const) {
     const suffix = season === "winter" ? "_v2" : "";
     expect(loaded).toContain(`/models/buildings/BLD_OFFICE${suffix}.glb`);
     expect(loaded).toContain(`/models/residents/R02_Triceratops${suffix}.glb`);
-    expect(loaded).toContain("/models/buildings/BLD_NEST.glb");
-    // Models without a winter variant are requested in their original form directly.
+    expect(loaded).toContain(`/models/buildings/BLD_NEST${suffix}.glb`);
     expect(missing).toEqual([]);
     const ondol = await page.evaluate(() => {
       const { __scene: scene } = window as unknown as {
         __scene: {
-          getTransformNodeByName(name: string): object | null;
+          getTransformNodeByName(name: string): {
+            getDescendants(): { name: string }[];
+          } | null;
           getLightByName(name: string): {
             parent: object;
             isEnabled(): boolean;
@@ -44,6 +45,10 @@ for (const season of ["winter", "summer"] as const) {
       const nest = scene.getTransformNodeByName("example-building-1:glb");
       const light = scene.getLightByName("representative-ondol-glow");
       return {
+        snowCap:
+          nest
+            ?.getDescendants()
+            .some((node) => node.name.includes("nest_snow_cap")) ?? false,
         enabled: light?.isEnabled() ?? false,
         scoped: !!(
           light &&
@@ -55,6 +60,7 @@ for (const season of ["winter", "summer"] as const) {
       };
     });
     expect(ondol).toEqual({
+      snowCap: season === "winter",
       enabled: season === "winter",
       scoped: season === "winter",
     });
