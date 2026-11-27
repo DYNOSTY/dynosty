@@ -683,7 +683,7 @@ export function createCapital(s: TimberState): TimberState {
     );
   const posts = facilities.flatMap((facility, index) =>
     Array.from({ length: facility.target }, () => ({
-      workplaceId: index === 0 ? "restaurant" : "facility:" + facility.id,
+      workplaceId: index === 0 ? "restaurant" : `facility:${facility.id}`,
       position: facilityDoor(facility),
     })),
   );
@@ -881,7 +881,7 @@ function diningShift(s: TimberState, r: VillageResident) {
       const kitchen =
         post === "restaurant"
           ? (kitchens[0]?.id ?? "restaurant")
-          : kitchens.find((k) => post === "facility:" + k.id)?.id;
+          : kitchens.find((k) => post === `facility:${k.id}`)?.id;
       if (!kitchen) continue;
       const index = counts.get(kitchen) ?? 0;
       counts.set(kitchen, index + 1);
@@ -1152,11 +1152,12 @@ function routinePlaces(
         : 0) <
       rationLimit(s.world.citizens[index]?.species ?? "R02", s.rationPolicy),
     minute: s.world.minute,
-    workOpen: employee
-      ? diningShift(s, s.residents[index]!)
-      : residentShiftOpen(s, id),
+    workOpen: employee ? diningShift(s, resident) : residentShiftOpen(s, id),
     obstacles: shared.obstacles,
   };
+}
+function missingCitizen(): never {
+  throw new TypeError("Missing resident citizen");
 }
 function resumeResidents(input: TimberState, minutes: number): TimberState {
   const s = staffTown(staffLogging(staffRestaurant(input), eligible));
@@ -1181,7 +1182,7 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
     if (s.yardTransfer?.worker === r.id && workplaceOpen(s.world.minute))
       return current;
     if (r.task?.startsWith("scout:")) {
-      const site = SCOUT_SITES.find((q) => r.task === "scout:" + q.id);
+      const site = SCOUT_SITES.find((q) => r.task === `scout:${q.id}`);
       const trip = site && scoutRun(s, site);
       if (trip && (s.world.day - 1) * 1440 + s.world.minute < trip.due)
         return current;
@@ -1200,8 +1201,10 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
       if (
         served &&
         meal.amount <
-          speciesRule(s.world.citizens.find((c) => c.id === r.id)!.species)
-            .portion
+          speciesRule(
+            (s.world.citizens.find((c) => c.id === r.id) ?? missingCitizen())
+              .species,
+          ).portion
       )
         poorMeals.push(r.id);
       if (served)
@@ -1265,8 +1268,10 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
     if (
       served &&
       meal.amount <
-        speciesRule(s.world.citizens.find((c) => c.id === r.id)!.species)
-          .portion
+        speciesRule(
+          (s.world.citizens.find((c) => c.id === r.id) ?? missingCitizen())
+            .species,
+        ).portion
     )
       poorMeals.push(r.id);
     return {
@@ -1304,7 +1309,7 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
     next = note(
       applyAutomaticCitizenEvent(next, {
         type: "death",
-        id: "hunger-" + s.elapsed,
+        id: `hunger-${s.elapsed}`,
         citizenIds: starving,
       }),
       "식량을 받지 못한 주민 " +
@@ -1329,7 +1334,7 @@ function resumeResidents(input: TimberState, minutes: number): TimberState {
         applyAutomaticCitizenEvent(next, {
           type: "illness",
           severity: "minor",
-          id: "ration-" + s.elapsed,
+          id: `ration-${s.elapsed}`,
           citizenIds: sick,
         }),
         "간소 배급을 받은 주민이 탈이 났습니다.",
@@ -3075,7 +3080,7 @@ function merchantStaff(s: TimberState) {
   return post && s.mutantDamage?.[post.id] !== 100
     ? s.residents.filter(
         (r) =>
-          r.workplaceId === "facility:" + post.id &&
+          r.workplaceId === `facility:${post.id}` &&
           r.health === "healthy" &&
           !r.task,
       ).length
@@ -3233,7 +3238,7 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
   if (victims.length)
     s = applyAutomaticCitizenEvent(s, {
       type: "death",
-      id: "raid-" + s.elapsed,
+      id: `raid-${s.elapsed}`,
       citizenIds: victims,
     });
   const buildings = fireBuildings(s).filter(
@@ -3311,7 +3316,7 @@ export function gateRaid(s: TimberState, random = Math.random): TimberState {
     loss
       ? failures === 3
         ? "마을이 전소했습니다."
-        : "성문이 뚫렸습니다. 사망 " + dead + "명."
+        : `성문이 뚫렸습니다. 사망 ${dead}명.`
       : "성문 수비대가 습격을 막았습니다.",
   );
 }
@@ -3482,7 +3487,7 @@ export function villageFatalIncident(
       r.routine === "working" &&
       (r.workplaceId?.startsWith("logging") ||
         s.town.facilities.some(
-          (f) => r.workplaceId === "facility:" + f.id && facilityResource(f),
+          (f) => r.workplaceId === `facility:${f.id}` && facilityResource(f),
         ))
     ) {
       if (random() >= Math.min(1, 0.35 + Math.max(0, -temperature) * 0.03))
@@ -3522,7 +3527,7 @@ export function villageFatalIncident(
   }
   const casualty = cases[Math.floor(random() * cases.length)];
   if (!casualty) return s;
-  const id = "village-fatality-" + s.elapsed;
+  const id = `village-fatality-${s.elapsed}`;
   if (s.world.citizenEvents?.includes(id)) return s;
   const wounded = casualty.injury && random() >= 0.25;
   let result = note(
@@ -3645,7 +3650,7 @@ function advanceParsedTimber(
       if (
         e.decision === "waiting" &&
         !s.residents.some(
-          (r) => r.task === "scout:" + site && r.health !== "dead",
+          (r) => r.task === `scout:${site}` && r.health !== "dead",
         )
       ) {
         const departures = { ...s.scoutDepartures },
@@ -3671,7 +3676,7 @@ function advanceParsedTimber(
       )
         continue;
       const escorts = s.residents.some(
-        (r) => r.task === "scout:" + site && r.health !== "dead",
+        (r) => r.task === `scout:${site}` && r.health !== "dead",
       );
       s = {
         ...s,
@@ -3679,7 +3684,7 @@ function advanceParsedTimber(
       };
       if (!escorts || e.decision !== "take") continue;
       if (e.kind === "survivors") {
-        const id = "field-" + site + "-" + (s.scoutDepartures?.[site] ?? e.due);
+        const id = `field-${site}-${s.scoutDepartures?.[site] ?? e.due}`;
         s = applyAutomaticCitizenEvent(s, {
           type: "arrival",
           id,
@@ -3703,13 +3708,13 @@ function advanceParsedTimber(
             ...(s.bulletins ?? []).slice(-99),
             {
               kind: "scout",
-              key: "return-" + site + "-" + e.due,
+              key: `return-${site}-${e.due}`,
               title: "정찰대가 복홀에 돌아왔습니다",
-              detail: title + " · " + delivery,
+              detail: `${title} · ${delivery}`,
             },
           ],
         },
-        "정찰대 귀환 · " + title + " · " + delivery,
+        `정찰대 귀환 · ${title} · ${delivery}`,
       );
     }
     s = ageYardFood(s, nextTime - elapsed);
@@ -3744,7 +3749,7 @@ function advanceParsedTimber(
           f.kind === "trade" &&
           s.residents.some(
             (r) =>
-              r.workplaceId === "facility:" + f.id && r.health === "healthy",
+              r.workplaceId === `facility:${f.id}` && r.health === "healthy",
           ),
       )
     ) {
@@ -3813,7 +3818,7 @@ function advanceParsedTimber(
             .slice(0, 2)
             .map((r) => r.id);
           if (ids.length === 2) {
-            const eventId = "brawl-" + s.elapsed;
+            const eventId = `brawl-${s.elapsed}`;
             s = applyTimberCommand(
               { ...s, openingFight: true },
               {
@@ -3839,7 +3844,7 @@ function advanceParsedTimber(
           s = applyTimberCommand(
             s,
             { type: "building-damage", cause: "fire", amount: 25 },
-            "fire-" + s.elapsed,
+            `fire-${s.elapsed}`,
             false,
           );
         }
@@ -3864,7 +3869,7 @@ function advanceParsedTimber(
             !isMechanical(s, r.id),
         );
         if (patient) {
-          const id = "capital-cold-" + s.elapsed;
+          const id = `capital-cold-${s.elapsed}`;
           s = note(
             applyAutomaticCitizenEvent(s, {
               id,
@@ -4108,7 +4113,7 @@ function applyTimberCommand(
             delete durations[id];
             delete finds[id];
             residents = residents.map((r) =>
-              r.task === "scout:" + id ? { ...r, task: null } : r,
+              r.task === `scout:${id}` ? { ...r, task: null } : r,
             );
           }
         } else if (
@@ -4129,7 +4134,7 @@ function applyTimberCommand(
               crew.includes(r.id)
                 ? {
                     ...r,
-                    task: "scout:" + id,
+                    task: `scout:${id}`,
                     insideHome: false,
                     routine: "idle",
                     diningSeat: null,
@@ -4708,7 +4713,7 @@ function applyTimberCommand(
         typeof command.accept !== "boolean"
       )
         fail();
-      const visit = "gate-" + s.processed.length;
+      const visit = `gate-${s.processed.length}`;
       if (command.accept) {
         n = commandTimber(
           s,
@@ -4723,7 +4728,7 @@ function applyTimberCommand(
               ],
             },
           },
-          visit + "-arrive",
+          `${visit}-arrive`,
         );
         n = commandTimber(
           n,
@@ -4731,12 +4736,12 @@ function applyTimberCommand(
             type: "citizen-event",
             event: {
               type: "illness",
-              id: visit + "-sick",
-              citizenIds: ["arrival:" + visit + ":R02:0"],
+              id: `${visit}-sick`,
+              citizenIds: [`arrival:${visit}:R02:0`],
               severity: "minor",
             },
           },
-          visit + "-care",
+          `${visit}-care`,
         );
       } else {
         n = {
@@ -4921,10 +4926,10 @@ function applyTimberCommand(
       bulletins: [
         ...(n.bulletins ?? []).slice(-99),
         {
-          key: "decree-" + n.decree.serial,
+          key: `decree-${n.decree.serial}`,
           kind: "decree",
           title: decision,
-          detail: "관아 앞에 방이 붙었습니다. “" + n.decree.reaction + "”",
+          detail: `관아 앞에 방이 붙었습니다. “${n.decree.reaction}”`,
         },
       ],
     };

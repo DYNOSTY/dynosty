@@ -70,7 +70,7 @@ export function advanceYardTransfer(
     s.residents.find(
       (r) =>
         (!old || r.id === old.worker) &&
-        r.workplaceId === "facility:" + shop.id &&
+        r.workplaceId === `facility:${shop.id}` &&
         r.health === "healthy" &&
         !r.task,
     );

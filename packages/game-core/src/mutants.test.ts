@@ -77,7 +77,7 @@ describe("변종 야습", () => {
       "guards",
     );
     const guards = assigned.residents.filter((r) => r.workplaceId === "office");
-    const lastGuard = guards[3]!;
+    const lastGuard = must(guards[3], "last guard");
     const before = parseTimberSave(
       createTimberSave(
         commandTimber(
@@ -119,7 +119,10 @@ describe("변종 야습", () => {
         "sick",
       );
       expect(next.mutants).toEqual([
-        { id: before.mutants![0]!.id, due: next.elapsed + 30 },
+        {
+          id: must(must(before.mutants, "mutants")[0], "first mutant").id,
+          due: next.elapsed + 30,
+        },
       ]);
     } finally {
       roll.mockRestore();
@@ -213,3 +216,7 @@ describe("변종 야습", () => {
     }
   });
 });
+function must<T>(value: T | null | undefined, what: string): T {
+  if (value == null) throw new Error(`missing ${what}`);
+  return value;
+}

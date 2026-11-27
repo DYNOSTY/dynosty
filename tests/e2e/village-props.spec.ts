@@ -7,6 +7,31 @@ import {
   createVillageGame,
 } from "../../packages/game-core/dist/index.js";
 
+type SceneForProps = {
+  transformNodes: {
+    name: string;
+    isEnabled(): boolean;
+    parent: { id: string } | null;
+    getChildMeshes(): unknown[];
+  }[];
+  getMeshByName(name: string): {
+    thinInstanceCount?: number;
+    getAbsolutePosition(): {
+      clone(): { set(x: number, y: number, z: number): void };
+    };
+  };
+  getMeshById(id: string | undefined): {
+    getAbsolutePosition(): unknown;
+    rotation: { y: number };
+  };
+  activeCamera: {
+    setTarget(target: unknown): void;
+    radius: number;
+    beta: number;
+    alpha: number;
+  };
+};
+
 for (const wood of [20, 100]) {
   test(`운반 지게와 연료 재고 표시: 목재 ${wood}`, async ({ page }) => {
     let state = commandTimber(
@@ -59,9 +84,10 @@ for (const wood of [20, 100]) {
     await expect
       .poll(() =>
         page.evaluate((workerId) => {
-          const scene = (window as any).__scene;
+          const scene = (window as unknown as { __scene: SceneForProps })
+            .__scene;
           return scene.transformNodes.some(
-            (n: any) =>
+            (n) =>
               n.name.startsWith("jige-") &&
               n.isEnabled() &&
               n.parent?.id === workerId &&
@@ -73,7 +99,8 @@ for (const wood of [20, 100]) {
     await expect
       .poll(() =>
         page.evaluate(() => {
-          const scene = (window as any).__scene;
+          const scene = (window as unknown as { __scene: SceneForProps })
+            .__scene;
           return ["FUEL_LOG", "FUEL_COAL_0", "FUEL_COAL_1", "FUEL_COAL_2"].map(
             (name) => scene.getMeshByName(`fuel-${name}`)?.thinInstanceCount,
           );
@@ -81,7 +108,7 @@ for (const wood of [20, 100]) {
       )
       .toEqual([Math.ceil(wood / 4), 3, 3, 2]);
     await page.evaluate(() => {
-      const scene = (window as any).__scene;
+      const scene = (window as unknown as { __scene: SceneForProps }).__scene;
       const point = scene
         .getMeshByName("fuel-FUEL_LOG")
         .getAbsolutePosition()
@@ -93,7 +120,7 @@ for (const wood of [20, 100]) {
     await page.waitForTimeout(500);
     await page.screenshot({ path: test.info().outputPath("fuel-yard.png") });
     await page.evaluate((workerId) => {
-      const scene = (window as any).__scene;
+      const scene = (window as unknown as { __scene: SceneForProps }).__scene;
       const resident = scene.getMeshById(workerId);
       scene.activeCamera.setTarget(resident.getAbsolutePosition());
       scene.activeCamera.radius = 5;

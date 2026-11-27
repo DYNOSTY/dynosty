@@ -93,7 +93,7 @@ it("광맥이 고갈되면 채석장은 이웃 광맥을 캐지 않고 배치 �
   s = advanceTimber(s, 1440);
   expect(s.town.facilities[0]?.sourceId).toBe("stone-bokhol-south");
   expect(
-    s.residents.filter((r) => r.workplaceId === "facility:" + quarry.id),
+    s.residents.filter((r) => r.workplaceId === `facility:${quarry.id}`),
   ).toHaveLength(4);
   expect(remaining(s, "stone-east")).toBe(neighbour);
   expect(remaining(s, "stone-bokhol-south")).toBe(0);

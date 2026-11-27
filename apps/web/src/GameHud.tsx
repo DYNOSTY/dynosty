@@ -147,8 +147,8 @@ export function MoodScale({
         <span
           className="g-mood__v"
           style={{
-            left: ((X + lx) / 1120) * 100 + "%",
-            top: ((Y + ly + 480) / 930) * 100 + "%",
+            left: `${((X + lx) / 1120) * 100}%`,
+            top: `${((Y + ly + 480) / 930) * 100}%`,
           }}
         >
           <small>희망</small>
@@ -157,8 +157,8 @@ export function MoodScale({
         <span
           className="g-mood__v"
           style={{
-            left: ((X + rx) / 1120) * 100 + "%",
-            top: ((Y + ry + 480) / 930) * 100 + "%",
+            left: `${((X + rx) / 1120) * 100}%`,
+            top: `${((Y + ry + 480) / 930) * 100}%`,
           }}
         >
           <small>절망</small>
