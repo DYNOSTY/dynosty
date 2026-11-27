@@ -915,6 +915,7 @@ export function buildWorld(
   };
   return {
     shadow,
+    blobSrc,
     setTime,
     glow,
     warmMat,

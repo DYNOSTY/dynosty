@@ -1,12 +1,13 @@
 import type { InstantiatedEntries } from "@babylonjs/core/assetContainer";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import "@babylonjs/core/Meshes/instancedMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import "@babylonjs/core/Rendering/outlineRenderer";
 import type { Scene } from "@babylonjs/core/scene";
+import { addResidentInstance, residentLocal } from "./resident-crowd.js";
 import { loadSceneAsset } from "./scene-assets.js";
 import { seasonalModelUrl } from "./seasonal-model.js";
 import type { GlbVisual } from "./village.js";
@@ -32,6 +33,32 @@ export function residentGlb(species: string, season: Season) {
 }
 
 const outlineColor = new Color3(0.3, 0.9, 1);
+const crowdLoads = new WeakMap<
+  Scene,
+  WeakMap<typeof loadSceneAsset, Map<string, ReturnType<typeof loadSceneAsset>>>
+>();
+function loadCrowd(scene: Scene, load: typeof loadSceneAsset, url: string) {
+  let loaders = crowdLoads.get(scene);
+  if (!loaders) {
+    loaders = new WeakMap();
+    crowdLoads.set(scene, loaders);
+  }
+  let urls = loaders.get(load);
+  if (!urls) {
+    urls = new Map();
+    loaders.set(load, urls);
+  }
+  let pending = urls.get(url);
+  if (!pending) {
+    pending = load(scene, url);
+    urls.set(url, pending);
+    const owned = urls;
+    void pending.catch(() => {
+      if (owned.get(url) === pending) owned.delete(url);
+    });
+  }
+  return pending;
+}
 function outline(mesh: AbstractMesh) {
   mesh.outlineColor = outlineColor;
   mesh.outlineWidth = 0.025;
@@ -50,6 +77,7 @@ export async function createResidentVisual(
     depth: number,
   ) => AbstractMesh | null,
   load = loadSceneAsset,
+  shadowSource?: Mesh,
 ): Promise<GlbVisual> {
   const model = residentGlb(species, season);
   if (!model) throw Error("알 수 없는 주민 종입니다.");
@@ -58,12 +86,16 @@ export async function createResidentVisual(
     active: () => boolean,
   ) => {
     try {
-      return await load(scene, model[variant]);
+      return await (variant === "crowdUrl"
+        ? loadCrowd(scene, load, model[variant])
+        : load(scene, model[variant]));
     } catch (error) {
       if (season !== "winter" || !active()) throw error;
       const fallback = residentGlb(species, "summer");
       if (!fallback) throw error;
-      return load(scene, fallback[variant]);
+      return variant === "crowdUrl"
+        ? loadCrowd(scene, load, fallback[variant])
+        : load(scene, fallback[variant]);
     }
   };
   const alive = () => !parent.isDisposed() && !scene.isDisposed;
@@ -78,17 +110,48 @@ export async function createResidentVisual(
   const baseY = offsetY - model.bottom * model.scale;
   node.position.y = baseY;
   node.scaling.setAll(model.scale);
-  const crowd = source.createInstance(`${parent.name}:crowd`);
-  crowd.parent = node;
   // Include the GLTF loader's handedness root and any authored node transform.
   const orientation = new Quaternion();
-  crowd.rotationQuaternion = orientation;
+  const sourceScale = new Vector3(),
+    sourcePosition = new Vector3();
   source
     .computeWorldMatrix(true)
-    .decompose(crowd.scaling, crowd.rotationQuaternion, crowd.position);
-  crowd.isPickable = true;
+    .decompose(sourceScale, orientation, sourcePosition);
+  let selected = false;
+  const crowdLocal = new Matrix();
+  const releaseCrowd = addResidentInstance(
+    scene,
+    source,
+    {
+      root: parent,
+      visible: () => !selected,
+      local: () =>
+        residentLocal(node.scaling, node.rotation.z, node.position, crowdLocal),
+    },
+    true,
+  );
   // Anchor the contact shadow to the ground, not the animated body pivot.
-  const blob = shadow(parent, 1.3 * model.scale, 2 * model.scale);
+  const radius = 1.3 * model.scale,
+    depth = 2 * model.scale;
+  const blob = shadowSource ? null : shadow(parent, radius, depth);
+  const shadowLocal = residentLocal(
+    new Vector3(radius, 1, depth),
+    0,
+    new Vector3(radius * 0.25, 0.03 + offsetY, radius * 0.15),
+    new Matrix(),
+  );
+  const releaseShadow = shadowSource
+    ? addResidentInstance(
+        scene,
+        shadowSource,
+        {
+          root: parent,
+          visible: () => true,
+          local: () => shadowLocal,
+        },
+        false,
+      )
+    : null;
   if (blob) {
     blob.isPickable = false;
     blob.position.y += offsetY;
@@ -96,7 +159,6 @@ export async function createResidentVisual(
   let proxy: Mesh | null = null,
     detail: InstantiatedEntries | null = null;
   let generation = 0,
-    selected = false,
     walking = false,
     disposed = false;
   let phase = (parent.uniqueId * 2.39996) % (2 * Math.PI);
@@ -121,12 +183,11 @@ export async function createResidentVisual(
       detail = null;
       proxy?.dispose();
       proxy = null;
-      crowd.setEnabled(!value);
       if (!value) return;
       // A private rigid copy provides immediate feedback, including on load failure.
       proxy = source.clone(`${parent.name}:selected`, node, true);
-      proxy.position.copyFrom(crowd.position);
-      proxy.scaling.copyFrom(crowd.scaling);
+      proxy.position.copyFrom(sourcePosition);
+      proxy.scaling.copyFrom(sourceScale);
       proxy.rotationQuaternion = orientation.clone();
       proxy.isPickable = true;
       outline(proxy);
@@ -162,7 +223,10 @@ export async function createResidentVisual(
       if (detail) return;
       const eye = scene.activeCamera?.globalPosition;
       const d2 = eye
-        ? Vector3.DistanceSquared(parent.absolutePosition, eye)
+        ? Vector3.DistanceSquared(
+            parent.parent ? parent.absolutePosition : parent.position,
+            eye,
+          )
         : 0;
       // At overview distance retain path/heading, not subpixel bob and sway.
       if (d2 >= 85 * 85) {
@@ -177,6 +241,8 @@ export async function createResidentVisual(
     dispose() {
       if (disposed) return;
       disposed = true;
+      releaseCrowd();
+      releaseShadow?.();
       detail?.dispose();
       blob?.dispose();
       node.dispose();

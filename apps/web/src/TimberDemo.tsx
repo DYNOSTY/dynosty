@@ -49,8 +49,53 @@ import { buildingCost, TownPanel } from "./TownPanel.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
 import { readWorkerSnapshot } from "./timber-protocol.js";
 import { loadTimber, saveTimber, timberSaveError } from "./timber-save.js";
+import { rememberScene } from "./timber-scene-cache.js";
 
 const time = (m: number) => `${Math.floor(m / 60)}시간 ${m % 60}분`;
+function NestList({ state }: { state: TimberState }) {
+  const byHome = new Map<
+    string,
+    { resident: TimberState["residents"][number]; index: number }[]
+  >();
+  const indices = new Map<string, number>();
+  state.residents.forEach((resident, index) => {
+    if (!indices.has(resident.id)) indices.set(resident.id, index);
+    if (resident.homeId) {
+      const group = byHome.get(resident.homeId) ?? [];
+      group.push({ resident, index });
+      byHome.set(resident.homeId, group);
+    }
+  });
+  return (
+    <ul>
+      {state.homes.map((h, i) => {
+        const residents = byHome.get(h.id) ?? [];
+        const alive = residents.filter(
+          ({ resident }) => resident.health !== "dead",
+        );
+        return (
+          <li key={h.id}>
+            둥지{i + 1} · {alive.length}명 · 공간{" "}
+            {homeUsage(
+              h.id,
+              residents.map(({ resident }) => resident),
+              state.world.citizens,
+            )}
+            /{h.capacity}
+            <ul>
+              {alive.map(({ resident: r, index }) => (
+                <li key={r.id}>
+                  {residentName(indices.get(r.id) ?? index)} · 고정 잠자리{" "}
+                  {(r.homeSlot ?? 0) + 1}
+                </li>
+              ))}
+            </ul>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 const phaseNames = {
   select: "공급 제안 비교",
   relief: "유휴 주민이 업무 교대하러 이동",
@@ -117,6 +162,8 @@ export function TimberDemo({
 }: Props) {
   const [laborMode, setLaborMode] = useState(false);
   const [slotPicker, setSlotPicker] = useState(false);
+  const [nestsOpen, setNestsOpen] = useState(false);
+  const [routinesOpen, setRoutinesOpen] = useState(false);
   useEffect(() => onLaborModeChange(laborMode), [laborMode, onLaborModeChange]);
   const [placingKind, setPlacingKind] = useState<BuildingKind>("home");
   const [placingHome, setPlacingHome] = useState(false);
@@ -220,6 +267,7 @@ export function TimberDemo({
       const m = e.data;
       if (m.type === "state") {
         const state = readWorkerSnapshot(m.resumeJson);
+        rememberScene(state, m.scene);
         const stage = state.chapter ?? 1;
         const campaign = state.campaign;
         if (
@@ -876,7 +924,7 @@ export function TimberDemo({
               잠자리는 주민마다 고정 배정합니다. 빈 둥지는 이후 합류할 주민을
               위해 남겨 둡니다.
             </p>
-            <details>
+            <details onToggle={(e) => setNestsOpen(e.currentTarget.open)}>
               <summary>입주 현황</summary>
               <details>
                 <summary>종별 주민 설계 보기</summary>
@@ -889,33 +937,7 @@ export function TimberDemo({
                   height="1024"
                 />
               </details>
-              <ul>
-                {state.homes.map((h, i) => (
-                  <li key={h.id}>
-                    둥지{i + 1} ·{" "}
-                    {
-                      state.residents.filter(
-                        (r) => r.homeId === h.id && r.health !== "dead",
-                      ).length
-                    }
-                    명 · 공간{" "}
-                    {homeUsage(h.id, state.residents, state.world.citizens)}/
-                    {h.capacity}
-                    <ul>
-                      {state.residents
-                        .filter((r) => r.homeId === h.id && r.health !== "dead")
-                        .map((r) => (
-                          <li key={r.id}>
-                            {residentName(
-                              state.residents.findIndex((q) => q.id === r.id),
-                            )}{" "}
-                            · 고정 잠자리 {(r.homeSlot ?? 0) + 1}
-                          </li>
-                        ))}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
+              {nestsOpen ? <NestList state={state} /> : null}
             </details>
           </section>
           <section aria-label="자원 생산" data-testid="logging-panel">
@@ -1455,51 +1477,53 @@ export function TimberDemo({
               ) : null}
             </section>
           ) : null}
-          <details>
+          <details onToggle={(e) => setRoutinesOpen(e.currentTarget.open)}>
             <summary>주민 생활 동선</summary>
             <p>
               다음 지시가 있으면 업무 장소로, 개별 허기가 쌓이면 영업 중인 공동
               식당으로, 그 외에는 집이나 따뜻한 대기 장소로 이동합니다. 현재
               외형은 트리케라톱스 임시 모델입니다.
             </p>
-            <ul data-testid="resident-routines">
-              {state.residents
-                .filter((r) => r.health !== "dead")
-                .map((r) => (
-                  <li key={r.id}>
-                    {residentName(state.residents.indexOf(r))}
-                    {r.workplaceId === "restaurant"
-                      ? "(식당 직원)"
-                      : r.workplaceId?.startsWith("logging")
-                        ? "(자원 작업장 직원)"
-                        : r.task?.startsWith("logging-haul")
-                          ? "(자원 운반)"
-                          : ""}{" "}
-                    ·{" "}
-                    {r.insideHome
-                      ? "둥지에서 휴식"
-                      : state.workerIds.includes(r.id)
-                        ? "지시 업무 중"
-                        : r.task
-                          ? "다음 업무 수행 중"
-                          : {
-                              idle: "휴식",
-                              home: "집으로 이동",
-                              warmth: "따뜻한 곳으로 이동",
-                              restaurant: "식당으로 이동·대기",
-                              eating: "식사 중",
-                              "next-work": "다음 업무로 이동",
-                              "to-work": "식당 근무지로 이동",
-                              working: "근무 중",
-                              resting: "건강 회복을 위해 휴식",
-                            }[r.routine]}
-                    <span className="hint">
-                      {" "}
-                      · 오늘 배급 {formatRation(r.rationUsed)}
-                    </span>
-                  </li>
-                ))}
-            </ul>
+            {routinesOpen ? (
+              <ul data-testid="resident-routines">
+                {state.residents
+                  .filter((r) => r.health !== "dead")
+                  .map((r) => (
+                    <li key={r.id}>
+                      {residentName(state.residents.indexOf(r))}
+                      {r.workplaceId === "restaurant"
+                        ? "(식당 직원)"
+                        : r.workplaceId?.startsWith("logging")
+                          ? "(자원 작업장 직원)"
+                          : r.task?.startsWith("logging-haul")
+                            ? "(자원 운반)"
+                            : ""}{" "}
+                      ·{" "}
+                      {r.insideHome
+                        ? "둥지에서 휴식"
+                        : state.workerIds.includes(r.id)
+                          ? "지시 업무 중"
+                          : r.task
+                            ? "다음 업무 수행 중"
+                            : {
+                                idle: "휴식",
+                                home: "집으로 이동",
+                                warmth: "따뜻한 곳으로 이동",
+                                restaurant: "식당으로 이동·대기",
+                                eating: "식사 중",
+                                "next-work": "다음 업무로 이동",
+                                "to-work": "식당 근무지로 이동",
+                                working: "근무 중",
+                                resting: "건강 회복을 위해 휴식",
+                              }[r.routine]}
+                      <span className="hint">
+                        {" "}
+                        · 오늘 배급 {formatRation(r.rationUsed)}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            ) : null}
           </details>
           <details>
             <summary>업무 처리 기록</summary>

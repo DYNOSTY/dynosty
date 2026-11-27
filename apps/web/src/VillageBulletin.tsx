@@ -31,6 +31,7 @@ export function VillageBulletin({
   const [hiddenCold, setHiddenCold] = useState("");
   const [census, setCensus] = useState(false);
   const [filter, setFilter] = useState("");
+  const [workplacesOpen, setWorkplacesOpen] = useState(false);
   const alive = s.residents.filter((r) => r.health !== "dead");
   const idle = idleTownResidents(s).length;
   const children = new Set(
@@ -138,7 +139,7 @@ export function VillageBulletin({
                 </div>
               ))}
             </dl>
-            <details>
+            <details onToggle={(e) => setWorkplacesOpen(e.currentTarget.open)}>
               <summary>주민별 근무지와 배치</summary>
               <label>
                 주민 찾기{" "}
@@ -148,114 +149,118 @@ export function VillageBulletin({
                   placeholder="이름 · 종 · 근무지"
                 />
               </label>
-              <ul>
-                {s.residents.map((r, index) => {
-                  if (r.health === "dead") return null;
-                  const citizen = citizens.get(r.id);
-                  const facility = s.town.facilities.find(
-                    (f) => "facility:" + f.id === r.workplaceId,
-                  );
-                  const workplace = facility
-                    ? facilityNames.get(facility.id)
-                    : r.workplaceId === "restaurant"
-                      ? "공동 식당"
-                      : r.workplaceId === "office"
-                        ? "관아"
-                        : r.workplaceId?.startsWith("logging")
-                          ? "자원 작업장"
-                          : r.workplaceId
-                            ? "마을 업무"
-                            : "미배치";
-                  const species =
-                    citizen?.species === "R02"
-                      ? "트리케라톱스"
-                      : citizen?.species === "R03"
-                        ? "벨로키랍토르"
-                        : "스피노사우루스";
-                  const job = s.town.orders.find((o) => o.crew.includes(r.id));
-                  const status =
-                    r.health === "sick"
-                      ? "치료 중"
-                      : r.insideHome
-                        ? "둥지"
-                        : job
-                          ? BUILDING_RULES[job.kind].name + " 공사 배정"
-                          : r.task
-                            ? "업무 중"
-                            : {
-                                idle: "대기",
-                                home: "귀가 중",
-                                warmth: "온기로 이동",
-                                restaurant: "식당으로 이동",
-                                eating: "식사 중",
-                                "next-work": "이동 중",
-                                "to-work": "출근 중",
-                                working: "근무 중",
-                                resting: "휴식 중",
-                              }[r.routine];
-                  const name = residentName(index);
-                  if (
-                    ![name, species, workplace, status]
-                      .join(" ")
-                      .includes(filter.trim())
-                  )
-                    return null;
-                  const available =
-                    citizen?.alive &&
-                    (s.childLabor || citizen.age !== "child") &&
-                    r.health === "healthy" &&
-                    !r.task &&
-                    !r.nextWork &&
-                    r.routine !== "eating" &&
-                    !s.workerIds.includes(r.id) &&
-                    !s.town.trips.some((t) => t.ids.includes(r.id)) &&
-                    (!r.workplaceId ||
-                      (facility && canDirectStaff(facility.kind)));
-                  return (
-                    <li key={r.id}>
-                      <strong>{name}</strong> · {species} ·{" "}
-                      {children.has(r.id) ? "아동" : "성체"}
-                      <small>
-                        {workplace} · {status}
-                      </small>
-                      {available && (
-                        <select
-                          aria-label={name + " 근무지"}
-                          value={facility?.id ?? ""}
-                          onChange={(e) =>
-                            command({
-                              type: "direct-staff",
-                              resident: r.id,
-                              destination: e.target.value || null,
-                            })
-                          }
-                        >
-                          <option value="">미배치</option>
-                          {s.town.facilities
-                            .filter((f) => canDirectStaff(f.kind))
-                            .map((f) => {
-                              const count =
-                                workers.get("facility:" + f.id) ?? 0;
-                              return (
-                                <option
-                                  key={f.id}
-                                  value={f.id}
-                                  disabled={
-                                    count >= facilityStaffLimit(f) &&
-                                    facility?.id !== f.id
-                                  }
-                                >
-                                  {facilityNames.get(f.id)} · {count}/
-                                  {facilityStaffLimit(f)}
-                                </option>
-                              );
-                            })}
-                        </select>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+              {workplacesOpen ? (
+                <ul>
+                  {s.residents.map((r, index) => {
+                    if (r.health === "dead") return null;
+                    const citizen = citizens.get(r.id);
+                    const facility = s.town.facilities.find(
+                      (f) => "facility:" + f.id === r.workplaceId,
+                    );
+                    const workplace = facility
+                      ? facilityNames.get(facility.id)
+                      : r.workplaceId === "restaurant"
+                        ? "공동 식당"
+                        : r.workplaceId === "office"
+                          ? "관아"
+                          : r.workplaceId?.startsWith("logging")
+                            ? "자원 작업장"
+                            : r.workplaceId
+                              ? "마을 업무"
+                              : "미배치";
+                    const species =
+                      citizen?.species === "R02"
+                        ? "트리케라톱스"
+                        : citizen?.species === "R03"
+                          ? "벨로키랍토르"
+                          : "스피노사우루스";
+                    const job = s.town.orders.find((o) =>
+                      o.crew.includes(r.id),
+                    );
+                    const status =
+                      r.health === "sick"
+                        ? "치료 중"
+                        : r.insideHome
+                          ? "둥지"
+                          : job
+                            ? BUILDING_RULES[job.kind].name + " 공사 배정"
+                            : r.task
+                              ? "업무 중"
+                              : {
+                                  idle: "대기",
+                                  home: "귀가 중",
+                                  warmth: "온기로 이동",
+                                  restaurant: "식당으로 이동",
+                                  eating: "식사 중",
+                                  "next-work": "이동 중",
+                                  "to-work": "출근 중",
+                                  working: "근무 중",
+                                  resting: "휴식 중",
+                                }[r.routine];
+                    const name = residentName(index);
+                    if (
+                      ![name, species, workplace, status]
+                        .join(" ")
+                        .includes(filter.trim())
+                    )
+                      return null;
+                    const available =
+                      citizen?.alive &&
+                      (s.childLabor || citizen.age !== "child") &&
+                      r.health === "healthy" &&
+                      !r.task &&
+                      !r.nextWork &&
+                      r.routine !== "eating" &&
+                      !s.workerIds.includes(r.id) &&
+                      !s.town.trips.some((t) => t.ids.includes(r.id)) &&
+                      (!r.workplaceId ||
+                        (facility && canDirectStaff(facility.kind)));
+                    return (
+                      <li key={r.id}>
+                        <strong>{name}</strong> · {species} ·{" "}
+                        {children.has(r.id) ? "아동" : "성체"}
+                        <small>
+                          {workplace} · {status}
+                        </small>
+                        {available && (
+                          <select
+                            aria-label={name + " 근무지"}
+                            value={facility?.id ?? ""}
+                            onChange={(e) =>
+                              command({
+                                type: "direct-staff",
+                                resident: r.id,
+                                destination: e.target.value || null,
+                              })
+                            }
+                          >
+                            <option value="">미배치</option>
+                            {s.town.facilities
+                              .filter((f) => canDirectStaff(f.kind))
+                              .map((f) => {
+                                const count =
+                                  workers.get("facility:" + f.id) ?? 0;
+                                return (
+                                  <option
+                                    key={f.id}
+                                    value={f.id}
+                                    disabled={
+                                      count >= facilityStaffLimit(f) &&
+                                      facility?.id !== f.id
+                                    }
+                                  >
+                                    {facilityNames.get(f.id)} · {count}/
+                                    {facilityStaffLimit(f)}
+                                  </option>
+                                );
+                              })}
+                          </select>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
             </details>
           </div>
         )}

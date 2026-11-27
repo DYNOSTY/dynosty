@@ -4,6 +4,7 @@ import {
   createTimberSave,
   createVillageGame,
   tickTimber,
+  timberScene,
 } from "@dynosty/game-core";
 import { resumeVillage } from "./resume-village.js";
 import type { TimberRequest, TimberResponse } from "./timber-protocol.js";
@@ -18,6 +19,7 @@ const send = (m: TimberResponse) => self.postMessage(m);
 const publish = (before?: typeof state) =>
   send({
     type: "state",
+    scene: timberScene(state),
     resumeJson: encodeVillageSnapshot(state),
     ...(before
       ? { completions: villageCompletions(before, state) }
