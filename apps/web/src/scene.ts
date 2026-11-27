@@ -297,7 +297,6 @@ export function mountScene(
   let terrainKey = "";
   let elevation = terrainElevation(null);
   const updateGround = (s: TimberState | null, flat = false) => {
-    elevation = flat ? () => 0 : terrainElevation(s);
     const key = JSON.stringify([
       flat,
       s
@@ -315,6 +314,7 @@ export function mountScene(
     ]);
     if (key === terrainKey) return false;
     terrainKey = key;
+    elevation = flat ? () => 0 : terrainElevation(s);
     const positions = ground.getVerticesData(VertexBuffer.PositionKind),
       indices = ground.getIndices();
     if (positions && indices) {
@@ -1062,7 +1062,7 @@ export function mountScene(
         townVisual.update(null);
         homePreview.cancel();
         updateGround(null, true);
-        entities.setElevation(() => 0);
+        entities.setElevation(elevation);
         resourceSites.update(null, () => 0, false);
         entities.setObstacles([]);
         legacyVisual.update({ ...state.timber, stock: laborStock(state) });

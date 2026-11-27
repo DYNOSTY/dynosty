@@ -160,6 +160,7 @@ export function createSceneEntities(
 
   return {
     setElevation(height: (x: number, z: number) => number) {
+      if (height === elevation) return;
       elevation = height;
       for (const o of objects.values())
         o.mesh.position.y =
