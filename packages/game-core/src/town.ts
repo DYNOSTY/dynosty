@@ -1019,7 +1019,7 @@ export function demolishBuilding(s: TimberState, id: string): TimberState {
         ...dev,
         electrical: dev.electrical.filter((x) => x !== id),
         overtime: dev.overtime.filter((o) => o.target !== id),
-        grandfathered: dev.grandfathered.filter((x) => !x.startsWith(id + ":")),
+        grandfathered: dev.grandfathered.filter((x) => !x.startsWith(`${id}:`)),
       },
     },
   };
@@ -1035,7 +1035,7 @@ export function directStaff(
   const r = s.residents.find((r) => r.id === residentId);
   const citizen = s.world.citizens.find((c) => c.id === residentId);
   const previous = s.town.facilities.find(
-    (f) => "facility:" + f.id === r?.workplaceId,
+    (f) => `facility:${f.id}` === r?.workplaceId,
   );
   const next = s.town.facilities.find((f) => f.id === destination);
   if (
@@ -1054,7 +1054,7 @@ export function directStaff(
     throw Error("지금은 이 주민을 배치할 수 없습니다.");
   if (next?.id === previous?.id) return s;
   const assigned = (id: string) =>
-    s.residents.filter((r) => r.workplaceId === "facility:" + id).length;
+    s.residents.filter((r) => r.workplaceId === `facility:${id}`).length;
   if (
     next &&
     (assigned(next.id) >= facilityStaffLimit(next) ||
@@ -1067,7 +1067,7 @@ export function directStaff(
       q.id === residentId
         ? {
             ...q,
-            workplaceId: next ? "facility:" + next.id : null,
+            workplaceId: next ? `facility:${next.id}` : null,
             insideHome: false,
           }
         : q,

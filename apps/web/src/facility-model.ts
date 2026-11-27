@@ -226,7 +226,7 @@ export function facilityModel(
       );
       if (level >= 2)
         for (let i = 0; i < 8; i++)
-          box("wheel-spoke-" + i, [1.7, 0.13, 0.2], [1.65, 0.15, 1.65], wood, [
+          box(`wheel-spoke-${i}`, [1.7, 0.13, 0.2], [1.65, 0.15, 1.65], wood, [
             0,
             0,
             (i * Math.PI) / 8,

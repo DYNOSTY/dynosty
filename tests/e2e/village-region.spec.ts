@@ -100,7 +100,7 @@ for (const kind of ["hospital", "logging"] as const)
       const cx = windowBox.x + windowBox.width / 2,
         cy = windowBox.y + windowBox.height / 2;
       await page.mouse.click(cx, cy - 10);
-      const staff = page.getByLabel(facility.id + " 운영 인원", {
+      const staff = page.getByLabel(`${facility.id} 운영 인원`, {
         exact: true,
       });
       await expect(staff).toBeVisible({ timeout: 8000 });
@@ -148,7 +148,7 @@ test("다섯째 미션의 복홀 주변 지도에 다섯 교역 마을이 표시
   const region = page.getByRole("dialog", { name: "복홀 주변 지도" });
   for (const town of SETTLEMENTS)
     await expect(
-      region.getByText(town.name + " · 교역 중", { exact: true }),
+      region.getByText(`${town.name} · 교역 중`, { exact: true }),
     ).toBeVisible();
 });
 

@@ -163,7 +163,7 @@ for (const [level, label] of [
       await page.goto("/");
       for (const x of SCOUT_SITES) {
         await expect(page.getByRole("dialog")).toHaveAccessibleName(
-          x.name + " · 정찰 결과",
+          `${x.name} · 정찰 결과`,
         );
         await readScene(
           page,
@@ -233,7 +233,7 @@ for (const [level, label] of [
         await expect(
           page
             .getByRole("dialog")
-            .getByRole("button", { name: new RegExp("^" + name + " ·") }),
+            .getByRole("button", { name: new RegExp(`^${name} ·`) }),
         ).toBeVisible();
       }
       await page.getByRole("button", { name: "장면 접기" }).click();
@@ -556,7 +556,7 @@ for (const prepared of [true, false]) {
       const clip = dialog.locator("video");
       await expect(clip).toHaveAttribute(
         "src",
-        "/story/campaign/" + (prepared ? "escape" : "mechanical-late") + ".mp4",
+        `/story/campaign/${prepared ? "escape" : "mechanical-late"}.mp4`,
       );
       await expect
         .poll(() => clip.evaluate((v) => v.currentTime))
@@ -604,7 +604,7 @@ test("양녕의 피난 명부와 입고 장부가 복홀 인구와 네 재고 �
       ].map(async (id) => {
         const label = (await page.getByTestId(id).textContent()) ?? "";
         const match = label.match(/[\d,]+/);
-        if (!match) throw Error(id + " 수량 누락");
+        if (!match) throw Error(`${id} 수량 누락`);
         return Number(match[0].replaceAll(",", ""));
       }),
     );
@@ -663,7 +663,7 @@ for (const [label, raided, rally, verdict] of [
   ["습격", true, "성문에 붉은 눈이 들이닥쳤소", "성문에 붉은 눈이 붙은 걸"],
   ["조용한 밤", false, "창고에서 나와 약조한 이들", "문을 열기로 했잖소"],
 ] as const) {
-  test("닷새째 목진의 외침과 판결 · " + label, async ({ page }) => {
+  test(`닷새째 목진의 외침과 판결 · ${label}`, async ({ page }) => {
     const base = createVillageGame();
     const save = createTimberSave({
       ...base,
@@ -699,7 +699,7 @@ for (const [hope, allegiance, film] of [
   [70, "양녕의 반란에 맞선다", "hope"],
   [70, "양녕의 반란에 동조한다", "order"],
 ] as const) {
-  test("반란 선택부터 결말 재생까지 · " + film, async ({ page }) => {
+  test(`반란 선택부터 결말 재생까지 · ${film}`, async ({ page }) => {
     test.setTimeout(240_000);
     // The rebellion takes place in an established settlement with winter fuel.
     let village = deposit(createVillageGame(), "RES_WOOD", 3500);
@@ -707,7 +707,7 @@ for (const [hope, allegiance, film] of [
       village = commandTimber(
         village,
         cmd,
-        "setup-" + village.processed.length,
+        `setup-${village.processed.length}`,
       );
     };
     send({
@@ -821,10 +821,7 @@ for (const [hope, allegiance, film] of [
     const next = dialog.getByRole("button", { name: /^다음 대사/ });
     await next.click();
     const clip = dialog.locator("video");
-    await expect(clip).toHaveAttribute(
-      "src",
-      "/story/campaign/" + film + ".mp4",
-    );
+    await expect(clip).toHaveAttribute("src", `/story/campaign/${film}.mp4`);
     await expect
       .poll(() => clip.evaluate((v) => v.currentTime))
       .toBeGreaterThan(0);
@@ -967,7 +964,7 @@ for (const [choice, words] of [
     "길에 남은 집이 마음에 걸립니다. 길이 열리는 대로 빈 솥부터 돌려받으러 가겠다고 약속했어요.",
   ],
 ] as const) {
-  test("4단계 도착 대사 · " + choice, async ({ page }) => {
+  test(`4단계 도착 대사 · ${choice}`, async ({ page }) => {
     const village = createVillageGame();
     const save = createTimberSave({
       ...village,
@@ -1032,7 +1029,7 @@ test("출문 대화 중 실제 3D 장면에서 불길이 그려진다", async ({
         return ids.every((id) =>
           __scene.particleSystems.some(
             (system) =>
-              system.name === "건물 화재-" + id && system.getActiveCount() > 0,
+              system.name === `건물 화재-${id}` && system.getActiveCount() > 0,
           ),
         );
       }, losses),

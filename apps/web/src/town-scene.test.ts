@@ -57,7 +57,7 @@ it("수역·어군과 결빙 구멍을 전환하고 대기 부지에서 완성 �
     visual.update({ ...s, paused: false });
     const id = requireValue(s.town.orders[0]?.crew[0], "건설 인부");
     const hammer = requireValue(
-      scene.getMeshById("town-job:" + id),
+      scene.getMeshById(`town-job:${id}`),
       "인부의 망치",
     );
     scene.onBeforeRenderObservable.notifyObservers(scene);
@@ -146,7 +146,7 @@ it("연구와 정책이 동시에 완료되면 한 줄씩 알리고 다음 갱�
     decree: { serial: 1, title: "새 주민 구휼", reaction: "" },
   };
   expect(villageCompletions(s, after)).toEqual([
-    tech.name + " 연구 완료",
+    `${tech.name} 연구 완료`,
     "새 주민 구휼 발효",
   ]);
   expect(villageCompletions(after, after)).toEqual([]);

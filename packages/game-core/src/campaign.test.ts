@@ -161,7 +161,7 @@ it.each([
 const command = (
   state: TimberState,
   cmd: Parameters<typeof commandTimber>[1],
-) => commandTimber(state, cmd, "run-" + state.processed.length);
+) => commandTimber(state, cmd, `run-${state.processed.length}`);
 
 function saveBeforeEndingChoice(): string {
   let s = restore(createVillageGame(true));
@@ -187,7 +187,7 @@ function saveBeforeEndingChoice(): string {
   s = later(s, 60 * 60);
   for (const x of SCOUT_SITES) {
     if (x.id !== lostPatrol(s)) {
-      s = restore(act(s, "report:" + x.id));
+      s = restore(act(s, `report:${x.id}`));
       continue;
     }
     const roll = vi.spyOn(Math, "random");
@@ -253,8 +253,8 @@ function saveBeforeEndingChoice(): string {
   expect(() => act(s, "recover")).toThrow();
   s = act(s, "next");
   for (const [i, v] of SETTLEMENTS.entries()) {
-    s = act(s, "send:" + i);
-    expect(() => act(s, "send:" + i)).toThrow();
+    s = act(s, `send:${i}`);
+    expect(() => act(s, `send:${i}`)).toThrow();
     s = restore(later(s, v.hours * 60));
   }
   s = act(s, "next");
@@ -288,17 +288,17 @@ function saveBeforeEndingChoice(): string {
   s = act(later(s, 1440), "open-stores");
   expect(() => act(s, "open-stores")).toThrow();
   for (let trip = 1; trip <= 3; trip++) {
-    expect(() => act(s, "dispatch:" + trip)).toThrow();
+    expect(() => act(s, `dispatch:${trip}`)).toThrow();
     for (const item of CONVOY_ITEMS)
-      while (convoyLoad(s, item) > 0) s = act(s, "load:" + item);
+      while (convoyLoad(s, item) > 0) s = act(s, `load:${item}`);
     expect(() => act(s, "next")).toThrow();
     if (trip === 3) {
       expect(() => act(s, "dispatch:3")).toThrow();
       for (let i = 0; i < 4; i++) s = act(s, "muster");
     }
-    s = restore(act(s, "dispatch:" + trip));
+    s = restore(act(s, `dispatch:${trip}`));
     expect(s.campaign?.departures).toBe(trip);
-    expect(() => act(s, "dispatch:" + trip)).toThrow();
+    expect(() => act(s, `dispatch:${trip}`)).toThrow();
   }
   s = act(restore(s), "next");
   s = act(s, "next");
@@ -602,7 +602,7 @@ it("재건 중 순라 인원과 배식소 부상을 실제 주민에게 기록�
     s = commandTimber(
       s,
       { type: "set-guards", count },
-      "guards-" + s.processed.length,
+      `guards-${s.processed.length}`,
     );
     expect(
       restore(s).residents.filter((r) => r.workplaceId === "office"),

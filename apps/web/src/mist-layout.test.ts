@@ -118,6 +118,10 @@ test("낮과 자정의 안개색은 원본 낮 색과 어두운 색이다", () =
   const color = [0.6, 0.66, 0.77];
   expect(fogColorAtDaylight(color, 1)).toEqual(color);
   expect(fogColorAtDaylight(color, 0)).toEqual(
-    color.map((v, i) => v * [0.3, 0.34, 0.5][i]!),
+    color.map((v, i) => v * must([0.3, 0.34, 0.5][i], "fog color factor")),
   );
 });
+function must<T>(value: T | null | undefined, what: string): T {
+  if (value == null) throw new Error(`missing ${what}`);
+  return value;
+}

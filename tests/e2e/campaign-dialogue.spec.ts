@@ -186,10 +186,7 @@ test("기한 1분 전 세 번째 행렬을 보내면 왕의 결말에서 남하 
   const advance = letter.getByRole("button", { name: /^다음 대사/ });
   for (const image of ["mokjin-night", "palace-letter", "road-letter"]) {
     const still = letter.locator("img.campaign-still");
-    await expect(still).toHaveAttribute(
-      "src",
-      "/story/campaign/" + image + ".webp",
-    );
+    await expect(still).toHaveAttribute("src", `/story/campaign/${image}.webp`);
     await expect(still).toBeVisible();
     await expect
       .poll(() => still.evaluate((el) => (el as HTMLImageElement).naturalWidth))

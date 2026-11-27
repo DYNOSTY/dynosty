@@ -466,7 +466,7 @@ export function mountScene(
       if (target) {
         select(target);
         const facility = villageState?.town.facilities.find(
-          (f) => "town:" + f.id === townId,
+          (f) => `town:${f.id}` === townId,
         );
         onFacilitySelect(
           facility?.id ?? villageId?.match(/^production:(.+)$/)?.[1] ?? null,
@@ -491,7 +491,7 @@ export function mountScene(
       });
     onFacilitySelect(null);
     if (foundation) {
-      select("town:" + foundation.id);
+      select(`town:${foundation.id}`);
       return;
     }
     const site = sites.idForMesh(picked);
@@ -554,11 +554,11 @@ export function mountScene(
         break;
       }
       const order = villageState?.town.orders.find(
-        (o) => "town:" + o.id === mesh?.id,
+        (o) => `town:${o.id}` === mesh?.id,
       );
       if (order) {
         name = BUILDING_RULES[order.kind].name;
-        details = "건설 현장 · 인부 " + order.crew.length + "명";
+        details = `건설 현장 · 인부 ${order.crew.length}명`;
         break;
       }
       const facility = villageState?.town.facilities.find(
@@ -1192,20 +1192,20 @@ export function mountScene(
     },
     villageInfo(id) {
       const order = villageState?.town.orders.find(
-        (o) => "town:" + o.id === id,
+        (o) => `town:${o.id}` === id,
       );
       if (order)
         return {
           name: BUILDING_RULES[order.kind].name,
-          detail: "건설 현장 · 인부 " + order.crew.length + "명",
+          detail: `건설 현장 · 인부 ${order.crew.length}명`,
         };
       const facility = villageState?.town.facilities.find(
-        (f) => "town:" + f.id === id,
+        (f) => `town:${f.id}` === id,
       );
       if (facility)
         return {
           name: BUILDING_RULES[facility.kind].name,
-          detail: "완공 시설 · " + facility.level + "단계",
+          detail: `완공 시설 · ${facility.level}단계`,
         };
       return village.targets.get(id);
     },

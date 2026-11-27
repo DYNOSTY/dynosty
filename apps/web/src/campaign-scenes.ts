@@ -219,11 +219,11 @@ export function supplyAdvice(s: TimberState): string[] {
   const advice: string[] = [];
   if (stock.RES_PLANT < plant)
     advice.push(
-      "풀 먹는 이들에게 두 끼 돌릴 풀잎이 모자라요. " + assign("farm"),
+      `풀 먹는 이들에게 두 끼 돌릴 풀잎이 모자라요. ${assign("farm")}`,
     );
   if (stock.RES_MEAT + stock.RES_FISH < protein)
     advice.push(
-      "고기와 생선을 합쳐도 두 끼를 못 채우겠어요. " + assign("fishery"),
+      `고기와 생선을 합쳐도 두 끼를 못 채우겠어요. ${assign("fishery")}`,
     );
   if (stock.RES_WATER <= 10 * AMOUNT_SCALE)
     advice.push(
@@ -390,8 +390,8 @@ export function campaignPage(s: TimberState): ScenePage {
     page.choices.push({ action, label, disabled });
   const complete = (next: string, action = "next") => {
     page.nextStage = chapter + 1;
-    page.title = chapter + "단계 완료 · " + CHAPTERS[chapter - 1];
-    page.goal = chapter + "단계 완료";
+    page.title = `${chapter}단계 완료 · ${CHAPTERS[chapter - 1]}`;
+    page.goal = `${chapter}단계 완료`;
     if (chapter !== 3)
       page.frames =
         chapter === 1
@@ -429,7 +429,7 @@ export function campaignPage(s: TimberState): ScenePage {
       page.nextStage = 1;
       page.title = "별이 진 뒤, 복홀";
       page.clip = "opening";
-      page.music = filmMusic["opening"];
+      page.music = filmMusic.opening;
       line(
         "나르미",
         "운석이 떨어지기 전엔 고려 강가에 장이 섰대요. 아버진 그때 들은 소리를 아직도 흉내 내셨어요. 빈 수레가 다리를 건너는 소리요.",
@@ -448,7 +448,7 @@ export function campaignPage(s: TimberState): ScenePage {
     case "departure":
       page.title = "귀족들이 출문을 청했다";
       page.clip = "one";
-      page.music = filmMusic["one"];
+      page.music = filmMusic.one;
       page.goal = `출문 전 · 주민 ${s.residents.length}명 · 물 ${(s.world.resources.RES_WATER / AMOUNT_SCALE).toLocaleString("ko-KR")} · 나머지 자원별 10,000`;
       line(
         "가솔을 이끄는 귀족",
@@ -560,8 +560,8 @@ export function campaignPage(s: TimberState): ScenePage {
       const site = SCOUT_SITES.find((q) => q.id === id);
       if (!site) break;
       const idx = c.patrolOrder.indexOf(id);
-      page.key = "report-" + id;
-      page.title = site.name + " · 정찰 결과";
+      page.key = `report-${id}`;
+      page.title = `${site.name} · 정찰 결과`;
       page.music =
         id === "reed"
           ? "06"
@@ -654,13 +654,13 @@ export function campaignPage(s: TimberState): ScenePage {
           "뒤따라온 수레도 우리 편이야. 귀족들을 따라 떠났던 집에서 이제야 돌아올 마음을 냈대.",
         );
       page.goal = site.find;
-      choice("report:" + id, "보고를 장부에 적기");
+      choice(`report:${id}`, "보고를 장부에 적기");
       break;
     }
     case "roads": {
-      page.music = filmMusic["two"];
+      page.music = filmMusic.two;
       page.goal = `교섭 회복 ${c.treaties.length} / 5`;
-      page.key = "roads-" + c.treaties.length;
+      page.key = `roads-${c.treaties.length}`;
       const receipt = c.treaties.at(-1);
       if (receipt !== undefined) {
         const replies: Line[] = [
@@ -739,7 +739,7 @@ export function campaignPage(s: TimberState): ScenePage {
       for (const [i, v] of SETTLEMENTS.entries())
         if (!c.treaties.includes(i))
           choice(
-            "send:" + i,
+            `send:${i}`,
             `${v.name} · ${v.request} (${GAME_RULES.resources[v.resource].name} ${v.amount}, ${v.hours}시간)`,
             !!c.caravan || !canPay(s, v.resource, v.amount),
           );
@@ -848,7 +848,7 @@ export function campaignPage(s: TimberState): ScenePage {
     }
     case "seal":
       page.clip = "three";
-      page.music = filmMusic["three"];
+      page.music = filmMusic.three;
       page.title = "두 번 접힌 봉서";
       page.lineIllustration = {
         at: 0,
@@ -874,7 +874,7 @@ export function campaignPage(s: TimberState): ScenePage {
     case "escort":
       page.nextStage = 4;
       page.clip = "escort";
-      page.music = filmMusic["escort"];
+      page.music = filmMusic.escort;
       page.title = "길가에서 기다린 목진";
       line(
         "목진",
@@ -930,7 +930,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     case "winter":
       page.clip = "four";
-      page.music = filmMusic["four"];
+      page.music = filmMusic.four;
       page.title = "밤새 식지 않은 그릇";
       page.goal = `혹한 ${Math.min(15, days)} / 15일`;
       line(
@@ -956,7 +956,7 @@ export function campaignPage(s: TimberState): ScenePage {
       break;
     case "summit": {
       page.clip = "five";
-      page.music = filmMusic["five"];
+      page.music = filmMusic.five;
       page.title = "두 그릇을 놓고";
       page.goal = "복홀에 들어온 이들의 첫 배급";
       line(

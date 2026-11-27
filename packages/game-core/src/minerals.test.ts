@@ -214,7 +214,7 @@ it("주민을 지정해 병원으로 보내거나 빼고 저장 후에도 지정
   s = command(s, { type: "direct-staff", resident: r.id, destination: f.id });
   s = parseTimberSave(createTimberSave(advanceTimber(s, 1))).state;
   expect(s.residents.find((q) => q.id === r.id)?.workplaceId).toBe(
-    "facility:" + f.id,
+    `facility:${f.id}`,
   );
   s = command(s, { type: "direct-staff", resident: r.id, destination: null });
   expect(s.residents.find((q) => q.id === r.id)?.workplaceId).toBeNull();
@@ -256,7 +256,7 @@ it("관아의 아동 노동령을 유휴 명부와 병원 직접 배치에 함�
   expect(idleTownResidents(s).some((r) => r.id === child.id)).toBe(true);
   s = command(s, assign);
   expect(s.residents.find((r) => r.id === child.id)?.workplaceId).toBe(
-    "facility:" + hospital.id,
+    `facility:${hospital.id}`,
   );
   expect(idleTownResidents(s).some((r) => r.id === child.id)).toBe(false);
 });

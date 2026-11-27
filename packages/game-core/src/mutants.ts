@@ -144,7 +144,7 @@ export function advanceMutants(
     if (residents.length && (!targets.length || random() < 0.5)) {
       const victim = residents[Math.floor(random() * residents.length)];
       if (!victim) continue;
-      const key = "mutant-" + m.id + "-" + s.elapsed;
+      const key = `mutant-${m.id}-${s.elapsed}`;
       s = applyAutomaticCitizenEvent(s, {
         id: key,
         type: "illness",

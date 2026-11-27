@@ -129,7 +129,7 @@ test("돌아보기에서 서막 영상을 넘길 때 마을을 가린 채 다음
 }) => {
   await page.addInitScript(() => {
     for (const id of ["opening", "one"])
-      localStorage.setItem("dynosty.film." + id, "seen");
+      localStorage.setItem(`dynosty.film.${id}`, "seen");
   });
   await page.goto("/");
   await page.getByRole("button", { name: "돌아보기", exact: true }).click();
@@ -155,7 +155,7 @@ for (const [completed, song] of [
   [0, "Steps_Through_The_Frost.mp3"],
   [5, "Steps_Upon_the_Permafrost.mp3"],
 ] as const) {
-  test("메뉴 배경 음악을 재생하고 반복한다 · " + song, async ({ page }) => {
+  test(`메뉴 배경 음악을 재생하고 반복한다 · ${song}`, async ({ page }) => {
     await page.addInitScript((stage) => {
       if (stage === 5) {
         localStorage.setItem("dynosty.completedChapter", "5");

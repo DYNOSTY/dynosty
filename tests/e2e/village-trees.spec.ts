@@ -61,6 +61,7 @@ test("복홀 숲은 공유 인스턴스를 사용하고 두 시점을 기록한�
     .toBe(13 * 32);
   expect((await counts(page)).TREE_STUMP).toBe(0);
   await page.waitForTimeout(5000);
+  // biome-ignore lint/performance/useDomNodeTextContent: The prologue can hide this badge, changing rendered text relative to textContent.
   console.log("fps", await page.locator(".g-fps").innerText());
   await page.screenshot({ path: info.outputPath("village-default.png") });
   await page.evaluate(() => {

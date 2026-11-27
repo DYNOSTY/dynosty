@@ -55,7 +55,7 @@ export function RegionMap({
         <button
           className="region-place"
           type="button"
-          style={{ left: bokhol.x + "%", top: bokhol.y + "%" }}
+          style={{ left: `${bokhol.x}%`, top: `${bokhol.y}%` }}
           onClick={close}
         >
           복홀
@@ -65,11 +65,11 @@ export function RegionMap({
           if (!position) return null;
           return (
             (state.campaign?.treaties.includes(i) ||
-              state.scoutClues?.some((k) => k === "contact" + i)) && (
+              state.scoutClues?.some((k) => k === `contact${i}`)) && (
               <span
                 className="region-place"
                 key={v.name}
-                style={{ left: position[0] + "%", top: position[1] + "%" }}
+                style={{ left: `${position[0]}%`, top: `${position[1]}%` }}
               >
                 {v.name} ·{" "}
                 {state.campaign?.treaties.includes(i)
@@ -104,8 +104,8 @@ export function RegionMap({
               key={site.id}
               className="region-scout"
               style={{
-                left: bokhol.x + site.x * 0.53 * progress + "%",
-                top: bokhol.y - site.z * 0.42 * progress + "%",
+                left: `${bokhol.x + site.x * 0.53 * progress}%`,
+                top: `${bokhol.y - site.z * 0.42 * progress}%`,
               }}
             >
               {site.name} 정찰대 ·{" "}

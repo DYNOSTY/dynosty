@@ -286,7 +286,7 @@ export function createVillage(
       radius,
       depth,
     );
-    const id = "village:" + model + ":" + x + ":" + z;
+    const id = `village:${model}:${x}:${z}`;
     const detail = !role
       ? "복홀 · 마을 시설"
       : role === "walk"
@@ -576,7 +576,7 @@ export function createVillage(
     [16, 0],
     [-10, -8],
   ].map(([x = 0, z = 0], i) =>
-    createFire("처마 불길-" + i, new Vector3(x, elevation(x, z) + 1.8, z)),
+    createFire(`처마 불길-${i}`, new Vector3(x, elevation(x, z) + 1.8, z)),
   );
   const CHIMNEY: Record<string, number> = {
     BLD_OFFICE: 2.5,
@@ -1079,7 +1079,7 @@ export function createVillage(
     const lamp =
       kind === "building" && light
         ? CreateBox(
-            node.name + "-door-light",
+            `${node.name}-door-light`,
             { width: 1.1, height: 0.95, depth: 0.06 },
             scene,
           )
@@ -1182,7 +1182,7 @@ export function createVillage(
         if (incidentFires.has(b.id)) continue;
         // DynamicTexture.clone()은 그려 둔 픽셀을 복사하지 않으므로 원본을 공유한다.
         const fire = createFire(
-          "건물 화재-" + b.id,
+          `건물 화재-${b.id}`,
           new Vector3(b.x, elevation(b.x, b.z) + 1.2, b.z),
         );
         incidentFires.set(b.id, fire);

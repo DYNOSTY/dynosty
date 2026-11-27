@@ -377,7 +377,7 @@ export function EndingMenu({
                       }
                     >
                       {slot
-                        ? slot.label + " · 덮어쓰기"
+                        ? `${slot.label} · 덮어쓰기`
                         : `슬롯 ${id} · 빈 슬롯에 저장`}
                     </button>
                   );
