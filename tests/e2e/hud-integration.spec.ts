@@ -218,8 +218,10 @@ test("찬님 GLB 일부 요청 실패를 안내하며 대체 모델·선택과 �
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  const nestGlb = "**/models/buildings/BLD_NEST.glb";
-  await page.route(nestGlb, (r) => r.fulfill({ status: 404, body: "missing" }));
+  const nestGlb = "**/models/buildings/BLD_NEST_v2.glb";
+  await page.route("**/models/buildings/BLD_NEST{,_v2}.glb", (r) =>
+    r.fulfill({ status: 404, body: "missing" }),
+  );
   const [response] = await Promise.all([
     page.waitForResponse(nestGlb, { timeout: 90_000 }),
     ready(page),
