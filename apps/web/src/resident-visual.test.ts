@@ -15,6 +15,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { createSceneExample } from "@dynosty/game-core";
 import { expect, it, vi } from "vitest";
 import { installMeshoptDecoder } from "./meshopt.js";
+import { pickedNode } from "./model-assets.js";
 import { createResidentVisual } from "./resident-visual.js";
 import { createSceneEntities } from "./scene-entities.js";
 
@@ -22,6 +23,7 @@ it("600명이 같은 원본을 공유하고 선택이 바뀐 뒤 도착한 상�
   const engine = new NullEngine(),
     scene = new Scene(engine);
   const asset = new AssetContainer(scene);
+  const camera = new FreeCamera("eye", new Vector3(0, 2, -10), scene);
   const source = CreateBox("source", {}, scene);
   asset.meshes.push(source);
   asset.removeAllFromScene();
@@ -34,6 +36,10 @@ it("600명이 같은 원본을 공유하고 선택이 바뀐 뒤 도착한 상�
     url.includes("/crowd/") ? asset : detail,
   );
   try {
+    const shadowSource = CreateDisc("shadow-source", { radius: 1 }, scene);
+    shadowSource.isVisible = false;
+    const observers =
+      scene.onAfterActiveMeshesEvaluationObservable.observers.length;
     const roots = Array.from(
       { length: 600 },
       (_, i) => new Mesh(`citizen-${i}`, scene),
@@ -48,17 +54,50 @@ it("600명이 같은 원본을 공유하고 선택이 바뀐 뒤 도착한 상�
           "winter",
           () => null,
           load,
+          shadowSource,
         ),
       ),
     );
     expect(new Set(load.mock.calls.map((c) => c[1]))).toEqual(
       new Set(["/models/residents/crowd/R03_Velociraptor_v2.glb"]),
     );
-    expect(source.instances).toHaveLength(600);
-    expect(roots[599]?.getChildMeshes()[0]).toBeInstanceOf(InstancedMesh);
+    expect(load).toHaveBeenCalledTimes(1);
+    const batches = scene.meshes.filter(
+      (m) => m.name === "resident-batch:source",
+    );
+    expect(batches).toHaveLength(1);
+    const crowd = batches[0] as Mesh;
+    const shadowBatch = scene.getMeshByName(
+      "resident-batch:shadow-source",
+    ) as Mesh;
+    scene.render();
+    expect(crowd.thinInstanceCount).toBe(600);
+    expect(shadowBatch.thinInstanceCount).toBe(600);
+    const before = crowd.thinInstanceGetWorldMatrices()[0]?.asArray().slice();
+    visuals[0]?.setMotion("walking");
+    visuals[0]?.animate(0.1);
+    scene.render();
+    expect(crowd.thinInstanceGetWorldMatrices()[0]?.asArray()).not.toEqual(
+      before,
+    );
+    camera.position.z = -120;
+    scene.render();
+    visuals[0]?.animate(0.1);
+    scene.render();
+    const distant = crowd.thinInstanceGetWorldMatrices()[0]?.asArray().slice();
+    visuals[0]?.animate(0.1);
+    scene.render();
+    expect(crowd.thinInstanceGetWorldMatrices()[0]?.asArray()).toEqual(distant);
     expect(clone).not.toHaveBeenCalled();
     visuals[0]?.setOutline(true);
     visuals[0]?.setOutline(false);
+    visuals[599]?.setOutline(true);
+    scene.render();
+    expect(crowd.thinInstanceCount).toBe(599);
+    expect(shadowBatch.thinInstanceCount).toBe(600);
+    visuals[599]?.setOutline(false);
+    scene.render();
+    expect(crowd.thinInstanceCount).toBe(600);
     visuals[599]?.setOutline(true);
     expect(
       roots[599]
@@ -68,17 +107,20 @@ it("600명이 같은 원본을 공유하고 선택이 바뀐 뒤 도착한 상�
     expect(source.renderOutline).toBeFalsy();
     finish(asset);
     await vi.waitFor(() => expect(clone).toHaveBeenCalledTimes(1));
-    expect(
-      roots[0]?.getChildMeshes().filter((m) => m.isEnabled()),
-    ).toHaveLength(1);
+    expect(roots[0]?.getChildMeshes()).toHaveLength(0);
     expect(
       roots[599]
         ?.getChildMeshes()
         .filter((m) => m.isEnabled() && m.renderOutline),
     ).toHaveLength(1);
     for (const visual of visuals) visual.dispose();
-    expect(source.instances).toHaveLength(0);
-    expect(scene.meshes).toHaveLength(600);
+    expect(scene.getMeshByName("resident-batch:source")).toBeNull();
+    expect(scene.getMeshByName("resident-batch:shadow-source")).toBeNull();
+    await vi.waitFor(() =>
+      expect(
+        scene.onAfterActiveMeshesEvaluationObservable.observers.length,
+      ).toBe(observers),
+    );
   } finally {
     asset.dispose();
     scene.dispose();
@@ -147,10 +189,12 @@ it("겨울 실패 시 같은 종 여름 GLB로 클릭·걷기·개별 선택·�
     if (!root) throw Error("주민 노드 없음");
     await vi.waitFor(() =>
       expect(
-        root.getChildMeshes().some((m) => m instanceof InstancedMesh),
+        scene.meshes.some((m) => m.name.startsWith("resident-batch:")),
       ).toBe(true),
     );
-    const crowd = root.getChildMeshes().find((m) => m.name.endsWith(":crowd"));
+    const crowd = scene.meshes.find((m) =>
+      m.name.startsWith("resident-batch:"),
+    ) as Mesh | undefined;
     if (!crowd) throw Error("군중 메시 없음");
     scene.render();
     const [shadow] = disc.instances;
@@ -165,15 +209,21 @@ it("겨울 실패 시 같은 종 여름 GLB로 클릭·걷기·개별 선택·�
       new Ray(new Vector3(5, 1, -8), new Vector3(0, 0, 1)),
     );
     expect(hit?.pickedMesh).toBe(crowd);
+    expect(pickedNode(hit)).toBe(root);
     entities.animate(0.1);
-    const pivot = crowd.parent as Mesh;
+    scene.render();
+    const pivot = root
+      .getChildren()
+      .find((n) => n.name.endsWith(":glb")) as Mesh;
     expect(pivot.rotation.z).not.toBe(0);
     camera.position.z = -120;
     scene.render();
     entities.animate(0.1);
     expect(pivot.rotation.z).toBe(0);
-    entities.selectMesh(hit?.pickedMesh ?? null);
+    entities.selectMesh(pickedNode(hit));
     expect(selected).toHaveBeenLastCalledWith(root.id);
+    scene.render();
+    expect(crowd.thinInstanceCount).toBe(0);
     await vi.waitFor(() =>
       expect(
         scene.animationGroups.some(
@@ -209,14 +259,14 @@ it("겨울 실패 시 같은 종 여름 GLB로 클릭·걷기·개별 선택·�
     expect(
       scene.animationGroups.some((g) => g.isPlaying && g.name.endsWith("Walk")),
     ).toBe(true);
-    expect(crowd.isEnabled()).toBe(false);
+    scene.render();
+    expect(crowd.thinInstanceCount).toBe(0);
     entities.select(null);
-    expect(crowd.isEnabled()).toBe(true);
+    scene.render();
+    expect(crowd.thinInstanceCount).toBe(1);
     expect(scene.animationGroups).toHaveLength(0);
-    expect(root.getChildMeshes()).toEqual(
-      expect.arrayContaining([crowd, shadow]),
-    );
-    expect(root.getChildMeshes()).toHaveLength(2);
+    expect(root.getChildMeshes()).toEqual(expect.arrayContaining([shadow]));
+    expect(root.getChildMeshes()).toHaveLength(1);
   } finally {
     entities.dispose();
     for (const a of assets) a.dispose();
