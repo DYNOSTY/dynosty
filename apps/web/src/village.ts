@@ -20,7 +20,7 @@ import { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
 import { createResidentVisual } from "./resident-visual.js";
 import { loadSceneAsset as load } from "./scene-assets.js";
 import { hasWinterModel, seasonalModelUrl } from "./seasonal-model.js";
-import { freezeStaticVisual } from "./static-visual.js";
+import { freezeStaticVisual, transformKey } from "./static-visual.js";
 import { elevation, rng, type Season } from "./world.js";
 
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
@@ -104,7 +104,7 @@ const villageNames: Record<string, string> = {
 export { residentGlb } from "./resident-visual.js";
 
 export interface GlbVisual {
-  refreshStatic?(): void;
+  refreshStatic?(force?: boolean): void;
   setOutline(value: boolean): void;
   setLit?(lit: boolean): void;
   setMotion(value: string): void;
@@ -1142,8 +1142,12 @@ export function createVillage(
       ondolGlow.range = 2;
     }
     v.play("Idle", 0);
-    const refreshStatic = () => {
+    let frozenAt = "";
+    const refreshStatic = (force = false) => {
       if (kind !== "building" || parent.name === "placement-round-nest") return;
+      const key = transformKey(parent);
+      if (!force && key === frozenAt) return;
+      frozenAt = key;
       const descendants = node
         .getDescendants(false)
         .filter(
@@ -1151,7 +1155,7 @@ export function createVillage(
         );
       freezeStaticVisual([node, ...descendants]);
     };
-    refreshStatic();
+    refreshStatic(true);
     return {
       refreshStatic,
       setLit(value) {
@@ -1163,7 +1167,7 @@ export function createVillage(
         if (instanced && value !== outlined) {
           v.dispose();
           v = make(value);
-          refreshStatic();
+          refreshStatic(true);
         }
         outlined = value;
         for (const m of v.meshes) {
