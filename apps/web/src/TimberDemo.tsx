@@ -832,8 +832,8 @@ export function TimberDemo({
                 ❗ 교역소 · {merchant[1]} 상인 {merchant[2]} 방문
               </h3>
               <img
-                src={"/art/merchants/" + merchant[0] + ".webp"}
-                alt={merchant[1] + " 상인 " + merchant[2] + "의 초상"}
+                src={`/art/merchants/${merchant[0]}.webp`}
+                alt={`${merchant[1]} 상인 ${merchant[2]}의 초상`}
                 width="112"
                 height="112"
               />

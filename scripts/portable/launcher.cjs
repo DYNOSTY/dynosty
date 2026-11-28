@@ -24,9 +24,7 @@ const mime = {
   ".woff2": "font/woff2",
 };
 function openGame() {
-  console.log(
-    "Dynosty · 재의 왕조\n" + url + "\n게임을 마치면 이 창을 닫으세요.",
-  );
+  console.log(`Dynosty · 재의 왕조\n${url}\n게임을 마치면 이 창을 닫으세요.`);
   if (!process.argv.includes("--no-browser")) {
     spawn("rundll32.exe", ["url.dll,FileProtocolHandler", url], {
       windowsHide: true,
@@ -52,7 +50,7 @@ const server = http.createServer(async (req, res) => {
           ? "/initial.json"
           : pathname;
     if (/[\\:\0]/.test(entry)) return finish(400);
-    const file = path.resolve(root, "." + entry);
+    const file = path.resolve(root, `.${entry}`);
     if (!file.startsWith(root + path.sep)) return finish(403);
     const stat = await fs.promises.stat(file);
     if (!stat.isFile()) return finish(404);
@@ -71,10 +69,10 @@ const server = http.createServer(async (req, res) => {
         start = stat.size;
       }
       if (start > end) {
-        res.setHeader("Content-Range", "bytes */" + stat.size);
+        res.setHeader("Content-Range", `bytes */${stat.size}`);
         return finish(416);
       }
-      headers["Content-Range"] = "bytes " + start + "-" + end + "/" + stat.size;
+      headers["Content-Range"] = `bytes ${start}-${end}/${stat.size}`;
     }
     headers["Content-Length"] = end - start + 1;
     res.writeHead(req.headers.range ? 206 : 200, headers);
@@ -88,7 +86,7 @@ const server = http.createServer(async (req, res) => {
 server.on("error", async (error) => {
   if (error.code === "EADDRINUSE") {
     try {
-      const response = await fetch(url + "/.dynosty-portable");
+      const response = await fetch(`${url}/.dynosty-portable`);
       if ((await response.text()) === "Dynosty portable 1") return openGame();
     } catch {}
   }

@@ -96,7 +96,7 @@ export function scoutFinding(kind: ScoutFind["kind"]) {
       "교역 마을",
     ).name;
     return [
-      village + "의 길잡이",
+      `${village}의 길잡이`,
       village +
         "에서 왔다는 짐꾼이 눈에 덮인 샛길을 짚어 줍니다. 길을 그려 복홀에 전할까요?",
       "교역로 약도",

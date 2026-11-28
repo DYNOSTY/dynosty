@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+function must<T>(value: T | null | undefined, what: string): T {
+  if (value == null) throw new Error(`missing ${what}`);
+  return value;
+}
+
 function glb(name: string) {
   const data = readFileSync(
     new URL(`../public/models/residents/${name}.glb`, import.meta.url),
@@ -73,32 +78,54 @@ it("스피노 표면의 삼각형 방향은 바깥 법선과 일치한다", asyn
         ),
       ),
     );
-  const primitive = doc
-    .getRoot()
-    .listNodes()
-    .find((node) => node.getName() === "body")!
-    .getMesh()!
-    .listPrimitives()[0]!;
-  const positions = primitive.getAttribute("POSITION")!.getArray()!;
-  const normals = primitive.getAttribute("NORMAL")!.getArray()!;
-  const indices = primitive.getIndices()!.getArray()!;
+  const body = must(
+    doc
+      .getRoot()
+      .listNodes()
+      .find((node) => node.getName() === "body"),
+    "body node",
+  );
+  const primitive = must(
+    must(body.getMesh(), "body mesh").listPrimitives()[0],
+    "body primitive",
+  );
+  const positions = must(
+    must(primitive.getAttribute("POSITION"), "position attribute").getArray(),
+    "positions",
+  );
+  const normals = must(
+    must(primitive.getAttribute("NORMAL"), "normal attribute").getArray(),
+    "normals",
+  );
+  const indices = must(
+    must(primitive.getIndices(), "index accessor").getArray(),
+    "indices",
+  );
   let checked = 0;
   for (let i = 0; i < indices.length; i += 3) {
-    const [a, b, c] = [indices[i]!, indices[i + 1]!, indices[i + 2]!].map(
-      (n) => n * 3,
+    const a = must(indices[i], "index a") * 3;
+    const b = must(indices[i + 1], "index b") * 3;
+    const c = must(indices[i + 2], "index c") * 3;
+    const u = [0, 1, 2].map(
+      (j) =>
+        must(positions[b + j], "position b") -
+        must(positions[a + j], "position a"),
     );
-    const u = [0, 1, 2].map((j) => positions[b! + j]! - positions[a! + j]!);
-    const v = [0, 1, 2].map((j) => positions[c! + j]! - positions[a! + j]!);
+    const v = [0, 1, 2].map(
+      (j) =>
+        must(positions[c + j], "position c") -
+        must(positions[a + j], "position a"),
+    );
     const cross = [
-      u[1]! * v[2]! - u[2]! * v[1]!,
-      u[2]! * v[0]! - u[0]! * v[2]!,
-      u[0]! * v[1]! - u[1]! * v[0]!,
+      must(u[1], "u1") * must(v[2], "v2") - must(u[2], "u2") * must(v[1], "v1"),
+      must(u[2], "u2") * must(v[0], "v0") - must(u[0], "u0") * must(v[2], "v2"),
+      must(u[0], "u0") * must(v[1], "v1") - must(u[1], "u1") * must(v[0], "v0"),
     ];
     if (Math.hypot(...cross) < 1e-7) continue;
     expect(
-      cross[0]! * normals[a!]! +
-        cross[1]! * normals[a! + 1]! +
-        cross[2]! * normals[a! + 2]!,
+      must(cross[0], "cross 0") * must(normals[a], "normal 0") +
+        must(cross[1], "cross 1") * must(normals[a + 1], "normal 1") +
+        must(cross[2], "cross 2") * must(normals[a + 2], "normal 2"),
     ).toBeGreaterThan(0);
     checked++;
   }

@@ -1,3 +1,8 @@
+function must<T>(value: T | null | undefined, what: string): T {
+  if (value == null) throw new Error(`missing ${what}`);
+  return value;
+}
+
 import { readFileSync } from "node:fs";
 import {
   AMOUNT_SCALE,
@@ -466,7 +471,10 @@ it.each([
   "%s의 판결 대사는 충녕의 생사와 일치한다",
   (_, assassinated, health) => {
     const s = createVillageGame();
-    const { victoryQuotes: _quotes, ...legacyCampaign } = s.campaign!;
+    const { victoryQuotes: _quotes, ...legacyCampaign } = must(
+      s.campaign,
+      "campaign",
+    );
     const verdict = recordResearchStory(
       {
         ...s,

@@ -23,8 +23,8 @@ describe("GLB 자산의 장면 소유권", () => {
   it("같은 장면은 요청을 공유하지만 StrictMode 재기동의 새 장면은 공유하지 않는다", async () => {
     const first = world(),
       second = world();
-    const asset1 = { dispose: vi.fn() },
-      asset2 = { dispose: vi.fn() };
+    const asset1 = { dispose: vi.fn(), animationGroups: [] },
+      asset2 = { dispose: vi.fn(), animationGroups: [] };
     load.mockResolvedValueOnce(asset1).mockResolvedValueOnce(asset2);
     const a = loadSceneAsset(first, "/model.glb");
     expect(loadSceneAsset(first, "/model.glb")).toBe(a);
@@ -46,7 +46,7 @@ describe("GLB 자산의 장면 소유권", () => {
     );
     const pending = loadSceneAsset(scene, "/late.glb");
     scene.dispose();
-    const asset = { dispose: vi.fn() };
+    const asset = { dispose: vi.fn(), animationGroups: [] };
     finish(asset as unknown as AssetContainer);
     await expect(pending).rejects.toThrow("장면이 종료");
     expect(asset.dispose).toHaveBeenCalledOnce();
@@ -57,7 +57,7 @@ describe("GLB 자산의 장면 소유권", () => {
   });
   it("실패한 요청을 캐시에 고정하지 않아 같은 장면에서 복구할 수 있다", async () => {
     const scene = world(),
-      asset = { dispose: vi.fn() };
+      asset = { dispose: vi.fn(), animationGroups: [] };
     load
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce(asset);

@@ -610,10 +610,10 @@ it("종이 다시 바뀌거나 ID가 재사용돼도 오래된 GLB를 붙이지 
     update("R02");
     const old = makeVisual(),
       current = makeVisual();
-    pending[0]!(old);
+    must(pending[0], "pending visual 0")(old);
     await Promise.resolve();
     expect(old.dispose).toHaveBeenCalledOnce();
-    pending[2]!(current);
+    must(pending[2], "pending visual 2")(current);
     await Promise.resolve();
     entities.selectMesh(scene.getMeshById("example-resident-1"));
     expect(current.setOutline).toHaveBeenLastCalledWith(true);
@@ -623,7 +623,7 @@ it("종이 다시 바뀌거나 ID가 재사용돼도 오래된 GLB를 붙이지 
     });
     update("R02");
     const stale = makeVisual();
-    pending[1]!(stale);
+    must(pending[1], "pending visual 1")(stale);
     await Promise.resolve();
     expect(stale.dispose).toHaveBeenCalledOnce();
   } finally {
@@ -632,3 +632,7 @@ it("종이 다시 바뀌거나 ID가 재사용돼도 오래된 GLB를 붙이지 
     engine.dispose();
   }
 });
+function must<T>(value: T | null | undefined, what: string): T {
+  if (value == null) throw new Error(`missing ${what}`);
+  return value;
+}

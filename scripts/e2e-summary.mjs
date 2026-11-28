@@ -11,12 +11,16 @@ const {
   skipped = 0,
 } = report.stats ?? {};
 const failed = [];
+const flakyTests = [];
 const walk = (suite, path) => {
   const file = suite.file ?? path;
   for (const spec of suite.specs ?? [])
-    for (const test of spec.tests ?? [])
+    for (const test of spec.tests ?? []) {
       if (test.status === "unexpected")
         failed.push(`${file}:${spec.line} ${spec.title}`);
+      if (test.status === "flaky")
+        flakyTests.push(`${file}:${spec.line} ${spec.title}`);
+    }
   for (const child of suite.suites ?? []) walk(child, file);
 };
 for (const suite of report.suites ?? []) walk(suite, "");
@@ -31,4 +35,8 @@ console.log(
 if (failed.length) {
   console.log("\n### 실패한 검사\n");
   for (const line of failed.sort()) console.log(`- \`${line}\``);
+}
+if (flakyTests.length) {
+  console.log("\n### 재시도 후 통과한 검사 (불안정)\n");
+  for (const line of flakyTests.sort()) console.log(`- \`${line}\``);
 }

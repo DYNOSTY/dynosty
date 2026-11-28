@@ -129,7 +129,7 @@ export function createTownVisual(scene: Scene) {
           mesh.isPickable = false;
           if (kind === "tool") {
             const head = CreateBox(
-              "mallet-head:" + id,
+              `mallet-head:${id}`,
               { width: 0.85, height: 0.4, depth: 0.4 },
               scene,
             );
@@ -226,6 +226,7 @@ export function createTownVisual(scene: Scene) {
           f.position.z,
         );
         o.root.rotation.y = f.headingRadians;
+        o.visual?.refreshStatic();
       }
     },
     dispose() {

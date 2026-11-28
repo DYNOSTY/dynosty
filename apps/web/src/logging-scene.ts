@@ -81,7 +81,7 @@ function createLoggingSiteVisual(scene: Scene, siteId: ProductionSiteId) {
   };
   const workshop = new TransformNode(unique("logging-workshop"), scene);
   workshop.position.set(rules.workshopPlot.x, 0, rules.workshopPlot.z);
-  workshop.metadata = { villageTarget: "production:" + siteId };
+  workshop.metadata = { villageTarget: `production:${siteId}` };
   box("logging-workshop-floor", [8.4, 0.2, 6], [0, 0.1, 0], wood, workshop);
   for (const x of [-3.8, 3.8])
     for (const z of [-2.8, 2.8])

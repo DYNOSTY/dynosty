@@ -31,7 +31,7 @@ export function PlayPanel({
     return (
       <section
         className="settlement-dashboard"
-        aria-label={settlement + " 현황"}
+        aria-label={`${settlement} 현황`}
       >
         <p role={error ? "alert" : undefined}>
           {error ?? "게임 기준을 불러오는 중입니다."}
@@ -42,7 +42,7 @@ export function PlayPanel({
   const minutes = minute ?? state.minute;
   const clock = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
   return (
-    <section className="settlement-dashboard" aria-label={settlement + " 현황"}>
+    <section className="settlement-dashboard" aria-label={`${settlement} 현황`}>
       <div className="settlement-heading">
         <div>
           <h2 className="settlement-title">{settlement} 현황</h2>

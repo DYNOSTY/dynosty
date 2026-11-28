@@ -338,7 +338,7 @@ export function recoveryCrew(s: TimberState) {
   const production = new Set(
     s.town.facilities
       .filter((f) => facilityResource(f))
-      .map((f) => "facility:" + f.id),
+      .map((f) => `facility:${f.id}`),
   );
   const producer = (work: string | null) =>
     !!work && (work.startsWith("logging") || production.has(work));
@@ -628,7 +628,7 @@ export function actCampaign(
       const report = returnedScouts(s).find(
         ([id]) => !c.reports.includes(id),
       )?.[0];
-      if (report && action === "report:" + report && report !== lostPatrol(s))
+      if (report && action === `report:${report}` && report !== lostPatrol(s))
         return change(
           "patrol",
           { reports: [...c.reports, report] },
@@ -703,7 +703,7 @@ export function actCampaign(
       break;
     }
     case "roads": {
-      const i = SETTLEMENTS.findIndex((_, i) => action === "send:" + i),
+      const i = SETTLEMENTS.findIndex((_, i) => action === `send:${i}`),
         v = SETTLEMENTS[i];
       if (v && !c.caravan && !c.treaties.includes(i))
         return change(
@@ -737,7 +737,7 @@ export function actCampaign(
           );
         return change("capital", { storeBatches: batches }, city);
       }
-      const item = CONVOY_ITEMS.find((key) => action === "load:" + key);
+      const item = CONVOY_ITEMS.find((key) => action === `load:${key}`);
       if (item && c.relief) {
         const n = convoyLoad(s, item);
         if (n)

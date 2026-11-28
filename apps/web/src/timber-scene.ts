@@ -69,7 +69,7 @@ export function createTimberVisual(scene: Scene) {
     parts.push(shaft);
   }
   const convoyCarts = CONVOY_ITEMS.map((item, index) => {
-    const cart = base.clone("south-gate-" + item);
+    const cart = base.clone(`south-gate-${item}`);
     cart.position.set(-6 + index * 3, 0.42, 25);
     const load = requireValue(
       cart.getChildMeshes().find((mesh) => mesh.name.endsWith(cargo.name)),

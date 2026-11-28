@@ -90,7 +90,7 @@ test("시설 완성 모습으로 회전 배치하고 자재를 확보한 두 공
     await page.mouse.move(px, py);
     await page.keyboard.press("ArrowRight");
     await expect(
-      page.getByText(new RegExp(name + " · 배치 가능 · 방향 195°")).first(),
+      page.getByText(new RegExp(`${name} · 배치 가능 · 방향 195°`)).first(),
     ).toBeVisible();
     await page.mouse.click(px, py);
     await expect

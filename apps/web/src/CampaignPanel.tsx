@@ -119,7 +119,7 @@ function SceneDialog({
       : page.laterIllustration && cursor >= page.laterIllustration.from
         ? page.laterIllustration
         : undefined);
-  const face = PATROL_NAMES.findIndex((x) => x === name);
+  const face = (PATROL_NAMES as readonly string[]).indexOf(name);
   const last = cursor === total - 1;
   const film = page.clip === "one" && !filmDone ? page.clip : undefined;
   const filmLine = page.resultQuote
@@ -169,7 +169,7 @@ function SceneDialog({
     if (page.illustration === "gori-exile") rememberFilm("collapse");
     if (palaceFilm) rememberFilm("king-palace-night");
     if (inlineFilm) rememberFilm(inlineFilm);
-    if (frame) rememberFilm("ending-" + frame.image.charAt(4));
+    if (frame) rememberFilm(`ending-${frame.image.charAt(4)}`);
   }, [frame, inlineFilm, page.illustration, palaceFilm]);
   const openDialog = useCallback(
     (element: HTMLDialogElement | null) => {
@@ -335,7 +335,7 @@ function SceneDialog({
           {!backdrop && page.clip && (
             <video
               className="result-film"
-              src={media + page.clip + ".mp4"}
+              src={`${media + page.clip}.mp4`}
               autoPlay
               muted
               playsInline
@@ -366,7 +366,7 @@ function SceneDialog({
             <video
               key={frame.image}
               className="campaign-still"
-              aria-label={page.title + " 엔딩 영상"}
+              aria-label={`${page.title} 엔딩 영상`}
               src={
                 media +
                 "ending-" +
@@ -376,7 +376,7 @@ function SceneDialog({
                 "," +
                 (frameIndex + 1) * 7.5
               }
-              poster={media + frame.image + ".webp"}
+              poster={`${media + frame.image}.webp`}
               playsInline
               muted
               autoPlay
@@ -385,14 +385,14 @@ function SceneDialog({
           {flashback && (
             <img
               className="campaign-still"
-              src={media + "end-3b.webp"}
+              src={`${media}end-3b.webp`}
               alt="도성 광장에 홀로 선 왕의 뒷모습"
             />
           )}
           {palaceFilm && (
             <img
               className="campaign-still"
-              src={media + "king-palace-night-half-speed.gif"}
+              src={`${media}king-palace-night-half-speed.gif`}
               alt="궁궐 침전에서 피습당한 왕"
             />
           )}
@@ -702,7 +702,7 @@ export function CampaignPanel({
     (c.ending !== "collapse" || s.chapter === 3 || lossShown) &&
     (petitionOpen || opened === p.key || (p.auto && dismissed !== p.key));
   const petitionPage: ScenePage = {
-    key: "petition-" + s.world.day,
+    key: `petition-${s.world.day}`,
     title: "배식 줄에서 온 청",
     music: "10",
     goal: "오늘 저녁 배식",
@@ -769,13 +769,13 @@ export function CampaignPanel({
                   ? "04"
                   : "01";
   const trackUrl = galleryMusic
-    ? media + galleryMusic + ".ogg"
+    ? `${media + galleryMusic}.ogg`
     : titleScreen
       ? media +
         (completedChapters(chapterLimit) === CHAPTERS.length
           ? "Steps_Upon_the_Permafrost.mp3"
           : "Steps_Through_The_Frost.mp3")
-      : media + sceneTrack + ".ogg";
+      : `${media + sceneTrack}.ogg`;
   useEffect(() => {
     if (filmHasAudio || intro) return;
     let live = true;
@@ -1003,7 +1003,7 @@ export function CampaignPanel({
                       <button
                         type="button"
                         disabled={!convoyLoad(s, item)}
-                        onClick={() => act("load:" + item)}
+                        onClick={() => act(`load:${item}`)}
                       >
                         {GAME_RULES.resources[item].name} {convoyLoad(s, item)}{" "}
                         수레에 싣기
@@ -1027,9 +1027,7 @@ export function CampaignPanel({
                     <button
                       type="button"
                       disabled={!canDispatchConvoy(s)}
-                      onClick={() =>
-                        act("dispatch:" + ((c.departures ?? 0) + 1))
-                      }
+                      onClick={() => act(`dispatch:${(c.departures ?? 0) + 1}`)}
                     >
                       {(c.departures ?? 0) + 1}차 수레 출발
                     </button>
@@ -1087,7 +1085,7 @@ export function CampaignPanel({
                       max="3"
                       step="1"
                       value={gateLevels.filter((n) => n <= gateCrew).length - 1}
-                      aria-valuetext={gateCrew + "명 배치"}
+                      aria-valuetext={`${gateCrew}명 배치`}
                       onChange={(e) =>
                         command({
                           type: "set-gate",
@@ -1128,7 +1126,7 @@ export function CampaignPanel({
                   max="3"
                   step="1"
                   value={heating}
-                  aria-valuetext={s.heating ? s.heating + "단계" : "자동"}
+                  aria-valuetext={s.heating ? `${s.heating}단계` : "자동"}
                   onChange={(e) => {
                     const level = Number(e.target.value);
                     setHeating(level);
@@ -1152,8 +1150,8 @@ export function CampaignPanel({
                 보고 닫기
               </button>
               <img
-                src={"/art/mutant-" + s.sighting.species + ".webp"}
-                alt={"붉어진 눈의 " + mutantNames[s.sighting.species]}
+                src={`/art/mutant-${s.sighting.species}.webp`}
+                alt={`붉어진 눈의 ${mutantNames[s.sighting.species]}`}
               />
               <strong>
                 {s.sighting.source === "gate"
@@ -1180,8 +1178,8 @@ export function CampaignPanel({
                 aria-label="마을 안 변종"
               >
                 <img
-                  src={"/art/mutant-" + species + ".webp"}
-                  alt={"눈이 붉어진 " + mutantNames[species]}
+                  src={`/art/mutant-${species}.webp`}
+                  alt={`눈이 붉어진 ${mutantNames[species]}`}
                 />
                 <strong>마을 안 변종 · {mutantNames[species]}</strong>
                 <p>
@@ -1242,7 +1240,7 @@ export function CampaignPanel({
           {s.raid && (
             <section className="office-panel" aria-label="성문 전투 보고">
               <img
-                src={"/art/raid-" + (s.raid.picture + 1) + ".webp"}
+                src={`/art/raid-${s.raid.picture + 1}.webp`}
                 alt="복홀 성문의 수비 기록"
               />
               <strong>성문 전투 보고</strong>
@@ -1327,7 +1325,7 @@ export function CampaignPanel({
               key={count}
               onClick={() => command({ type: "set-guards", count })}
             >
-              {i ? i + "단계 · " + count + "명" : "순라 해제"}
+              {i ? `${i}단계 · ${count}명` : "순라 해제"}
             </button>
           ))}
         </section>

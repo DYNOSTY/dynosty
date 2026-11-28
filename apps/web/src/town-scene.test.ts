@@ -57,7 +57,7 @@ it("수역·어군과 결빙 구멍을 전환하고 대기 부지에서 완성 �
     visual.update({ ...s, paused: false });
     const id = requireValue(s.town.orders[0]?.crew[0], "건설 인부");
     const hammer = requireValue(
-      scene.getMeshById("town-job:" + id),
+      scene.getMeshById(`town-job:${id}`),
       "인부의 망치",
     );
     scene.onBeforeRenderObservable.notifyObservers(scene);
@@ -73,8 +73,13 @@ it("수역·어군과 결빙 구멍을 전환하고 대기 부지에서 완성 �
     visual.update(s);
     expect(scene.getMeshById("town:build-1")?.isVisible).toBe(false);
     expect(scene.getMeshById("town:build-1")?.rotation.y).toBe(Math.PI / 2);
-    expect(scene.getMeshById("town:build-1:sprout-0")).not.toBeNull();
-    const first = scene.getMeshById("town:build-1:sprout-0");
+    // Coloured parts of a finished facility are merged into one mesh.
+    const first = requireValue(
+      scene.getMeshById("town:build-1:model"),
+      "완성 시설 모델",
+    );
+    const firstVertices = first.getTotalVertices();
+    expect(firstVertices).toBeGreaterThan(0);
     visual.update({
       ...s,
       town: {
@@ -82,8 +87,11 @@ it("수역·어군과 결빙 구멍을 전환하고 대기 부지에서 완성 �
         facilities: s.town.facilities.map((f) => ({ ...f, level: 3 })),
       },
     });
-    expect(first?.isDisposed()).toBe(true);
-    expect(scene.getMeshById("town:build-1:high-bay-ridge")).not.toBeNull();
+    expect(first.isDisposed()).toBe(true);
+    // Level 3 adds the high bay, so the rebuilt model has more geometry.
+    expect(
+      scene.getMeshById("town:build-1:model")?.getTotalVertices(),
+    ).toBeGreaterThan(firstVertices);
     visual.update(null);
     expect(scene.getMeshById("town:build-1")).toBeNull();
   } finally {
@@ -146,7 +154,7 @@ it("연구와 정책이 동시에 완료되면 한 줄씩 알리고 다음 갱�
     decree: { serial: 1, title: "새 주민 구휼", reaction: "" },
   };
   expect(villageCompletions(s, after)).toEqual([
-    tech.name + " 연구 완료",
+    `${tech.name} 연구 완료`,
     "새 주민 구휼 발효",
   ]);
   expect(villageCompletions(after, after)).toEqual([]);

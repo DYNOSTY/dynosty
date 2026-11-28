@@ -93,7 +93,7 @@ export function DevelopmentPanel({
       (id) => RESEARCH_CATALOG.find((node) => node.id === id)?.name ?? id,
     );
     const price = Object.entries(entry.cost)
-      .map(([id, n]) => GAME_RULES.resources[id as ResourceId].name + " " + n)
+      .map(([id, n]) => `${GAME_RULES.resources[id as ResourceId].name} ${n}`)
       .join(" · ");
     const image =
       entry.category === "building" && entry.level > 0
@@ -102,7 +102,7 @@ export function DevelopmentPanel({
     const detail = [
       entry.effect,
       price,
-      prerequisites.length ? "선행 연구 · " + prerequisites.join(", ") : "",
+      prerequisites.length ? `선행 연구 · ${prerequisites.join(", ")}` : "",
       reason,
     ]
       .filter(Boolean)

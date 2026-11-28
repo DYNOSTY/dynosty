@@ -323,13 +323,18 @@ export function App() {
         const controller = sceneRef.current;
         await controller.ready;
         if (cancelled) return;
-        void controller
-          .minimap()
-          .then((map) => {
-            if (!cancelled) setMinimap(map);
-          })
-          .catch(() => {});
         setSceneStatus("준비 완료");
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (cancelled) return;
+            void controller
+              .minimap()
+              .then((map) => {
+                if (!cancelled) setMinimap(map);
+              })
+              .catch(() => {});
+          }, 0);
+        });
       })
       .catch(() => {
         if (!cancelled)
@@ -572,7 +577,7 @@ export function App() {
     const due = find?.decision === "waiting" ? find.due : run?.due;
     return due === undefined
       ? "출발 전"
-      : Math.max(0, Math.ceil((due - gameMinutes) / 60)) + "시간 남음";
+      : `${Math.max(0, Math.ceil((due - gameMinutes) / 60))}시간 남음`;
   };
 
   // 게임 시작 → 주민이 걷고 연기가 남, 시각에 맞춰 낮밤
@@ -650,7 +655,7 @@ export function App() {
     sceneRef.current?.trackPoints(
       [
         ...BOKHOL_MINERALS.map((m) => ({
-          id: "visitor-mineral-" + m.id,
+          id: `visitor-mineral-${m.id}`,
           x: m.x,
           z: m.z,
           y: 6,
@@ -690,8 +695,8 @@ export function App() {
           if (!el) continue;
           if (id.startsWith("visitor-")) {
             el.hidden = !pt.visible;
-            el.style.left = pt.x + "px";
-            el.style.top = pt.y + "px";
+            el.style.left = `${pt.x}px`;
+            el.style.top = `${pt.y}px`;
             continue;
           }
           // 정찰 거점: 화면 밖이면 그 방향 가장자리에 화살표로 붙임 (RTS 방식)
@@ -976,7 +981,7 @@ export function App() {
       alt=""
       src={
         speakingMerchant
-          ? "/art/merchants/" + speakingMerchant[0] + ".webp"
+          ? `/art/merchants/${speakingMerchant[0]}.webp`
           : `/art/advisers/${daylight ? "nareumi" : "dali"}/neutral.webp`
       }
     />
@@ -991,7 +996,7 @@ export function App() {
             : "달이")}
       <small>
         {speakingMerchant
-          ? speakingMerchant[3] + " " + speakingMerchant[4]
+          ? `${speakingMerchant[3]} ${speakingMerchant[4]}`
           : residentSpeaking
             ? PATROL_REQUESTS[residentVoice]
             : timberState
@@ -1325,7 +1330,7 @@ export function App() {
                   key={m.id}
                   hidden
                   ref={(el) => {
-                    pinRefs.current["visitor-mineral-" + m.id] = el;
+                    pinRefs.current[`visitor-mineral-${m.id}`] = el;
                   }}
                   title={
                     m.name +
@@ -1356,7 +1361,7 @@ export function App() {
             {capitalMap &&
               timberState &&
               (["south", "north", "east", "west"] as const).map((gate) => {
-                const id = "visitor-" + gate;
+                const id = `visitor-${gate}`;
                 const road = capitalRoad(timberState);
                 const label =
                   gate === "south"

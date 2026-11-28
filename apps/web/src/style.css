@@ -4964,6 +4964,7 @@ dialog.film-gallery:has(.campaign-film) .campaign-film {
   padding: 0.6rem;
   text-align: left;
 }
+/* biome-ignore lint/style/noDescendingSpecificity: Preserve ledger ordering relative to other list rules and the cascade. */
 .resident-ledger ul {
   list-style: none;
   padding: 0;
@@ -4972,7 +4973,9 @@ dialog.film-gallery:has(.campaign-film) .campaign-film {
   padding: 0.5rem 0;
   border-top: 1px solid #b89a70;
 }
+/* biome-ignore lint/style/noDescendingSpecificity: Preserve ledger ordering relative to other small and select rules and the cascade. */
 .resident-ledger small,
+/* biome-ignore lint/style/noDescendingSpecificity: Preserve the select rule's position relative to other select rules and the cascade. */
 .resident-ledger select {
   display: block;
 }
@@ -4981,6 +4984,7 @@ dialog.film-gallery:has(.campaign-film) .campaign-film {
   grid-template-columns: minmax(0, 1fr);
   gap: 0.4rem;
 }
+/* biome-ignore lint/style/noDescendingSpecificity: Preserve ordering relative to other button rules and the cascade. */
 .ration-choices button {
   width: 100%;
   white-space: normal;

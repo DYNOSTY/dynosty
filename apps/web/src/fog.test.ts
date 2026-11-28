@@ -29,7 +29,14 @@ test("NullEngine 재질에 안개가 등록되고 정찰 후 2초 동안 걷힌�
     },
   } as unknown as UniformBuffer;
   const read = () => {
-    plugin?.hardBindForSubMesh(ubo, scene, engine, null!);
+    plugin?.hardBindForSubMesh(
+      ubo,
+      scene,
+      engine,
+      null as unknown as Parameters<
+        NonNullable<typeof plugin>["hardBindForSubMesh"]
+      >[3],
+    );
     return sites[3];
   };
   const first = SCOUT_SITES[0];
@@ -45,7 +52,8 @@ test("NullEngine 재질에 안개가 등록되고 정찰 후 2초 동안 걷힌�
       0,
     ]);
   });
-  fog.reveal(first!.id);
+  if (first == null) throw new Error("missing first scout site");
+  fog.reveal(first.id);
   fog.animate(1);
   expect(read()).toBeCloseTo(0.5);
   fog.animate(1);

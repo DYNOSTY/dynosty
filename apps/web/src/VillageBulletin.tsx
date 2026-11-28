@@ -42,7 +42,7 @@ export function VillageBulletin({
   const skilled = new Set(
     s.town.facilities
       .filter((f) => f.kind === "workshop" || f.kind === "hospital")
-      .map((f) => "facility:" + f.id),
+      .map((f) => `facility:${f.id}`),
   );
   const specialists = alive.filter(
     (r) => !children.has(r.id) && skilled.has(r.workplaceId ?? ""),
@@ -55,7 +55,7 @@ export function VillageBulletin({
   const bulletin = s.bulletins?.[0];
   const site = SCOUT_SITES.find((site) => encounterReady(s, site.id));
   const find = site && s.scoutFinds?.[site.id];
-  const reportId = site ? site.id + "-" + find?.due : "";
+  const reportId = site ? `${site.id}-${find?.due}` : "";
   const finding = find ? scoutFinding(find.kind) : undefined;
   const arrival = s.mission === "register-policy" || (s.scoutVisitors ?? 0) > 0;
   const temp = villageTemperature(s);
@@ -109,7 +109,7 @@ export function VillageBulletin({
     for (const f of s.town.facilities) {
       const n = (ordinals.get(f.kind) ?? 0) + 1;
       ordinals.set(f.kind, n);
-      facilityNames.set(f.id, BUILDING_RULES[f.kind].name + " " + n);
+      facilityNames.set(f.id, `${BUILDING_RULES[f.kind].name} ${n}`);
     }
   }
   return (
@@ -155,7 +155,7 @@ export function VillageBulletin({
                     if (r.health === "dead") return null;
                     const citizen = citizens.get(r.id);
                     const facility = s.town.facilities.find(
-                      (f) => "facility:" + f.id === r.workplaceId,
+                      (f) => `facility:${f.id}` === r.workplaceId,
                     );
                     const workplace = facility
                       ? facilityNames.get(facility.id)
@@ -183,7 +183,7 @@ export function VillageBulletin({
                         : r.insideHome
                           ? "둥지"
                           : job
-                            ? BUILDING_RULES[job.kind].name + " 공사 배정"
+                            ? `${BUILDING_RULES[job.kind].name} 공사 배정`
                             : r.task
                               ? "업무 중"
                               : {
@@ -224,7 +224,7 @@ export function VillageBulletin({
                         </small>
                         {available && (
                           <select
-                            aria-label={name + " 근무지"}
+                            aria-label={`${name} 근무지`}
                             value={facility?.id ?? ""}
                             onChange={(e) =>
                               command({
@@ -239,7 +239,7 @@ export function VillageBulletin({
                               .filter((f) => canDirectStaff(f.kind))
                               .map((f) => {
                                 const count =
-                                  workers.get("facility:" + f.id) ?? 0;
+                                  workers.get(`facility:${f.id}`) ?? 0;
                                 return (
                                   <option
                                     key={f.id}
@@ -303,7 +303,7 @@ export function VillageBulletin({
               )}
               <small>
                 {finding && site
-                  ? site.name + " 방면 · 정찰대의 전갈"
+                  ? `${site.name} 방면 · 정찰대의 전갈`
                   : bulletin?.kind === "decree"
                     ? "관아의 방"
                     : bulletin
@@ -312,7 +312,7 @@ export function VillageBulletin({
                         : "복홀의 기록"
                       : arrival
                         ? "달이 · 성문"
-                        : (isNight ? "달이" : "나르미") + " · 추위 경고"}
+                        : `${isNight ? "달이" : "나르미"} · 추위 경고`}
               </small>
               <h3>
                 {finding?.[0] ??

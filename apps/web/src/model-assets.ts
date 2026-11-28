@@ -12,6 +12,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import "@babylonjs/core/Meshes/thinInstanceMesh";
 import type { Scene } from "@babylonjs/core/scene";
 import { isRecord } from "@dynosty/game-core";
+import { freezeStaticVisual, transformKey } from "./static-visual.js";
 export interface ModelPart {
   name: string;
   shape: "box" | "sphere" | "cylinder";
@@ -481,7 +482,31 @@ export function buildModel(
     rig.push({ mesh, part: p });
   };
   try {
+    if (asset.kind === "building") {
+      // Keep changing window and fallback materials separate from baked colours.
+      for (const colored of [true, false]) {
+        const parts = asset.parts.filter(
+          (p) => !p.name.startsWith("paper-") && !!p.color === colored,
+        );
+        if (!parts.length) continue;
+        const mesh = mergedPiece(
+          scene,
+          `${root.id}:${colored ? "model" : "fallback"}`,
+          parts,
+          [0, 0, 0],
+        );
+        meshes.push(mesh);
+        mesh.parent = root;
+        if (colored) {
+          const m = new StandardMaterial(`${root.id}:model:material`, scene);
+          m.diffuseColor = Color3.White();
+          materials.push(m);
+          mesh.material = m;
+        } else mesh.material = material;
+      }
+    }
     for (const p of asset.parts) {
+      if (asset.kind === "building" && !p.name.startsWith("paper-")) continue;
       if (shared && p.color) continue;
       const id = `${root.id}:${p.name}`;
       const mesh = createPart(id, p, scene);
@@ -521,8 +546,16 @@ export function buildModel(
       mesh.scaling.copyFrom(scaling);
     }
   };
+  let frozenAt = "";
   return {
     meshes,
+    refreshStatic(force = false) {
+      if (asset.kind !== "building") return;
+      const key = transformKey(root);
+      if (!force && key === frozenAt) return;
+      frozenAt = key;
+      freezeStaticVisual(meshes);
+    },
     setOutline(value: boolean) {
       for (const mesh of meshes)
         if (!(mesh instanceof InstancedMesh)) mesh.renderOutline = value;
@@ -552,6 +585,7 @@ export function buildModel(
       }
     },
     animate(delta: number) {
+      if (asset.kind === "building") return;
       slot.time += Math.min(Math.max(delta, 0), 0.1);
       applyPose();
     },
