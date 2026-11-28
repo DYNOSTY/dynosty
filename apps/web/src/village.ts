@@ -20,6 +20,7 @@ import { VILLAGE_LAYOUT as LAYOUT } from "@dynosty/game-core";
 import { createResidentVisual } from "./resident-visual.js";
 import { loadSceneAsset as load } from "./scene-assets.js";
 import { hasWinterModel, seasonalModelUrl } from "./seasonal-model.js";
+import { freezeStaticVisual, transformKey } from "./static-visual.js";
 import { elevation, rng, type Season } from "./world.js";
 
 // ponytail: 표시 축척은 개발 시안 값. 기획서는 1단위=1m만 정함 → 개발팀과 확정 필요
@@ -103,6 +104,7 @@ const villageNames: Record<string, string> = {
 export { residentGlb } from "./resident-visual.js";
 
 export interface GlbVisual {
+  refreshStatic?(force?: boolean): void;
   setOutline(value: boolean): void;
   setLit?(lit: boolean): void;
   setMotion(value: string): void;
@@ -155,11 +157,32 @@ function instantiate(
   const groups = inst.animationGroups;
   for (const g of groups) g.stop();
   let playing: AnimationGroup | undefined;
+  let hiddenPause = false;
+  const visibilityObserver = groups.length
+    ? parent.getScene().onBeforeAnimationsObservable.add(() => {
+        if (!playing) return;
+        const visible = meshes.some(
+          (mesh) =>
+            mesh.getTotalVertices() > 0 &&
+            mesh.isEnabled() &&
+            mesh.isVisible &&
+            mesh.visibility > 0,
+        );
+        if (!visible && playing.isPlaying) {
+          playing.pause();
+          hiddenPause = true;
+        } else if (visible && hiddenPause) {
+          playing.restart();
+          hiddenPause = false;
+        }
+      })
+    : null;
   const play = (clip: string, offset = 0) => {
     const g = groups.find((x) => x.name.endsWith(clip));
     if (!g || g === playing) return;
     playing?.stop();
     playing = g;
+    hiddenPause = false;
     g.start(true, 1);
     if (offset) g.goToFrame(g.from + (g.to - g.from) * offset);
   };
@@ -167,6 +190,10 @@ function instantiate(
     meshes,
     play,
     dispose() {
+      if (visibilityObserver)
+        parent
+          .getScene()
+          .onBeforeAnimationsObservable.remove(visibilityObserver);
       blob?.dispose();
       inst.dispose();
     },
@@ -1115,7 +1142,22 @@ export function createVillage(
       ondolGlow.range = 2;
     }
     v.play("Idle", 0);
+    let frozenAt = "";
+    const refreshStatic = (force = false) => {
+      if (kind !== "building" || parent.name === "placement-round-nest") return;
+      const key = transformKey(parent);
+      if (!force && key === frozenAt) return;
+      frozenAt = key;
+      const descendants = node
+        .getDescendants(false)
+        .filter(
+          (child): child is TransformNode => child instanceof TransformNode,
+        );
+      freezeStaticVisual([node, ...descendants]);
+    };
+    refreshStatic(true);
     return {
+      refreshStatic,
       setLit(value) {
         lamp?.setEnabled(value);
       },
@@ -1125,6 +1167,7 @@ export function createVillage(
         if (instanced && value !== outlined) {
           v.dispose();
           v = make(value);
+          refreshStatic(true);
         }
         outlined = value;
         for (const m of v.meshes) {

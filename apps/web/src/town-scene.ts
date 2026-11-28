@@ -226,6 +226,7 @@ export function createTownVisual(scene: Scene) {
           f.position.z,
         );
         o.root.rotation.y = f.headingRadians;
+        o.visual?.refreshStatic();
       }
     },
     dispose() {

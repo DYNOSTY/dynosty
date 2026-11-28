@@ -12,6 +12,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import "@babylonjs/core/Meshes/thinInstanceMesh";
 import type { Scene } from "@babylonjs/core/scene";
 import { isRecord } from "@dynosty/game-core";
+import { freezeStaticVisual, transformKey } from "./static-visual.js";
 export interface ModelPart {
   name: string;
   shape: "box" | "sphere" | "cylinder";
@@ -521,8 +522,16 @@ export function buildModel(
       mesh.scaling.copyFrom(scaling);
     }
   };
+  let frozenAt = "";
   return {
     meshes,
+    refreshStatic(force = false) {
+      if (asset.kind !== "building") return;
+      const key = transformKey(root);
+      if (!force && key === frozenAt) return;
+      frozenAt = key;
+      freezeStaticVisual(meshes);
+    },
     setOutline(value: boolean) {
       for (const mesh of meshes)
         if (!(mesh instanceof InstancedMesh)) mesh.renderOutline = value;
@@ -552,6 +561,7 @@ export function buildModel(
       }
     },
     animate(delta: number) {
+      if (asset.kind === "building") return;
       slot.time += Math.min(Math.max(delta, 0), 0.1);
       applyPose();
     },

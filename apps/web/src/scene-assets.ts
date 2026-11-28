@@ -27,6 +27,9 @@ export function loadSceneAsset(scene: Scene, url: string) {
         asset.dispose();
         throw new Error("모델을 불러오는 동안 장면이 종료되었습니다.");
       }
+      // The container is only a template. The loader starts its first clip,
+      // but visible actors play independently instantiated animation groups.
+      for (const group of asset.animationGroups) group.stop();
       return asset;
     });
     cache.set(url, pending);

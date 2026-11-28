@@ -44,6 +44,36 @@ export function createSceneEntities(
 ) {
   let needMaterial: StandardMaterial | null = null;
   let needLetter: StandardMaterial | null = null;
+  let residentIdleMaterial: StandardMaterial | null = null;
+  let residentWalkingMaterial: StandardMaterial | null = null;
+  // Shared by every resident root box; released when the last resident leaves.
+  let residentBoxes = 0;
+  function releaseResidentMaterials() {
+    residentIdleMaterial?.dispose();
+    residentWalkingMaterial?.dispose();
+    residentIdleMaterial = null;
+    residentWalkingMaterial = null;
+  }
+  function residentMaterial(walking: boolean) {
+    if (walking) {
+      if (!residentWalkingMaterial) {
+        residentWalkingMaterial = new StandardMaterial(
+          "resident-walking-material",
+          scene,
+        );
+        residentWalkingMaterial.diffuseColor = new Color3(0.3, 0.65, 0.95);
+      }
+      return residentWalkingMaterial;
+    }
+    if (!residentIdleMaterial) {
+      residentIdleMaterial = new StandardMaterial(
+        "resident-idle-material",
+        scene,
+      );
+      residentIdleMaterial.diffuseColor = new Color3(0.6, 0.8, 0.9);
+    }
+    return residentIdleMaterial;
+  }
   let selectedId: string | null = null;
   let models: ModelAssets = {};
   let glb: GlbFactory | null = null;
@@ -154,7 +184,8 @@ export function createSceneEntities(
     object.visual?.dispose();
     object.jige?.dispose();
     object.mesh.dispose();
-    object.material.dispose();
+    if (object.kind !== "resident") object.material.dispose();
+    else if (--residentBoxes === 0) releaseResidentMaterials();
     objects.delete(id);
   }
 
@@ -162,11 +193,13 @@ export function createSceneEntities(
     setElevation(height: (x: number, z: number) => number) {
       if (height === elevation) return;
       elevation = height;
-      for (const o of objects.values())
+      for (const o of objects.values()) {
         o.mesh.position.y =
           o.entity.position.y +
           (o.kind === "resident" ? 0.5 : 0.75) +
           elevation(o.mesh.position.x, o.mesh.position.z);
+        if (o.kind === "building") o.visual?.refreshStatic?.();
+      }
     },
     setObstacles(obstacles: readonly GroundObstacle[]) {
       const nextSignature = signature(obstacles);
@@ -349,7 +382,11 @@ export function createSceneEntities(
         const created = !object;
         if (!object) {
           const mesh = CreateBox(entity.id, { size }, scene);
-          const material = new StandardMaterial(`${entity.id}-material`, scene);
+          if (entity.kind === "resident") residentBoxes++;
+          const material =
+            entity.kind === "resident"
+              ? residentMaterial(entity.motion === "walking")
+              : new StandardMaterial(`${entity.id}-material`, scene);
           mesh.material = material;
           mesh.renderOutline = false;
           mesh.outlineColor = new Color3(0.3, 0.9, 1);
@@ -569,6 +606,7 @@ export function createSceneEntities(
           );
         if (created || entity.kind !== "resident")
           object.mesh.rotation.y = entity.headingRadians;
+        if (entity.kind === "building") object.visual?.refreshStatic?.();
         object.mesh.setEnabled(
           entity.visible ||
             (entity.kind === "resident" &&
@@ -578,14 +616,21 @@ export function createSceneEntities(
                 object.mesh.position.z - entity.position.z,
               ) > 0.01),
         );
-        object.material.diffuseColor =
-          entity.kind === "resident"
-            ? entity.motion === "walking"
-              ? new Color3(0.3, 0.65, 0.95)
-              : new Color3(0.6, 0.8, 0.9)
-            : entity.highlighted
-              ? new Color3(1, 0.9, 0.3)
-              : new Color3(0.84, 0.66, 0.38);
+        if (entity.kind === "resident") {
+          const next = residentMaterial(entity.motion === "walking");
+          if (object.material !== next) {
+            const previous = object.material;
+            object.material = next;
+            object.mesh.material = next;
+            if (object.visual && "meshes" in object.visual)
+              for (const mesh of object.visual.meshes)
+                if (mesh.material === previous) mesh.material = next;
+          }
+        } else {
+          object.material.diffuseColor = entity.highlighted
+            ? new Color3(1, 0.9, 0.3)
+            : new Color3(0.84, 0.66, 0.38);
+        }
       }
       replan();
       if (selectedId !== null && !objects.get(selectedId)?.entity.visible)
@@ -597,6 +642,7 @@ export function createSceneEntities(
       for (const id of objects.keys()) remove(id);
       needMaterial?.dispose();
       needLetter?.dispose();
+      releaseResidentMaterials();
     },
   };
 }

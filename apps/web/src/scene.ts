@@ -680,7 +680,6 @@ export function mountScene(
     village.updateParties(gameMin);
     followSnow(camera.target.x, camera.target.z);
     // 눈보라 안개: 카메라 거리에 맞춰 (가까이선 또렷, 멀리선 끝만 흐림)
-    scene.fogMode = Scene.FOGMODE_LINEAR;
     scene.fogStart = Math.max(30, camera.radius * 0.8);
     scene.fogEnd = Math.max(
       95,
